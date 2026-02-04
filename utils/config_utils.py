@@ -49,9 +49,12 @@ def write_config_file(config_data: Dict[str, Any], config_path: str = "config.to
         config_data: 配置字典
         config_path: 配置文件路径
     """
-    dir_name = os.path.dirname(config_path)
-    if dir_name:
-        os.makedirs(dir_name, exist_ok=True)
+    try:
+        dir_name = os.path.dirname(config_path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
 
-    with open(config_path, "w", encoding="utf-8") as f:
-        toml.dump(config_data, f)
+        with open(config_path, "w", encoding="utf-8") as f:
+            toml.dump(config_data, f)
+    except IOError as e:
+        raise RuntimeError(f"写入配置文件失败: {e}")

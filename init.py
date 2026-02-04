@@ -1,14 +1,10 @@
 import os
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 from config import ConfigManager
 
 from utils.config_utils import generate_default_config, write_config_file
 from utils.port_utils import (
-    get_port_processes_linux,
-    get_port_processes_windows,
-    get_port_processes,
-    kill_process,
     check_and_terminate_running_service,
     terminate_all_python_services,
 )
@@ -19,17 +15,20 @@ class Initializer:
         self.config_path = config_path
         self.config_manager = ConfigManager(config_path)
 
-    def _generate_default_config(self) -> Dict[str, Any]:
+    def _gen_default_config(self) -> Dict[str, Any]:
         return generate_default_config()
 
-    def _write_config_file(self, config_data: Dict[str, Any]) -> None:
-        write_config_file(config_data, self.config_path)
+    def _write_config(self, config_data: Dict[str, Any]) -> None:
+        try:
+            write_config_file(config_data, self.config_path)
+        except IOError as e:
+            raise RuntimeError(f"写入配置文件失败: {e}")
 
     def initialize(self, check_service: bool = True) -> None:
         if not os.path.exists(self.config_path):
             print(f"配置文件 {self.config_path} 不存在，正在生成默认配置...")
-            default_config = self._generate_default_config()
-            self._write_config_file(default_config)
+            default_config = self._gen_default_config()
+            self._write_config(default_config)
             print(f"默认配置文件已生成：{self.config_path}")
         else:
             print(f"配置文件 {self.config_path} 已存在")
@@ -39,8 +38,8 @@ class Initializer:
             except Exception as e:
                 print(f"配置文件结构验证失败：{e}")
                 print("正在重新生成默认配置文件...")
-                default_config = self._generate_default_config()
-                self._write_config_file(default_config)
+                default_config = self._gen_default_config()
+                self._write_config(default_config)
                 print(f"默认配置文件已重新生成：{self.config_path}")
 
         if check_service:
@@ -50,8 +49,8 @@ class Initializer:
 
     def reset_config(self) -> None:
         print(f"正在重置配置文件 {self.config_path}...")
-        default_config = self._generate_default_config()
-        self._write_config_file(default_config)
+        default_config = self._gen_default_config()
+        self._write_config(default_config)
         self.config_manager.get_config(force_reload=True)
         print(f"配置文件已重置为默认值：{self.config_path}")
 
@@ -59,18 +58,6 @@ class Initializer:
         print(f"正在更新配置文件 {self.config_path}...")
         self.config_manager.update_config(new_config)
         print(f"配置文件已更新：{self.config_path}")
-
-    def _get_port_processes_linux(self, port: int) -> List[int]:
-        return get_port_processes_linux(port)
-
-    def _get_port_processes_windows(self, port: int) -> List[int]:
-        return get_port_processes_windows(port)
-
-    def _get_port_processes(self, port: int) -> List[int]:
-        return get_port_processes(port)
-
-    def _kill_process(self, pid: int, timeout: int = 5) -> bool:
-        return kill_process(pid, timeout)
 
     def check_and_terminate_running_service(self, port: Optional[int] = None) -> bool:
         return check_and_terminate_running_service(port=port, config_path=self.config_path)

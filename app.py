@@ -1,5 +1,5 @@
-import os
 import sys
+from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from init import init_app
@@ -30,10 +30,10 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     # 添加CORS中间件
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # 限制允许的来源
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # 限制允许的HTTP方法
+        allow_headers=["Content-Type", "Authorization"],  # 限制允许的请求头
     )
     
     # 根路由
@@ -51,7 +51,7 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     async def health_check():
         return {
             "status": "healthy",
-            "timestamp": "now",
+            "timestamp": datetime.now().isoformat(),
             "service": config.app.title
         }
     
@@ -112,17 +112,17 @@ def run_gunicorn():
     2. Gunicorn未安装：自动回退到Uvicorn
     3. Gunicorn启动失败：自动回退到Uvicorn
     """
-    # 检查是否在Windows系统上
-    if sys.platform == "win32":
-        print("Gunicorn is not supported on Windows. Falling back to Uvicorn...")
-        run_uvicorn()
-        return
-    
     try:
         import gunicorn.app.base
         
         # 获取配置
         config = get_config()
+        
+        # 检查是否在Windows系统上（使用配置中的系统信息）
+        if config.system and config.system.platform == "win32":
+            print("Gunicorn is not supported on Windows. Falling back to Uvicorn...")
+            run_uvicorn()
+            return
         
         class GunicornApp(gunicorn.app.base.BaseApplication):
             """
@@ -145,7 +145,6 @@ def run_gunicorn():
                 """
                 加载Gunicorn配置
                 """
-                config = {}
                 for key, value in self.options.items():
                     if key in self.cfg.settings and value is not None:
                         self.cfg.set(key.lower(), value)

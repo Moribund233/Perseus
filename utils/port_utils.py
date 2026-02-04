@@ -34,8 +34,10 @@ def get_port_processes_linux(port: int) -> List[int]:
                         pids.append(pid)
                     except ValueError:
                         continue
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        pass
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        print(f"获取端口 {port} 占用情况时出错: {e}")
+    except Exception as e:
+        print(f"处理端口 {port} 占用情况时发生意外错误: {e}")
 
     return pids
 
@@ -52,8 +54,10 @@ def get_port_processes_windows(port: int) -> List[int]:
     """
     pids = []
     try:
+        # 使用PowerShell命令改进Windows端口检查，避免管道问题
+        cmd = f"powershell -Command \"netstat -ano | Select-String -Pattern ':${port}' | Where-Object {{ $_ -match 'LISTENING' }} | ForEach-Object {{ $_.ToString().Split()[-1] }}\""
         result = subprocess.run(
-            ["netstat", "-ano", f"| findstr :{port}"],
+            cmd, 
             capture_output=True,
             text=True,
             timeout=5,
@@ -61,16 +65,17 @@ def get_port_processes_windows(port: int) -> List[int]:
         )
         if result.returncode == 0 and result.stdout.strip():
             for line in result.stdout.strip().split("\n"):
-                if "LISTENING" in line:
-                    parts = line.split()
-                    if parts:
-                        try:
-                            pid = int(parts[-1])
-                            pids.append(pid)
-                        except (ValueError, IndexError):
-                            continue
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        pass
+                line = line.strip()
+                if line:
+                    try:
+                        pid = int(line)
+                        pids.append(pid)
+                    except ValueError:
+                        continue
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        print(f"获取端口 {port} 占用情况时出错: {e}")
+    except Exception as e:
+        print(f"处理端口 {port} 占用情况时发生意外错误: {e}")
 
     return pids
 
@@ -202,14 +207,35 @@ def terminate_all_python_services(
     terminated_count = 0
     for pid in pids:
         try:
-            proc_info = subprocess.run(
-                ["ps", "-p", str(pid), "-o", "comm="],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            proc_name = proc_info.stdout.strip()
-            if "python" in proc_name.lower():
+            is_python_process = False
+            
+            if sys.platform == "win32":
+                # Windows平台：使用tasklist命令获取进程信息
+                proc_info = subprocess.run(
+                    ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if proc_info.returncode == 0 and proc_info.stdout.strip():
+                    # 解析CSV输出，检查进程名是否包含python
+                    for line in proc_info.stdout.strip().split("\n"):
+                        if "python" in line.lower():
+                            is_python_process = True
+                            break
+            else:
+                # Linux平台：使用ps命令获取进程信息
+                proc_info = subprocess.run(
+                    ["ps", "-p", str(pid), "-o", "comm="],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                proc_name = proc_info.stdout.strip()
+                if "python" in proc_name.lower():
+                    is_python_process = True
+            
+            if is_python_process:
                 print(f"正在终止Python进程 PID {pid}...")
                 if kill_process(pid):
                     print(f"  ✓ Python进程 PID {pid} 已终止")
@@ -218,6 +244,8 @@ def terminate_all_python_services(
                     print(f"  ✗ Python进程 PID {pid} 终止失败")
         except subprocess.TimeoutExpired:
             print(f"  ✗ 获取进程信息超时 PID {pid}")
+        except Exception as e:
+            print(f"  ✗ 获取进程信息失败 PID {pid}: {e}")
 
     print(f"共终止 {terminated_count} 个Python进程")
     return terminated_count

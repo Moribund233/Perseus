@@ -8,10 +8,10 @@ from pydantic import Field
 class ServerSettings(BaseSettings):
     """服务器配置类"""
     host: str = Field(default="0.0.0.0", description="服务器监听地址")
-    port: int = Field(default=8000, description="服务器监听端口")
+    port: int = Field(default=8000, ge=1, le=65535, description="服务器监听端口")  # 添加端口范围验证
     reload: bool = Field(default=False, description="是否启用热重载")
-    workers: int = Field(default=1, description="服务器工作进程数")
-    log_level: str = Field(default="info", description="日志级别")
+    workers: int = Field(default=1, ge=1, description="服务器工作进程数")  # 添加workers数量验证
+    log_level: str = Field(default="info", description="日志级别", pattern="^(debug|info|warning|error|critical)$")  # 添加日志级别验证
 
 
 class AppSettings(BaseSettings):
@@ -22,13 +22,21 @@ class AppSettings(BaseSettings):
     debug: bool = Field(default=True, description="是否启用调试模式")
 
 
+class SystemSettings(BaseSettings):
+    """系统配置类"""
+    platform: str = Field(description="操作系统平台")
+    python_version: str = Field(description="Python版本")
+    python_version_info: Dict[str, Any] = Field(description="Python版本信息")
+
+
 class Config(BaseSettings):
     """配置主类"""
     server: ServerSettings = ServerSettings()
     app: AppSettings = AppSettings()
+    system: Optional[SystemSettings] = Field(default=None, description="系统信息")
     
     class Config:
-        extra = 'allow'
+        extra = 'forbid'  # 严格验证配置，禁止额外的配置项
 
 
 class ConfigManager:
