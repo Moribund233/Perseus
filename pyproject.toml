@@ -1,0 +1,42 @@
+[tool.poetry]
+name = "langit"
+version = "0.1.0"
+description = "A Git-based collaborative development tool"
+authors = ["Your Name <your.email@example.com>"]
+readme = "README.md"
+packages = [{ include = "langit" }]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.115.4"
+uvicorn = { extras = ["standard"], version = "^0.32.0" }
+gunicorn = { version = "^23.0.0", markers = "sys_platform != 'win32'" }
+pydantic-settings = "^2.6.0"
+toml = "^0.10.2"
+click = "^8.1.7"
+rich = "^13.7.1"
+httpx = "^0.27.2"
+pyside6 = "^6.7.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.3"
+httpx = "^0.27.2"
+black = "^24.10.0"
+isort = "^5.13.2"
+flake8 = "^7.1.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
