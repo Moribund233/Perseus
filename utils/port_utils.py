@@ -160,21 +160,78 @@ def check_and_terminate_running_service(
     for pid in pids:
         print(f"  - PID: {pid}")
 
-    terminated_count = 0
+    # 只终止相关的服务进程
+    related_pids = []
     for pid in pids:
-        print(f"正在终止进程 PID {pid}...")
+        try:
+            if is_related_service_process(pid):
+                related_pids.append(pid)
+            else:
+                print(f"  ⚠ 进程 PID {pid} 不是相关服务进程，将被跳过")
+        except Exception as e:
+            print(f"  ✗ 检查进程 PID {pid} 时出错: {e}，将被跳过")
+
+    if not related_pids:
+        print(f"端口 {port} 没有相关的服务进程占用")
+        return True
+
+    terminated_count = 0
+    for pid in related_pids:
+        print(f"正在终止相关服务进程 PID {pid}...")
         if kill_process(pid):
-            print(f"  ✓ 进程 PID {pid} 已终止")
+            print(f"  ✓ 服务进程 PID {pid} 已终止")
             terminated_count += 1
         else:
-            print(f"  ✗ 进程 PID {pid} 终止失败")
+            print(f"  ✗ 服务进程 PID {pid} 终止失败")
 
-    if terminated_count == len(pids):
-        print(f"所有占用端口 {port} 的进程已成功终止")
+    if terminated_count == len(related_pids):
+        print(f"所有占用端口 {port} 的相关服务进程已成功终止")
         return True
     else:
-        print(f"警告：{len(pids) - terminated_count} 个进程未能终止")
+        print(f"警告：{len(related_pids) - terminated_count} 个相关服务进程未能终止")
         return False
+
+
+def is_related_service_process(pid: int) -> bool:
+    """
+    检查进程是否为当前服务相关的进程
+    
+    Args:
+        pid: 进程PID
+        
+    Returns:
+        bool: 如果是相关服务进程返回True，否则返回False
+    """
+    try:
+        if sys.platform == "win32":
+            # Windows平台：使用wmic命令获取进程命令行
+            cmd = f"wmic process where ProcessId={pid} get CommandLine /value"
+            proc_info = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=5,
+                shell=True
+            )
+            if proc_info.returncode == 0:
+                cmd_line = proc_info.stdout.lower()
+                # 检查命令行是否包含当前服务的关键词
+                return "langit" in cmd_line or "app.py" in cmd_line or "gunicorn" in cmd_line
+        else:
+            # Linux平台：使用ps命令获取进程命令行
+            proc_info = subprocess.run(
+                ["ps", "-p", str(pid), "-o", "cmd="],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if proc_info.returncode == 0:
+                cmd_line = proc_info.stdout.lower()
+                # 检查命令行是否包含当前服务的关键词
+                return "langit" in cmd_line or "app.py" in cmd_line or "gunicorn" in cmd_line
+    except Exception as e:
+        print(f"检查进程 {pid} 命令行时出错: {e}")
+    return False
 
 
 def terminate_all_python_services(
@@ -208,6 +265,7 @@ def terminate_all_python_services(
     for pid in pids:
         try:
             is_python_process = False
+            is_related_process = False
             
             if sys.platform == "win32":
                 # Windows平台：使用tasklist命令获取进程信息
@@ -235,19 +293,25 @@ def terminate_all_python_services(
                 if "python" in proc_name.lower():
                     is_python_process = True
             
+            # 检查是否为相关服务进程
             if is_python_process:
-                print(f"正在终止Python进程 PID {pid}...")
+                is_related_process = is_related_service_process(pid)
+            
+            if is_python_process and is_related_process:
+                print(f"正在终止相关服务进程 PID {pid}...")
                 if kill_process(pid):
-                    print(f"  ✓ Python进程 PID {pid} 已终止")
+                    print(f"  ✓ 服务进程 PID {pid} 已终止")
                     terminated_count += 1
                 else:
-                    print(f"  ✗ Python进程 PID {pid} 终止失败")
+                    print(f"  ✗ 服务进程 PID {pid} 终止失败")
+            elif is_python_process:
+                print(f"  ⚠ 跳过非相关Python进程 PID {pid}")
         except subprocess.TimeoutExpired:
             print(f"  ✗ 获取进程信息超时 PID {pid}")
         except Exception as e:
             print(f"  ✗ 获取进程信息失败 PID {pid}: {e}")
 
-    print(f"共终止 {terminated_count} 个Python进程")
+    print(f"共终止 {terminated_count} 个相关服务进程")
     return terminated_count
 
 

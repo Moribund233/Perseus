@@ -58,8 +58,45 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     return app
 
 
-# FastAPI应用实例（延迟创建）
-_app_instance = None
+class AppSingleton:
+    """
+    FastAPI应用实例的单例管理器
+    用于替代全局变量，更适合测试
+    """
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(AppSingleton, cls).__new__(cls)
+            cls._instance._app = None
+            cls._instance._config_path = None
+        return cls._instance
+    
+    def get_app(self, config_path: str = "config.toml") -> FastAPI:
+        """
+        获取FastAPI应用实例
+        
+        Args:
+            config_path: 配置文件路径
+            
+        Returns:
+            FastAPI: FastAPI应用实例
+        """
+        if self._app is None or self._config_path != config_path:
+            self._app = create_app(config_path)
+            self._config_path = config_path
+        return self._app
+    
+    def reset(self):
+        """
+        重置单例实例，用于测试
+        """
+        self._app = None
+        self._config_path = None
+
+
+# 创建单例管理器实例
+app_singleton = AppSingleton()
 
 
 def get_app(config_path: str = "config.toml") -> FastAPI:
@@ -72,10 +109,7 @@ def get_app(config_path: str = "config.toml") -> FastAPI:
     Returns:
         FastAPI: FastAPI应用实例
     """
-    global _app_instance
-    if _app_instance is None:
-        _app_instance = create_app(config_path)
-    return _app_instance
+    return app_singleton.get_app(config_path)
 
 
 # 导出应用实例

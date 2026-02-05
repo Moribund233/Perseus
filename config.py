@@ -155,31 +155,60 @@ class ConfigManager:
                 target[key] = value
 
 
-# 创建全局配置管理器实例
-config_manager = ConfigManager()
+# 模块级别的单例实例，用于向后兼容
+# 但建议在新代码中直接使用ConfigManager类
+_module_config_manager = None
 
 
-def get_config(force_reload: bool = False) -> Config:
+def get_module_config_manager(config_path: str = "config.toml") -> ConfigManager:
+    """
+    获取模块级别的配置管理器实例（用于向后兼容）
+    
+    Args:
+        config_path: 配置文件路径
+        
+    Returns:
+        ConfigManager: 配置管理器实例
+    """
+    global _module_config_manager
+    if _module_config_manager is None:
+        _module_config_manager = ConfigManager(config_path)
+    return _module_config_manager
+
+
+def get_config(force_reload: bool = False, config_path: str = "config.toml") -> Config:
     """
     获取配置的便捷函数
     
     Args:
         force_reload: 是否强制重新加载配置
+        config_path: 配置文件路径（仅首次调用时有效）
         
     Returns:
         Config: 配置对象
     """
-    return config_manager.get_config(force_reload)
+    manager = get_module_config_manager(config_path)
+    return manager.get_config(force_reload)
 
 
-def update_config(new_config: Dict[str, Any]) -> Config:
+def update_config(new_config: Dict[str, Any], config_path: str = "config.toml") -> Config:
     """
     更新配置的便捷函数
     
     Args:
         new_config: 新的配置数据
+        config_path: 配置文件路径（仅首次调用时有效）
         
     Returns:
         Config: 更新后的配置对象
     """
-    return config_manager.update_config(new_config)
+    manager = get_module_config_manager(config_path)
+    return manager.update_config(new_config)
+
+
+def reset_module_config_manager():
+    """
+    重置模块级别的配置管理器实例，用于测试
+    """
+    global _module_config_manager
+    _module_config_manager = None
