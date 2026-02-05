@@ -1,4 +1,5 @@
 import os
+import sys
 import tempfile
 import pytest
 from client.controller.service_controller import ServiceController, ServiceState
@@ -233,7 +234,9 @@ class TestServiceController:
                 os.unlink(temp_config_path)
     
     def test_get_config_value(self):
-        """测试获取配置值"""
+        """
+        测试获取配置值
+        """
         # 使用临时配置文件
         with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.toml') as f:
             f.write("[server]\n")
@@ -254,6 +257,30 @@ class TestServiceController:
             # 测试获取不存在的配置值
             nonexistent = controller.get_config_value("nonexistent.key")
             assert nonexistent is None
+        finally:
+            # 清理临时文件
+            if os.path.exists(temp_config_path):
+                os.unlink(temp_config_path)
+    
+    def test_get_startup_command(self):
+        """
+        测试获取启动命令
+        
+        统一通过模块导入方式运行服务，无论环境如何
+        """
+        # 使用临时配置文件
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.toml') as f:
+            temp_config_path = f.name
+        
+        try:
+            controller = ServiceController(temp_config_path)
+            
+            # 测试启动命令，应该统一使用模块方式
+            startup_cmd = controller._get_startup_command()
+            assert len(startup_cmd) == 3
+            assert startup_cmd[0] == sys.executable  # Python 可执行文件路径
+            assert startup_cmd[1] == "-m"  # 模块方式启动
+            assert startup_cmd[2] == "app"  # 模块名为 app
         finally:
             # 清理临时文件
             if os.path.exists(temp_config_path):

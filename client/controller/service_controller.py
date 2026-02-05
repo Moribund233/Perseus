@@ -210,29 +210,20 @@ class ServiceController:
         """
         return sys.executable
     
-    def _get_app_path(self) -> str:
+    def _get_startup_command(self) -> list[str]:
         """
-        获取应用主文件路径
+        获取服务启动命令
+        
+        统一通过模块导入方式运行服务，避免依赖app.py文件：
+        python -m app
         
         Returns:
-            str: app.py的绝对路径
-            
-        Raises:
-            FileNotFoundError: 找不到app.py文件时抛出
+            list[str]: 启动命令列表
         """
-        # 获取当前文件的绝对路径
-        current_file = os.path.abspath(__file__)
+        python_path = self._get_python_executable()
         
-        # 向上查找app.py文件，最多查找5级目录
-        for _ in range(5):  # 最多向上查找5级目录
-            parent_dir = os.path.dirname(current_file)
-            app_path = os.path.join(parent_dir, "app.py")
-            if os.path.exists(app_path):
-                return app_path
-            current_file = parent_dir
-        
-        # 如果找不到，抛出异常
-        raise FileNotFoundError("app.py文件未找到，无法启动服务")
+        # 统一通过模块方式启动服务
+        return [python_path, "-m", "app"]
     
     def start(self, block: bool = False, timeout: int = 10) -> bool:
         """
@@ -262,22 +253,47 @@ class ServiceController:
         self._log("正在启动服务...")
         
         try:
-            python_path = self._get_python_executable()
-            app_path = self._get_app_path()
+            startup_cmd = self._get_startup_command()
             
-            self._log(f"启动命令: {python_path} {app_path}")
+            self._log(f"启动命令: {' '.join(startup_cmd)}")
             
             env = os.environ.copy()
-            env["PYTHONPATH"] = os.path.dirname(os.path.dirname(app_path))
+            
+            # 获取当前文件的绝对路径
+            current_file = os.path.abspath(__file__)
+            
+            # 查找项目根目录
+            # 向上查找，直到找到包含app模块的目录
+            project_root = None
+            for _ in range(6):  # 最多向上查找6级目录
+                parent_dir = os.path.dirname(current_file)
+                # 检查是否存在app.py或app目录
+                if os.path.exists(os.path.join(parent_dir, "app.py")) or os.path.exists(os.path.join(parent_dir, "app")):
+                    project_root = parent_dir
+                    break
+                current_file = parent_dir
+            
+            # 如果找不到项目根目录，使用当前目录
+            if project_root is None:
+                project_root = os.path.dirname(os.path.abspath(__file__))
+                self._log(f"无法确定项目根目录，使用当前目录: {project_root}")
+            
+            # 设置PYTHONPATH，确保模块导入正常工作
+            # 将项目根目录添加到PYTHONPATH，这样可以找到app模块
+            env["PYTHONPATH"] = project_root
+            
+            # 确定工作目录
+            # 使用项目根目录作为工作目录，确保app模块能被正确找到
+            cwd = project_root
             
             self.process = subprocess.Popen(
-                [python_path, app_path],
+                startup_cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
                 env=env,
-                cwd=os.path.dirname(app_path),
+                cwd=cwd,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
             )
             
