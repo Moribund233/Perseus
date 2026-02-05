@@ -7,6 +7,7 @@ import click
 from typing import Optional
 from client.controller.service_controller import get_service_controller, ServiceState
 from client.utils.config_manager import get_client_config_manager
+from client.utils.command_handler import CommandHandler
 
 
 @click.group()
@@ -22,6 +23,7 @@ def cli(ctx, config: str):
     ctx.obj['config'] = config
     ctx.obj['controller'] = get_service_controller(config)
     ctx.obj['config_manager'] = get_client_config_manager(config)
+    ctx.obj['command_handler'] = CommandHandler(ctx.obj['controller'], ctx.obj['config_manager'])
 
 
 @cli.command()
@@ -36,11 +38,12 @@ def start(ctx, block: bool, timeout: int):
         block: 是否阻塞等待服务启动完成
         timeout: 启动超时时间（秒）
     """
-    controller = ctx.obj['controller']
-    if controller.start(block=block, timeout=timeout):
-        click.echo('服务启动成功')
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_start(block=block, timeout=timeout)
+    if success:
+        click.echo(message)
     else:
-        click.echo('服务启动失败', err=True)
+        click.echo(message, err=True)
 
 
 @cli.command()
@@ -53,16 +56,17 @@ def stop(ctx, timeout: int):
     Args:
         timeout: 停止超时时间（秒）
     """
-    controller = ctx.obj['controller']
-    if controller.stop(timeout=timeout):
-        click.echo('服务停止成功')
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_stop(timeout=timeout)
+    if success:
+        click.echo(message)
     else:
-        click.echo('服务停止失败', err=True)
+        click.echo(message, err=True)
 
 
 @cli.command()
 @click.pass_context
-@click.option('--timeout', '-t', default=10, help='重启超时时间（秒）')
+@click.option('--timeout', '-t', default=15, help='重启超时时间（秒）')
 def restart(ctx, timeout: int):
     """
     重启FastAPI服务
@@ -70,11 +74,12 @@ def restart(ctx, timeout: int):
     Args:
         timeout: 重启超时时间（秒）
     """
-    controller = ctx.obj['controller']
-    if controller.restart(timeout=timeout):
-        click.echo('服务重启成功')
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_restart(timeout=timeout)
+    if success:
+        click.echo(message)
     else:
-        click.echo('服务重启失败', err=True)
+        click.echo(message, err=True)
 
 
 @cli.command()
@@ -83,14 +88,14 @@ def status(ctx):
     """
     查看服务状态
     """
-    controller = ctx.obj['controller']
-    state = controller.get_state()
-    click.echo(f'服务状态: {state.value}')
+    command_handler = ctx.obj['command_handler']
+    status_info = command_handler.handle_status()
+    click.echo(f'服务状态: {status_info["state"]}')
     
-    if controller.is_running():
-        port = controller.get_config_value('server.port')
-        host = controller.get_config_value('server.host')
-        click.echo(f'服务地址: http://{host}:{port}')
+    if status_info["is_running"]:
+        click.echo(f'服务地址: {status_info["address"]}')
+        if "pid" in status_info:
+            click.echo(f'进程ID: {status_info["pid"]}')
 
 
 @cli.command()
@@ -103,8 +108,8 @@ def logs(ctx, lines: int):
     Args:
         lines: 显示日志行数
     """
-    controller = ctx.obj['controller']
-    logs = controller.get_logs(lines=lines)
+    command_handler = ctx.obj['command_handler']
+    logs = command_handler.handle_logs(lines=lines)
     for line in logs:
         click.echo(line)
 
@@ -115,9 +120,9 @@ def clear_logs(ctx):
     """
     清除服务日志
     """
-    controller = ctx.obj['controller']
-    controller.clear_logs()
-    click.echo('日志已清除')
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_clear_logs()
+    click.echo(message)
 
 
 @cli.command()
@@ -132,11 +137,12 @@ def config(ctx, key: str, value: str):
         key: 配置键名，支持点号分隔的嵌套键，如 'server.port'
         value: 新的配置值
     """
-    controller = ctx.obj['controller']
-    if controller.update_config(key, value):
-        click.echo(f'配置已更新: {key} = {value}')
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_update_config(key, value)
+    if success:
+        click.echo(message)
     else:
-        click.echo('配置更新失败', err=True)
+        click.echo(message, err=True)
 
 
 @cli.command()
@@ -151,21 +157,12 @@ def show_config(ctx, server: bool, app: bool):
         server: 只显示服务器配置
         app: 只显示应用配置
     """
-    config_manager = ctx.obj['config_manager']
-    config = config_manager.load_config()
+    command_handler = ctx.obj['command_handler']
+    config = command_handler.handle_get_config(server_only=server, app_only=app)
     
-    if server:
-        server_config = config_manager.get_server_config()
-        for key, value in server_config.items():
-            click.echo(f'server.{key} = {value}')
-    elif app:
-        app_config = config_manager.get_app_config()
-        for key, value in app_config.items():
-            click.echo(f'app.{key} = {value}')
-    else:
-        for section, section_config in config.items():
-            for key, value in section_config.items():
-                click.echo(f'{section}.{key} = {value}')
+    for section, section_config in config.items():
+        for key, value in section_config.items():
+            click.echo(f'{section}.{key} = {value}')
 
 
 @cli.command()
@@ -174,11 +171,12 @@ def reset_config(ctx):
     """
     重置配置为默认值
     """
-    config_manager = ctx.obj['config_manager']
-    if config_manager.reset_to_defaults():
-        click.echo('配置已重置为默认值')
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_reset_config()
+    if success:
+        click.echo(message)
     else:
-        click.echo('配置重置失败', err=True)
+        click.echo(message, err=True)
 
 
 @cli.command()
@@ -191,11 +189,12 @@ def port(ctx, port: int):
     Args:
         port: 新的端口号
     """
-    config_manager = ctx.obj['config_manager']
-    if config_manager.update_server_port(port):
-        click.echo(f'服务器端口已更新为: {port}')
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_update_server_port(port)
+    if success:
+        click.echo(message)
     else:
-        click.echo('服务器端口更新失败', err=True)
+        click.echo(message, err=True)
 
 
 @cli.command()
@@ -208,11 +207,12 @@ def host(ctx, host: str):
     Args:
         host: 新的服务器地址
     """
-    config_manager = ctx.obj['config_manager']
-    if config_manager.update_server_host(host):
-        click.echo(f'服务器地址已更新为: {host}')
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_update_server_host(host)
+    if success:
+        click.echo(message)
     else:
-        click.echo('服务器地址更新失败', err=True)
+        click.echo(message, err=True)
 
 
 @cli.command()
@@ -225,11 +225,12 @@ def log_level(ctx, log_level: str):
     Args:
         log_level: 新的日志级别，可选值: debug, info, warning, error, critical
     """
-    config_manager = ctx.obj['config_manager']
-    if config_manager.update_server_log_level(log_level):
-        click.echo(f'日志级别已更新为: {log_level}')
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_update_server_log_level(log_level)
+    if success:
+        click.echo(message)
     else:
-        click.echo('日志级别更新失败', err=True)
+        click.echo(message, err=True)
 
 
 @cli.command()
@@ -238,8 +239,8 @@ def validate(ctx):
     """
     验证配置文件
     """
-    config_manager = ctx.obj['config_manager']
-    is_valid, errors = config_manager.validate_config()
+    command_handler = ctx.obj['command_handler']
+    is_valid, errors = command_handler.handle_validate_config()
     
     if is_valid:
         click.echo('配置文件验证通过')

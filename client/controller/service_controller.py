@@ -12,6 +12,7 @@ import time
 import threading
 from typing import Optional, Callable, List
 from enum import Enum
+from client.utils.log_manager import get_log_manager
 
 
 class ServiceState(Enum):
@@ -41,9 +42,7 @@ class ServiceController:
         self.config_path = config_path
         self.process: Optional[subprocess.Popen] = None
         self.state = ServiceState.STOPPED
-        self.log_callback: Optional[Callable[[str], None]] = None
-        self._log_lines: List[str] = []
-        self._log_lock = threading.Lock()
+        self.log_manager = get_log_manager()
     
     def set_log_callback(self, callback: Callable[[str], None]) -> None:
         """
@@ -52,7 +51,7 @@ class ServiceController:
         Args:
             callback: 接受日志字符串的回调函数
         """
-        self.log_callback = callback
+        self.log_manager.add_callback(callback)
     
     def _log(self, message: str) -> None:
         """
@@ -61,19 +60,7 @@ class ServiceController:
         Args:
             message: 日志消息
         """
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-        log_line = f"[{timestamp}] {message}"
-        
-        with self._log_lock:
-            self._log_lines.append(log_line)
-            # 保留最近1000条日志
-            if len(self._log_lines) > 1000:
-                self._log_lines = self._log_lines[-1000:]
-        
-        if self.log_callback:
-            self.log_callback(log_line)
-        else:
-            print(log_line)
+        self.log_manager.add_log(message)
     
     def get_logs(self, lines: int = 100) -> List[str]:
         """
@@ -85,13 +72,11 @@ class ServiceController:
         Returns:
             List[str]: 日志行列表
         """
-        with self._log_lock:
-            return self._log_lines[-lines:]
+        return self.log_manager.get_logs(lines)
     
     def clear_logs(self) -> None:
         """清除所有日志"""
-        with self._log_lock:
-            self._log_lines.clear()
+        self.log_manager.clear_logs()
     
     def check_port_available(self, port: int) -> bool:
         """
@@ -132,6 +117,7 @@ class ServiceController:
             Optional[str]: 配置值，不存在返回None
         """
         if not os.path.exists(self.config_path):
+            self._log(f"配置文件不存在: {self.config_path}")
             return None
         
         try:
@@ -145,10 +131,18 @@ class ServiceController:
                 if isinstance(value, dict) and k in value:
                     value = value[k]
                 else:
+                    self._log(f"配置项不存在: {key}")
                     return None
             
             return str(value)
-        except Exception:
+        except toml.TomlDecodeError as e:
+            self._log(f"配置文件格式错误: {e}")
+            return None
+        except PermissionError as e:
+            self._log(f"无权限读取配置文件: {e}")
+            return None
+        except Exception as e:
+            self._log(f"读取配置值失败: {key} - {e}")
             return None
     
     def update_config(self, key: str, value: str) -> bool:
@@ -194,8 +188,17 @@ class ServiceController:
             
             self._log(f"配置已更新: {key} = {value}")
             return True
+        except toml.TomlDecodeError as e:
+            self._log(f"配置文件格式错误: {e}")
+            return False
+        except PermissionError as e:
+            self._log(f"无权限读写配置文件: {e}")
+            return False
+        except IsADirectoryError as e:
+            self._log(f"配置路径是目录，不是文件: {e}")
+            return False
         except Exception as e:
-            self._log(f"配置更新失败: {e}")
+            self._log(f"配置更新失败: {key} = {value} - {type(e).__name__}: {e}")
             return False
     
     def _get_python_executable(self) -> str:
@@ -213,15 +216,23 @@ class ServiceController:
         
         Returns:
             str: app.py的绝对路径
+            
+        Raises:
+            FileNotFoundError: 找不到app.py文件时抛出
         """
-        current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        app_path = os.path.join(current_dir, "app.py")
+        # 获取当前文件的绝对路径
+        current_file = os.path.abspath(__file__)
         
-        if not os.path.exists(app_path):
-            current_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            app_path = os.path.join(current_dir, "app.py")
+        # 向上查找app.py文件，最多查找5级目录
+        for _ in range(5):  # 最多向上查找5级目录
+            parent_dir = os.path.dirname(current_file)
+            app_path = os.path.join(parent_dir, "app.py")
+            if os.path.exists(app_path):
+                return app_path
+            current_file = parent_dir
         
-        return app_path
+        # 如果找不到，抛出异常
+        raise FileNotFoundError("app.py文件未找到，无法启动服务")
     
     def start(self, block: bool = False, timeout: int = 10) -> bool:
         """
@@ -287,9 +298,21 @@ class ServiceController:
                     self._log("服务启动中...")
                     return True
                 
+        except FileNotFoundError as e:
+            self.state = ServiceState.ERROR
+            self._log(f"服务启动失败: 找不到文件 - {e}")
+            return False
+        except PermissionError as e:
+            self.state = ServiceState.ERROR
+            self._log(f"服务启动失败: 权限不足 - {e}")
+            return False
+        except subprocess.SubprocessError as e:
+            self.state = ServiceState.ERROR
+            self._log(f"服务启动失败: 子进程错误 - {e}")
+            return False
         except Exception as e:
             self.state = ServiceState.ERROR
-            self._log(f"服务启动失败: {e}")
+            self._log(f"服务启动失败: {type(e).__name__} - {e}")
             return False
     
     def _read_output(self) -> None:

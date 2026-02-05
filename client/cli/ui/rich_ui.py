@@ -17,6 +17,7 @@ from rich.status import Status
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from client.controller.service_controller import get_service_controller, ServiceState
 from client.utils.config_manager import get_client_config_manager
+from client.utils.command_handler import CommandHandler
 
 
 class RichUI:
@@ -37,9 +38,9 @@ class RichUI:
         self.config_path = config_path
         self.controller = get_service_controller(config_path)
         self.config_manager = get_client_config_manager(config_path)
+        self.command_handler = CommandHandler(self.controller, self.config_manager)
         self.is_running = False
         self.log_update_event = threading.Event()
-        self.log_lines = []
         
         # 设置日志回调
         self.controller.set_log_callback(self._on_log)
@@ -51,10 +52,6 @@ class RichUI:
         Args:
             log_line: 日志行
         """
-        self.log_lines.append(log_line)
-        # 保留最近1000条日志
-        if len(self.log_lines) > 1000:
-            self.log_lines = self.log_lines[-1000:]
         self.log_update_event.set()
     
     def _get_service_status_panel(self) -> Panel:
@@ -106,7 +103,7 @@ class RichUI:
         Returns:
             Panel: 日志面板
         """
-        logs = self.log_lines[-lines:]
+        logs = self.controller.get_logs(lines)
         log_text = "\n".join(logs)
         
         return Panel(
@@ -230,10 +227,11 @@ class RichUI:
             return
         
         with Status("正在启动服务...", console=self.console) as status:
-            if self.controller.start(block=True, timeout=10):
-                self.console.print("[green]服务启动成功[/green]")
+            success, message = self.command_handler.handle_start(block=True, timeout=10)
+            if success:
+                self.console.print(f"[green]{message}[/green]")
             else:
-                self.console.print("[red]服务启动失败[/red]")
+                self.console.print(f"[red]{message}[/red]")
     
     def _action_stop(self) -> None:
         """
@@ -244,20 +242,22 @@ class RichUI:
             return
         
         with Status("正在停止服务...", console=self.console) as status:
-            if self.controller.stop(timeout=10):
-                self.console.print("[green]服务停止成功[/green]")
+            success, message = self.command_handler.handle_stop(timeout=10)
+            if success:
+                self.console.print(f"[green]{message}[/green]")
             else:
-                self.console.print("[red]服务停止失败[/red]")
+                self.console.print(f"[red]{message}[/red]")
     
     def _action_restart(self) -> None:
         """
         执行重启服务操作
         """
         with Status("正在重启服务...", console=self.console) as status:
-            if self.controller.restart(timeout=15):
-                self.console.print("[green]服务重启成功[/green]")
+            success, message = self.command_handler.handle_restart(timeout=15)
+            if success:
+                self.console.print(f"[green]{message}[/green]")
             else:
-                self.console.print("[red]服务重启失败[/red]")
+                self.console.print(f"[red]{message}[/red]")
     
     def _action_status(self) -> None:
         """
@@ -269,7 +269,7 @@ class RichUI:
         """
         执行查看配置操作
         """
-        config = self.config_manager.load_config()
+        config = self.command_handler.handle_get_config()
         
         table = Table(title="配置信息", expand=True)
         table.add_column("配置项", style="bold")
@@ -293,10 +293,11 @@ class RichUI:
         
         value = Prompt.ask("请输入新值")
         
-        if self.controller.update_config(key, value):
-            self.console.print("[green]配置更新成功[/green]")
+        success, message = self.command_handler.handle_update_config(key, value)
+        if success:
+            self.console.print(f"[green]{message}[/green]")
         else:
-            self.console.print("[red]配置更新失败[/red]")
+            self.console.print(f"[red]{message}[/red]")
     
     def _action_show_logs(self) -> None:
         """
@@ -308,7 +309,7 @@ class RichUI:
         except ValueError:
             lines = 50
         
-        logs = self.log_lines[-lines:]
+        logs = self.controller.get_logs(lines)
         log_text = "\n".join(logs)
         self.console.print(Panel(log_text, title="完整日志"))
     
@@ -317,19 +318,19 @@ class RichUI:
         执行清除日志操作
         """
         if Confirm.ask("确定要清除所有日志吗？"):
-            self.controller.clear_logs()
-            self.log_lines.clear()
-            self.console.print("[green]日志已清除[/green]")
+            success, message = self.command_handler.handle_clear_logs()
+            self.console.print(f"[green]{message}[/green]")
     
     def _action_reset_config(self) -> None:
         """
         执行重置配置操作
         """
         if Confirm.ask("确定要重置配置为默认值吗？"):
-            if self.config_manager.reset_to_defaults():
-                self.console.print("[green]配置已重置为默认值[/green]")
+            success, message = self.command_handler.handle_reset_config()
+            if success:
+                self.console.print(f"[green]{message}[/green]")
             else:
-                self.console.print("[red]配置重置失败[/red]")
+                self.console.print(f"[red]{message}[/red]")
     
     def run_interactive(self) -> None:
         """
@@ -373,46 +374,50 @@ class RichUI:
             if command == "start":
                 block = kwargs.get("block", False)
                 timeout = kwargs.get("timeout", 10)
-                if self.controller.start(block=block, timeout=timeout):
-                    self.console.print("[green]服务启动成功[/green]")
+                success, message = self.command_handler.handle_start(block=block, timeout=timeout)
+                if success:
+                    self.console.print(f"[green]{message}[/green]")
                 else:
-                    self.console.print("[red]服务启动失败[/red]")
+                    self.console.print(f"[red]{message}[/red]")
             
             elif command == "stop":
                 timeout = kwargs.get("timeout", 10)
-                if self.controller.stop(timeout=timeout):
-                    self.console.print("[green]服务停止成功[/green]")
+                success, message = self.command_handler.handle_stop(timeout=timeout)
+                if success:
+                    self.console.print(f"[green]{message}[/green]")
                 else:
-                    self.console.print("[red]服务停止失败[/red]")
+                    self.console.print(f"[red]{message}[/red]")
             
             elif command == "restart":
-                timeout = kwargs.get("timeout", 10)
-                if self.controller.restart(timeout=timeout):
-                    self.console.print("[green]服务重启成功[/green]")
+                timeout = kwargs.get("timeout", 15)
+                success, message = self.command_handler.handle_restart(timeout=timeout)
+                if success:
+                    self.console.print(f"[green]{message}[/green]")
                 else:
-                    self.console.print("[red]服务重启失败[/red]")
+                    self.console.print(f"[red]{message}[/red]")
             
             elif command == "status":
                 self.console.print(self._get_service_status_panel())
             
             elif command == "logs":
                 lines = kwargs.get("lines", 20)
-                logs = self.controller.get_logs(lines=lines)
+                logs = self.command_handler.handle_logs(lines=lines)
                 log_text = "\n".join(logs)
                 self.console.print(Panel(log_text, title="服务日志"))
             
             elif command == "clear_logs":
-                self.controller.clear_logs()
-                self.console.print("[green]日志已清除[/green]")
+                success, message = self.command_handler.handle_clear_logs()
+                self.console.print(f"[green]{message}[/green]")
             
             elif command == "config":
                 key = kwargs.get("key")
                 value = kwargs.get("value")
                 if key and value:
-                    if self.controller.update_config(key, value):
-                        self.console.print(f"[green]配置已更新: {key} = {value}[/green]")
+                    success, message = self.command_handler.handle_update_config(key, value)
+                    if success:
+                        self.console.print(f"[green]{message}[/green]")
                     else:
-                        self.console.print("[red]配置更新失败[/red]")
+                        self.console.print(f"[red]{message}[/red]")
                 else:
                     self._action_show_config()
             

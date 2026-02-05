@@ -34,13 +34,23 @@ class ClientConfigManager:
             Dict[str, Any]: 配置数据
         """
         if not os.path.exists(self.config_path):
+            print(f"配置文件不存在: {self.config_path}")
             return {}
         
         try:
             with open(self.config_path, "r", encoding="utf-8") as f:
                 return toml.load(f)
+        except toml.TomlDecodeError as e:
+            print(f"配置文件格式错误 ({self.config_path}): {e}")
+            return {}
+        except PermissionError as e:
+            print(f"无权限读取配置文件 ({self.config_path}): {e}")
+            return {}
+        except IsADirectoryError as e:
+            print(f"配置路径是目录，不是文件 ({self.config_path}): {e}")
+            return {}
         except Exception as e:
-            print(f"加载配置文件失败: {e}")
+            print(f"加载配置文件失败 ({self.config_path}): {type(e).__name__}: {e}")
             return {}
     
     def save_config(self, config: Dict[str, Any]) -> bool:
@@ -57,8 +67,14 @@ class ClientConfigManager:
             with open(self.config_path, "w", encoding="utf-8") as f:
                 toml.dump(config, f)
             return True
+        except PermissionError as e:
+            print(f"无权限写入配置文件 ({self.config_path}): {e}")
+            return False
+        except IsADirectoryError as e:
+            print(f"配置路径是目录，不是文件 ({self.config_path}): {e}")
+            return False
         except Exception as e:
-            print(f"保存配置文件失败: {e}")
+            print(f"保存配置文件失败 ({self.config_path}): {type(e).__name__}: {e}")
             return False
     
     def get(self, key: str, default: Any = None) -> Any:
@@ -213,23 +229,34 @@ class ClientConfigManager:
         Returns:
             bool: 重置成功返回True，否则返回False
         """
-        default_config = {
-            "server": {
-                "host": "0.0.0.0",
-                "port": 8000,
-                "reload": False,
-                "workers": 1,
-                "log_level": "info"
-            },
-            "app": {
-                "title": "LanGit API",
-                "description": "A Git-based collaborative development tool API",
-                "version": "0.1.0",
-                "debug": True
+        try:
+            # 从外部默认配置文件加载
+            import os
+            default_config_path = os.path.join(os.path.dirname(__file__), "default_config.toml")
+            
+            with open(default_config_path, "r", encoding="utf-8") as f:
+                default_config = toml.load(f)
+            
+            return self.save_config(default_config)
+        except Exception as e:
+            print(f"加载默认配置失败: {e}")
+            # 如果加载失败，使用备份的硬编码默认配置
+            default_config = {
+                "server": {
+                    "host": "0.0.0.0",
+                    "port": 8000,
+                    "reload": False,
+                    "workers": 1,
+                    "log_level": "info"
+                },
+                "app": {
+                    "title": "LanGit API",
+                    "description": "A Git-based collaborative development tool API",
+                    "version": "0.1.0",
+                    "debug": True
+                }
             }
-        }
-        
-        return self.save_config(default_config)
+            return self.save_config(default_config)
     
     def validate_config(self) -> tuple[bool, list[str]]:
         """
@@ -243,6 +270,21 @@ class ClientConfigManager:
         
         # 验证服务器配置
         server = config.get("server", {})
+        
+        # 验证host格式
+        if "host" in server:
+            host = server["host"]
+            if not isinstance(host, str) or not host:
+                errors.append("服务器地址不能为空")
+            else:
+                # 简单的IP地址或主机名验证
+                import re
+                ip_pattern = r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$'
+                hostname_pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*$'
+                if host != "localhost" and host != "0.0.0.0" and not re.match(ip_pattern, host) and not re.match(hostname_pattern, host):
+                    errors.append("服务器地址格式无效，请输入有效的IP地址或主机名")
+        
+        # 验证port范围
         if "port" in server:
             port = server["port"]
             try:
@@ -252,11 +294,21 @@ class ClientConfigManager:
             except (ValueError, TypeError):
                 errors.append("服务器端口必须是1-65535之间的整数")
         
-        if "host" in server:
-            host = server["host"]
-            if not isinstance(host, str) or not host:
-                errors.append("服务器地址不能为空")
+        # 验证reload是否为布尔值
+        if "reload" in server and not isinstance(server["reload"], bool):
+            errors.append("服务器热重载配置必须是布尔值")
         
+        # 验证workers是否为正整数
+        if "workers" in server:
+            workers = server["workers"]
+            try:
+                workers = int(workers)
+                if workers < 1:
+                    errors.append("服务器工作进程数必须是正整数")
+            except (ValueError, TypeError):
+                errors.append("服务器工作进程数必须是正整数")
+        
+        # 验证log_level
         if "log_level" in server:
             log_level = server["log_level"]
             valid_levels = ["debug", "info", "warning", "error", "critical"]
@@ -265,6 +317,29 @@ class ClientConfigManager:
         
         # 验证应用配置
         app = config.get("app", {})
+        
+        # 验证title是否为非空字符串
+        if "title" in app:
+            if not isinstance(app["title"], str) or not app["title"].strip():
+                errors.append("应用标题不能为空")
+        
+        # 验证description是否为字符串
+        if "description" in app and not isinstance(app["description"], str):
+            errors.append("应用描述必须是字符串")
+        
+        # 验证version格式
+        if "version" in app:
+            version = app["version"]
+            if not isinstance(version, str):
+                errors.append("应用版本必须是字符串")
+            else:
+                # 简单的版本格式验证 (x.y.z 或 x.y)
+                import re
+                version_pattern = r'^\d+(\.\d+){1,2}$'
+                if not re.match(version_pattern, version):
+                    errors.append("应用版本格式无效，建议使用 x.y.z 或 x.y 格式")
+        
+        # 验证debug是否为布尔值
         if "debug" in app and not isinstance(app["debug"], bool):
             errors.append("调试模式必须是布尔值")
         

@@ -1,0 +1,12 @@
+[server]
+host = "0.0.0.0"
+port = 8000
+reload = false
+workers = 1
+log_level = "info"
+
+[app]
+title = "LanGit API"
+description = "A Git-based collaborative development tool API"
+version = "0.1.0"
+debug = true
