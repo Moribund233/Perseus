@@ -45,11 +45,17 @@ class NginxSettings(BaseSettings):
     api_port: int = Field(default=8000, ge=1, le=65535, description="Nginx API代理端口")
 
 
+class ProxySettings(BaseSettings):
+    """代理配置类"""
+    enabled: bool = Field(default=False, description="是否启用代理")
+
+
 class Config(BaseSettings):
     """配置主类"""
     server: ServerSettings = ServerSettings()
     app: AppSettings = AppSettings()
     nginx: NginxSettings = NginxSettings()
+    proxy: ProxySettings = ProxySettings()
     system: Optional[SystemSettings] = Field(default=None, description="系统信息")
     
     class Config:

@@ -13,6 +13,7 @@ import threading
 from typing import Optional, Callable, List
 from enum import Enum
 from client.utils.log_manager import get_log_manager
+from client.controller.nginx_controller import get_nginx_controller
 
 
 class ServiceState(Enum):
@@ -43,6 +44,7 @@ class ServiceController:
         self.process: Optional[subprocess.Popen] = None
         self.state = ServiceState.STOPPED
         self.log_manager = get_log_manager()
+        self.nginx_controller = get_nginx_controller(config_path)
     
     def set_log_callback(self, callback: Callable[[str], None]) -> None:
         """
@@ -274,10 +276,14 @@ class ServiceController:
                 success = self._wait_for_startup(timeout)
                 if success:
                     self.state = ServiceState.RUNNING
+                    # 启动服务后，根据代理配置启动Nginx
+                    self.nginx_controller.start()
                 return success
             else:
                 self.state = ServiceState.RUNNING
                 self._log("服务启动成功")
+                # 启动服务后，根据代理配置启动Nginx
+                self.nginx_controller.start()
                 return True
                 
         except Exception as e:
@@ -456,6 +462,9 @@ class ServiceController:
         port = int(port_str) if port_str else 8000
         self._stop_port_processes(port)
         
+        # 停止服务后，停止Nginx
+        self.nginx_controller.stop()
+        
         # 更新服务状态
         self.state = ServiceState.STOPPED
         self._log("服务已停止")
@@ -474,12 +483,12 @@ class ServiceController:
         self._log("正在重启服务...")
         
         try:
-            # 1. 停止服务
+            # 1. 停止服务（会自动停止Nginx）
             if not self.stop(timeout):
                 self._log("服务停止失败，重启中断")
                 return False
             
-            # 2. 启动服务（block=True确保服务完全启动）
+            # 2. 启动服务（会自动根据代理配置启动Nginx）
             return self.start(block=True, timeout=timeout)
         except Exception as e:
             self.state = ServiceState.ERROR

@@ -326,3 +326,79 @@ class CommandHandler:
             return True, "Nginx配置文件生成成功"
         else:
             return False, "Nginx配置文件生成失败"
+    
+    def handle_nginx_start(self) -> tuple[bool, str]:
+        """
+        处理启动Nginx命令
+        
+        Returns:
+            tuple: (是否成功, 结果消息)
+        """
+        # 直接调用nginx_controller的start方法并获取结果
+        success = self.controller.nginx_controller.start()
+        
+        # 直接返回结果，不依赖日志
+        if success:
+            return True, "Nginx启动成功"
+        else:
+            return False, "Nginx启动失败"
+    
+    def handle_nginx_stop(self) -> tuple[bool, str]:
+        """
+        处理停止Nginx命令
+        
+        Returns:
+            tuple: (是否成功, 结果消息)
+        """
+        if self.controller.nginx_controller.stop():
+            return True, "Nginx停止成功"
+        else:
+            return False, "Nginx停止失败"
+    
+    def handle_nginx_restart(self) -> tuple[bool, str]:
+        """
+        处理重启Nginx命令
+        
+        Returns:
+            tuple: (是否成功, 结果消息)
+        """
+        if self.controller.nginx_controller.restart():
+            return True, "Nginx重启成功"
+        else:
+            return False, "Nginx重启失败"
+    
+    def handle_nginx_status(self) -> tuple[bool, Dict[str, Any]]:
+        """
+        处理查看Nginx状态命令
+        
+        Returns:
+            tuple: (是否成功, Nginx状态信息)
+        """
+        try:
+            is_running = self.controller.nginx_controller.is_running()
+            state = self.controller.nginx_controller.get_state()
+            is_installed = self.controller.nginx_controller.is_nginx_installed()
+            is_proxy_enabled = self.controller.nginx_controller.is_proxy_enabled()
+            
+            status_info = {
+                "state": state.value,
+                "is_running": is_running,
+                "is_installed": is_installed,
+                "is_proxy_enabled": is_proxy_enabled
+            }
+            
+            return True, status_info
+        except Exception as e:
+            return False, {"error": str(e)}
+    
+    def handle_nginx_install(self) -> tuple[bool, str]:
+        """
+        处理安装Nginx命令
+        
+        Returns:
+            tuple: (是否成功, 结果消息)
+        """
+        if self.controller.nginx_controller.install_nginx():
+            return True, "Nginx安装成功"
+        else:
+            return False, "Nginx安装失败"

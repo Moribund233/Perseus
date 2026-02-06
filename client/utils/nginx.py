@@ -235,6 +235,30 @@ class NginxDownloader(QThread):
         
         # 删除临时目录
         shutil.rmtree(temp_dir)
+    
+    def is_nginx_installed(self) -> bool:
+        """
+        检查Nginx是否已安装（公开方法）
+        
+        Returns:
+            bool: 是否已安装
+        """
+        system = platform.system()
+        return self._is_nginx_installed(system)
+    
+    def get_nginx_path(self) -> str:
+        """
+        获取Nginx可执行文件路径
+        
+        Returns:
+            str: Nginx可执行文件路径
+        """
+        system = platform.system()
+        if system == "Windows":
+            return os.path.join(self._install_path, "nginx.exe")
+        else:
+            # Linux系统中Nginx通常安装在/usr/sbin/nginx
+            return "/usr/sbin/nginx"
 
 
 class NginxConfigGenerator:

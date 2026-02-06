@@ -382,5 +382,78 @@ def generate(ctx):
         click.echo(message, err=True)
 
 
+@nginx.command()
+@click.pass_context
+def start(ctx):
+    """
+    启动Nginx服务器
+    """
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_nginx_start()
+    if success:
+        click.echo(message)
+    else:
+        click.echo(message, err=True)
+
+
+@nginx.command()
+@click.pass_context
+def stop(ctx):
+    """
+    停止Nginx服务器
+    """
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_nginx_stop()
+    if success:
+        click.echo(message)
+    else:
+        click.echo(message, err=True)
+
+
+@nginx.command()
+@click.pass_context
+def restart(ctx):
+    """
+    重启Nginx服务器
+    """
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_nginx_restart()
+    if success:
+        click.echo(message)
+    else:
+        click.echo(message, err=True)
+
+
+@nginx.command()
+@click.pass_context
+def status(ctx):
+    """
+    查看Nginx服务器状态
+    """
+    command_handler = ctx.obj['command_handler']
+    success, status_info = command_handler.handle_nginx_status()
+    if success:
+        click.echo(f'Nginx状态: {status_info["state"]}')
+        click.echo(f'是否运行中: {"是" if status_info["is_running"] else "否"}')
+        click.echo(f'是否已安装: {"是" if status_info["is_installed"] else "否"}')
+        click.echo(f'是否启用代理: {"是" if status_info["is_proxy_enabled"] else "否"}')
+    else:
+        click.echo(f'获取Nginx状态失败: {status_info["error"]}', err=True)
+
+
+@nginx.command()
+@click.pass_context
+def install(ctx):
+    """
+    安装Nginx服务器
+    """
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_nginx_install()
+    if success:
+        click.echo(message)
+    else:
+        click.echo(message, err=True)
+
+
 if __name__ == '__main__':
     cli()
