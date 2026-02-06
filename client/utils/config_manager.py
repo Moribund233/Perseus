@@ -250,7 +250,21 @@ class ClientConfigManager:
                     "description": "A Git-based collaborative development tool API",
                     "version": "0.1.0",
                     "debug": True
-                }
+                },
+                "nginx": {
+                "enabled": True,
+                "proxy": True,
+                "version": "1.26.0",
+                "mirror_url": None,
+                "install_path": "nginx",
+                "worker_processes": "auto",
+                "worker_connections": 1024,
+                "keepalive_timeout": 65,
+                "listen_port": 8080,
+                "server_name": "localhost",
+                "api_host": "localhost",
+                "api_port": 8000
+            }
             }
             return self.save_config(default_config)
     
@@ -339,7 +353,170 @@ class ClientConfigManager:
         if "debug" in app and not isinstance(app["debug"], bool):
             errors.append("调试模式必须是布尔值")
         
+        # 验证Nginx配置
+        nginx = config.get("nginx", {})
+        
+        # 验证enabled是否为布尔值
+        if "enabled" in nginx and not isinstance(nginx["enabled"], bool):
+            errors.append("Nginx启用配置必须是布尔值")
+        
+        # 验证proxy是否为布尔值
+        if "proxy" in nginx and not isinstance(nginx["proxy"], bool):
+            errors.append("Nginx代理配置必须是布尔值")
+        
+        # 验证version是否为非空字符串
+        if "version" in nginx:
+            if not isinstance(nginx["version"], str) or not nginx["version"].strip():
+                errors.append("Nginx版本不能为空")
+        
+        # 验证mirror_url是否为字符串（可选）
+        if "mirror_url" in nginx and nginx["mirror_url"] is not None:
+            if not isinstance(nginx["mirror_url"], str):
+                errors.append("Nginx镜像URL必须是字符串")
+        
+        # 验证install_path是否为非空字符串
+        if "install_path" in nginx:
+            if not isinstance(nginx["install_path"], str) or not nginx["install_path"].strip():
+                errors.append("Nginx安装路径不能为空")
+        
+        # 验证worker_processes
+        if "worker_processes" in nginx:
+            worker_processes = nginx["worker_processes"]
+            if worker_processes != "auto" and not isinstance(worker_processes, int):
+                errors.append("Nginx worker_processes 必须是 'auto' 或整数")
+        
+        # 验证worker_connections
+        if "worker_connections" in nginx:
+            worker_connections = nginx["worker_connections"]
+            try:
+                worker_connections = int(worker_connections)
+                if worker_connections <= 0:
+                    errors.append("Nginx worker_connections 必须是正整数")
+            except (ValueError, TypeError):
+                errors.append("Nginx worker_connections 必须是正整数")
+        
+        # 验证keepalive_timeout
+        if "keepalive_timeout" in nginx:
+            keepalive_timeout = nginx["keepalive_timeout"]
+            try:
+                keepalive_timeout = int(keepalive_timeout)
+                if keepalive_timeout < 0:
+                    errors.append("Nginx keepalive_timeout 必须是非负整数")
+            except (ValueError, TypeError):
+                errors.append("Nginx keepalive_timeout 必须是非负整数")
+        
+        # 验证listen_port
+        if "listen_port" in nginx:
+            listen_port = nginx["listen_port"]
+            try:
+                listen_port = int(listen_port)
+                if listen_port < 1 or listen_port > 65535:
+                    errors.append("Nginx监听端口必须是1-65535之间的整数")
+            except (ValueError, TypeError):
+                errors.append("Nginx监听端口必须是1-65535之间的整数")
+        
+        # 验证server_name是否为非空字符串
+        if "server_name" in nginx:
+            if not isinstance(nginx["server_name"], str) or not nginx["server_name"].strip():
+                errors.append("Nginx服务器名称不能为空")
+        
+        # 验证api_host是否为非空字符串
+        if "api_host" in nginx:
+            if not isinstance(nginx["api_host"], str) or not nginx["api_host"].strip():
+                errors.append("Nginx API主机不能为空")
+        
+        # 验证api_port
+        if "api_port" in nginx:
+            api_port = nginx["api_port"]
+            try:
+                api_port = int(api_port)
+                if api_port < 1 or api_port > 65535:
+                    errors.append("Nginx API端口必须是1-65535之间的整数")
+            except (ValueError, TypeError):
+                errors.append("Nginx API端口必须是1-65535之间的整数")
+        
         return len(errors) == 0, errors
+    
+    def get_nginx_config(self) -> Dict[str, Any]:
+        """
+        获取Nginx配置
+        
+        Returns:
+            Dict[str, Any]: Nginx配置字典
+        """
+        config = self.load_config()
+        return config.get("nginx", {})
+    
+    def update_nginx_config(self, nginx_config: Dict[str, Any]) -> bool:
+        """
+        更新Nginx配置
+        
+        Args:
+            nginx_config: Nginx配置字典
+            
+        Returns:
+            bool: 更新成功返回True，否则返回False
+        """
+        config = self.load_config()
+        
+        # 合并Nginx配置
+        config["nginx"] = {**config.get("nginx", {}), **nginx_config}
+        
+        return self.save_config(config)
+    
+    def update_nginx_port(self, port: int) -> bool:
+        """
+        更新Nginx监听端口
+        
+        Args:
+            port: 新端口号
+            
+        Returns:
+            bool: 更新成功返回True，否则返回False
+        """
+        return self.set("nginx.listen_port", port)
+    
+    def update_nginx_server_name(self, server_name: str) -> bool:
+        """
+        更新Nginx服务器名称
+        
+        Args:
+            server_name: 新服务器名称
+            
+        Returns:
+            bool: 更新成功返回True，否则返回False
+        """
+        return self.set("nginx.server_name", server_name)
+    
+    def update_nginx_api_proxy(self, host: str, port: int) -> bool:
+        """
+        更新Nginx API代理配置
+        
+        Args:
+            host: API主机地址
+            port: API端口号
+            
+        Returns:
+            bool: 更新成功返回True，否则返回False
+        """
+        config = self.load_config()
+        nginx = config.get("nginx", {})
+        nginx["api_host"] = host
+        nginx["api_port"] = port
+        config["nginx"] = nginx
+        return self.save_config(config)
+    
+    def toggle_nginx(self, enabled: bool) -> bool:
+        """
+        启用或禁用Nginx
+        
+        Args:
+            enabled: 是否启用
+            
+        Returns:
+            bool: 更新成功返回True，否则返回False
+        """
+        return self.set("nginx.enabled", enabled)
 
 
 # 创建全局配置管理器实例

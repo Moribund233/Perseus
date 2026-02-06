@@ -251,6 +251,41 @@ QSS_STYLES = {
             border-color: #007aff;
             image: url(:/icons/check.svg);
         }
+    """,
+    "splash_screen": """
+        /* 首屏样式 */
+        QSplashScreen {
+            background-color: white;
+            border-radius: 10px;
+        }
+        
+        QLabel#splash_app_name {
+            color: #1d1d1f;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        
+        QLabel#splash_app_desc {
+            color: #666666;
+            font-size: 14px;
+        }
+        
+        QLabel#splash_status {
+            color: #888888;
+            font-size: 12px;
+        }
+        
+        QProgressBar#splash_progress {
+            background-color: #f0f0f0;
+            border: none;
+            border-radius: 4px;
+            text-align: center;
+        }
+        
+        QProgressBar#splash_progress::chunk {
+            background-color: #007aff;
+            border-radius: 4px;
+        }
     """
 }
 
@@ -273,6 +308,10 @@ UI_SIZES = {
     },
     "status_label": {
         "height": 19
+    },
+    "splash_screen": {
+        "width": 600,
+        "height": 400
     }
 }
 
