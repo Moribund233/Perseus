@@ -23,6 +23,16 @@ def main():
     - 命令参数模式：使用click库的命令行界面
     - 交互界面模式：使用rich库的交互式界面
     """
+    # 首先调用服务端init模块生成配置文件
+    print("正在初始化配置文件...")
+    try:
+        from init import init_app
+        init_app(check_service=False)  # 初始化配置文件，但不检查服务
+        print("配置文件初始化完成")
+    except Exception as e:
+        print(f"配置文件初始化失败: {e}")
+        print("继续启动CLI...")
+    
     # 创建解析器，用于处理--interactive和-i参数
     parser = argparse.ArgumentParser(
         description='LanGit FastAPI服务管理工具',

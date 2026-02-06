@@ -201,30 +201,6 @@ class ServiceController:
             self._log(f"配置更新失败: {key} = {value} - {type(e).__name__}: {e}")
             return False
     
-    def _get_python_executable(self) -> str:
-        """
-        获取Python可执行文件路径
-        
-        Returns:
-            str: Python可执行文件路径
-        """
-        return sys.executable
-    
-    def _get_startup_command(self) -> list[str]:
-        """
-        获取服务启动命令
-        
-        统一通过模块导入方式运行服务，避免依赖app.py文件：
-        python -m app
-        
-        Returns:
-            list[str]: 启动命令列表
-        """
-        python_path = self._get_python_executable()
-        
-        # 统一通过模块方式启动服务
-        return [python_path, "-m", "app"]
-    
     def start(self, block: bool = False, timeout: int = 10) -> bool:
         """
         启动服务
@@ -236,13 +212,14 @@ class ServiceController:
         Returns:
             bool: 启动成功返回True，否则返回False
         """
-        if self.state == ServiceState.RUNNING:
+        if self.is_running():
             self._log("服务已在运行中")
             return False
         
         port_str = self.get_config_value("server.port")
         port = int(port_str) if port_str else 8000
         
+        # 检查并释放端口
         if not self.check_port_available(port):
             self._log(f"端口 {port} 已被占用，尝试停止占用端口的进程...")
             if not self._stop_port_processes(port):
@@ -253,79 +230,56 @@ class ServiceController:
         self._log("正在启动服务...")
         
         try:
-            startup_cmd = self._get_startup_command()
+            # 直接调用uvicorn.run()函数启动服务，使用线程避免阻塞主线程
+            from app import get_app
+            import uvicorn
             
-            self._log(f"启动命令: {' '.join(startup_cmd)}")
+            # 获取配置
+            host = self.get_config_value("server.host") or "127.0.0.1"
+            log_level = self.get_config_value("server.log_level") or "info"
             
-            env = os.environ.copy()
+            # 禁用reload模式，在打包应用中reload会导致问题
+            reload = False
             
-            # 获取当前文件的绝对路径
-            current_file = os.path.abspath(__file__)
-            
-            # 查找项目根目录
-            # 向上查找，直到找到包含app模块的目录
-            project_root = None
-            for _ in range(6):  # 最多向上查找6级目录
-                parent_dir = os.path.dirname(current_file)
-                # 检查是否存在app.py或app目录
-                if os.path.exists(os.path.join(parent_dir, "app.py")) or os.path.exists(os.path.join(parent_dir, "app")):
-                    project_root = parent_dir
-                    break
-                current_file = parent_dir
-            
-            # 如果找不到项目根目录，使用当前目录
-            if project_root is None:
-                project_root = os.path.dirname(os.path.abspath(__file__))
-                self._log(f"无法确定项目根目录，使用当前目录: {project_root}")
-            
-            # 设置PYTHONPATH，确保模块导入正常工作
-            # 将项目根目录添加到PYTHONPATH，这样可以找到app模块
-            env["PYTHONPATH"] = project_root
-            
-            # 确定工作目录
-            # 使用项目根目录作为工作目录，确保app模块能被正确找到
-            cwd = project_root
-            
-            self.process = subprocess.Popen(
-                startup_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                env=env,
-                cwd=cwd,
-                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+            # 构建uvicorn配置
+            config = uvicorn.Config(
+                app=get_app(),
+                host=host,
+                port=port,
+                reload=reload,
+                log_level=log_level,
+                workers=1
             )
             
-            self._log(f"进程已启动, PID: {self.process.pid}")
+            # 创建服务器实例
+            server = uvicorn.Server(config)
+            
+            # 定义服务运行函数
+            def run_server():
+                try:
+                    self._log(f"正在启动uvicorn服务: http://{host}:{port}")
+                    server.run()
+                except Exception as e:
+                    self._log(f"服务运行失败: {type(e).__name__} - {e}")
+                    self.state = ServiceState.ERROR
+            
+            # 保存服务器实例，用于后续停止服务
+            self.server = server
+            
+            # 创建并启动服务线程
+            self.server_thread = threading.Thread(target=run_server, daemon=True)
+            self.server_thread.start()
             
             if block:
-                return self._wait_for_startup(timeout)
-            else:
-                threading.Thread(target=self._read_output, daemon=True).start()
-                time.sleep(0.5)
-                
-                if self.is_running():
+                success = self._wait_for_startup(timeout)
+                if success:
                     self.state = ServiceState.RUNNING
-                    self._log("服务启动成功")
-                    return True
-                else:
-                    self.state = ServiceState.STARTING
-                    self._log("服务启动中...")
-                    return True
+                return success
+            else:
+                self.state = ServiceState.RUNNING
+                self._log("服务启动成功")
+                return True
                 
-        except FileNotFoundError as e:
-            self.state = ServiceState.ERROR
-            self._log(f"服务启动失败: 找不到文件 - {e}")
-            return False
-        except PermissionError as e:
-            self.state = ServiceState.ERROR
-            self._log(f"服务启动失败: 权限不足 - {e}")
-            return False
-        except subprocess.SubprocessError as e:
-            self.state = ServiceState.ERROR
-            self._log(f"服务启动失败: 子进程错误 - {e}")
-            return False
         except Exception as e:
             self.state = ServiceState.ERROR
             self._log(f"服务启动失败: {type(e).__name__} - {e}")
@@ -358,27 +312,22 @@ class ServiceController:
             if self.state == ServiceState.ERROR:
                 return False
             
-            if self.process is None:
-                self._log("进程未初始化")
+            # 检查服务线程是否在运行
+            if hasattr(self, 'server_thread') and self.server_thread.is_alive():
+                # 尝试HTTP请求检测服务是否可用
+                try:
+                    port_str = self.get_config_value("server.port")
+                    port = int(port_str) if port_str else 8000
+                    import httpx
+                    response = httpx.get(f"http://localhost:{port}/health", timeout=2)
+                    if response.status_code == 200:
+                        self.state = ServiceState.RUNNING
+                        self._log("服务启动成功")
+                        return True
+                except Exception:
+                    pass
+            elif self.state == ServiceState.ERROR:
                 return False
-            
-            poll_result = self.process.poll()
-            if poll_result is not None:
-                self._log(f"进程已退出，退出码: {poll_result}")
-                self.state = ServiceState.ERROR
-                return False
-            
-            try:
-                port_str = self.get_config_value("server.port")
-                port = int(port_str) if port_str else 8000
-                import httpx
-                response = httpx.get(f"http://localhost:{port}/health", timeout=2)
-                if response.status_code == 200:
-                    self.state = ServiceState.RUNNING
-                    self._log("服务启动成功")
-                    return True
-            except Exception:
-                pass
             
             time.sleep(0.5)
         
@@ -463,15 +412,12 @@ class ServiceController:
         停止服务
         
         Args:
-            timeout: 等待进程终止的超时时间（秒）
+            timeout: 等待服务停止的超时时间（秒）
             
         Returns:
             bool: 停止成功返回True，否则返回False
         """
-        # 更新服务状态，确保准确检测服务是否在运行
-        self.get_state()
-        
-        if self.state == ServiceState.STOPPED:
+        if not self.is_running():
             self._log("服务未运行")
             return True
         
@@ -482,54 +428,38 @@ class ServiceController:
         self.state = ServiceState.STOPPING
         self._log("正在停止服务...")
         
-        if not self.process:
-            # 检测服务是否通过端口在运行
-            if self.is_running():
-                self._log("检测到服务在运行，但无进程信息，尝试通过端口停止服务...")
-                # 通过端口停止服务
-                port_str = self.get_config_value("server.port")
-                port = int(port_str) if port_str else 8000
-                if self._stop_port_processes(port):
-                    self.state = ServiceState.STOPPED
-                    self._log("服务已停止")
-                    return True
-                else:
-                    self.state = ServiceState.ERROR
-                    self._log("服务停止失败")
-                    return False
-            else:
-                self.state = ServiceState.STOPPED
-                return True
-        
-        try:
-            # 根据平台发送终止信号
-            if sys.platform == "win32":
-                self.process.terminate()
-            else:
-                self.process.send_signal(signal.SIGTERM)
-            
-            # 等待进程终止
+        # 停止服务线程
+        if hasattr(self, 'server') and hasattr(self, 'server_thread'):
             try:
-                self.process.wait(timeout=timeout)
-                self.state = ServiceState.STOPPED
-                self._log("服务已停止")
-                return True
-            except subprocess.TimeoutExpired:
-                # 如果超时，强制终止
-                if sys.platform == "win32":
-                    self.process.kill()
+                # 使用uvicorn的should_exit属性优雅停止服务器
+                self.server.should_exit = True
+                
+                # 等待服务线程结束
+                self._log("正在等待服务线程结束...")
+                start_time = time.time()
+                while self.server_thread.is_alive() and (time.time() - start_time) < timeout:
+                    time.sleep(0.5)
+                
+                if self.server_thread.is_alive():
+                    self._log("服务线程仍在运行，正在强制释放端口...")
                 else:
-                    self.process.kill()
+                    self._log("服务线程已正常结束")
                 
-                self.process.wait(timeout=5)
-                self.state = ServiceState.STOPPED
-                self._log("服务已强制停止")
-                return True
-                
-        except Exception as e:
-            self.state = ServiceState.ERROR
-            self._log(f"服务停止失败: {e}")
-            return False
+                # 清除服务器和线程属性
+                delattr(self, 'server')
+                delattr(self, 'server_thread')
+            except Exception as e:
+                self._log(f"停止服务线程失败: {e}")
+        
+        # 确保端口已释放
+        port_str = self.get_config_value("server.port")
+        port = int(port_str) if port_str else 8000
+        self._stop_port_processes(port)
+        
+        # 更新服务状态
+        self.state = ServiceState.STOPPED
+        self._log("服务已停止")
+        return True
     
     def restart(self, timeout: int = 10) -> bool:
         """
@@ -543,130 +473,51 @@ class ServiceController:
         """
         self._log("正在重启服务...")
         
-        was_running = self.state == ServiceState.RUNNING
-        
-        if was_running:
+        try:
+            # 1. 停止服务
             if not self.stop(timeout):
+                self._log("服务停止失败，重启中断")
                 return False
             
-            # 等待完全停止
-            time.sleep(1)
-        
-        return self.start(block=True, timeout=timeout)
+            # 2. 启动服务（block=True确保服务完全启动）
+            return self.start(block=True, timeout=timeout)
+        except Exception as e:
+            self.state = ServiceState.ERROR
+            self._log(f"服务重启失败: {type(e).__name__} - {e}")
+            return False
     
     def is_running(self) -> bool:
         """
         检查服务是否正在运行
         
         检测逻辑：
-        1. 首先检查当前控制器实例的进程是否在运行
-        2. 如果进程信息不可用，则通过端口检测判断服务是否在运行
-        3. 最后通过进程名称检测确认服务状态
+        1. 首先检查服务线程是否在运行（最快）
+        2. 检查端口是否被占用（中等速度）
+        3. 最后通过HTTP请求检测健康端点（较慢，仅作为确认）
         
         Returns:
             bool: 运行中返回True，否则返回False
         """
-        # 检查当前控制器实例的进程是否在运行
-        if self.process:
-            if self.process.poll() is None:
-                return True
+        # 1. 检查服务线程是否在运行（最快）
+        if hasattr(self, 'server_thread') and self.server_thread.is_alive():
+            return True
         
-        # 通过端口检测服务是否在运行
+        # 2. 检查端口是否被占用（中等速度）
         port_str = self.get_config_value("server.port")
         port = int(port_str) if port_str else 8000
         
-        # 检查端口是否被占用且响应HTTP请求
-        try:
-            import httpx
-            response = httpx.get(f"http://localhost:{port}/health", timeout=2)
-            if response.status_code == 200:
-                return True
-        except Exception:
-            pass
-        
-        # 通过进程名称检测服务是否在运行
-        try:
-            import subprocess
-            import sys
-            import os
-            
-            current_pid = os.getpid()
-            
-            if sys.platform == "win32":
-                # Windows平台：通过进程命令行检测
-                result = subprocess.run(
-                    ["wmic", "process", "get", "CommandLine,ProcessId"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
-                )
-                
-                # 遍历进程列表，查找app.py进程（排除当前进程）
-                found = False
-                for line in result.stdout.strip().split('\n'):
-                    line = line.strip()
-                    if not line:
-                        continue
-                    
-                    # 提取PID和命令行
-                    parts = line.split(maxsplit=1)
-                    if len(parts) < 2:
-                        continue
-                    
-                    try:
-                        pid = int(parts[0].strip())
-                        cmdline = parts[1].strip()
-                        
-                        # 排除当前进程
-                        if pid == current_pid:
-                            continue
-                        
-                        # 精确匹配app.py，避免误判
-                        if 'app.py' in cmdline and not any(test_script in cmdline for test_script in ['test_', 'pytest', 'debugpy']):
-                            found = True
-                            break
-                    except (ValueError, IndexError):
-                        continue
-                
-                return found
-            else:
-                # Linux/macOS平台：通过ps命令检测
-                result = subprocess.run(
-                    ["ps", "aux"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
-                )
-                
-                # 遍历进程列表，查找app.py进程（排除当前进程）
-                found = False
-                for line in result.stdout.strip().split('\n'):
-                    line = line.strip()
-                    if not line:
-                        continue
-                    
-                    # 提取PID
-                    parts = line.split()
-                    if len(parts) < 2:
-                        continue
-                    
-                    try:
-                        pid = int(parts[1])
-                        
-                        # 排除当前进程
-                        if pid == current_pid:
-                            continue
-                        
-                        # 精确匹配app.py，避免误判
-                        if 'app.py' in line and not any(test_script in line for test_script in ['test_', 'pytest', 'debugpy']):
-                            found = True
-                            break
-                    except (ValueError, IndexError):
-                        continue
-                
-                return found
-        except Exception:
-            pass
+        # 先快速检查端口是否被占用，避免不必要的HTTP请求
+        if not self.check_port_available(port):
+            # 端口被占用，再尝试HTTP请求确认是否是我们的服务
+            try:
+                import httpx
+                # 使用更短的超时时间，避免阻塞
+                response = httpx.get(f"http://localhost:{port}/health", timeout=0.5)
+                if response.status_code == 200:
+                    return True
+            except Exception:
+                # HTTP请求失败，可能是其他服务占用了端口
+                pass
         
         return False
     
@@ -678,11 +529,15 @@ class ServiceController:
             ServiceState: 服务状态
         """
         if self.is_running():
-            # 如果检测到服务正在运行，更新状态为RUNNING
+            # 如果检测到服务正在运行，无论之前是什么状态，都更新为RUNNING
             self.state = ServiceState.RUNNING
         elif self.state != ServiceState.STARTING and self.state != ServiceState.STOPPING:
             # 如果服务不在运行且不是正在启动/停止，更新状态为STOPPED
             self.state = ServiceState.STOPPED
+        elif self.state == ServiceState.STARTING:
+            # 如果服务正在启动中，但is_running()返回True，更新为RUNNING
+            if self.is_running():
+                self.state = ServiceState.RUNNING
         
         return self.state
 

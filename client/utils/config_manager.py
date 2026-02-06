@@ -230,17 +230,13 @@ class ClientConfigManager:
             bool: 重置成功返回True，否则返回False
         """
         try:
-            # 从外部默认配置文件加载
-            import os
-            default_config_path = os.path.join(os.path.dirname(__file__), "default_config.toml")
-            
-            with open(default_config_path, "r", encoding="utf-8") as f:
-                default_config = toml.load(f)
-            
-            return self.save_config(default_config)
+            # 直接调用服务端init模块的reset_config方法
+            from init import reset_config
+            reset_config()
+            return True
         except Exception as e:
-            print(f"加载默认配置失败: {e}")
-            # 如果加载失败，使用备份的硬编码默认配置
+            print(f"调用服务端重置配置方法失败: {e}")
+            # 如果调用失败，使用备份的硬编码默认配置
             default_config = {
                 "server": {
                     "host": "0.0.0.0",

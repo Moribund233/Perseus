@@ -120,13 +120,23 @@ def run_uvicorn():
     """
     使用Uvicorn启动服务器（开发环境）
     开发环境始终使用1个worker，不需要多进程
+    
+    注意：不再支持direct_mode，统一使用子进程方式启动服务
+    通过进程ID跟踪实现可靠的服务管理
     """
     import uvicorn
+    import os
+    import sys
     
     # 获取配置
     config = get_config()
     
+    # 记录当前进程ID，便于后续管理
+    current_pid = os.getpid()
+    print(f"[INFO] App main process started with PID: {current_pid}")
+    
     # 启动Uvicorn服务器（开发环境始终使用1个worker）
+    # 注意：在主进程中可以使用reload模式，在子进程中会自动禁用
     uvicorn.run(
         "app:app",
         host=config.server.host,
