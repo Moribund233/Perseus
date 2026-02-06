@@ -149,16 +149,18 @@ def config(ctx, key: str, value: str):
 @click.pass_context
 @click.option('--server', '-s', is_flag=True, help='只显示服务器配置')
 @click.option('--app', '-a', is_flag=True, help='只显示应用配置')
-def show_config(ctx, server: bool, app: bool):
+@click.option('--nginx', '-n', is_flag=True, help='只显示Nginx配置')
+def show_config(ctx, server: bool, app: bool, nginx: bool):
     """
     显示配置信息
     
     Args:
         server: 只显示服务器配置
         app: 只显示应用配置
+        nginx: 只显示Nginx配置
     """
     command_handler = ctx.obj['command_handler']
-    config = command_handler.handle_get_config(server_only=server, app_only=app)
+    config = command_handler.handle_get_config(server_only=server, app_only=app, nginx_only=nginx)
     
     for section, section_config in config.items():
         for key, value in section_config.items():
@@ -248,6 +250,136 @@ def validate(ctx):
         click.echo('配置文件验证失败', err=True)
         for error in errors:
             click.echo(f'  - {error}', err=True)
+
+
+# Nginx命令组
+@cli.group()
+def nginx():
+    """
+    Nginx服务器管理命令
+    """
+    pass
+
+
+@nginx.command()
+@click.pass_context
+def show(ctx):
+    """
+    显示Nginx配置信息
+    """
+    command_handler = ctx.obj['command_handler']
+    nginx_config = command_handler.handle_get_nginx_config()
+    
+    for key, value in nginx_config['nginx'].items():
+        click.echo(f'nginx.{key} = {value}')
+
+
+@nginx.command()
+@click.pass_context
+@click.argument('key')
+@click.argument('value')
+def update(ctx, key: str, value: str):
+    """
+    更新Nginx配置项
+    
+    Args:
+        key: 配置键名，如 'listen_port' 或 'server_name'
+        value: 新的配置值
+    """
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_update_nginx_config(key, value)
+    if success:
+        click.echo(message)
+    else:
+        click.echo(message, err=True)
+
+
+@nginx.command()
+@click.pass_context
+@click.argument('port', type=int)
+def port(ctx, port: int):
+    """
+    更新Nginx监听端口
+    
+    Args:
+        port: 新的端口号
+    """
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_update_nginx_port(port)
+    if success:
+        click.echo(message)
+    else:
+        click.echo(message, err=True)
+
+
+@nginx.command()
+@click.pass_context
+@click.argument('server_name')
+def server_name(ctx, server_name: str):
+    """
+    更新Nginx服务器名称
+    
+    Args:
+        server_name: 新的服务器名称
+    """
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_update_nginx_server_name(server_name)
+    if success:
+        click.echo(message)
+    else:
+        click.echo(message, err=True)
+
+
+@nginx.command()
+@click.pass_context
+@click.argument('host')
+@click.argument('port', type=int)
+def proxy(ctx, host: str, port: int):
+    """
+    更新Nginx API代理配置
+    
+    Args:
+        host: API主机地址
+        port: API端口号
+    """
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_update_nginx_api_proxy(host, port)
+    if success:
+        click.echo(message)
+    else:
+        click.echo(message, err=True)
+
+
+@nginx.command()
+@click.pass_context
+@click.argument('enabled', type=bool)
+def toggle(ctx, enabled: bool):
+    """
+    启用/禁用Nginx
+    
+    Args:
+        enabled: 是否启用Nginx (true/false)
+    """
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_toggle_nginx(enabled)
+    if success:
+        click.echo(message)
+    else:
+        click.echo(message, err=True)
+
+
+@nginx.command()
+@click.pass_context
+def generate(ctx):
+    """
+    生成Nginx配置文件
+    """
+    command_handler = ctx.obj['command_handler']
+    success, message = command_handler.handle_generate_nginx_config()
+    if success:
+        click.echo(message)
+    else:
+        click.echo(message, err=True)
 
 
 if __name__ == '__main__':

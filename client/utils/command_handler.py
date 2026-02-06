@@ -136,13 +136,14 @@ class CommandHandler:
         else:
             return False, "配置更新失败"
     
-    def handle_get_config(self, server_only: bool = False, app_only: bool = False) -> Dict[str, Any]:
+    def handle_get_config(self, server_only: bool = False, app_only: bool = False, nginx_only: bool = False) -> Dict[str, Any]:
         """
         处理获取配置命令
         
         Args:
             server_only: 只获取服务器配置
             app_only: 只获取应用配置
+            nginx_only: 只获取Nginx配置
         
         Returns:
             Dict: 配置信息
@@ -153,6 +154,8 @@ class CommandHandler:
             return {"server": config.get("server", {})}
         elif app_only:
             return {"app": config.get("app", {})}
+        elif nginx_only:
+            return {"nginx": config.get("nginx", {})}
         else:
             return config
     
@@ -221,3 +224,105 @@ class CommandHandler:
             tuple: (是否有效, 错误信息列表)
         """
         return self.config_manager.validate_config()
+    
+    def handle_get_nginx_config(self) -> Dict[str, Any]:
+        """
+        处理获取Nginx配置命令
+        
+        Returns:
+            Dict: Nginx配置信息
+        """
+        return {"nginx": self.config_manager.get_nginx_config()}
+    
+    def handle_update_nginx_config(self, key: str, value: str) -> tuple[bool, str]:
+        """
+        处理更新Nginx配置命令
+        
+        Args:
+            key: 配置键名
+            value: 新的配置值
+        
+        Returns:
+            tuple: (是否成功, 结果消息)
+        """
+        full_key = f"nginx.{key}"
+        if self.controller.update_config(full_key, value):
+            return True, f"Nginx配置已更新: {key} = {value}"
+        else:
+            return False, "Nginx配置更新失败"
+    
+    def handle_update_nginx_port(self, port: int) -> tuple[bool, str]:
+        """
+        处理更新Nginx端口命令
+        
+        Args:
+            port: 新的端口号
+        
+        Returns:
+            tuple: (是否成功, 结果消息)
+        """
+        if self.config_manager.update_nginx_port(port):
+            return True, f"Nginx端口已更新为: {port}"
+        else:
+            return False, "Nginx端口更新失败"
+    
+    def handle_update_nginx_server_name(self, server_name: str) -> tuple[bool, str]:
+        """
+        处理更新Nginx服务器名称命令
+        
+        Args:
+            server_name: 新的服务器名称
+        
+        Returns:
+            tuple: (是否成功, 结果消息)
+        """
+        if self.config_manager.update_nginx_server_name(server_name):
+            return True, f"Nginx服务器名称已更新为: {server_name}"
+        else:
+            return False, "Nginx服务器名称更新失败"
+    
+    def handle_update_nginx_api_proxy(self, host: str, port: int) -> tuple[bool, str]:
+        """
+        处理更新Nginx API代理命令
+        
+        Args:
+            host: API主机地址
+            port: API端口号
+        
+        Returns:
+            tuple: (是否成功, 结果消息)
+        """
+        if self.config_manager.update_nginx_api_proxy(host, port):
+            return True, f"Nginx API代理已更新为: http://{host}:{port}"
+        else:
+            return False, "Nginx API代理更新失败"
+    
+    def handle_toggle_nginx(self, enabled: bool) -> tuple[bool, str]:
+        """
+        处理启用/禁用Nginx命令
+        
+        Args:
+            enabled: 是否启用Nginx
+        
+        Returns:
+            tuple: (是否成功, 结果消息)
+        """
+        if self.config_manager.toggle_nginx(enabled):
+            status = "启用" if enabled else "禁用"
+            return True, f"Nginx已{status}"
+        else:
+            return False, "Nginx状态更新失败"
+    
+    def handle_generate_nginx_config(self) -> tuple[bool, str]:
+        """
+        处理生成Nginx配置文件命令
+        
+        Returns:
+            tuple: (是否成功, 结果消息)
+        """
+        from client.utils.nginx import generate_nginx_config
+        nginx_config = self.config_manager.get_nginx_config()
+        if generate_nginx_config(nginx_config):
+            return True, "Nginx配置文件生成成功"
+        else:
+            return False, "Nginx配置文件生成失败"

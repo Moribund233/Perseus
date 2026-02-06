@@ -23,11 +23,11 @@ def main():
     - 命令参数模式：使用click库的命令行界面
     - 交互界面模式：使用rich库的交互式界面
     """
-    # 首先调用服务端init模块生成配置文件
+    # 首先调用客户端init工具生成配置文件和初始化Nginx
     print("正在初始化配置文件...")
     try:
-        from init import init_app
-        init_app(check_service=False)  # 初始化配置文件，但不检查服务
+        from client.utils.init import init_client
+        init_thread = init_client(check_service=False, use_thread=False)  # 同步执行初始化
         print("配置文件初始化完成")
     except Exception as e:
         print(f"配置文件初始化失败: {e}")
