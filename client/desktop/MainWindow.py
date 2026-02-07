@@ -225,9 +225,27 @@ class MainWindow(QMainWindow):
         port = server_config.get("port", 8000)
         log_level = server_config.get("log_level", "info")
         workers = server_config.get("workers", 1)
+
+        # 获取Nginx配置
+        nginx_config = self.config_manager.get_nginx_config()
+        nginx_proxy = nginx_config.get("proxy", True)
+        nginx_port = nginx_config.get("listen_port", 8080)
+        nginx_server_name = nginx_config.get("server_name", "localhost")
+        
+        # 获取Nginx高级配置
+        nginx_version = nginx_config.get("version", "1.26.0")
+        nginx_install_path = nginx_config.get("install_path", "nginx")
+        nginx_worker_processes = nginx_config.get("worker_processes", "auto")
+        nginx_worker_connections = nginx_config.get("worker_connections", 1024)
+        nginx_keepalive_timeout = nginx_config.get("keepalive_timeout", 65)
         
         # 更新设置卡片
-        self.settings_card.update_config(host, port, log_level, workers)
+        self.settings_card.update_config(
+            host, port, log_level, workers, 
+            nginx_proxy, nginx_port, nginx_server_name,
+            nginx_version, nginx_install_path, nginx_worker_processes,
+            nginx_worker_connections, nginx_keepalive_timeout
+        )
         
         # 更新状态卡片
         self.update_status_card()

@@ -71,7 +71,14 @@ class InitThread(QThread):
                     
                     # 生成Nginx配置文件
                     self.progress_updated.emit(80, "正在生成Nginx配置文件...")
-                    nginx_generator = get_nginx_config_generator()
+                    # 使用配置中的install_path和config_path
+                    import os
+                    install_path = nginx_config.get("install_path", "nginx")
+                    # 确保install_path是绝对路径
+                    if install_path:
+                        install_path = os.path.abspath(install_path)
+                    config_path = nginx_config.get("config_path")
+                    nginx_generator = get_nginx_config_generator(config_path, install_path)
                     nginx_generator.generate_config(nginx_config)
                 except Exception as e:
                     # 在Linux系统上，Nginx安装失败不应阻止应用程序启动

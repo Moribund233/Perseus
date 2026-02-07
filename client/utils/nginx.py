@@ -30,13 +30,17 @@ class NginxDownloader(QThread):
         
         Args:
             nginx_version: Nginx版本号
-            install_path: 安装路径
+            install_path: 安装路径（Windows为目录，Linux为可执行文件路径）
             mirror_url: 镜像URL，为空时使用华为云镜像
         """
         super().__init__()
         self._nginx_version = nginx_version
         self._install_path = install_path
         self._mirror_url = mirror_url
+        
+        # 确保install_path是绝对路径
+        if self._install_path:
+            self._install_path = os.path.abspath(self._install_path)
     
     def run(self):
         """
@@ -81,15 +85,36 @@ class NginxDownloader(QThread):
             bool: 是否已安装
         """
         if system == "Windows":
-            # Windows: 检查安装目录是否存在
-            return os.path.exists(self._install_path)
+            # Windows: 检查安装目录是否存在nginx.exe
+            nginx_exe = os.path.join(self._install_path, "nginx.exe")
+            return os.path.isfile(nginx_exe)
         else:
-            # Linux: 检查是否可以执行nginx命令
-            try:
-                subprocess.run(["nginx", "-v"], capture_output=True, check=True)
-                return True
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                return False
+            # Linux: 使用which命令检测nginx可执行文件
+            return self._get_linux_nginx_path() is not None
+    
+    def _get_linux_nginx_path(self) -> Optional[str]:
+        """
+        获取Linux系统Nginx可执行文件的绝对路径
+        
+        Returns:
+            Optional[str]: Nginx可执行文件路径，未找到返回None
+        """
+        try:
+            # 使用which命令查找nginx
+            result = subprocess.run(["which", "nginx"], capture_output=True, text=True, check=True)
+            nginx_path = result.stdout.strip()
+            if nginx_path and os.path.isfile(nginx_path) and os.access(nginx_path, os.X_OK):
+                return nginx_path
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+        
+        # 尝试常见的安装路径
+        common_paths = ["/usr/sbin/nginx", "/usr/local/nginx/sbin/nginx", "/opt/nginx/sbin/nginx"]
+        for path in common_paths:
+            if os.path.isfile(path) and os.access(path, os.X_OK):
+                return path
+        
+        return None
     
     def _install_nginx_windows(self):
         """
@@ -257,8 +282,32 @@ class NginxDownloader(QThread):
         if system == "Windows":
             return os.path.join(self._install_path, "nginx.exe")
         else:
-            # Linux系统中Nginx通常安装在/usr/sbin/nginx
+            # Linux: 返回检测到的绝对路径
+            nginx_path = self._get_linux_nginx_path()
+            if nginx_path:
+                return nginx_path
+            # 如果未检测到，返回默认路径（但可能不存在）
             return "/usr/sbin/nginx"
+    
+    def get_install_path(self) -> str:
+        """
+        获取安装路径（仅Windows使用，Linux返回空字符串）
+        
+        Returns:
+            str: Windows下返回安装目录，Linux下返回空字符串
+        """
+        if platform.system() == "Windows":
+            return self._install_path
+        return ""
+    
+    def is_linux_nginx_installed(self) -> bool:
+        """
+        检测Linux系统是否已安装Nginx
+        
+        Returns:
+            bool: 已安装返回True，否则返回False
+        """
+        return self._get_linux_nginx_path() is not None
 
 
 class NginxConfigGenerator:
@@ -268,22 +317,27 @@ class NginxConfigGenerator:
     负责生成和管理Nginx配置文件
     """
     
-    def __init__(self, config_path: str = None):
+    def __init__(self, config_path: str = None, install_path: str = None):
         """
         初始化Nginx配置生成器
         
         Args:
-            config_path: Nginx配置文件路径
+            config_path: Nginx配置文件路径（优先使用，推荐）
+            install_path: Nginx安装路径（仅Windows下用于生成默认配置路径）
         """
-        # 根据操作系统选择默认配置文件路径
-        if config_path is None:
-            if platform.system() == "Windows":
-                self._config_path = "nginx/conf/nginx.conf"
-            else:
-                # Linux系统默认配置文件路径
-                self._config_path = "/etc/nginx/nginx.conf"
+        if config_path:
+            # 如果提供了config_path，优先使用
+            self._config_path = os.path.abspath(config_path)
+        elif install_path and platform.system() == "Windows":
+            # Windows: 根据install_path生成配置路径
+            self._config_path = os.path.join(os.path.abspath(install_path), "conf", "nginx.conf")
+        elif platform.system() == "Windows":
+            # Windows默认路径
+            self._config_path = os.path.abspath("nginx/conf/nginx.conf")
         else:
-            self._config_path = config_path
+            # Linux系统使用用户级配置目录，避免需要root权限
+            user_config_dir = os.path.expanduser("~/.config/langit/nginx")
+            self._config_path = os.path.join(user_config_dir, "nginx.conf")
     
     def generate_config(self, config: Dict[str, Any]) -> bool:
         """
@@ -459,19 +513,20 @@ http {{
 _nginx_config_generator: Optional[NginxConfigGenerator] = None
 
 
-def get_nginx_config_generator(config_path: str = "nginx/conf/nginx.conf") -> NginxConfigGenerator:
+def get_nginx_config_generator(config_path: str = None, install_path: str = None) -> NginxConfigGenerator:
     """
     获取全局Nginx配置生成器实例
     
     Args:
-        config_path: Nginx配置文件路径
+        config_path: Nginx配置文件路径（优先使用）
+        install_path: Nginx安装路径（Windows下用于生成默认配置路径）
         
     Returns:
         NginxConfigGenerator: Nginx配置生成器实例
     """
     global _nginx_config_generator
     if _nginx_config_generator is None:
-        _nginx_config_generator = NginxConfigGenerator(config_path)
+        _nginx_config_generator = NginxConfigGenerator(config_path, install_path)
     return _nginx_config_generator
 
 

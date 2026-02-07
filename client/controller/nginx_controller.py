@@ -37,7 +37,7 @@ class NginxController:
         Args:
             config_path: 配置文件路径
         """
-        self.config_path = config_path
+        self.config_path = os.path.abspath(config_path)
         self.process: Optional[subprocess.Popen] = None
         self.state = NginxState.STOPPED
         self.log_manager = get_log_manager()
@@ -45,14 +45,23 @@ class NginxController:
         # 从配置文件中读取Nginx配置
         nginx_config = self.get_nginx_config()
         
+        # 获取install_path和config_path
+        install_path = nginx_config.get("install_path", "nginx")
+        config_path_nginx = nginx_config.get("config_path")
+
+        # 确保install_path是绝对路径
+        if install_path:
+            install_path = os.path.abspath(install_path)
+        
         # 初始化NginxDownloader
         self.nginx_downloader = NginxDownloader(
             nginx_version=nginx_config.get("version", "1.26.0"),
-            install_path=nginx_config.get("install_path", "nginx")
+            install_path=install_path
         )
         
         # 初始化NginxConfigGenerator
-        self.nginx_generator = NginxConfigGenerator(os.path.join(nginx_config.get("install_path", "nginx"), "conf", "nginx.conf"))
+        # 优先使用config_path，否则根据install_path生成
+        self.nginx_generator = NginxConfigGenerator(config_path_nginx, install_path)
     
     def set_log_callback(self, callback: Callable[[str], None]) -> None:
         """
@@ -83,7 +92,7 @@ class NginxController:
             import toml
             with open(self.config_path, "r", encoding="utf-8") as f:
                 config = toml.load(f)
-            return config.get("proxy", {}).get("enabled", False)
+            return config.get("nginx", {}).get("proxy", False)
         except Exception as e:
             self._log(f"检查代理配置失败: {e}")
             return False
@@ -160,26 +169,21 @@ class NginxController:
             self._log("Nginx已在运行中")
             return True
         
-        # 检查Nginx是否已安装
-        if not self.is_nginx_installed():
-            self._log("Nginx未安装，正在安装...")
-            if not self.install_nginx():
-                self._log("Nginx安装失败，无法启动")
-                return False
-        
-        # 生成Nginx配置文件
-        if not self.generate_nginx_config():
-            self._log("Nginx配置文件生成失败，无法启动")
-            return False
-        
         self.state = NginxState.STARTING
         self._log("正在启动Nginx...")
         
         try:
             nginx_path = self.nginx_downloader.get_nginx_path()
-            # 转换为绝对路径
-            nginx_path = os.path.abspath(nginx_path)
+            # nginx_path 已经是绝对路径（由 NginxDownloader 保证）
             self._log(f"Nginx可执行文件绝对路径: {nginx_path}")
+            
+            # 获取Nginx工作目录（nginx.exe所在目录）
+            nginx_cwd = os.path.dirname(nginx_path)
+            self._log(f"Nginx工作目录: {nginx_cwd}")
+            
+            # 获取配置文件绝对路径
+            config_path = os.path.abspath(self.nginx_generator._config_path)
+            self._log(f"Nginx配置文件绝对路径: {config_path}")
             
             if sys.platform == "win32":
                 # 检查Nginx可执行文件是否存在
@@ -187,104 +191,269 @@ class NginxController:
                     self._log(f"Nginx可执行文件不存在: {nginx_path}")
                     return False
                 
-                # Windows下启动Nginx
-                cmd = [nginx_path]
+                # 检查配置文件是否存在
+                if not os.path.exists(config_path):
+                    self._log(f"Nginx配置文件不存在: {config_path}")
+                    return False
+                
+                # Windows下启动Nginx，使用-c参数指定配置文件路径，并设置工作目录
+                cmd = [nginx_path, "-c", config_path]
                 self._log(f"Windows下执行命令: {cmd}")
                 
                 # 尝试检查配置文件
-                check_cmd = [nginx_path, "-t"]
-                check_result = subprocess.run(check_cmd, capture_output=True, text=True)
-                self._log(f"配置检查结果: 返回码={check_result.returncode}, 标准输出={check_result.stdout}, 标准错误={check_result.stderr}")
+                check_cmd = [nginx_path, "-t", "-c", config_path]
+                try:
+                    check_result = subprocess.run(check_cmd, capture_output=True, text=True, cwd=nginx_cwd, timeout=10)
+                    self._log(f"配置检查结果: 返回码={check_result.returncode}")
+                    if check_result.stderr:
+                        # 区分错误信息和正常信息
+                        stderr_text = check_result.stderr
+                        if "successful" in stderr_text.lower() or "ok" in stderr_text.lower():
+                            self._log(f"配置检查信息: {stderr_text}")
+                        else:
+                            self._log(f"配置检查错误: {stderr_text}")
+                except subprocess.TimeoutExpired:
+                    self._log("配置检查超时")
+                    self.state = NginxState.ERROR
+                    return False
+                except Exception as e:
+                    self._log(f"配置检查异常: {type(e).__name__}: {e}")
+                    self.state = NginxState.ERROR
+                    return False
                 
                 # 如果配置检查失败，返回错误
                 if check_result.returncode != 0:
-                    self._log(f"Nginx配置文件错误: {check_result.stderr}")
+                    self._log(f"Nginx配置文件错误，返回码: {check_result.returncode}")
+                    self.state = NginxState.ERROR
                     return False
                 
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                self._log(f"命令执行结果: 返回码={result.returncode}, 标准输出={result.stdout}, 标准错误={result.stderr}")
-                
-                # Nginx在Windows下启动成功时返回码为0，并且stdout和stderr都为空
-                # 但有时候即使返回码为1，Nginx也可能已经启动成功（例如，当配置文件中的某些选项不被支持时）
-                # 所以我们需要检查Nginx是否真的在运行
-                if result.returncode != 0:
-                    self._log(f"Nginx启动命令返回错误，但将检查是否真的在运行: {result.stderr}")
+                # 启动Nginx - 使用Popen非阻塞启动
+                try:
+                    # Nginx是守护进程，启动后会立即返回
+                    process = subprocess.Popen(
+                        cmd,
+                        cwd=nginx_cwd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+                    )
                     
+                    # 等待短时间检查是否立即失败
+                    try:
+                        stdout, stderr = process.communicate(timeout=2)
+                        if process.returncode != 0:
+                            self._log(f"Nginx启动失败，返回码: {process.returncode}")
+                            if stderr:
+                                self._log(f"错误信息: {stderr.decode('utf-8', errors='ignore')}")
+                            self.state = NginxState.ERROR
+                            return False
+                    except subprocess.TimeoutExpired:
+                        # 超时说明Nginx正在运行（正常情况）
+                        self._log("Nginx进程已启动")
+                        pass
+                    
+                except Exception as e:
+                    self._log(f"启动命令异常: {type(e).__name__}: {e}")
+                
                 # 检查Nginx是否真的在运行
+                import time
+                time.sleep(1)  # 等待1秒让Nginx启动
+                
                 if self.is_running():
                     self.state = NginxState.RUNNING
                     self._log("Nginx启动成功")
                     return True
                 else:
-                    raise subprocess.CalledProcessError(result.returncode, cmd)
+                    self._log("Nginx启动后未检测到运行状态")
+                    self.state = NginxState.ERROR
+                    return False
             else:
-                # Linux下启动Nginx
-                cmd = ["nginx"]
-                self._log(f"Linux下执行命令: {cmd}")
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                self._log(f"命令执行结果: 返回码={result.returncode}, 标准输出={result.stdout}, 标准错误={result.stderr}")
+                # Linux下启动Nginx，使用-c参数指定配置文件路径
+                # 首先检查Nginx是否已安装
+                nginx_cmd = self._get_linux_nginx_cmd()
+                if not nginx_cmd:
+                    self._log("错误: 未找到Nginx可执行文件，请确保已通过包管理器安装Nginx")
+                    self.state = NginxState.ERROR
+                    return False
                 
-                if result.returncode != 0:
-                    raise subprocess.CalledProcessError(result.returncode, cmd)
+                self._log(f"Linux Nginx命令: {nginx_cmd}")
+                self._log(f"Linux配置文件路径: {config_path}")
+                
+                # 检查配置文件是否存在
+                if not os.path.exists(config_path):
+                    self._log(f"错误: Nginx配置文件不存在: {config_path}")
+                    self.state = NginxState.ERROR
+                    return False
+                
+                cmd = [nginx_cmd, "-c", config_path]
+                self._log(f"Linux下执行命令: {cmd}")
+                
+                # 检查配置是否正确
+                try:
+                    check_cmd = [nginx_cmd, "-t", "-c", config_path]
+                    self._log(f"检查Nginx配置: {check_cmd}")
+                    check_result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=10)
+                    if check_result.returncode != 0:
+                        self._log(f"配置检查失败: {check_result.stderr}")
+                        self.state = NginxState.ERROR
+                        return False
+                    self._log("配置检查通过")
+                except Exception as e:
+                    self._log(f"配置检查异常: {type(e).__name__}: {e}")
+                
+                # 启动Nginx - 使用Popen非阻塞启动
+                try:
+                    # Nginx是守护进程，启动后会立即返回
+                    process = subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE
+                    )
+                    
+                    # 等待短时间检查是否立即失败
+                    try:
+                        stdout, stderr = process.communicate(timeout=2)
+                        if process.returncode != 0:
+                            self._log(f"Nginx启动失败，返回码: {process.returncode}")
+                            if stderr:
+                                self._log(f"错误信息: {stderr.decode('utf-8', errors='ignore')}")
+                            self.state = NginxState.ERROR
+                            return False
+                    except subprocess.TimeoutExpired:
+                        # 超时说明Nginx正在运行（正常情况）
+                        self._log("Nginx进程已启动")
+                        pass
+                    
+                except Exception as e:
+                    self._log(f"启动命令异常: {type(e).__name__}: {e}")
+                
+                # 检查Nginx是否真的在运行
+                import time
+                time.sleep(1)
+                
+                if self.is_running():
+                    self.state = NginxState.RUNNING
+                    self._log("Nginx启动成功")
+                    return True
+                else:
+                    self._log("Nginx启动后未检测到运行状态")
+                    self.state = NginxState.ERROR
+                    return False
             
-            self.state = NginxState.RUNNING
-            self._log("Nginx启动成功")
-            return True
-        except subprocess.CalledProcessError as e:
-            self.state = NginxState.ERROR
-            self._log(f"Nginx启动失败 - 命令执行错误: {e}")
-            return False
         except Exception as e:
             self.state = NginxState.ERROR
-            self._log(f"Nginx启动失败 - 其他错误: {type(e).__name__}: {str(e)}")
+            self._log(f"Nginx启动失败 - 错误: {type(e).__name__}: {str(e)}")
+            return False
             return False
     
     def stop(self) -> bool:
         """
         停止Nginx服务器
-        
+
         Returns:
             bool: 停止成功返回True，否则返回False
         """
         if not self.is_running():
             self._log("Nginx未运行")
             return True
-        
+
         self.state = NginxState.STOPPING
         self._log("正在停止Nginx...")
-        
+
         try:
+            # 获取配置文件绝对路径
+            config_path = os.path.abspath(self.nginx_generator._config_path)
+
+            # 获取Nginx工作目录（nginx.exe所在目录）
             nginx_path = self.nginx_downloader.get_nginx_path()
+            # nginx_path 已经是绝对路径（由 NginxDownloader 保证）
+            nginx_cwd = os.path.dirname(nginx_path)
+            self._log(f"Nginx工作目录: {nginx_cwd}")
+
             if sys.platform == "win32":
-                # Windows下停止Nginx
-                cmd = [nginx_path, "-s", "quit"]
-                subprocess.run(cmd, check=True, capture_output=True)
+                # Windows下停止Nginx，使用-c参数指定配置文件路径，并设置工作目录
+                cmd = [nginx_path, "-c", config_path, "-s", "quit"]
+                self._log(f"Windows下停止命令: {cmd}")
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True, cwd=nginx_cwd, timeout=10)
+                    if result.returncode != 0:
+                        self._log(f"停止命令返回非零码: {result.returncode}")
+                        if result.stderr:
+                            self._log(f"停止错误输出: {result.stderr}")
+                except subprocess.TimeoutExpired:
+                    self._log("停止命令超时")
+                except Exception as e:
+                    self._log(f"停止命令异常: {type(e).__name__}: {e}")
             else:
-                # Linux下停止Nginx
-                cmd = ["nginx", "-s", "quit"]
-                subprocess.run(cmd, check=True, capture_output=True)
+                # Linux下停止Nginx，使用-c参数指定配置文件路径
+                nginx_cmd = self._get_linux_nginx_cmd()
+                if not nginx_cmd:
+                    self._log("错误: 未找到Nginx可执行文件")
+                    self._force_stop()
+                    return False
+
+                cmd = [nginx_cmd, "-c", config_path, "-s", "quit"]
+                self._log(f"Linux下停止命令: {cmd}")
+                try:
+                    # Linux下也需要设置工作目录为Nginx可执行文件所在目录
+                    nginx_cwd = os.path.dirname(os.path.abspath(nginx_cmd))
+                    if not nginx_cwd:
+                        nginx_cwd = "/etc/nginx"  # 默认工作目录
+                    result = subprocess.run(cmd, capture_output=True, text=True, cwd=nginx_cwd, timeout=10)
+                    if result.returncode != 0:
+                        self._log(f"停止命令返回非零码: {result.returncode}")
+                        if result.stderr:
+                            self._log(f"停止错误输出: {result.stderr}")
+                except subprocess.TimeoutExpired:
+                    self._log("停止命令超时")
+                except Exception as e:
+                    self._log(f"停止命令异常: {type(e).__name__}: {e}")
             
             # 等待Nginx完全停止
-            time.sleep(1)
+            time.sleep(2)
             
             # 如果Nginx仍在运行，强制停止
             if self.is_running():
                 self._log("Nginx仍在运行，尝试强制停止...")
                 self._force_stop()
+            else:
+                self.state = NginxState.STOPPED
+                self._log("Nginx停止成功")
+                return True
             
             self.state = NginxState.STOPPED
             self._log("Nginx停止成功")
             return True
-        except subprocess.CalledProcessError as e:
-            self._log(f"Nginx停止命令执行失败: {e.stderr.decode() if e.stderr else str(e)}")
-            # 尝试强制停止
-            self._force_stop()
-            return False
         except Exception as e:
             self._log(f"Nginx停止失败: {str(e)}")
             # 尝试强制停止
             self._force_stop()
             return False
+    
+    def _get_linux_nginx_cmd(self) -> str:
+        """
+        获取Linux系统下的Nginx命令路径
+        
+        Returns:
+            str: Nginx命令路径，如果未找到则返回空字符串
+        """
+        # Linux下使用which命令查找系统安装的Nginx
+        # 不依赖install_path配置，因为Linux通过包管理器安装
+        try:
+            result = subprocess.run(["which", "nginx"], capture_output=True, text=True, check=True)
+            nginx_path = result.stdout.strip()
+            if nginx_path and os.path.isfile(nginx_path) and os.access(nginx_path, os.X_OK):
+                return nginx_path
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+        
+        # 尝试常见的安装路径
+        common_paths = ["/usr/sbin/nginx", "/usr/local/nginx/sbin/nginx", "/opt/nginx/sbin/nginx"]
+        for path in common_paths:
+            if os.path.isfile(path) and os.access(path, os.X_OK):
+                return path
+        
+        return ""
     
     def _force_stop(self) -> bool:
         """
@@ -299,14 +468,39 @@ class NginxController:
                 subprocess.run(["taskkill", "/F", "/IM", "nginx.exe"], check=True, capture_output=True)
             else:
                 # Linux下强制停止Nginx进程
-                result = subprocess.run(["lsof", "-i", ":80", "-t"], capture_output=True, text=True)
+                # 获取配置文件路径
+                config_path = os.path.abspath(self.nginx_generator._config_path)
+                nginx_cmd = self._get_linux_nginx_cmd()
+                
+                if nginx_cmd:
+                    # 尝试使用nginx -s stop停止
+                    try:
+                        subprocess.run([nginx_cmd, "-c", config_path, "-s", "stop"], 
+                                     capture_output=True, timeout=5)
+                    except Exception:
+                        pass
+                
+                # 查找并终止Nginx进程
+                result = subprocess.run(["pgrep", "-f", f"nginx.*{config_path}"], 
+                                      capture_output=True, text=True)
                 if result.returncode == 0 and result.stdout.strip():
-                    pid = int(result.stdout.strip())
-                    os.kill(pid, signal.SIGTERM)
+                    for pid_str in result.stdout.strip().split('\n'):
+                        try:
+                            pid = int(pid_str.strip())
+                            os.kill(pid, signal.SIGTERM)
+                        except (ValueError, ProcessLookupError):
+                            continue
                     time.sleep(1)
                     # 如果仍在运行，使用SIGKILL
-                    if subprocess.run(["lsof", "-i", ":80", "-t"], capture_output=True, text=True).stdout.strip():
-                        os.kill(pid, signal.SIGKILL)
+                    result = subprocess.run(["pgrep", "-f", f"nginx.*{config_path}"], 
+                                          capture_output=True, text=True)
+                    if result.returncode == 0 and result.stdout.strip():
+                        for pid_str in result.stdout.strip().split('\n'):
+                            try:
+                                pid = int(pid_str.strip())
+                                os.kill(pid, signal.SIGKILL)
+                            except (ValueError, ProcessLookupError):
+                                continue
             
             self.state = NginxState.STOPPED
             self._log("Nginx已强制停止")
