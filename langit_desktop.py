@@ -16,7 +16,7 @@ def main():
     """
     主函数
     
-    初始化QApplication，显示首屏，异步初始化配置文件，完成后显示主窗口
+    初始化QApplication，显示首屏，异步初始化流程，完成后显示主窗口
     """
     # 创建应用程序实例
     app = QApplication(sys.argv)

@@ -7,9 +7,16 @@ import os
 from typing import Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from passlib.context import CryptContext
 
 # 导入模型
 from models import Base, engine, SessionLocal
+
+# 密码哈希上下文
+pwd_context = CryptContext(
+    schemes=["bcrypt"], 
+    deprecated="auto"
+)
 
 
 class DatabaseInitializer:
@@ -67,7 +74,7 @@ class DatabaseInitializer:
         """
         try:
             # 获取会话
-            session = SessionLocal() if not self.SessionLocal else self.SessionLocal()
+            session = SessionLocal() if self.SessionLocal is None else self.SessionLocal()
             
             # 检查是否已有用户数据
             from models.user import User
@@ -78,7 +85,7 @@ class DatabaseInitializer:
                 admin_user = User(
                     username="admin",
                     email="admin@example.com",
-                    password="admin123",  # 注意：实际生产环境中应该使用哈希密码
+                    password=pwd_context.hash("admin123"[:72]),  # 使用哈希密码，限制长度
                     full_name="Admin User",
                     is_active=True,
                     is_admin=True
@@ -89,7 +96,7 @@ class DatabaseInitializer:
                 test_user = User(
                     username="test",
                     email="test@example.com",
-                    password="test123",  # 注意：实际生产环境中应该使用哈希密码
+                    password=pwd_context.hash("test123"[:72]),  # 使用哈希密码，限制长度
                     full_name="Test User",
                     is_active=True,
                     is_admin=False
