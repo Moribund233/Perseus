@@ -89,10 +89,10 @@ class NginxController:
             bool: 启用代理返回True，否则返回False
         """
         try:
-            import toml
-            with open(self.config_path, "r", encoding="utf-8") as f:
-                config = toml.load(f)
-            return config.get("nginx", {}).get("proxy", False)
+            # 使用config_manager获取配置值
+            from client.utils.config_manager import get_client_config_manager
+            config_manager = get_client_config_manager(self.config_path)
+            return config_manager.get("nginx.proxy", False)
         except Exception as e:
             self._log(f"检查代理配置失败: {e}")
             return False
@@ -105,10 +105,10 @@ class NginxController:
             dict: Nginx配置
         """
         try:
-            import toml
-            with open(self.config_path, "r", encoding="utf-8") as f:
-                config = toml.load(f)
-            return config.get("nginx", {})
+            # 使用config_manager获取配置值
+            from client.utils.config_manager import get_client_config_manager
+            config_manager = get_client_config_manager(self.config_path)
+            return config_manager.get_nginx_config()
         except Exception as e:
             self._log(f"获取Nginx配置失败: {e}")
             return {}
@@ -182,7 +182,7 @@ class NginxController:
             self._log(f"Nginx工作目录: {nginx_cwd}")
             
             # 获取配置文件绝对路径
-            config_path = os.path.abspath(self.nginx_generator._config_path)
+            config_path = os.path.abspath(self.nginx_generator.get_config_path())
             self._log(f"Nginx配置文件绝对路径: {config_path}")
             
             if sys.platform == "win32":
@@ -270,12 +270,14 @@ class NginxController:
             else:
                 # Linux下启动Nginx，使用-c参数指定配置文件路径
                 # 首先检查Nginx是否已安装
-                nginx_cmd = self._get_linux_nginx_cmd()
+                nginx_cmd = self.nginx_downloader.get_nginx_path()
                 if not nginx_cmd:
                     self._log("错误: 未找到Nginx可执行文件，请确保已通过包管理器安装Nginx")
                     self.state = NginxState.ERROR
                     return False
                 
+                # 获取配置文件绝对路径
+                config_path = os.path.abspath(self.nginx_generator.get_config_path())
                 self._log(f"Linux Nginx命令: {nginx_cmd}")
                 self._log(f"Linux配置文件路径: {config_path}")
                 
@@ -344,7 +346,6 @@ class NginxController:
             self.state = NginxState.ERROR
             self._log(f"Nginx启动失败 - 错误: {type(e).__name__}: {str(e)}")
             return False
-            return False
     
     def stop(self) -> bool:
         """
@@ -362,7 +363,7 @@ class NginxController:
 
         try:
             # 获取配置文件绝对路径
-            config_path = os.path.abspath(self.nginx_generator._config_path)
+            config_path = os.path.abspath(self.nginx_generator.get_config_path())
 
             # 获取Nginx工作目录（nginx.exe所在目录）
             nginx_path = self.nginx_downloader.get_nginx_path()
@@ -386,7 +387,7 @@ class NginxController:
                     self._log(f"停止命令异常: {type(e).__name__}: {e}")
             else:
                 # Linux下停止Nginx，使用-c参数指定配置文件路径
-                nginx_cmd = self._get_linux_nginx_cmd()
+                nginx_cmd = self.nginx_downloader.get_nginx_path()
                 if not nginx_cmd:
                     self._log("错误: 未找到Nginx可执行文件")
                     self._force_stop()
@@ -429,32 +430,7 @@ class NginxController:
             # 尝试强制停止
             self._force_stop()
             return False
-    
-    def _get_linux_nginx_cmd(self) -> str:
-        """
-        获取Linux系统下的Nginx命令路径
-        
-        Returns:
-            str: Nginx命令路径，如果未找到则返回空字符串
-        """
-        # Linux下使用which命令查找系统安装的Nginx
-        # 不依赖install_path配置，因为Linux通过包管理器安装
-        try:
-            result = subprocess.run(["which", "nginx"], capture_output=True, text=True, check=True)
-            nginx_path = result.stdout.strip()
-            if nginx_path and os.path.isfile(nginx_path) and os.access(nginx_path, os.X_OK):
-                return nginx_path
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            pass
-        
-        # 尝试常见的安装路径
-        common_paths = ["/usr/sbin/nginx", "/usr/local/nginx/sbin/nginx", "/opt/nginx/sbin/nginx"]
-        for path in common_paths:
-            if os.path.isfile(path) and os.access(path, os.X_OK):
-                return path
-        
-        return ""
-    
+
     def _force_stop(self) -> bool:
         """
         强制停止Nginx服务器
@@ -469,16 +445,16 @@ class NginxController:
             else:
                 # Linux下强制停止Nginx进程
                 # 获取配置文件路径
-                config_path = os.path.abspath(self.nginx_generator._config_path)
-                nginx_cmd = self._get_linux_nginx_cmd()
+                config_path = os.path.abspath(self.nginx_generator.get_config_path())
                 
-                if nginx_cmd:
-                    # 尝试使用nginx -s stop停止
-                    try:
+                # 尝试使用nginx -s stop停止
+                try:
+                    nginx_cmd = self.nginx_downloader.get_nginx_path()
+                    if nginx_cmd:
                         subprocess.run([nginx_cmd, "-c", config_path, "-s", "stop"], 
                                      capture_output=True, timeout=5)
-                    except Exception:
-                        pass
+                except Exception:
+                    pass
                 
                 # 查找并终止Nginx进程
                 result = subprocess.run(["pgrep", "-f", f"nginx.*{config_path}"], 
@@ -544,7 +520,7 @@ class NginxController:
                 return "nginx.exe" in result.stdout
             else:
                 # Linux下优先检查PID文件
-                config_path = os.path.abspath(self.nginx_generator._config_path)
+                config_path = os.path.abspath(self.nginx_generator.get_config_path())
                 pid_file = os.path.join(os.path.dirname(config_path), "nginx.pid")
                 
                 if os.path.exists(pid_file):

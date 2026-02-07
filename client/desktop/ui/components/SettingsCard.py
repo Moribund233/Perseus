@@ -109,7 +109,7 @@ class SettingsCard(QWidget):
         # Nginx代理开关
         config_layout.addWidget(QLabel("启用代理:"), 6, 0)
         self.nginx_proxy_check = QCheckBox()
-        self.nginx_proxy_check.clicked.connect(lambda checked: self.config_changed.emit("nginx.proxy", str(checked)))
+        self.nginx_proxy_check.clicked.connect(lambda checked: self.config_changed.emit("nginx.proxy", checked))
         config_layout.addWidget(self.nginx_proxy_check, 6, 1)
         
         # Nginx监听端口

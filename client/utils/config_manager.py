@@ -253,7 +253,7 @@ class ClientConfigManager:
                 },
                 "nginx": {
                 "enabled": True,
-                "proxy": True,
+                "proxy": False,
                 "version": "1.26.0",
                 "mirror_url": None,
                 "install_path": "nginx",
@@ -499,12 +499,9 @@ class ClientConfigManager:
         Returns:
             bool: 更新成功返回True，否则返回False
         """
-        config = self.load_config()
-        nginx = config.get("nginx", {})
-        nginx["api_host"] = host
-        nginx["api_port"] = port
-        config["nginx"] = nginx
-        return self.save_config(config)
+        self.set("nginx.api_host", host)
+        self.set("nginx.api_port", port)
+        return True
     
     def toggle_nginx(self, enabled: bool) -> bool:
         """

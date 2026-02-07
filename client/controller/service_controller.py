@@ -10,7 +10,7 @@ import subprocess
 import signal
 import time
 import threading
-from typing import Optional, Callable, List
+from typing import Optional, Callable, List, Any
 from enum import Enum
 from client.utils.log_manager import get_log_manager
 from client.controller.nginx_controller import get_nginx_controller
@@ -45,6 +45,8 @@ class ServiceController:
         self.state = ServiceState.STOPPED
         self.log_manager = get_log_manager()
         self.nginx_controller = get_nginx_controller(config_path)
+        from client.utils.config_manager import get_client_config_manager
+        self.config_manager = get_client_config_manager(config_path)
     
     def set_log_callback(self, callback: Callable[[str], None]) -> None:
         """
@@ -90,64 +92,17 @@ class ServiceController:
         Returns:
             bool: 端口可用返回True，否则返回False
         """
-        if sys.platform == "win32":
-            result = subprocess.run(
-                ["netstat", "-ano", f"| findstr :{port}"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                shell=True
-            )
-            return "LISTENING" not in result.stdout
-        else:
-            result = subprocess.run(
-                ["lsof", "-i", f":{port}", "-t"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            return result.returncode != 0 or not result.stdout.strip()
-    
-    def get_config_value(self, key: str) -> Optional[str]:
-        """
-        获取配置值
-        
-        Args:
-            key: 配置键名，支持点号分隔的嵌套键，如 'server.port'
-            
-        Returns:
-            Optional[str]: 配置值，不存在返回None
-        """
-        if not os.path.exists(self.config_path):
-            self._log(f"配置文件不存在: {self.config_path}")
-            return None
-        
+        import socket
         try:
-            import toml
-            with open(self.config_path, "r", encoding="utf-8") as f:
-                config = toml.load(f)
-            
-            keys = key.split(".")
-            value = config
-            for k in keys:
-                if isinstance(value, dict) and k in value:
-                    value = value[k]
-                else:
-                    self._log(f"配置项不存在: {key}")
-                    return None
-            
-            return str(value)
-        except toml.TomlDecodeError as e:
-            self._log(f"配置文件格式错误: {e}")
-            return None
-        except PermissionError as e:
-            self._log(f"无权限读取配置文件: {e}")
-            return None
-        except Exception as e:
-            self._log(f"读取配置值失败: {key} - {e}")
-            return None
-    
-    def update_config(self, key: str, value: str) -> bool:
+            # 使用socket库检查端口是否可用，跨平台且高效
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(1)
+                s.bind(("", port))
+                return True
+        except OSError:
+            return False
+
+    def update_config(self, key: str, value: Any) -> bool:
         """
         更新配置值
         
@@ -158,50 +113,7 @@ class ServiceController:
         Returns:
             bool: 更新成功返回True，否则返回False
         """
-        if not os.path.exists(self.config_path):
-            self._log(f"配置文件不存在: {self.config_path}")
-            return False
-        
-        try:
-            import toml
-            with open(self.config_path, "r", encoding="utf-8") as f:
-                config = toml.load(f)
-            
-            keys = key.split(".")
-            current = config
-            for k in keys[:-1]:
-                if k not in current:
-                    current[k] = {}
-                current = current[k]
-            
-            # 尝试转换为合适的类型
-            try:
-                if value.isdigit():
-                    value = int(value)
-                elif value.lower() in ("true", "false"):
-                    value = value.lower() == "true"
-            except ValueError:
-                pass
-            
-            current[keys[-1]] = value
-            
-            with open(self.config_path, "w", encoding="utf-8") as f:
-                toml.dump(config, f)
-            
-            self._log(f"配置已更新: {key} = {value}")
-            return True
-        except toml.TomlDecodeError as e:
-            self._log(f"配置文件格式错误: {e}")
-            return False
-        except PermissionError as e:
-            self._log(f"无权限读写配置文件: {e}")
-            return False
-        except IsADirectoryError as e:
-            self._log(f"配置路径是目录，不是文件: {e}")
-            return False
-        except Exception as e:
-            self._log(f"配置更新失败: {key} = {value} - {type(e).__name__}: {e}")
-            return False
+        return self.config_manager.set(key, value)
     
     def start(self, block: bool = False, timeout: int = 10) -> bool:
         """
@@ -218,7 +130,7 @@ class ServiceController:
             self._log("服务已在运行中")
             return False
         
-        port_str = self.get_config_value("server.port")
+        port_str = self.config_manager.get("server.port")
         port = int(port_str) if port_str else 8000
         
         # 检查并释放端口
@@ -237,8 +149,8 @@ class ServiceController:
             import uvicorn
             
             # 获取配置
-            host = self.get_config_value("server.host") or "127.0.0.1"
-            log_level = self.get_config_value("server.log_level") or "info"
+            host = self.config_manager.get("server.host") or "127.0.0.1"
+            log_level = self.config_manager.get("server.log_level") or "info"
             
             # 禁用reload模式，在打包应用中reload会导致问题
             reload = False
@@ -322,7 +234,7 @@ class ServiceController:
             if hasattr(self, 'server_thread') and self.server_thread.is_alive():
                 # 尝试HTTP请求检测服务是否可用
                 try:
-                    port_str = self.get_config_value("server.port")
+                    port_str = self.config_manager.get("server.port")
                     port = int(port_str) if port_str else 8000
                     import httpx
                     response = httpx.get(f"http://localhost:{port}/health", timeout=2)
@@ -458,7 +370,7 @@ class ServiceController:
                 self._log(f"停止服务线程失败: {e}")
         
         # 确保端口已释放
-        port_str = self.get_config_value("server.port")
+        port_str = self.config_manager.get("server.port")
         port = int(port_str) if port_str else 8000
         self._stop_port_processes(port)
         
@@ -512,7 +424,7 @@ class ServiceController:
             return True
         
         # 2. 检查端口是否被占用（中等速度）
-        port_str = self.get_config_value("server.port")
+        port_str = self.config_manager.get("server.port")
         port = int(port_str) if port_str else 8000
         
         # 先快速检查端口是否被占用，避免不必要的HTTP请求

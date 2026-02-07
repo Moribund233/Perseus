@@ -228,7 +228,7 @@ class MainWindow(QMainWindow):
 
         # 获取Nginx配置
         nginx_config = self.config_manager.get_nginx_config()
-        nginx_proxy = nginx_config.get("proxy", True)
+        nginx_proxy = nginx_config.get("proxy", False)
         nginx_port = nginx_config.get("listen_port", 8080)
         nginx_server_name = nginx_config.get("server_name", "localhost")
         
@@ -249,6 +249,18 @@ class MainWindow(QMainWindow):
         
         # 更新状态卡片
         self.update_status_card()
+        
+        # 配置更新检查
+        self.add_log_line("客户端准备就绪 - 配置已加载")
+        
+        # 验证配置有效性
+        is_valid, errors = self.config_manager.validate_config()
+        if is_valid:
+            self.add_log_line("配置验证通过，所有配置项有效")
+        else:
+            self.add_log_line(f"配置验证发现 {len(errors)} 个问题")
+            for error in errors:
+                self.add_log_line(f"  - {error}")
     
     def update_status_card(self):
         """

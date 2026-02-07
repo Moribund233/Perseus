@@ -299,15 +299,6 @@ class NginxDownloader(QThread):
         if platform.system() == "Windows":
             return self._install_path
         return ""
-    
-    def is_linux_nginx_installed(self) -> bool:
-        """
-        检测Linux系统是否已安装Nginx
-        
-        Returns:
-            bool: 已安装返回True，否则返回False
-        """
-        return self._get_linux_nginx_path() is not None
 
 
 class NginxConfigGenerator:
@@ -325,6 +316,8 @@ class NginxConfigGenerator:
             config_path: Nginx配置文件路径（优先使用，推荐）
             install_path: Nginx安装路径（仅Windows下用于生成默认配置路径）
         """
+        self._install_path = install_path
+        
         if config_path:
             # 如果提供了config_path，优先使用
             self._config_path = os.path.abspath(config_path)
@@ -421,19 +414,32 @@ class NginxConfigGenerator:
         # 获取mime.types的绝对路径
         mime_types_path = self._get_mime_types_path()
         
-        # 生成配置文件目录路径（用于存放pid、log等文件）
-        config_dir = os.path.dirname(self._config_path)
-        pid_path = os.path.join(config_dir, "nginx.pid")
+        # 使用install_path来构建相对路径，避免绝对路径的路径分隔符问题
+        # 如果提供了install_path，使用它作为基础，否则使用配置文件目录
+        if self._install_path and platform.system() == "Windows":
+            # Windows下使用相对路径，基于nginx.exe所在目录
+            pid_path = "logs/nginx.pid"
+            access_log_path = "logs/access.log"
+            error_log_path = "logs/error.log"
+            html_dir = "html"
+        else:
+            # Linux或其他情况，使用绝对路径
+            config_dir = os.path.dirname(self._config_path)
+            pid_path = os.path.join(config_dir, "nginx.pid")
+            log_dir = os.path.join(config_dir, "logs")
+            access_log_path = os.path.join(log_dir, "access.log")
+            error_log_path = os.path.join(log_dir, "error.log")
+            html_dir = os.path.join(config_dir, "html")
+            
+            # 处理Linux路径，确保使用正斜杠
+            pid_path = pid_path.replace('\\', '/')
+            access_log_path = access_log_path.replace('\\', '/')
+            error_log_path = error_log_path.replace('\\', '/')
+            html_dir = html_dir.replace('\\', '/')
         
-        # 生成日志目录路径
-        log_dir = os.path.join(config_dir, "logs")
-        access_log_path = os.path.join(log_dir, "access.log")
-        error_log_path = os.path.join(log_dir, "error.log")
+        # 处理mime.types路径
+        mime_types_path = mime_types_path.replace('\\', '/')
         
-        # 生成静态文件目录路径
-        html_dir = os.path.join(config_dir, "html")
-        
-        # 基础配置模板
         base_config = f"""
 worker_processes  {config.get('worker_processes', 'auto')};
 pid {pid_path};
@@ -449,7 +455,7 @@ http {{
     sendfile        on;
     keepalive_timeout  {config.get('keepalive_timeout', 65)};
     
-    # 日志配置（用户目录下，避免权限问题）
+    # 日志配置
     access_log  {access_log_path};
     error_log   {error_log_path};
 
@@ -496,6 +502,15 @@ http {{
             'api_host': 'localhost',
             'api_port': 8000
         }
+    
+    def get_config_path(self) -> str:
+        """
+        获取配置文件路径
+        
+        Returns:
+            str: 配置文件路径
+        """
+        return self._config_path
     
     def update_config(self, key: str, value: Any) -> bool:
         """
