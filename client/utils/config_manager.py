@@ -374,10 +374,12 @@ class ClientConfigManager:
             if not isinstance(nginx["mirror_url"], str):
                 errors.append("Nginx镜像URL必须是字符串")
         
-        # 验证install_path是否为非空字符串
-        if "install_path" in nginx:
-            if not isinstance(nginx["install_path"], str) or not nginx["install_path"].strip():
-                errors.append("Nginx安装路径不能为空")
+        # 验证install_path是否为非空字符串（仅Windows需要）
+        import platform
+        if platform.system() == "Windows":
+            if "install_path" in nginx:
+                if not isinstance(nginx["install_path"], str) or not nginx["install_path"].strip():
+                    errors.append("Nginx安装路径不能为空")
         
         # 验证worker_processes
         if "worker_processes" in nginx:
