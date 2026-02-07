@@ -1,0 +1,27 @@
+{
+  "containers": {
+    "bottomPanel": {
+      "visible": true,
+      "height": 150,
+      "resizable": true
+    },
+    "auxSidebar": {
+      "visible": true,
+      "width": 200,
+      "resizable": true
+    }
+  },
+  "sidebar": {
+    "mainSidebar": {
+      "collapsed": false,
+      "width": {
+        "expanded": 250,
+        "collapsed": 60
+      }
+    }
+  },
+  "theme": {
+    "mode": "light",
+    "primaryColor": "#3498db"
+  }
+}

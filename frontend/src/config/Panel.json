@@ -1,0 +1,22 @@
+{
+  "panels": [
+    {
+      "id": "panel1",
+      "title": "示例面板1",
+      "visible": true,
+      "component": "ExamplePanel1New"
+    },
+    {
+      "id": "panel2",
+      "title": "示例面板2",
+      "visible": true,
+      "component": "ExamplePanel2New"
+    },
+    {
+      "id": "panel3",
+      "title": "设置面板",
+      "visible": true,
+      "component": "ExamplePanel3New"
+    }
+  ]
+}

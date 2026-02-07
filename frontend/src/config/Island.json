@@ -1,0 +1,16 @@
+{
+    "Debug":[
+        {
+            "name": "示例路由1",
+            "icon": "/src/assets/icons/Debug.svg",
+            "route": "/debug/example1",
+            "component": "Example1"
+        },
+        {
+            "name": "示例路由2",
+            "icon": "/src/assets/icons/Debug.svg",
+            "route": "/debug/example2",
+            "component": "Example2"
+        }
+    ]
+}

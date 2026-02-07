@@ -141,3 +141,10 @@ Thumbs.db
 # Custom
 *.log
 nginx/
+
+# node_modules
+node_modules/
+
+# lock files
+yarn.lock
+package-lock.json

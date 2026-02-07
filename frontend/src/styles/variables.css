@@ -1,0 +1,234 @@
+/* CSS 变量定义 - 基础主题变量 */
+
+/* 基础颜色变量 */
+:root {
+  /* 容器相关颜色 */
+  --color-titlebar-bg: #2c3e50;
+  --color-titlebar-border: #1a252f;
+  --color-titlebar-text: #ffffff;
+  --color-titlebar-hover: rgba(255, 255, 255, 0.1);
+  --color-titlebar-minimize: #f39c12;
+  --color-titlebar-maximize: #27ae60;
+  --color-titlebar-close: #e74c3c;
+  
+  /* 侧边栏颜色 */
+  --color-sidebar-bg: #34495e;
+  --color-sidebar-border: #2c3e50;
+  --color-sidebar-text: #ffffff;
+  --color-sidebar-text-secondary: #ecf0f1;
+  
+  /* 主内容区域颜色 */
+  --color-main-content-bg: #ecf0f1;
+  --color-main-content-text: #2c3e50;
+  
+  /* 辅助侧边栏颜色 */
+  --color-aux-sidebar-bg: #7f8c8d;
+  --color-aux-sidebar-border: #6c7b7b;
+  --color-aux-sidebar-text: #ffffff;
+  
+  /* 底部面板颜色 */
+  --color-bottom-panel-bg: #95a5a6;
+  --color-bottom-panel-border: #7f8c8d;
+  --color-bottom-panel-text: #ffffff;
+  
+  /* 主侧边栏具体元素 */
+  --color-main-sidebar-bg: #f5f5f5;
+  --color-main-sidebar-border: #e0e0e0;
+  --color-main-sidebar-text: #333333;
+  --color-main-sidebar-text-secondary: #666666;
+  --color-main-sidebar-section-border: #e0e0e0;
+  --color-main-sidebar-hover: rgba(0, 0, 0, 0.05);
+  --color-main-sidebar-active: #3498db;
+  --color-main-sidebar-active-text: #ffffff;
+  
+  /* 状态颜色 */
+  --color-success: #27ae60;
+  --color-warning: #f39c12;
+  --color-error: #e74c3c;
+  --color-info: #3498db;
+  
+  /* 中性颜色 */
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-gray-100: #f8f9fa;
+  --color-gray-200: #e9ecef;
+  --color-gray-300: #dee2e6;
+  --color-gray-400: #ced4da;
+  --color-gray-500: #adb5bd;
+  --color-gray-600: #6c757d;
+  --color-gray-700: #495057;
+  --color-gray-800: #343a40;
+  --color-gray-900: #212529;
+  
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  
+  /* 圆角 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  
+  /* 过渡 */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+  --transition-slow: 0.3s ease;
+  
+  /* 图标 */
+  --color-icon-filter: none;
+  
+  /* 卡片组件变量 */
+  --color-card-bg: #ffffff;
+  --color-card-border: #e0e0e0;
+  --color-card-divider: #f0f0f0;
+  --color-card-title: #333333;
+  --color-card-description: #666666;
+}
+
+/* 现代主题 */
+.theme-modern {
+  /* 设计令牌变量 */
+  --color-primary: #3498db;
+  --color-background: #f8f9fa;
+  --color-surface: #ffffff;
+  --color-border: #e0e0e0;
+  --color-text: #333333;
+  --color-text-secondary: #666666;
+  --color-hover: rgba(0, 0, 0, 0.05);
+  
+  /* 容器相关 */
+  --color-titlebar-bg: var(--color-primary);
+  --color-titlebar-border: var(--color-gray-700);
+  --color-titlebar-text: var(--color-white);
+  --color-titlebar-hover: rgba(255, 255, 255, 0.1);
+  
+  /* 侧边栏 */
+  --color-sidebar-bg: var(--color-surface);
+  --color-sidebar-border: var(--color-border);
+  --color-sidebar-text: var(--color-text);
+  --color-sidebar-text-secondary: var(--color-text-secondary);
+  
+  /* 主内容区域 */
+  --color-main-content-bg: var(--color-background);
+  --color-main-content-text: var(--color-text);
+  
+  /* 主侧边栏 */
+  --color-main-sidebar-bg: var(--color-surface);
+  --color-main-sidebar-border: var(--color-border);
+  --color-main-sidebar-text: var(--color-text);
+  --color-main-sidebar-text-secondary: var(--color-text-secondary);
+  --color-main-sidebar-section-border: var(--color-border);
+  --color-main-sidebar-hover: var(--color-hover);
+  --color-main-sidebar-active: var(--color-primary);
+  --color-main-sidebar-active-text: var(--color-white);
+  --color-main-sidebar-toggle-bg: var(--color-gray-400);
+  --color-main-sidebar-toggle-active: var(--color-primary);
+  
+  /* 卡片组件 */
+  --color-card-bg: var(--color-surface);
+  --color-card-border: var(--color-border);
+  --color-card-divider: var(--color-border);
+  --color-card-title: var(--color-text);
+  --color-card-description: var(--color-text-secondary);
+}
+
+/* 明亮主题 */
+.theme-light {
+  /* 设计令牌变量 */
+  --color-primary: #4f46e5;
+  --color-background: #f8fafc;
+  --color-surface: #ffffff;
+  --color-border: #e2e8f0;
+  --color-text: #1e293b;
+  --color-text-secondary: #64748b;
+  --color-hover: rgba(0, 0, 0, 0.05);
+  
+  /* 容器相关 */
+  --color-titlebar-bg: #4f46e5;
+  --color-titlebar-border: #3730a3;
+  --color-titlebar-text: var(--color-white);
+  --color-titlebar-hover: rgba(255, 255, 255, 0.1);
+  --color-titlebar-minimize: var(--color-warning);
+  --color-titlebar-maximize: var(--color-success);
+  --color-titlebar-close: var(--color-error);
+  
+  /* 侧边栏 */
+  --color-sidebar-bg: var(--color-surface);
+  --color-sidebar-border: var(--color-border);
+  --color-sidebar-text: var(--color-text);
+  --color-sidebar-text-secondary: var(--color-text-secondary);
+  
+  /* 主内容区域 */
+  --color-main-content-bg: var(--color-background);
+  --color-main-content-text: var(--color-text);
+  
+  /* 主侧边栏 */
+  --color-main-sidebar-bg: var(--color-white);
+  --color-main-sidebar-border: var(--color-border);
+  --color-main-sidebar-text: var(--color-text);
+  --color-main-sidebar-text-secondary: var(--color-text-secondary);
+  --color-main-sidebar-section-border: var(--color-border);
+  --color-main-sidebar-hover: var(--color-hover);
+  --color-main-sidebar-active: var(--color-primary);
+  --color-main-sidebar-active-text: var(--color-white);
+  --color-main-sidebar-toggle-bg: var(--color-gray-300);
+  --color-main-sidebar-toggle-active: var(--color-primary);
+  
+  /* 卡片组件 */
+  --color-card-bg: var(--color-white);
+  --color-card-border: var(--color-border);
+  --color-card-divider: var(--color-border);
+  --color-card-title: var(--color-text);
+  --color-card-description: var(--color-text-secondary);
+}
+
+/* 暗黑主题 */
+.theme-dark {
+  /* 设计令牌变量 */
+  --color-primary: #6366f1;
+  --color-background: #0f172a;
+  --color-surface: #1e293b;
+  --color-border: #334155;
+  --color-text: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-hover: rgba(255, 255, 255, 0.1);
+  
+  /* 容器相关 */
+  --color-titlebar-bg: #0f172a;
+  --color-titlebar-border: #020617;
+  --color-titlebar-text: var(--color-white);
+  --color-titlebar-hover: rgba(255, 255, 255, 0.1);
+  --color-titlebar-minimize: var(--color-warning);
+  --color-titlebar-maximize: var(--color-success);
+  --color-titlebar-close: var(--color-error);
+  
+  /* 侧边栏 */
+  --color-sidebar-bg: var(--color-surface);
+  --color-sidebar-border: var(--color-border);
+  --color-sidebar-text: var(--color-text);
+  --color-sidebar-text-secondary: var(--color-text-secondary);
+  
+  /* 主内容区域 */
+  --color-main-content-bg: var(--color-background);
+  --color-main-content-text: var(--color-text);
+  
+  /* 主侧边栏 */
+  --color-main-sidebar-bg: var(--color-surface);
+  --color-main-sidebar-border: var(--color-border);
+  --color-main-sidebar-text: var(--color-text);
+  --color-main-sidebar-text-secondary: var(--color-text-secondary);
+  --color-main-sidebar-section-border: var(--color-border);
+  --color-main-sidebar-hover: var(--color-hover);
+  --color-main-sidebar-active: var(--color-primary);
+  --color-main-sidebar-active-text: var(--color-white);
+  --color-main-sidebar-toggle-bg: var(--color-gray-600);
+  --color-main-sidebar-toggle-active: var(--color-primary);
+  
+  /* 卡片组件 */
+  --color-card-bg: var(--color-surface);
+  --color-card-border: var(--color-border);
+  --color-card-divider: var(--color-border);
+  --color-card-title: var(--color-text);
+  --color-card-description: var(--color-text-secondary);
+}

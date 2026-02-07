@@ -1,0 +1,11 @@
+{
+  "default": [],
+  "example1": [
+    {
+      "id": "colorPalette",
+      "title": "调色板",
+      "visible": true,
+      "component": "ColorPalette"
+    }
+  ]
+}
