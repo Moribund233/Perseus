@@ -543,14 +543,32 @@ class NginxController:
                 )
                 return "nginx.exe" in result.stdout
             else:
-                # Linux下检查Nginx进程
+                # Linux下优先检查PID文件
+                config_path = os.path.abspath(self.nginx_generator._config_path)
+                pid_file = os.path.join(os.path.dirname(config_path), "nginx.pid")
+                
+                if os.path.exists(pid_file):
+                    try:
+                        with open(pid_file, 'r') as f:
+                            pid = int(f.read().strip())
+                        # 检查进程是否存在
+                        os.kill(pid, 0)
+                        return True
+                    except (ValueError, ProcessLookupError, OSError):
+                        # PID文件存在但进程不存在，删除过期的PID文件
+                        try:
+                            os.remove(pid_file)
+                        except:
+                            pass
+                
+                # 备用方法：使用pgrep查找Nginx进程
                 result = subprocess.run(
-                    ["nginx", "-t"],
+                    ["pgrep", "-f", f"nginx.*{config_path}"],
                     capture_output=True,
                     text=True,
                     timeout=5
                 )
-                return result.returncode == 0
+                return result.returncode == 0 and bool(result.stdout.strip())
         except Exception as e:
             self._log(f"检查Nginx运行状态失败: {str(e)}")
             return False

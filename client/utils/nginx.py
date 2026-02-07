@@ -354,7 +354,28 @@ class NginxConfigGenerator:
             nginx_config = self._build_config_content(config)
             
             # 确保配置目录存在
-            os.makedirs(os.path.dirname(self._config_path), exist_ok=True)
+            config_dir = os.path.dirname(self._config_path)
+            os.makedirs(config_dir, exist_ok=True)
+            
+            # 确保日志目录存在
+            log_dir = os.path.join(config_dir, "logs")
+            os.makedirs(log_dir, exist_ok=True)
+            
+            # 确保静态文件目录存在
+            html_dir = os.path.join(config_dir, "html")
+            os.makedirs(html_dir, exist_ok=True)
+            
+            # 创建默认的index.html文件（如果不存在）
+            index_html_path = os.path.join(html_dir, "index.html")
+            if not os.path.exists(index_html_path):
+                with open(index_html_path, 'w', encoding='utf-8') as f:
+                    f.write("<html><body><h1>LanGit</h1><p>Welcome to LanGit!</p></body></html>")
+            
+            # 创建50x.html错误页面（如果不存在）
+            error_html_path = os.path.join(html_dir, "50x.html")
+            if not os.path.exists(error_html_path):
+                with open(error_html_path, 'w', encoding='utf-8') as f:
+                    f.write("<html><body><h1>Error</h1><p>An error occurred.</p></body></html>")
             
             # 写入配置文件
             with open(self._config_path, 'w', encoding='utf-8') as f:
@@ -364,6 +385,28 @@ class NginxConfigGenerator:
         except Exception as e:
             print(f"生成Nginx配置文件失败: {e}")
             return False
+    
+    def _get_mime_types_path(self) -> str:
+        """
+        获取mime.types文件的绝对路径
+        
+        Returns:
+            str: mime.types文件的绝对路径
+        """
+        # 常见mime.types文件位置
+        common_paths = [
+            "/etc/nginx/mime.types",
+            "/usr/local/nginx/conf/mime.types",
+            "/opt/nginx/conf/mime.types",
+        ]
+        
+        # 优先查找系统路径
+        for path in common_paths:
+            if os.path.isfile(path):
+                return path
+        
+        # 如果找不到，返回相对路径（兼容Windows）
+        return "mime.types"
     
     def _build_config_content(self, config: Dict[str, Any]) -> str:
         """
@@ -375,27 +418,47 @@ class NginxConfigGenerator:
         Returns:
             str: Nginx配置内容
         """
+        # 获取mime.types的绝对路径
+        mime_types_path = self._get_mime_types_path()
+        
+        # 生成配置文件目录路径（用于存放pid、log等文件）
+        config_dir = os.path.dirname(self._config_path)
+        pid_path = os.path.join(config_dir, "nginx.pid")
+        
+        # 生成日志目录路径
+        log_dir = os.path.join(config_dir, "logs")
+        access_log_path = os.path.join(log_dir, "access.log")
+        error_log_path = os.path.join(log_dir, "error.log")
+        
+        # 生成静态文件目录路径
+        html_dir = os.path.join(config_dir, "html")
+        
         # 基础配置模板
         base_config = f"""
 worker_processes  {config.get('worker_processes', 'auto')};
+pid {pid_path};
 
 events {{
     worker_connections  {config.get('worker_connections', 1024)};
 }}
 
 http {{
-    include       mime.types;
+    include       {mime_types_path};
     default_type  application/octet-stream;
 
     sendfile        on;
     keepalive_timeout  {config.get('keepalive_timeout', 65)};
+    
+    # 日志配置（用户目录下，避免权限问题）
+    access_log  {access_log_path};
+    error_log   {error_log_path};
 
     server {{
         listen       {config.get('listen_port', 80)};
         server_name  {config.get('server_name', 'localhost')};
 
         location / {{
-            root   html;
+            root   {html_dir};
             index  index.html index.htm;
         }}
 
@@ -410,7 +473,7 @@ http {{
 
         error_page   500 502 503 504  /50x.html;
         location = /50x.html {{
-            root   html;
+            root   {html_dir};
         }}
     }}
 }}
