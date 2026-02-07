@@ -19,6 +19,7 @@ from services.user_service import (
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 
+@router.get("")
 @router.get("/")
 async def get_users(db: Session = Depends(get_db)):
     """

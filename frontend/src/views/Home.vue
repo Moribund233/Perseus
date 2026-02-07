@@ -50,7 +50,7 @@
           <div class="info-item">
             <span class="info-label">API文档</span>
             <span class="info-value">
-              <a href="http://localhost:8000/docs" target="_blank" id="api-docs-link">/docs</a>
+              <a :href="`${API_BASE_URL}/docs`" target="_blank" id="api-docs-link">/docs</a>
             </span>
           </div>
           <div class="info-item">
@@ -141,7 +141,7 @@
       <!-- 开发文档卡片 -->
       <Card title="开发文档" usage="display">
         <div class="docs-list">
-          <a href="http://localhost:8000/docs" target="_blank" class="docs-item">
+          <a :href="`${API_BASE_URL}/docs`" target="_blank" class="docs-item">
             <span class="docs-icon">📖</span>
             <span class="docs-title">API 文档</span>
             <span class="docs-arrow">→</span>
@@ -170,10 +170,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import Card from '@/components/public/Card.vue';
-import { repositoryApi, commitApi } from '@/utils/api';
+import { repositoryApi, commitApi, API_BASE_URL } from '@/utils/api';
 
 // 状态管理
-const serviceUrl = ref('http://localhost:8000');
+const serviceUrl = ref(API_BASE_URL);
 const isConnected = ref(false);
 const repositories = ref<any[]>([]);
 const recentCommits = ref<any[]>([]);

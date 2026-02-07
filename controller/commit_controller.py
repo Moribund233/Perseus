@@ -25,6 +25,7 @@ router = APIRouter(prefix="/api/repositories", tags=["commits"])
 
 
 @router.get("/{repo_id}/commits")
+@router.get("/{repo_id}/commits/")
 async def get_commits(
     repo_id: int,
     limit: int = Query(100, ge=1, le=1000),

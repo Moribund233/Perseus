@@ -24,6 +24,7 @@ router = APIRouter(prefix="/api/repositories", tags=["branches"])
 
 
 @router.get("/{repo_id}/branches")
+@router.get("/{repo_id}/branches/")
 async def get_branches(repo_id: int, db: Session = Depends(get_db)):
     """
     获取仓库的所有分支

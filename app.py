@@ -25,16 +25,19 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
         description=config.app.description,
         version=config.app.version,
         debug=config.app.debug,
+        redirect_slashes=False,  # 禁用尾部斜杠重定向，避免CORS问题
     )
     
-    # 添加CORS中间件
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173", "http://127.0.0.1:5173"],  # 限制允许的来源
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # 限制允许的HTTP方法
-        allow_headers=["Content-Type", "Authorization"],  # 限制允许的请求头
-    )
+    # 根据是否启用Nginx反向代理来决定是否启用CORS中间件
+    if not config.nginx.proxy:
+        # 未启用Nginx反向代理，启用FastAPI的CORS中间件
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],  # 允许所有来源，生产环境中应该限制为特定域名
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # 限制允许的HTTP方法
+            allow_headers=["Content-Type", "Authorization"],  # 限制允许的请求头
+        )
     
     # 根路由
     @app.get("/")

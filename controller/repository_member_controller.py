@@ -23,6 +23,7 @@ router = APIRouter(prefix="/api/repositories", tags=["repository_members"])
 
 
 @router.get("/{repo_id}/members")
+@router.get("/{repo_id}/members/")
 async def get_repository_members(repo_id: int, db: Session = Depends(get_db)):
     """
     获取仓库的所有成员

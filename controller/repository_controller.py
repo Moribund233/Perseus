@@ -21,6 +21,7 @@ from services.repository_service import (
 router = APIRouter(prefix="/api/repositories", tags=["repositories"])
 
 
+@router.get("")
 @router.get("/")
 async def get_repositories(db: Session = Depends(get_db)):
     """

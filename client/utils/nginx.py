@@ -470,13 +470,50 @@ http {{
 
         # LanGit API代理配置
         location /api/ {{
-            proxy_pass http://{config.get('api_host', 'localhost')}:{config.get('api_port', 8000)}/;
-            proxy_set_header Host $host;
+            proxy_pass http://{config.get('api_host', 'localhost')}:{config.get('api_port', 8000)};
+            proxy_set_header Host $host:$server_port;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # 修改后端返回的重定向URL，确保使用正确的主机名和端口
+            proxy_redirect ~^http://([^/]+)(/.*)$ http://$host:$server_port$2;
+            
+            # CORS配置
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods 'GET, POST, PUT, DELETE, OPTIONS' always;
+            add_header Access-Control-Allow-Headers 'Content-Type, Authorization' always;
+            add_header Access-Control-Allow-Credentials 'true' always;
+            
+            # 处理OPTIONS请求
+            if ($request_method = 'OPTIONS') {{
+                return 204;
+            }}
         }}
 
+        # 健康检查路径配置
+        location /health {{
+            proxy_pass http://{config.get('api_host', 'localhost')}:{config.get('api_port', 8000)}/health;
+            proxy_set_header Host $host:$server_port;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # 修改后端返回的重定向URL，确保使用正确的主机名和端口
+            proxy_redirect ~^http://([^/]+)(/.*)$ http://$host:$server_port$2;
+            
+            # CORS配置
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods 'GET, OPTIONS' always;
+            add_header Access-Control-Allow-Headers 'Content-Type, Authorization' always;
+            add_header Access-Control-Allow-Credentials 'true' always;
+            
+            # 处理OPTIONS请求
+            if ($request_method = 'OPTIONS') {{
+                return 204;
+            }}
+        }}
+        
         error_page   500 502 503 504  /50x.html;
         location = /50x.html {{
             root   {html_dir};

@@ -1,5 +1,5 @@
 // API基础配置
-const API_BASE_URL = 'http://localhost:8000';
+export const API_BASE_URL = 'http://192.168.31.248:8080';
 
 // 通用请求配置
 interface RequestOptions {
