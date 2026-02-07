@@ -165,11 +165,14 @@ class DatabaseInitializer:
                 
                 # 创建提交数据
                 from models.commit import Commit
+                import hashlib
                 branches = session.query(Branch).all()
-                for branch in branches:
+                for i, branch in enumerate(branches):
+                    # 为每个分支生成唯一的commit hash
+                    unique_hash = hashlib.sha1(f"initial-commit-{branch.repository_id}-{branch.id}-{i}".encode()).hexdigest()
                     # 创建初始提交
                     initial_commit = Commit(
-                        hash="a" * 40,  # 模拟sha1哈希
+                        hash=unique_hash,  # 生成唯一的sha1哈希
                         repository_id=branch.repository_id,
                         branch_id=branch.id,
                         author_name="Admin User",

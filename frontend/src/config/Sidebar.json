@@ -9,6 +9,13 @@
         "settingId": "nav-home"
       },
       {
+        "name": "仓库",
+        "icon": "/src/assets/icons/repo.svg",
+        "route": "/repository",
+        "component": "Repository",
+        "settingId": "nav-repository"
+      },
+      {
         "name": "设置",
         "icon": "/src/assets/icons/Setting.svg",
         "route": "/setting",

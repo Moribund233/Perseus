@@ -12,5 +12,19 @@
             "route": "/debug/example2",
             "component": "Example2"
         }
+    ],
+    "Repository":[
+        {
+            "name": "仓库管理",
+            "icon": "/src/assets/icons/repo.svg",
+            "route": "/repository/management",
+            "component": "Management"
+        },
+        {
+            "name": "仓库详情",
+            "icon": "/src/assets/icons/repo.svg",
+            "route": "/repository/detail/1",
+            "component": "Detail"
+        }
     ]
 }

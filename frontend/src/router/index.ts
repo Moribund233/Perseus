@@ -6,6 +6,9 @@ import Example1 from '@/views/debug/Example1.vue'
 import Example2 from '@/views/debug/Example2.vue'
 import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
+import Repository from '@/views/Repository.vue'
+import Management from '@/views/repository/Management.vue'
+import Detail from '@/views/repository/Detail.vue'
 import { useUserStore } from '@/stores/user'
 
 const routes = [
@@ -32,6 +35,10 @@ const routes = [
     meta: { requiresAuth: true }, // 需要登录才能访问
     children: [
       {
+        path: '',
+        redirect: '/debug/example1'
+      },
+      {
         path: 'example1',
         name: 'Example1',
         component: Example1
@@ -54,6 +61,28 @@ const routes = [
     name: 'Register',
     component: Register,
     meta: { requiresAuth: false } // 不需要登录就能访问
+  },
+  {
+    path: '/repository',
+    name: 'Repository',
+    component: Repository,
+    meta: { requiresAuth: true }, // 需要登录才能访问
+    children: [
+      {
+        path: '',
+        redirect: '/repository/management'
+      },
+      {
+        path: 'management',
+        name: 'RepositoryManagement',
+        component: Management
+      },
+      {
+        path: 'detail/:id',
+        name: 'RepositoryDetail',
+        component: Detail
+      }
+    ]
   }
 ]
 
