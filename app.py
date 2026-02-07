@@ -30,7 +30,7 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     # 添加CORS中间件
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # 限制允许的来源
+        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173", "http://127.0.0.1:5173"],  # 限制允许的来源
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # 限制允许的HTTP方法
         allow_headers=["Content-Type", "Authorization"],  # 限制允许的请求头
@@ -54,6 +54,18 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
             "timestamp": datetime.now().isoformat(),
             "service": config.app.title
         }
+    
+    # 包含API路由
+    from api.user import router as user_router
+    app.include_router(user_router)
+    
+    # 包含错误API路由
+    from api.error import router as error_router
+    app.include_router(error_router)
+    
+    # 设置全局异常处理器
+    from utils.exception_handler import setup_exception_handlers
+    setup_exception_handlers(app)
     
     return app
 
@@ -144,6 +156,7 @@ def run_uvicorn():
         reload=config.server.reload,
         log_level=config.server.log_level,
         workers=1,  # 开发环境不需要多进程
+        reload_excludes=["frontend/**"]  # 排除前端目录，避免前端更改时后端频繁重载
     )
 
 
