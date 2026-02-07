@@ -59,6 +59,19 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     from api.user import router as user_router
     app.include_router(user_router)
     
+    # 包含仓库相关API路由
+    from api.repository import router as repository_router
+    app.include_router(repository_router)
+    
+    from api.repository_member import router as repository_member_router
+    app.include_router(repository_member_router)
+    
+    from api.branch import router as branch_router
+    app.include_router(branch_router)
+    
+    from api.commit import router as commit_router
+    app.include_router(commit_router)
+    
     # 包含错误API路由
     from api.error import router as error_router
     app.include_router(error_router)

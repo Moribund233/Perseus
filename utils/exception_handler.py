@@ -41,6 +41,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         return JSONResponse(
             status_code=exc.status_code,
             content={
+                "detail": exc.detail,
                 "error": {
                     "code": exc.status_code,
                     "message": exc.detail,
@@ -50,12 +51,14 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         )
     
     # 处理其他类型的异常
+    error_msg = "Internal Server Error"
     return JSONResponse(
         status_code=500,
         content={
+            "detail": error_msg,
             "error": {
                 "code": 500,
-                "message": "Internal Server Error",
+                "message": error_msg,
                 "type": "InternalServerError"
             }
         }
@@ -80,6 +83,7 @@ async def http_exception_handler(request: Request, exc: Exception) -> JSONRespon
         return JSONResponse(
             status_code=exc.status_code,
             content={
+                "detail": exc.detail,
                 "error": {
                     "code": exc.status_code,
                     "message": exc.detail,
@@ -120,6 +124,7 @@ async def validation_exception_handler(request: Request, exc: Exception) -> JSON
         return JSONResponse(
             status_code=400,
             content={
+                "detail": "Validation Error",
                 "error": {
                     "code": 400,
                     "message": "Validation Error",

@@ -21,5 +21,9 @@ Base = declarative_base()
 # 导入所有模型
 from models.base import BaseModel
 from models.user import User
+from models.repository import Repository
+from models.repository_member import RepositoryMember
+from models.branch import Branch
+from models.commit import Commit
 
-__all__ = ["Base", "SessionLocal", "engine", "BaseModel", "User"]
+__all__ = ["Base", "SessionLocal", "engine", "BaseModel", "User", "Repository", "RepositoryMember", "Branch", "Commit"]

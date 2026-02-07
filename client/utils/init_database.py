@@ -105,6 +105,84 @@ class DatabaseInitializer:
                 
                 session.commit()
                 print("测试用户数据创建成功")
+            
+            # 检查是否已有仓库数据
+            from models.repository import Repository
+            repo_count = session.query(Repository).count()
+            
+            if repo_count == 0:
+                # 获取管理员用户
+                admin_user = session.query(User).filter(User.username == "admin").first()
+                
+                # 创建测试仓库1
+                test_repo1 = Repository(
+                    name="test-repo-1",
+                    path="/repos/test-repo-1",
+                    description="第一个测试仓库",
+                    is_public=True,
+                    owner_id=admin_user.id,
+                    default_branch="master"
+                )
+                session.add(test_repo1)
+                
+                # 创建测试仓库2
+                test_repo2 = Repository(
+                    name="test-repo-2",
+                    path="/repos/test-repo-2",
+                    description="第二个测试仓库",
+                    is_public=False,
+                    owner_id=admin_user.id,
+                    default_branch="main"
+                )
+                session.add(test_repo2)
+                
+                session.commit()
+                print("测试仓库数据创建成功")
+                
+                # 创建分支数据
+                from models.branch import Branch
+                for repo in [test_repo1, test_repo2]:
+                    # 创建主分支
+                    main_branch = Branch(
+                        name=repo.default_branch,
+                        repository_id=repo.id,
+                        is_protected=True,
+                        is_default=True
+                    )
+                    session.add(main_branch)
+                    
+                    # 创建开发分支
+                    dev_branch = Branch(
+                        name="develop",
+                        repository_id=repo.id,
+                        is_protected=False,
+                        is_default=False
+                    )
+                    session.add(dev_branch)
+                
+                session.commit()
+                print("测试分支数据创建成功")
+                
+                # 创建提交数据
+                from models.commit import Commit
+                branches = session.query(Branch).all()
+                for branch in branches:
+                    # 创建初始提交
+                    initial_commit = Commit(
+                        hash="a" * 40,  # 模拟sha1哈希
+                        repository_id=branch.repository_id,
+                        branch_id=branch.id,
+                        author_name="Admin User",
+                        author_email="admin@example.com",
+                        committer_name="Admin User",
+                        committer_email="admin@example.com",
+                        commit_message="Initial commit",
+                        parent_hashes=""
+                    )
+                    session.add(initial_commit)
+                
+                session.commit()
+                print("测试提交数据创建成功")
         except Exception as e:
             session.rollback()
             print(f"创建测试数据失败: {e}")

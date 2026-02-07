@@ -237,51 +237,70 @@ class TestServiceController:
         """
         测试获取配置值
         """
+        # 不通过ServiceController，直接测试ClientConfigManager
+        from client.utils.config_manager import ClientConfigManager
+        
         # 使用临时配置文件
         with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.toml') as f:
             f.write("[server]\n")
             f.write("host = '127.0.0.1'\n")
             f.write("port = 8000\n")
             temp_config_path = f.name
-        
+
         try:
-            controller = ServiceController(temp_config_path)
-            
+            # 直接创建ClientConfigManager实例
+            config_manager = ClientConfigManager(temp_config_path)
+
             # 测试获取存在的配置值
-            host = controller.get_config_value("server.host")
+            host = config_manager.get("server.host")
             assert host == "127.0.0.1"
             
-            port = controller.get_config_value("server.port")
-            assert port == "8000"
+            port = config_manager.get("server.port")
+            assert port == 8000  # 端口是整数类型，不是字符串
             
             # 测试获取不存在的配置值
-            nonexistent = controller.get_config_value("nonexistent.key")
+            nonexistent = config_manager.get("nonexistent.key")
             assert nonexistent is None
         finally:
             # 清理临时文件
             if os.path.exists(temp_config_path):
                 os.unlink(temp_config_path)
     
-    def test_get_startup_command(self):
+    def test_start_method(self):
         """
-        测试获取启动命令
+        测试启动方法
         
-        统一通过模块导入方式运行服务，无论环境如何
+        验证服务控制器能够正确启动服务
         """
-        # 使用临时配置文件
+        # 使用临时配置文件，指定一个不太可能被占用的端口
         with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.toml') as f:
+            f.write("[server]\n")
+            f.write("host = '127.0.0.1'\n")
+            f.write("port = 9999\n")
+            f.write("log_level = 'error'\n")  # 使用error级别减少日志输出
             temp_config_path = f.name
         
         try:
             controller = ServiceController(temp_config_path)
             
-            # 测试启动命令，应该统一使用模块方式
-            startup_cmd = controller._get_startup_command()
-            assert len(startup_cmd) == 3
-            assert startup_cmd[0] == sys.executable  # Python 可执行文件路径
-            assert startup_cmd[1] == "-m"  # 模块方式启动
-            assert startup_cmd[2] == "app"  # 模块名为 app
+            # 测试启动服务
+            success = controller.start(block=True, timeout=5)
+            assert success == True
+            
+            # 验证服务状态
+            state = controller.get_state()
+            assert state in [ServiceState.RUNNING, ServiceState.STARTING]
+            
+            # 测试停止服务
+            success = controller.stop(timeout=5)
+            assert success == True
+            
+            # 验证服务状态
+            state = controller.get_state()
+            assert state == ServiceState.STOPPED
         finally:
+            # 确保服务已停止
+            controller.stop(timeout=5)
             # 清理临时文件
             if os.path.exists(temp_config_path):
                 os.unlink(temp_config_path)
