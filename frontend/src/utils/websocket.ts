@@ -1,11 +1,26 @@
 /**
  * WebSocket客户端核心模块
- * 
+ *
  * 提供WebSocket连接管理和消息处理功能
  */
 
 // WebSocket配置
 const WS_BASE_URL = 'ws://192.168.31.248:8080';
+
+// 兼容浏览器和Node.js环境的定时器函数
+// 使用函数形式在运行时动态选择，以支持测试中的 vi.useFakeTimers()
+const _setTimeout = (fn: (...args: any[]) => void, delay: number, ...args: any[]): ReturnType<typeof setTimeout> => {
+  return (typeof window !== 'undefined' ? window.setTimeout : setTimeout)(fn, delay, ...args);
+};
+const _setInterval = (fn: (...args: any[]) => void, delay: number, ...args: any[]): ReturnType<typeof setInterval> => {
+  return (typeof window !== 'undefined' ? window.setInterval : setInterval)(fn, delay, ...args);
+};
+const _clearTimeout = (id: ReturnType<typeof setTimeout>): void => {
+  return (typeof window !== 'undefined' ? window.clearTimeout : clearTimeout)(id);
+};
+const _clearInterval = (id: ReturnType<typeof setInterval>): void => {
+  return (typeof window !== 'undefined' ? window.clearInterval : clearInterval)(id);
+};
 
 // 消息类型定义
 export interface WebSocketMessage {
@@ -92,7 +107,10 @@ export class WebSocketClient {
       try {
         const message: WebSocketMessage = JSON.parse(event.data);
         this.handleMessage(message);
-        this.config.onMessage(message);
+        // 只有非pong消息才触发onMessage回调
+        if (message.type !== 'pong') {
+          this.config.onMessage(message);
+        }
       } catch (error) {
         console.error('[WebSocket] 消息解析失败:', error);
       }
@@ -159,7 +177,7 @@ export class WebSocketClient {
       `[WebSocket] ${this.config.reconnectInterval}ms后尝试第${this.reconnectAttempts}次重连...`
     );
 
-    this.reconnectTimer = window.setTimeout(() => {
+    this.reconnectTimer = _setTimeout(() => {
       this.connect();
     }, this.config.reconnectInterval);
   }
@@ -168,7 +186,7 @@ export class WebSocketClient {
    * 启动心跳
    */
   private startHeartbeat(): void {
-    this.heartbeatTimer = window.setInterval(() => {
+    this.heartbeatTimer = _setInterval(() => {
       this.send({
         type: 'ping',
         timestamp: new Date().toISOString(),
@@ -181,7 +199,7 @@ export class WebSocketClient {
    */
   private stopHeartbeat(): void {
     if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer);
+      _clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
     }
   }
@@ -263,7 +281,7 @@ export class WebSocketClient {
     this.stopHeartbeat();
 
     if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
+      _clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
 
