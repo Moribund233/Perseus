@@ -323,6 +323,109 @@ export const commitApi = {
   }
 };
 
+// 仓库浏览器 API
+export const repositoryBrowserApi = {
+  /**
+   * 获取仓库文件树
+   * @param repoId 仓库ID
+   * @param ref 分支名或提交SHA，默认为 HEAD
+   * @param path 子目录路径，默认为空（根目录）
+   */
+  getTree: async (repoId: number, ref: string = 'HEAD', path: string = '') => {
+    let url = `/api/repositories/${repoId}/tree?ref=${encodeURIComponent(ref)}`;
+    if (path) {
+      url += `&path=${encodeURIComponent(path)}`;
+    }
+    return apiRequest<{
+      path: string;
+      ref: string;
+      entries: Array<{
+        name: string;
+        type: 'blob' | 'tree';
+        path: string;
+      }>;
+    }>(url, {
+      method: 'GET',
+      requireAuth: true
+    });
+  },
+
+  /**
+   * 获取文件内容
+   * @param repoId 仓库ID
+   * @param path 文件路径
+   * @param ref 分支名或提交SHA，默认为 HEAD
+   */
+  getBlob: async (repoId: number, path: string, ref: string = 'HEAD') => {
+    const url = `/api/repositories/${repoId}/blob?path=${encodeURIComponent(path)}&ref=${encodeURIComponent(ref)}`;
+    return apiRequest<{
+      path: string;
+      ref: string;
+      content: string;
+      size: number;
+      is_binary: boolean;
+    }>(url, {
+      method: 'GET',
+      requireAuth: true
+    });
+  },
+
+  /**
+   * 获取提交历史
+   * @param repoId 仓库ID
+   * @param ref 分支名或提交SHA，默认为 HEAD
+   * @param limit 返回数量限制，默认为 20
+   * @param offset 偏移量，用于分页，默认为 0
+   */
+  getCommits: async (repoId: number, ref: string = 'HEAD', limit: number = 20, offset: number = 0) => {
+    const url = `/api/repositories/${repoId}/commits?ref=${encodeURIComponent(ref)}&limit=${limit}&offset=${offset}`;
+    return apiRequest<{
+      commits: Array<{
+        hash: string;
+        message: string;
+        author: string;
+        author_email: string;
+        timestamp: number;
+        parents: string[];
+      }>;
+      total: number;
+      ref: string;
+    }>(url, {
+      method: 'GET',
+      requireAuth: true
+    });
+  },
+
+  /**
+   * 获取代码对比
+   * @param repoId 仓库ID
+   * @param head 目标分支或提交，默认为 HEAD
+   * @param base 对比基准分支或提交，默认为 head 的父提交
+   */
+  getDiff: async (repoId: number, head: string = 'HEAD', base?: string) => {
+    let url = `/api/repositories/${repoId}/diff?head=${encodeURIComponent(head)}`;
+    if (base) {
+      url += `&base=${encodeURIComponent(base)}`;
+    }
+    return apiRequest<{
+      head: string;
+      base: string;
+      files: Array<{
+        path: string;
+        status: 'added' | 'modified' | 'deleted' | 'renamed';
+        additions: number;
+        deletions: number;
+        diff: string;
+      }>;
+      total_additions: number;
+      total_deletions: number;
+    }>(url, {
+      method: 'GET',
+      requireAuth: true
+    });
+  }
+};
+
 // 通用工具函数
 export const apiUtils = {
   // 检查用户是否已登录

@@ -7,18 +7,21 @@
 // WebSocket配置
 const WS_BASE_URL = 'ws://192.168.31.248:8080';
 
+// 定时器类型定义
+type TimerId = ReturnType<typeof setTimeout>;
+
 // 兼容浏览器和Node.js环境的定时器函数
 // 使用函数形式在运行时动态选择，以支持测试中的 vi.useFakeTimers()
-const _setTimeout = (fn: (...args: any[]) => void, delay: number, ...args: any[]): ReturnType<typeof setTimeout> => {
+const _setTimeout = (fn: (...args: any[]) => void, delay: number, ...args: any[]): TimerId => {
   return (typeof window !== 'undefined' ? window.setTimeout : setTimeout)(fn, delay, ...args);
 };
-const _setInterval = (fn: (...args: any[]) => void, delay: number, ...args: any[]): ReturnType<typeof setInterval> => {
+const _setInterval = (fn: (...args: any[]) => void, delay: number, ...args: any[]): TimerId => {
   return (typeof window !== 'undefined' ? window.setInterval : setInterval)(fn, delay, ...args);
 };
-const _clearTimeout = (id: ReturnType<typeof setTimeout>): void => {
+const _clearTimeout = (id: TimerId): void => {
   return (typeof window !== 'undefined' ? window.clearTimeout : clearTimeout)(id);
 };
-const _clearInterval = (id: ReturnType<typeof setInterval>): void => {
+const _clearInterval = (id: TimerId): void => {
   return (typeof window !== 'undefined' ? window.clearInterval : clearInterval)(id);
 };
 
@@ -49,8 +52,8 @@ export class WebSocketClient {
   private ws: WebSocket | null = null;
   private config: Required<WebSocketConfig>;
   private reconnectAttempts = 0;
-  private reconnectTimer: number | null = null;
-  private heartbeatTimer: number | null = null;
+  private reconnectTimer: TimerId | null = null;
+  private heartbeatTimer: TimerId | null = null;
   private messageHandlers: Map<string, Set<MessageHandler>> = new Map();
   private isManualClose = false;
   private connectionId: string | null = null;
