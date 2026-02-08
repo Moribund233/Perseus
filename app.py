@@ -34,9 +34,12 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
 
     # 添加安全响应头中间件（最先添加，确保所有响应都包含安全头）
     from middleware.security_headers import SecurityHeadersMiddleware
+    # 根据debug配置自动启用HSTS：非debug模式（生产环境）启用HSTS
+    enable_hsts = not config.app.debug
     app.add_middleware(
         SecurityHeadersMiddleware,
-        enable_hsts=False,  # 开发环境禁用 HSTS，生产环境启用
+        enable_hsts=enable_hsts,  # 生产环境启用 HSTS，开发环境禁用
+        hsts_max_age=31536000,  # HSTS max-age: 1年
         allow_iframe=False
     )
 

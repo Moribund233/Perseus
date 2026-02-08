@@ -157,20 +157,27 @@ class NginxController:
     def start(self) -> bool:
         """
         启动Nginx服务器
-        
+
+        在启动前会自动重新生成配置文件，确保使用最新的配置。
+
         Returns:
             bool: 启动成功返回True，否则返回False
         """
         if not self.is_proxy_enabled():
             self._log("代理未启用，无需启动Nginx")
             return True
-        
+
         if self.is_running():
             self._log("Nginx已在运行中")
             return True
-        
+
         self.state = NginxState.STARTING
         self._log("正在启动Nginx...")
+
+        # 重新生成Nginx配置文件，确保使用最新配置
+        self._log("正在重新生成Nginx配置文件...")
+        if not self.generate_nginx_config():
+            self._log("警告: Nginx配置文件生成失败，将使用现有配置")
         
         try:
             nginx_path = self.nginx_downloader.get_nginx_path()
@@ -356,6 +363,7 @@ class NginxController:
         """
         if not self.is_running():
             self._log("Nginx未运行")
+            self.state = NginxState.STOPPED
             return True
 
         self.state = NginxState.STOPPING
@@ -367,39 +375,53 @@ class NginxController:
 
             # 获取Nginx工作目录（nginx.exe所在目录）
             nginx_path = self.nginx_downloader.get_nginx_path()
-            # nginx_path 已经是绝对路径（由 NginxDownloader 保证）
             nginx_cwd = os.path.dirname(nginx_path)
             self._log(f"Nginx工作目录: {nginx_cwd}")
 
             if sys.platform == "win32":
-                # Windows下停止Nginx，使用-c参数指定配置文件路径，并设置工作目录
+                # Windows下停止Nginx
+                # 首先尝试优雅停止（使用nginx -s quit）
                 cmd = [nginx_path, "-c", config_path, "-s", "quit"]
-                self._log(f"Windows下停止命令: {cmd}")
+                self._log(f"Windows下优雅停止命令: {cmd}")
                 try:
-                    result = subprocess.run(cmd, capture_output=True, text=True, cwd=nginx_cwd, timeout=10)
-                    if result.returncode != 0:
-                        self._log(f"停止命令返回非零码: {result.returncode}")
+                    result = subprocess.run(cmd, capture_output=True, text=True, cwd=nginx_cwd, timeout=5)
+                    if result.returncode == 0:
+                        self._log("Nginx优雅停止命令已发送")
+                    else:
+                        self._log(f"优雅停止命令返回非零码: {result.returncode}")
                         if result.stderr:
                             self._log(f"停止错误输出: {result.stderr}")
                 except subprocess.TimeoutExpired:
-                    self._log("停止命令超时")
+                    self._log("优雅停止命令超时")
                 except Exception as e:
-                    self._log(f"停止命令异常: {type(e).__name__}: {e}")
+                    self._log(f"优雅停止命令异常: {type(e).__name__}: {e}")
+
+                # 等待Nginx完全停止（最多等待5秒）
+                self._log("等待Nginx停止...")
+                for i in range(10):
+                    time.sleep(0.5)
+                    if not self.is_running():
+                        self.state = NginxState.STOPPED
+                        self._log("Nginx已优雅停止")
+                        return True
+                    self._log(f"  等待中... ({i+1}/10)")
+
+                # 如果Nginx仍在运行，强制停止
+                self._log("Nginx仍在运行，尝试强制停止...")
+                return self._force_stop()
             else:
-                # Linux下停止Nginx，使用-c参数指定配置文件路径
+                # Linux下停止Nginx
                 nginx_cmd = self.nginx_downloader.get_nginx_path()
                 if not nginx_cmd:
                     self._log("错误: 未找到Nginx可执行文件")
-                    self._force_stop()
-                    return False
+                    return self._force_stop()
 
                 cmd = [nginx_cmd, "-c", config_path, "-s", "quit"]
                 self._log(f"Linux下停止命令: {cmd}")
                 try:
-                    # Linux下也需要设置工作目录为Nginx可执行文件所在目录
                     nginx_cwd = os.path.dirname(os.path.abspath(nginx_cmd))
                     if not nginx_cwd:
-                        nginx_cwd = "/etc/nginx"  # 默认工作目录
+                        nginx_cwd = "/etc/nginx"
                     result = subprocess.run(cmd, capture_output=True, text=True, cwd=nginx_cwd, timeout=10)
                     if result.returncode != 0:
                         self._log(f"停止命令返回非零码: {result.returncode}")
@@ -409,55 +431,94 @@ class NginxController:
                     self._log("停止命令超时")
                 except Exception as e:
                     self._log(f"停止命令异常: {type(e).__name__}: {e}")
-            
-            # 等待Nginx完全停止
-            time.sleep(2)
-            
-            # 如果Nginx仍在运行，强制停止
-            if self.is_running():
-                self._log("Nginx仍在运行，尝试强制停止...")
-                self._force_stop()
-            else:
+
+                # 等待Nginx完全停止
+                time.sleep(2)
+
+                # 如果Nginx仍在运行，强制停止
+                if self.is_running():
+                    self._log("Nginx仍在运行，尝试强制停止...")
+                    return self._force_stop()
+
                 self.state = NginxState.STOPPED
                 self._log("Nginx停止成功")
                 return True
-            
-            self.state = NginxState.STOPPED
-            self._log("Nginx停止成功")
-            return True
+
         except Exception as e:
             self._log(f"Nginx停止失败: {str(e)}")
             # 尝试强制停止
-            self._force_stop()
-            return False
+            return self._force_stop()
 
     def _force_stop(self) -> bool:
         """
         强制停止Nginx服务器
-        
+
         Returns:
             bool: 强制停止成功返回True，否则返回False
         """
+        self._log("正在强制停止Nginx...")
         try:
             if sys.platform == "win32":
                 # Windows下强制停止Nginx进程
-                subprocess.run(["taskkill", "/F", "/IM", "nginx.exe"], check=True, capture_output=True)
+                # 首先尝试使用taskkill /IM（优雅终止）
+                try:
+                    self._log("尝试优雅终止Nginx进程...")
+                    result = subprocess.run(["taskkill", "/IM", "nginx.exe"], 
+                                          capture_output=True, text=True, timeout=5)
+                    if result.returncode == 0:
+                        self._log("优雅终止命令已发送")
+                    else:
+                        self._log(f"优雅终止返回: {result.returncode}")
+                except Exception as e:
+                    self._log(f"优雅终止失败: {e}")
+
+                # 等待Nginx停止（最多3秒）
+                for i in range(6):
+                    time.sleep(0.5)
+                    if not self.is_running():
+                        self.state = NginxState.STOPPED
+                        self._log("Nginx已优雅停止")
+                        return True
+
+                # 如果仍在运行，使用强制终止
+                self._log("Nginx仍在运行，使用强制终止...")
+                try:
+                    result = subprocess.run(["taskkill", "/F", "/IM", "nginx.exe"], 
+                                          capture_output=True, text=True, timeout=5)
+                    if result.returncode == 0 or "已成功终止" in result.stdout:
+                        self._log("强制终止成功")
+                    else:
+                        self._log(f"强制终止返回: {result.returncode}, {result.stdout}")
+                except Exception as e:
+                    self._log(f"强制终止失败: {e}")
+
+                # 再次等待
+                time.sleep(1)
+
+                # 检查是否还有Nginx进程
+                if not self.is_running():
+                    self.state = NginxState.STOPPED
+                    self._log("Nginx已强制停止")
+                    return True
+                else:
+                    self._log("警告: Nginx进程可能仍在运行")
+                    self.state = NginxState.ERROR
+                    return False
             else:
                 # Linux下强制停止Nginx进程
-                # 获取配置文件路径
                 config_path = os.path.abspath(self.nginx_generator.get_config_path())
-                
+
                 # 尝试使用nginx -s stop停止
                 try:
                     nginx_cmd = self.nginx_downloader.get_nginx_path()
                     if nginx_cmd:
-                        subprocess.run([nginx_cmd, "-c", config_path, "-s", "stop"], 
+                        subprocess.run([nginx_cmd, "-c", config_path, "-s", "stop"],
                                      capture_output=True, timeout=5)
                 except Exception:
                     pass
-                
+
                 # 查找并终止Nginx进程
-                result = subprocess.run(["pgrep", "-f", f"nginx.*{config_path}"], 
+                result = subprocess.run(["pgrep", "-f", f"nginx.*{config_path}"],
                                       capture_output=True, text=True)
                 if result.returncode == 0 and result.stdout.strip():
                     for pid_str in result.stdout.strip().split('\n'):
@@ -468,7 +529,7 @@ class NginxController:
                             continue
                     time.sleep(1)
                     # 如果仍在运行，使用SIGKILL
-                    result = subprocess.run(["pgrep", "-f", f"nginx.*{config_path}"], 
+                    result = subprocess.run(["pgrep", "-f", f"nginx.*{config_path}"],
                                           capture_output=True, text=True)
                     if result.returncode == 0 and result.stdout.strip():
                         for pid_str in result.stdout.strip().split('\n'):
@@ -477,10 +538,11 @@ class NginxController:
                                 os.kill(pid, signal.SIGKILL)
                             except (ValueError, ProcessLookupError):
                                 continue
-            
-            self.state = NginxState.STOPPED
-            self._log("Nginx已强制停止")
-            return True
+
+                self.state = NginxState.STOPPED
+                self._log("Nginx已强制停止")
+                return True
+
         except Exception as e:
             self._log(f"Nginx强制停止失败: {str(e)}")
             self.state = NginxState.ERROR

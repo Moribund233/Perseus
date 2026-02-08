@@ -83,7 +83,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     traceback_str = traceback.format_exc() if is_debug else None
     _log_exception(exc, traceback_str, is_debug)
     
-    # 如果是自定义异常，直接返回
+    # 如果是自定义异常，直接返回（生产环境隐藏异常类型）
     if isinstance(exc, BaseException):
         return JSONResponse(
             status_code=exc.status_code,
@@ -92,7 +92,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
                 "error": {
                     "code": exc.status_code,
                     "message": exc.detail,
-                    "type": exc.__class__.__name__
+                    "type": exc.__class__.__name__ if is_debug else "Error"
                 }
             }
         )

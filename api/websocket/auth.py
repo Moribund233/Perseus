@@ -10,6 +10,10 @@ from typing import Optional, Dict, Any
 from fastapi import WebSocket, HTTPException, status
 import logging
 
+from services.token_service import verify_token as jwt_verify_token
+from models.db import get_db
+from models.user import User
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,16 +47,15 @@ async def extract_token_from_query(websocket: WebSocket) -> Optional[str]:
 async def verify_token(token: str) -> Optional[Dict[str, Any]]:
     """
     验证token并返回用户信息
-    
-    注意：这是一个简化实现，实际应该调用你的认证服务
-    建议复用现有的认证逻辑
-    
+
+    使用JWT Token服务进行验证，集成现有认证系统
+
     Args:
-        token: JWT token或其他类型的token
-        
+        token: JWT token
+
     Returns:
         Optional[Dict]: 用户信息字典，验证失败返回None
-        
+
         用户信息格式：
         {
             "user_id": int,
@@ -61,25 +64,33 @@ async def verify_token(token: str) -> Optional[Dict[str, Any]]:
             "is_admin": bool
         }
     """
-    # TODO: 集成你现有的认证系统
-    # 这里提供一个简化示例，实际应该调用你的用户服务验证token
-    
-    # 示例：简单的token验证（仅用于开发测试）
-    if token == "dev_test_token":
+    # 使用真实的JWT验证服务
+    token_data = jwt_verify_token(token, token_type="access")
+
+    if not token_data:
+        logger.warning("WebSocket token verification failed: invalid token")
+        return None
+
+    # 从数据库获取完整的用户信息
+    try:
+        db = next(get_db())
+        user = db.query(User).filter(User.id == token_data.user_id).first()
+
+        if not user:
+            logger.warning(f"WebSocket token valid but user not found: user_id={token_data.user_id}")
+            return None
+
         return {
-            "user_id": 1,
-            "username": "developer",
-            "is_active": True,
-            "is_admin": True
+            "user_id": user.id,
+            "username": user.username,
+            "is_active": user.is_active,
+            "is_admin": user.is_admin
         }
-    
-    # 示例：检查token格式（实际应该验证JWT签名）
-    if token and len(token) > 10:
-        # 这里应该调用你的认证服务验证token
-        # 例如：return await user_service.verify_token(token)
-        pass
-    
-    return None
+    except Exception as e:
+        logger.error(f"WebSocket token verification error: {e}")
+        return None
+    finally:
+        db.close()
 
 
 async def authenticate_websocket(websocket: WebSocket) -> Optional[Dict[str, Any]]:

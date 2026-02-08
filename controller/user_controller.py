@@ -6,6 +6,8 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from models.db import get_db
+from models.user import User
+from api.dependencies import get_current_user, get_current_admin_user
 from services.user_service import (
     get_users as service_get_users,
     get_user_by_id as service_get_user_by_id,
@@ -15,6 +17,7 @@ from services.user_service import (
     login_user as service_login_user
 )
 from utils.rate_limiter import limiter, RateLimitConfig
+from exception import AuthorizationException
 
 # 创建路由实例
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -22,13 +25,17 @@ router = APIRouter(prefix="/api/users", tags=["users"])
 
 @router.get("")
 @router.get("/")
-def get_users(db: Session = Depends(get_db)):
+def get_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
-    获取所有用户
-    
+    获取所有用户（需要认证）
+
     Args:
         db: 数据库会话
-    
+        current_user: 当前认证用户
+
     Returns:
         list[User]: 用户列表
     """
@@ -36,17 +43,22 @@ def get_users(db: Session = Depends(get_db)):
 
 
 @router.get("/{user_id}")
-def get_user(user_id: int, db: Session = Depends(get_db)):
+def get_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
-    根据ID获取用户
-    
+    根据ID获取用户（需要认证）
+
     Args:
         user_id: 用户ID
         db: 数据库会话
-    
+        current_user: 当前认证用户
+
     Returns:
         User: 用户信息
-    
+
     Raises:
         NotFoundException: 用户不存在时抛出404异常
     """
@@ -72,38 +84,60 @@ def create_user(user: dict, db: Session = Depends(get_db)):
 
 
 @router.put("/{user_id}")
-def update_user(user_id: int, user: dict, db: Session = Depends(get_db)):
+@limiter.limit(RateLimitConfig.STANDARD)
+def update_user(
+    request: Request,
+    user_id: int,
+    user: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
-    更新用户信息
-    
+    更新用户信息（需要认证）
+
     Args:
+        request: HTTP请求对象（用于速率限制）
         user_id: 用户ID
         user: 更新的用户信息
         db: 数据库会话
-    
+        current_user: 当前认证用户
+
     Returns:
         User: 更新后的用户信息
-    
+
     Raises:
         NotFoundException: 用户不存在时抛出404异常
+        AuthorizationException: 无权限时抛出403异常
     """
+    # 检查权限：只能更新自己的信息，或管理员可以更新任何用户
+    if current_user.id != user_id and not current_user.is_admin:
+        raise AuthorizationException(detail="You don't have permission to update this user")
     return service_update_user(user_id, user, db)
 
 
 @router.delete("/{user_id}")
-def delete_user(user_id: int, db: Session = Depends(get_db)):
+@limiter.limit(RateLimitConfig.STANDARD)
+def delete_user(
+    request: Request,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
     """
-    删除用户
-    
+    删除用户（需要管理员权限）
+
     Args:
+        request: HTTP请求对象（用于速率限制）
         user_id: 用户ID
         db: 数据库会话
-    
+        current_user: 当前认证管理员用户
+
     Returns:
         dict: 删除成功消息
-    
+
     Raises:
         NotFoundException: 用户不存在时抛出404异常
+        AuthorizationException: 非管理员时抛出403异常
     """
     return service_delete_user(user_id, db)
 

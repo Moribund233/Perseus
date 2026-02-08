@@ -3,9 +3,12 @@
 
 处理与仓库相关的HTTP请求，调用服务层方法并返回响应
 """
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, status
+from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from models.db import get_db
+from models.user import User
+from api.dependencies import get_current_user, get_current_admin_user
 from services.repository_service import (
     get_repositories as service_get_repositories,
     get_repository_by_id as service_get_repository_by_id,
@@ -17,20 +20,28 @@ from services.repository_service import (
     check_repository_access as service_check_repository_access
 )
 from utils.rate_limiter import limiter, RateLimitConfig
+from exception import AuthorizationException
 
 # 创建路由实例
 router = APIRouter(prefix="/api/repositories", tags=["repositories"])
 
+# 安全方案
+security = HTTPBearer(auto_error=False)
+
 
 @router.get("")
 @router.get("/")
-def get_repositories(db: Session = Depends(get_db)):
+def get_repositories(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
-    获取所有仓库
-    
+    获取所有仓库（需要认证）
+
     Args:
         db: 数据库会话
-    
+        current_user: 当前认证用户
+
     Returns:
         list[Repository]: 仓库列表
     """
@@ -52,14 +63,19 @@ def get_public_repositories(db: Session = Depends(get_db)):
 
 
 @router.get("/user/{user_id}")
-def get_repositories_by_user(user_id: int, db: Session = Depends(get_db)):
+def get_repositories_by_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
-    根据用户ID获取仓库列表
-    
+    根据用户ID获取仓库列表（需要认证）
+
     Args:
         user_id: 用户ID
         db: 数据库会话
-    
+        current_user: 当前认证用户
+
     Returns:
         list[Repository]: 用户的仓库列表
     """
@@ -67,17 +83,22 @@ def get_repositories_by_user(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{repo_id}")
-def get_repository(repo_id: int, db: Session = Depends(get_db)):
+def get_repository(
+    repo_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
-    根据ID获取仓库
-    
+    根据ID获取仓库（需要认证）
+
     Args:
         repo_id: 仓库ID
         db: 数据库会话
-    
+        current_user: 当前认证用户
+
     Returns:
         Repository: 仓库信息
-    
+
     Raises:
         NotFoundException: 仓库不存在时抛出404异常
     """
@@ -86,14 +107,20 @@ def get_repository(repo_id: int, db: Session = Depends(get_db)):
 
 @router.post("/")
 @limiter.limit(RateLimitConfig.STANDARD)
-def create_repository(request: Request, repo: dict, db: Session = Depends(get_db)):
+def create_repository(
+    request: Request,
+    repo: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
-    创建新仓库
+    创建新仓库（需要认证）
 
     Args:
         request: HTTP请求对象（用于速率限制）
         repo: 仓库信息
         db: 数据库会话
+        current_user: 当前认证用户
 
     Returns:
         Repository: 创建的仓库信息
@@ -102,55 +129,98 @@ def create_repository(request: Request, repo: dict, db: Session = Depends(get_db
         ValidationException: 请求参数不完整时抛出422异常
         ConflictException: 仓库路径已存在时抛出409异常
     """
+    # 设置当前用户为仓库所有者
+    repo["owner_id"] = current_user.id
     return service_create_repository(repo, db)
 
 
 @router.put("/{repo_id}")
-def update_repository(repo_id: int, repo: dict, db: Session = Depends(get_db)):
+@limiter.limit(RateLimitConfig.STANDARD)
+def update_repository(
+    request: Request,
+    repo_id: int,
+    repo: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
-    更新仓库信息
-    
+    更新仓库信息（需要认证）
+
     Args:
+        request: HTTP请求对象（用于速率限制）
         repo_id: 仓库ID
         repo: 更新的仓库信息
         db: 数据库会话
-    
+        current_user: 当前认证用户
+
     Returns:
         Repository: 更新后的仓库信息
-    
+
     Raises:
         NotFoundException: 仓库不存在时抛出404异常
+        AuthorizationException: 无权限时抛出403异常
     """
+    # 检查权限
+    from api.dependencies import check_repository_permission
+    import asyncio
+    has_permission = asyncio.run(check_repository_permission(
+        db, repo_id, current_user.id, ["owner", "admin"]
+    ))
+    if not has_permission:
+        raise AuthorizationException(detail="You don't have permission to update this repository")
     return service_update_repository(repo_id, repo, db)
 
 
 @router.delete("/{repo_id}")
-def delete_repository(repo_id: int, db: Session = Depends(get_db)):
+@limiter.limit(RateLimitConfig.STANDARD)
+def delete_repository(
+    request: Request,
+    repo_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
-    删除仓库
-    
+    删除仓库（需要认证）
+
     Args:
+        request: HTTP请求对象（用于速率限制）
         repo_id: 仓库ID
         db: 数据库会话
-    
+        current_user: 当前认证用户
+
     Returns:
         dict: 删除成功消息
-    
+
     Raises:
         NotFoundException: 仓库不存在时抛出404异常
+        AuthorizationException: 无权限时抛出403异常
     """
+    # 检查权限（只有所有者或管理员可以删除）
+    from api.dependencies import check_repository_permission
+    import asyncio
+    has_permission = asyncio.run(check_repository_permission(
+        db, repo_id, current_user.id, ["owner"]
+    ))
+    if not has_permission:
+        raise AuthorizationException(detail="You don't have permission to delete this repository")
     return service_delete_repository(repo_id, db)
 
 
 @router.get("/{repo_id}/access")
-def check_repository_access(repo_id: int, user_id: int, db: Session = Depends(get_db)):
+def check_repository_access(
+    repo_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
-    检查用户对仓库的访问权限
+    检查用户对仓库的访问权限（需要认证）
 
     Args:
         repo_id: 仓库ID
         user_id: 用户ID
         db: 数据库会话
+        current_user: 当前认证用户
 
     Returns:
         dict: 访问权限信息
