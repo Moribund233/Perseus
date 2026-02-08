@@ -623,8 +623,12 @@ class RemoteSecurityTester:
         missing_headers = []
         wrong_headers = []
         
+        # 创建大小写不敏感的头字典
+        headers_lower = {k.lower(): v for k, v in headers.items()}
+        
         for header, expected_value in security_headers.items():
-            actual_value = headers.get(header)
+            # 使用大小写不敏感的方式查找头
+            actual_value = headers.get(header) or headers_lower.get(header.lower())
             if not actual_value:
                 missing_headers.append(header)
             elif expected_value and actual_value not in (expected_value if isinstance(expected_value, list) else [expected_value]):

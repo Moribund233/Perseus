@@ -36,11 +36,14 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     from middleware.security_headers import SecurityHeadersMiddleware
     # 根据debug配置自动启用HSTS：非debug模式（生产环境）启用HSTS
     enable_hsts = not config.app.debug
+    # 如果启用了Nginx反向代理，让Nginx处理基础安全头，应用只处理HSTS
+    add_security_headers = not config.nginx.proxy
     app.add_middleware(
         SecurityHeadersMiddleware,
         enable_hsts=enable_hsts,  # 生产环境启用 HSTS，开发环境禁用
         hsts_max_age=31536000,  # HSTS max-age: 1年
-        allow_iframe=False
+        allow_iframe=False,
+        add_security_headers=add_security_headers  # Nginx代理时跳过基础安全头
     )
 
     # 添加审计日志中间件
