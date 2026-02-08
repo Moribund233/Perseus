@@ -121,21 +121,22 @@ def remove_repository_member(repo_id: int, user_id: int, db: Session = Depends(g
 def update_member_role(repo_id: int, user_id: int, role_data: dict, db: Session = Depends(get_db)):
     """
     更新成员角色
-    
+
     Args:
         repo_id: 仓库ID
         user_id: 用户ID
         role_data: 角色信息
         db: 数据库会话
-    
+
     Returns:
         RepositoryMember: 更新后的成员信息
-    
+
     Raises:
         NotFoundException: 成员不存在时抛出404异常
         ValidationException: 角色无效时抛出422异常
     """
-    return service_update_member_role(repo_id, user_id, role_data, db)
+    role = role_data.get("role")
+    return service_update_member_role(repo_id, user_id, role, db)
 
 
 @router.put("/{repo_id}/members/{user_id}/activate")

@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from app import create_app
 from app import AppSingleton
 from config import reset_module_config_manager
+from models import Base, engine
 
 
 @pytest.fixture
@@ -18,11 +19,17 @@ def test_client():
     app_singleton.reset()
     reset_module_config_manager()
     
+    # 创建所有数据库表
+    Base.metadata.create_all(bind=engine)
+    
     # 创建应用和测试客户端
     app = create_app()
     client = TestClient(app)
     
     yield client
+    
+    # 清理数据库表
+    Base.metadata.drop_all(bind=engine)
 
 
 class TestUserAPI:

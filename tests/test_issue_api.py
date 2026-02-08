@@ -34,6 +34,7 @@ from models.db import get_db
 from models import Repository, User, Issue, Label, IssueComment
 from app import create_app
 from client.utils.git_utils import init_bare_repo
+from services.token_service import create_access_token
 
 
 # 测试数据库配置
@@ -124,6 +125,13 @@ def test_repository(test_user):
     if os.path.exists(physical_path):
         shutil.rmtree(physical_path, ignore_errors=True)
     db.close()
+
+
+@pytest.fixture
+def auth_headers(test_user):
+    """创建认证请求头"""
+    token = create_access_token({"sub": str(test_user.id), "username": test_user.username})
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
@@ -262,7 +270,7 @@ def test_list_issues_pagination(client, test_repository, test_user):
 
 # ==================== Issue 创建测试 ====================
 
-def test_create_issue_success(client, test_repository, test_label):
+def test_create_issue_success(client, test_repository, test_label, auth_headers):
     """测试成功创建 Issue"""
     payload = {
         "title": "New Bug Report",
@@ -271,7 +279,7 @@ def test_create_issue_success(client, test_repository, test_label):
         "label_ids": [test_label.id]
     }
     
-    response = client.post(f"/api/repositories/{test_repository.id}/issues", json=payload)
+    response = client.post(f"/api/repositories/{test_repository.id}/issues", json=payload, headers=auth_headers)
     
     assert response.status_code == 200
     data = response.json()
@@ -283,7 +291,7 @@ def test_create_issue_success(client, test_repository, test_label):
     assert len(data["labels"]) == 1
 
 
-def test_create_issue_validation_error(client, test_repository):
+def test_create_issue_validation_error(client, test_repository, auth_headers):
     """测试创建 Issue 参数验证失败"""
     # 缺少标题
     payload = {
@@ -291,7 +299,7 @@ def test_create_issue_validation_error(client, test_repository):
         "priority": "high"
     }
     
-    response = client.post(f"/api/repositories/{test_repository.id}/issues", json=payload)
+    response = client.post(f"/api/repositories/{test_repository.id}/issues", json=payload, headers=auth_headers)
     assert response.status_code == 422
     
     # 无效的优先级
@@ -300,28 +308,28 @@ def test_create_issue_validation_error(client, test_repository):
         "priority": "invalid"
     }
     
-    response = client.post(f"/api/repositories/{test_repository.id}/issues", json=payload)
+    response = client.post(f"/api/repositories/{test_repository.id}/issues", json=payload, headers=auth_headers)
     assert response.status_code == 400
 
 
-def test_create_issue_auto_numbering(client, test_repository):
+def test_create_issue_auto_numbering(client, test_repository, auth_headers):
     """测试 Issue 编号自动递增"""
     # 获取当前 Issue 数量
     list_response = client.get(f"/api/repositories/{test_repository.id}/issues")
     initial_count = list_response.json()["total"]
-    
+
     # 创建第一个 Issue
     payload1 = {"title": "First Issue"}
-    response1 = client.post(f"/api/repositories/{test_repository.id}/issues", json=payload1)
+    response1 = client.post(f"/api/repositories/{test_repository.id}/issues", json=payload1, headers=auth_headers)
     assert response1.status_code == 200
     issue_number1 = response1.json()["issue_number"]
-    
+
     # 创建第二个 Issue
     payload2 = {"title": "Second Issue"}
-    response2 = client.post(f"/api/repositories/{test_repository.id}/issues", json=payload2)
+    response2 = client.post(f"/api/repositories/{test_repository.id}/issues", json=payload2, headers=auth_headers)
     assert response2.status_code == 200
     issue_number2 = response2.json()["issue_number"]
-    
+
     # 验证编号递增
     assert issue_number2 == issue_number1 + 1
 
@@ -354,7 +362,7 @@ def test_get_issue_not_found(client, test_repository):
 
 # ==================== Issue 更新测试 ====================
 
-def test_update_issue_success(client, test_issue, test_repository, test_user):
+def test_update_issue_success(client, test_issue, test_repository, test_user, auth_headers):
     """测试成功更新 Issue"""
     payload = {
         "title": "Updated Title",
@@ -362,12 +370,13 @@ def test_update_issue_success(client, test_issue, test_repository, test_user):
         "priority": "high",
         "assignee_id": test_user.id
     }
-    
+
     response = client.patch(
         f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}",
-        json=payload
+        json=payload,
+        headers=auth_headers
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == "Updated Title"
@@ -376,52 +385,55 @@ def test_update_issue_success(client, test_issue, test_repository, test_user):
     assert data["assignee"]["id"] == test_user.id
 
 
-def test_update_issue_not_found(client, test_repository):
+def test_update_issue_not_found(client, test_repository, auth_headers):
     """测试更新不存在的 Issue"""
     payload = {"title": "Updated"}
-    
-    response = client.patch(f"/api/repositories/{test_repository.id}/issues/999", json=payload)
-    
+
+    response = client.patch(f"/api/repositories/{test_repository.id}/issues/999", json=payload, headers=auth_headers)
+
     assert response.status_code == 404
 
 
 # ==================== Issue 关闭/重新打开测试 ====================
 
-def test_close_issue_success(client, test_issue, test_repository):
+def test_close_issue_success(client, test_issue, test_repository, auth_headers):
     """测试成功关闭 Issue"""
     response = client.post(
-        f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}/close"
+        f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}/close",
+        headers=auth_headers
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "closed"
     assert data["closed_by"] is not None
 
 
-def test_close_issue_already_closed(client, test_issue, test_repository):
+def test_close_issue_already_closed(client, test_issue, test_repository, auth_headers):
     """测试关闭已关闭的 Issue"""
     # 先关闭 Issue
-    client.post(f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}/close")
-    
+    client.post(f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}/close", headers=auth_headers)
+
     # 再次关闭
     response = client.post(
-        f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}/close"
+        f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}/close",
+        headers=auth_headers
     )
-    
+
     assert response.status_code == 400
 
 
-def test_reopen_issue_success(client, test_issue, test_repository):
+def test_reopen_issue_success(client, test_issue, test_repository, auth_headers):
     """测试成功重新打开 Issue"""
     # 先关闭 Issue
-    client.post(f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}/close")
-    
+    client.post(f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}/close", headers=auth_headers)
+
     # 重新打开
     response = client.post(
-        f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}/reopen"
+        f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}/reopen",
+        headers=auth_headers
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "open"
@@ -429,59 +441,63 @@ def test_reopen_issue_success(client, test_issue, test_repository):
     assert data.get("closed_by") is None
 
 
-def test_reopen_issue_already_open(client, test_issue, test_repository):
+def test_reopen_issue_already_open(client, test_issue, test_repository, auth_headers):
     """测试重新打开已打开的 Issue"""
     response = client.post(
-        f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}/reopen"
+        f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}/reopen",
+        headers=auth_headers
     )
-    
+
     assert response.status_code == 400
 
 
 # ==================== Issue 评论测试 ====================
 
-def test_create_issue_comment_success(client, test_issue, test_repository):
+def test_create_issue_comment_success(client, test_issue, test_repository, auth_headers):
     """测试成功创建 Issue 评论"""
     payload = {
         "content": "I can reproduce this issue"
     }
-    
+
     response = client.post(
         f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}/comments",
-        json=payload
+        json=payload,
+        headers=auth_headers
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["content"] == "I can reproduce this issue"
 
 
-def test_create_issue_comment_empty_content(client, test_issue, test_repository):
+def test_create_issue_comment_empty_content(client, test_issue, test_repository, auth_headers):
     """测试创建空内容评论"""
     payload = {"content": ""}
-    
+
     response = client.post(
         f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}/comments",
-        json=payload
+        json=payload,
+        headers=auth_headers
     )
-    
+
     # Pydantic min_length 验证会返回 422
     assert response.status_code == 422
 
 
-def test_list_issue_comments(client, test_issue, test_repository):
+def test_list_issue_comments(client, test_issue, test_repository, auth_headers):
     """测试获取 Issue 评论列表"""
     # 先通过 API 创建评论
     payload = {"content": "Test comment for list"}
     client.post(
         f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}/comments",
-        json=payload
+        json=payload,
+        headers=auth_headers
     )
-    
+
     response = client.get(
         f"/api/repositories/{test_repository.id}/issues/{test_issue.issue_number}/comments"
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     # 检查是否包含我们创建的评论
