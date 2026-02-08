@@ -508,14 +508,68 @@ class ClientConfigManager:
     def toggle_nginx(self, enabled: bool) -> bool:
         """
         启用或禁用Nginx
-        
+
         Args:
             enabled: 是否启用
-            
+
         Returns:
             bool: 更新成功返回True，否则返回False
         """
         return self.set("nginx.enabled", enabled)
+
+    def get_storage_config(self) -> Dict[str, Any]:
+        """
+        获取存储配置
+
+        Returns:
+            Dict[str, Any]: 存储配置字典
+        """
+        config = self.load_config()
+        return config.get("storage", {})
+
+    def get_repo_root(self) -> str:
+        """
+        获取仓库根目录路径
+
+        Returns:
+            str: 仓库根目录路径，默认为 ./repositories
+        """
+        return self.get("storage.repo_root", "./repositories")
+
+    def set_repo_root(self, repo_root: str) -> bool:
+        """
+        设置仓库根目录路径
+
+        Args:
+            repo_root: 仓库根目录路径
+
+        Returns:
+            bool: 设置成功返回True，否则返回False
+        """
+        if not isinstance(repo_root, str) or not repo_root.strip():
+            print("仓库根目录路径不能为空")
+            return False
+
+        # 转换为绝对路径
+        repo_root = os.path.abspath(repo_root.strip())
+        return self.set("storage.repo_root", repo_root)
+
+    def update_storage_config(self, storage_config: Dict[str, Any]) -> bool:
+        """
+        更新存储配置
+
+        Args:
+            storage_config: 存储配置字典
+
+        Returns:
+            bool: 更新成功返回True，否则返回False
+        """
+        config = self.load_config()
+
+        # 合并存储配置
+        config["storage"] = {**config.get("storage", {}), **storage_config}
+
+        return self.save_config(config)
 
 
 # 创建全局配置管理器实例

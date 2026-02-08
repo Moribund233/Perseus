@@ -514,6 +514,30 @@ http {{
             }}
         }}
         
+        # WebSocket代理配置
+        location /ws/ {{
+            proxy_pass http://{config.get('api_host', 'localhost')}:{config.get('api_port', 8000)}/ws/;
+            
+            # WebSocket支持
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            
+            # 标准代理头
+            proxy_set_header Host $host:$server_port;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # 长连接超时设置
+            proxy_read_timeout 86400;
+            proxy_send_timeout 86400;
+            
+            # CORS配置
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Credentials 'true' always;
+        }}
+        
         error_page   500 502 503 504  /50x.html;
         location = /50x.html {{
             root   {html_dir};

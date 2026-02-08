@@ -79,6 +79,10 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     from api.error import router as error_router
     app.include_router(error_router)
     
+    # 包含WebSocket路由
+    from api.websocket import router as websocket_router
+    app.include_router(websocket_router)
+    
     # 设置全局异常处理器
     from utils.exception_handler import setup_exception_handlers
     setup_exception_handlers(app)

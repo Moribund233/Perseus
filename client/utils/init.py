@@ -88,14 +88,22 @@ class InitThread(QThread):
                     self.progress_updated.emit(100, "配置文件初始化完成")
                     # 继续执行，不中断初始化流程
             
-            # 步骤4: 初始化数据库
+            # 步骤4: 初始化仓库存储目录
+            self.progress_updated.emit(85, "正在初始化仓库存储目录...")
+
+            # 导入Git工具
+            from client.utils.git_utils import ensure_repository_root
+            repo_root = ensure_repository_root()
+            print(f"仓库根目录已确保存在: {repo_root}")
+
+            # 步骤5: 初始化数据库
             self.progress_updated.emit(90, "正在初始化数据库...")
-            
+
             # 导入数据库初始化工具
             from client.utils.init_database import init_database
             init_database()
-            
-            # 步骤5: 初始化完成
+
+            # 步骤6: 初始化完成
             self.progress_updated.emit(100, "配置文件初始化完成")
             
             # 发送初始化完成信号

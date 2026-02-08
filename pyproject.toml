@@ -27,6 +27,7 @@ priority = "supplemental"
 [tool.poetry.dependencies]
 python = ">=3.12,<3.13"
 fastapi = "^0.115.4"
+pygit2 = "^1.19.1"
 uvicorn = { extras = ["standard"], version = "^0.32.0" }
 gunicorn = { version = "^23.0.0", markers = "sys_platform != 'win32'" }
 pydantic-settings = "^2.6.0"
