@@ -11,9 +11,19 @@ Pull Request API 测试
 7. PR 评论 API - GET/POST /api/repositories/{repo_id}/pull-requests/{pr_number}/comments
 8. PR 审查 API - POST /api/repositories/{repo_id}/pull-requests/{pr_number}/reviews
 """
+
+import stat
+
+
+def remove_readonly(func, path, excinfo):
+    """Windows 下删除只读文件的回调函数"""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
 import pytest
 import os
 import shutil
+import stat
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine

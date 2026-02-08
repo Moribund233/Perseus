@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/users", tags=["users"])
 
 @router.get("")
 @router.get("/")
-async def get_users(db: Session = Depends(get_db)):
+def get_users(db: Session = Depends(get_db)):
     """
     获取所有用户
     
@@ -31,11 +31,11 @@ async def get_users(db: Session = Depends(get_db)):
     Returns:
         list[User]: 用户列表
     """
-    return await service_get_users(db)
+    return service_get_users(db)
 
 
 @router.get("/{user_id}")
-async def get_user(user_id: int, db: Session = Depends(get_db)):
+def get_user(user_id: int, db: Session = Depends(get_db)):
     """
     根据ID获取用户
     
@@ -49,11 +49,11 @@ async def get_user(user_id: int, db: Session = Depends(get_db)):
     Raises:
         NotFoundException: 用户不存在时抛出404异常
     """
-    return await service_get_user_by_id(user_id, db)
+    return service_get_user_by_id(user_id, db)
 
 
 @router.post("/")
-async def create_user(user: dict, db: Session = Depends(get_db)):
+def create_user(user: dict, db: Session = Depends(get_db)):
     """
     创建新用户
     
@@ -67,11 +67,11 @@ async def create_user(user: dict, db: Session = Depends(get_db)):
     Raises:
         ConflictException: 用户名或邮箱已存在时抛出409异常
     """
-    return await service_create_user(user, db)
+    return service_create_user(user, db)
 
 
 @router.put("/{user_id}")
-async def update_user(user_id: int, user: dict, db: Session = Depends(get_db)):
+def update_user(user_id: int, user: dict, db: Session = Depends(get_db)):
     """
     更新用户信息
     
@@ -86,11 +86,11 @@ async def update_user(user_id: int, user: dict, db: Session = Depends(get_db)):
     Raises:
         NotFoundException: 用户不存在时抛出404异常
     """
-    return await service_update_user(user_id, user, db)
+    return service_update_user(user_id, user, db)
 
 
 @router.delete("/{user_id}")
-async def delete_user(user_id: int, db: Session = Depends(get_db)):
+def delete_user(user_id: int, db: Session = Depends(get_db)):
     """
     删除用户
     
@@ -99,28 +99,28 @@ async def delete_user(user_id: int, db: Session = Depends(get_db)):
         db: 数据库会话
     
     Returns:
-        dict: 成功消息
+        dict: 删除成功消息
     
     Raises:
         NotFoundException: 用户不存在时抛出404异常
     """
-    return await service_delete_user(user_id, db)
+    return service_delete_user(user_id, db)
 
 
-# 登录路由
 @router.post("/login")
-async def login(credentials: dict, db: Session = Depends(get_db)):
+def login_user(credentials: dict, db: Session = Depends(get_db)):
     """
     用户登录
     
     Args:
-        credentials: 登录凭证，包含用户名和密码
+        credentials: 登录凭据（用户名和密码）
         db: 数据库会话
     
     Returns:
-        dict: 登录成功后的用户信息
+        dict: 登录成功信息和用户数据
     
     Raises:
-        AuthenticationException: 认证失败时抛出401异常
+        ValidationException: 请求参数不完整时抛出422异常
+        AuthenticationException: 用户名或密码错误时抛出401异常
     """
-    return await service_login_user(credentials, db)
+    return service_login_user(credentials, db)

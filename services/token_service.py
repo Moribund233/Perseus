@@ -3,23 +3,27 @@ Token 认证服务
 
 提供基于 JWT 的 Token 认证功能，替代 Basic Auth
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
-import secrets
-import hashlib
 import logging
 
 from models.user import User
 from models.db import get_db
+from config import get_config
 
-# 配置
-SECRET_KEY = secrets.token_urlsafe(32)  # 应该从配置文件读取
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-REFRESH_TOKEN_EXPIRE_DAYS = 7
+# 获取配置
+_config = get_config()
+_security_config = _config.security
+
+# 配置 - 从配置文件读取
+# 注意：SECRET_KEY 应在客户端初始化时通过 config_manager.ensure_secret_key() 生成并保存到 config.toml
+SECRET_KEY = _security_config.secret_key
+ALGORITHM = _security_config.algorithm
+ACCESS_TOKEN_EXPIRE_MINUTES = _security_config.access_token_expire_minutes
+REFRESH_TOKEN_EXPIRE_DAYS = _security_config.refresh_token_expire_days
 
 # 密码上下文
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -53,13 +57,13 @@ def create_access_token(
     to_encode = data.copy()
 
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     to_encode.update({
         "exp": expire,
-        "iat": datetime.utcnow(),
+        "iat": datetime.now(timezone.utc),
         "type": "access"
     })
 
@@ -84,13 +88,13 @@ def create_refresh_token(
     to_encode = data.copy()
 
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
 
     to_encode.update({
         "exp": expire,
-        "iat": datetime.utcnow(),
+        "iat": datetime.now(timezone.utc),
         "type": "refresh"
     })
 
@@ -198,105 +202,3 @@ def revoke_token(token: str) -> bool:
     # 这里仅作示例
     logger.info(f"Token revoked: {token[:10]}...")
     return True
-
-
-def generate_api_token(user: User, name: str = "API Token") -> Dict[str, Any]:
-    """
-    生成个人访问令牌（PAT）
-
-    用于 Git HTTP 协议认证和 API 访问
-
-    Args:
-        user: 用户对象
-        name: 令牌名称
-
-    Returns:
-        dict: 包含令牌信息的字典
-    """
-    # 生成随机令牌
-    raw_token = secrets.token_urlsafe(32)
-
-    # 计算令牌哈希（用于存储）
-    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-
-    # 创建令牌记录
-    token_record = {
-        "id": secrets.token_hex(16),
-        "user_id": user.id,
-        "name": name,
-        "token_hash": token_hash,
-        "created_at": datetime.utcnow().isoformat(),
-        "expires_at": (datetime.utcnow() + timedelta(days=90)).isoformat(),
-        "last_used_at": None,
-        "is_active": True
-    }
-
-    # TODO: 将 token_record 保存到数据库
-
-    logger.info(f"API token generated for user {user.username}")
-
-    return {
-        "id": token_record["id"],
-        "name": name,
-        "token": raw_token,  # 仅显示一次
-        "expires_at": token_record["expires_at"]
-    }
-
-
-def verify_api_token(token: str, db: Session) -> Optional[User]:
-    """
-    验证 API 令牌
-
-    Args:
-        token: API 令牌
-        db: 数据库会话
-
-    Returns:
-        User: 用户对象，验证失败返回 None
-    """
-    # 计算令牌哈希
-    token_hash = hashlib.sha256(token.encode()).hexdigest()
-
-    # TODO: 从数据库查询令牌记录
-    # 这里简化处理，实际应该查询数据库
-
-    # 验证令牌格式
-    if len(token) < 32:
-        return None
-
-    # 这里应该查询数据库验证令牌哈希
-    # 简化处理：直接返回 None，需要实际实现
-    return None
-
-
-def get_current_user_from_token(
-    token: str,
-    db: Session,
-    allow_api_token: bool = True
-) -> Optional[User]:
-    """
-    从令牌获取当前用户
-
-    支持 JWT 访问令牌和 API 令牌
-
-    Args:
-        token: 令牌字符串
-        db: 数据库会话
-        allow_api_token: 是否允许 API 令牌
-
-    Returns:
-        User: 用户对象，验证失败返回 None
-    """
-    # 尝试验证 JWT 令牌
-    token_data = verify_token(token, token_type="access")
-    if token_data:
-        user = db.query(User).filter(User.id == token_data.user_id).first()
-        if user and user.is_active:
-            return user
-        return None
-
-    # 尝试验证 API 令牌
-    if allow_api_token:
-        return verify_api_token(token, db)
-
-    return None

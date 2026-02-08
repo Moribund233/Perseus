@@ -10,11 +10,18 @@ import tempfile
 import shutil
 import subprocess
 import base64
+import stat
 import pytest
 from pathlib import Path
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def remove_readonly(func, path, excinfo):
+    """Windows 下删除只读文件的回调函数"""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -86,7 +93,7 @@ class TestGitHttpAPI:
         # 清理测试仓库目录
         repo_root = "./repositories"
         if os.path.exists(repo_root):
-            shutil.rmtree(repo_root)
+            shutil.rmtree(repo_root, onexc=remove_readonly)
 
         yield
 
@@ -103,7 +110,7 @@ class TestGitHttpAPI:
         db.close()
 
         if os.path.exists(repo_root):
-            shutil.rmtree(repo_root)
+            shutil.rmtree(repo_root, onexc=remove_readonly)
 
     def create_test_user(self, username=TEST_USERNAME, password=TEST_PASSWORD, email=TEST_EMAIL):
         """创建测试用户"""
@@ -303,7 +310,7 @@ class TestGitHttpIntegration:
         # 清理测试仓库目录
         repo_root = "./repositories"
         if os.path.exists(repo_root):
-            shutil.rmtree(repo_root)
+            shutil.rmtree(repo_root, onexc=remove_readonly)
 
         # 创建临时目录
         self.temp_dir = tempfile.mkdtemp()
@@ -319,10 +326,10 @@ class TestGitHttpIntegration:
         db.close()
 
         if os.path.exists(repo_root):
-            shutil.rmtree(repo_root)
+            shutil.rmtree(repo_root, onexc=remove_readonly)
 
         if os.path.exists(self.temp_dir):
-            shutil.rmtree(self.temp_dir)
+            shutil.rmtree(self.temp_dir, onexc=remove_readonly)
 
     def create_test_user(self, username=TEST_USERNAME, password=TEST_PASSWORD, email=TEST_EMAIL):
         """创建测试用户"""

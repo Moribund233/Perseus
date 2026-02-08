@@ -1,7 +1,7 @@
 import os
 import toml
 from typing import Dict, Any, Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
 
@@ -55,16 +55,44 @@ class StorageSettings(BaseSettings):
     lfs_storage_path: Optional[str] = Field(default=None, description="LFS文件存储路径，默认在repo_root/lfs")
 
 
+class SecuritySettings(BaseSettings):
+    """安全配置类"""
+    secret_key: str = Field(default="", description="JWT密钥，为空时自动生成")
+    access_token_expire_minutes: int = Field(default=30, ge=1, description="访问令牌过期时间（分钟）")
+    refresh_token_expire_days: int = Field(default=7, ge=1, description="刷新令牌过期时间（天）")
+    algorithm: str = Field(default="HS256", description="JWT加密算法")
+
+
+class LoggingSettings(BaseSettings):
+    """日志配置类"""
+    audit_log_path: str = Field(default="logs/audit.log", description="审计日志文件路径")
+    audit_log_max_size: int = Field(default=10485760, ge=1, description="审计日志文件最大大小（字节），默认10MB")
+    audit_log_backup_count: int = Field(default=5, ge=0, description="审计日志备份文件数量")
+    audit_log_enabled: bool = Field(default=True, description="是否启用审计日志")
+
+
+class RateLimitSettings(BaseSettings):
+    """速率限制配置类"""
+    default_limits: list = Field(default=["200 per minute", "1000 per hour"], description="默认速率限制")
+    strict: list = Field(default=["5 per minute", "20 per hour"], description="严格限制（用于敏感操作）")
+    standard: list = Field(default=["30 per minute", "500 per hour"], description="标准限制（用于普通API）")
+    generous: list = Field(default=["100 per minute", "2000 per hour"], description="宽松限制（用于读取操作）")
+    git_operations: list = Field(default=["10 per minute", "100 per hour"], description="Git操作限制")
+    download: list = Field(default=["20 per minute", "200 per hour"], description="下载限制")
+
+
 class Config(BaseSettings):
     """配置主类"""
     server: ServerSettings = ServerSettings()
     app: AppSettings = AppSettings()
     nginx: NginxSettings = NginxSettings()
     storage: StorageSettings = StorageSettings()
+    security: SecuritySettings = SecuritySettings()
+    logging: LoggingSettings = LoggingSettings()
+    rate_limit: RateLimitSettings = RateLimitSettings()
     system: Optional[SystemSettings] = Field(default=None, description="系统信息")
 
-    class Config:
-        extra = 'forbid'  # 严格验证配置，禁止额外的配置项
+    model_config = SettingsConfigDict(extra='forbid')  # 严格验证配置，禁止额外的配置项
 
 
 class ConfigManager:

@@ -19,6 +19,7 @@ from services.commit_service import (
     search_commits as service_search_commits,
     get_commits_by_author as service_get_commits_by_author
 )
+from services.branch_service import get_branch as service_get_branch
 
 # 创建路由实例
 router = APIRouter(prefix="/api/repositories", tags=["commits"])
@@ -26,7 +27,7 @@ router = APIRouter(prefix="/api/repositories", tags=["commits"])
 
 @router.get("/{repo_id}/commits")
 @router.get("/{repo_id}/commits/")
-async def get_commits(
+def get_commits(
     repo_id: int,
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
@@ -47,15 +48,14 @@ async def get_commits(
         list[Commit]: 提交记录列表
     """
     if branch_name:
-        from services.branch_service import get_branch as service_get_branch
-        branch = await service_get_branch(repo_id, branch_name, db)
-        return await service_get_commits_by_branch(branch.id, db, limit, offset)
+        branch = service_get_branch(repo_id, branch_name, db)
+        return service_get_commits_by_branch(branch.id, db, limit, offset)
     else:
-        return await service_get_commits(repo_id, db, limit, offset)
+        return service_get_commits(repo_id, db, limit, offset)
 
 
 @router.get("/{repo_id}/commits/history")
-async def get_commit_history(
+def get_commit_history(
     repo_id: int,
     branch_name: str = None,
     limit: int = Query(50, ge=1, le=100),
@@ -73,11 +73,11 @@ async def get_commit_history(
     Returns:
         list[Commit]: 提交历史列表
     """
-    return await service_get_commit_history(repo_id, db, branch_name, limit)
+    return service_get_commit_history(repo_id, db, branch_name, limit)
 
 
 @router.get("/{repo_id}/commits/count")
-async def count_repo_commits(repo_id: int, db: Session = Depends(get_db)):
+def count_repo_commits(repo_id: int, db: Session = Depends(get_db)):
     """
     统计仓库的提交数量
     
@@ -88,12 +88,12 @@ async def count_repo_commits(repo_id: int, db: Session = Depends(get_db)):
     Returns:
         dict: 提交数量统计
     """
-    count = await service_count_repo_commits(repo_id, db)
+    count = service_count_repo_commits(repo_id, db)
     return {"count": count}
 
 
 @router.get("/{repo_id}/commits/search")
-async def search_commits(
+def search_commits(
     repo_id: int,
     query: str = Query(..., min_length=1),
     limit: int = Query(50, ge=1, le=100),
@@ -111,11 +111,11 @@ async def search_commits(
     Returns:
         list[Commit]: 匹配的提交记录列表
     """
-    return await service_search_commits(repo_id, query, db, limit)
+    return service_search_commits(repo_id, query, db, limit)
 
 
 @router.get("/{repo_id}/commits/author")
-async def get_commits_by_author(
+def get_commits_by_author(
     repo_id: int,
     author_email: str = Query(..., email=True),
     limit: int = Query(50, ge=1, le=100),
@@ -133,11 +133,11 @@ async def get_commits_by_author(
     Returns:
         list[Commit]: 提交记录列表
     """
-    return await service_get_commits_by_author(repo_id, author_email, db, limit)
+    return service_get_commits_by_author(repo_id, author_email, db, limit)
 
 
 @router.get("/{repo_id}/commits/latest")
-async def get_latest_commit(repo_id: int, branch_name: str = None, db: Session = Depends(get_db)):
+def get_latest_commit(repo_id: int, branch_name: str = None, db: Session = Depends(get_db)):
     """
     获取仓库的最新提交
     
@@ -153,15 +153,14 @@ async def get_latest_commit(repo_id: int, branch_name: str = None, db: Session =
         NotFoundException: 没有提交记录时抛出404异常
     """
     if branch_name:
-        from services.branch_service import get_branch as service_get_branch
-        branch = await service_get_branch(repo_id, branch_name, db)
-        return await service_get_latest_commit_by_branch(branch.id, db)
+        branch = service_get_branch(repo_id, branch_name, db)
+        return service_get_latest_commit_by_branch(branch.id, db)
     else:
-        return await service_get_latest_commit(repo_id, db)
+        return service_get_latest_commit(repo_id, db)
 
 
 @router.get("/{repo_id}/commits/{commit_hash}")
-async def get_commit_by_hash(repo_id: int, commit_hash: str, db: Session = Depends(get_db)):
+def get_commit_by_hash(repo_id: int, commit_hash: str, db: Session = Depends(get_db)):
     """
     根据提交哈希获取提交详情
     
@@ -176,11 +175,11 @@ async def get_commit_by_hash(repo_id: int, commit_hash: str, db: Session = Depen
     Raises:
         NotFoundException: 提交不存在时抛出404异常
     """
-    return await service_get_commit_by_hash(repo_id, commit_hash, db)
+    return service_get_commit_by_hash(repo_id, commit_hash, db)
 
 
 @router.post("/{repo_id}/commits")
-async def create_commit(repo_id: int, commit_data: dict, db: Session = Depends(get_db)):
+def create_commit(repo_id: int, commit_data: dict, db: Session = Depends(get_db)):
     """
     创建提交记录
     
@@ -199,13 +198,41 @@ async def create_commit(repo_id: int, commit_data: dict, db: Session = Depends(g
     """
     # 确保仓库ID匹配
     commit_data["repository_id"] = repo_id
-    return await service_create_commit(commit_data, db)
+    return service_create_commit(commit_data, db)
+
+
+@router.get("/{repo_id}/branches/{branch_name}/commits")
+def get_branch_commits(
+    repo_id: int,
+    branch_name: str,
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
+    """
+    获取特定分支的提交记录
+    
+    Args:
+        repo_id: 仓库ID
+        branch_name: 分支名称
+        limit: 返回记录数量限制（默认100，最大1000）
+        offset: 记录偏移量（默认0）
+        db: 数据库会话
+    
+    Returns:
+        list[Commit]: 提交记录列表
+    
+    Raises:
+        NotFoundException: 分支不存在时抛出404异常
+    """
+    branch = service_get_branch(repo_id, branch_name, db)
+    return service_get_commits_by_branch(branch.id, db, limit, offset)
 
 
 @router.get("/{repo_id}/branches/{branch_name}/commits/count")
-async def count_branch_commits(repo_id: int, branch_name: str, db: Session = Depends(get_db)):
+def count_branch_commits(repo_id: int, branch_name: str, db: Session = Depends(get_db)):
     """
-    统计分支的提交数量
+    统计特定分支的提交数量
     
     Args:
         repo_id: 仓库ID
@@ -218,7 +245,6 @@ async def count_branch_commits(repo_id: int, branch_name: str, db: Session = Dep
     Raises:
         NotFoundException: 分支不存在时抛出404异常
     """
-    from services.branch_service import get_branch as service_get_branch
-    branch = await service_get_branch(repo_id, branch_name, db)
-    count = await service_count_branch_commits(branch.id, db)
+    branch = service_get_branch(repo_id, branch_name, db)
+    count = service_count_branch_commits(branch.id, db)
     return {"count": count}

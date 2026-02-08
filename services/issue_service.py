@@ -4,10 +4,12 @@ Issue 服务层
 处理 Issue 相关的所有业务逻辑
 """
 from typing import List, Optional, Dict, Any
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from models import Issue, Label, IssueComment, Repository
 from exception import ValidationException, NotFoundException, AuthorizationException
+from utils.permission_utils import check_resource_author_or_admin
+from utils.query_utils import get_issue_or_404
 
 
 def _build_issue_response(issue: Issue, include_details: bool = False) -> dict:
@@ -89,7 +91,7 @@ def _build_label_response(label: Label) -> dict:
     }
 
 
-async def list_issues(
+def list_issues(
     db: Session,
     repository_id: int,
     status: Optional[str] = None,
@@ -141,7 +143,7 @@ async def list_issues(
     }
 
 
-async def get_issue(
+def get_issue(
     db: Session,
     repository_id: int,
     issue_number: int,
@@ -149,28 +151,44 @@ async def get_issue(
 ) -> dict:
     """
     获取 Issue 详情
-    
+
     Args:
         db: 数据库会话
         repository_id: 仓库ID
         issue_number: Issue 编号
         include_details: 是否包含详细信息
-    
+
     Returns:
         dict: Issue 详情
     """
-    issue = db.query(Issue).filter(
+    # 使用 joinedload 预加载关联数据，避免 N+1 查询
+    query = db.query(Issue).filter(
         Issue.repository_id == repository_id,
         Issue.issue_number == issue_number
-    ).first()
-    
+    )
+
+    # 预加载关联数据
+    query = query.options(
+        joinedload(Issue.author),
+        joinedload(Issue.assignee),
+        joinedload(Issue.labels),
+        joinedload(Issue.closer)
+    )
+
+    if include_details:
+        query = query.options(
+            joinedload(Issue.comments).joinedload(IssueComment.author)
+        )
+
+    issue = query.first()
+
     if not issue:
         raise NotFoundException(detail="Issue not found")
-    
+
     return _build_issue_response(issue, include_details=include_details)
 
 
-async def create_issue(
+def create_issue(
     db: Session,
     repository_id: int,
     author_id: int,
@@ -260,43 +278,35 @@ async def update_issue(
     Returns:
         dict: 更新后的 Issue 数据
     """
-    from api.dependencies import check_repository_owner_or_admin
+    # 使用工具函数获取 Issue，不存在则抛出 404
+    issue = await get_issue_or_404(db, repository_id, issue_number)
 
-    issue = db.query(Issue).filter(
-        Issue.repository_id == repository_id,
-        Issue.issue_number == issue_number
-    ).first()
+    # 使用工具函数检查权限（作者或管理员）
+    await check_resource_author_or_admin(
+        db, issue.author_id, user_id, repository_id, "update this issue"
+    )
 
-    if not issue:
-        raise NotFoundException(detail="Issue not found")
-
-    # 检查权限（仅作者或管理员可修改）
-    if issue.author_id != user_id:
-        is_admin = await check_repository_owner_or_admin(db, repository_id, user_id)
-        if not is_admin:
-            raise AuthorizationException(detail="You don't have permission to update this issue")
-    
     if title is not None:
         issue.title = title.strip()
-    
+
     if description is not None:
         issue.description = description
-    
+
     if priority is not None:
         if priority not in ["low", "medium", "high", "critical"]:
             raise ValidationException(detail="Invalid priority")
         issue.priority = priority
-    
+
     if assignee_id is not None:
         issue.assignee_id = assignee_id
-    
+
     if label_ids is not None:
         labels = db.query(Label).filter(Label.id.in_(label_ids)).all()
         issue.labels = labels
-    
+
     db.commit()
     db.refresh(issue)
-    
+
     return _build_issue_response(issue)
 
 
@@ -318,21 +328,13 @@ async def close_issue(
     Returns:
         dict: 更新后的 Issue 数据
     """
-    from api.dependencies import check_repository_owner_or_admin
+    # 使用工具函数获取 Issue，不存在则抛出 404
+    issue = await get_issue_or_404(db, repository_id, issue_number)
 
-    issue = db.query(Issue).filter(
-        Issue.repository_id == repository_id,
-        Issue.issue_number == issue_number
-    ).first()
-
-    if not issue:
-        raise NotFoundException(detail="Issue not found")
-
-    # 检查权限（作者或管理员可关闭）
-    if issue.author_id != user_id:
-        is_admin = await check_repository_owner_or_admin(db, repository_id, user_id)
-        if not is_admin:
-            raise AuthorizationException(detail="You don't have permission to close this issue")
+    # 使用工具函数检查权限（作者或管理员）
+    await check_resource_author_or_admin(
+        db, issue.author_id, user_id, repository_id, "close this issue"
+    )
 
     if issue.status != "open":
         raise ValidationException(detail="Issue is already closed")
@@ -364,21 +366,13 @@ async def reopen_issue(
     Returns:
         dict: 更新后的 Issue 数据
     """
-    from api.dependencies import check_repository_owner_or_admin
+    # 使用工具函数获取 Issue，不存在则抛出 404
+    issue = await get_issue_or_404(db, repository_id, issue_number)
 
-    issue = db.query(Issue).filter(
-        Issue.repository_id == repository_id,
-        Issue.issue_number == issue_number
-    ).first()
-
-    if not issue:
-        raise NotFoundException(detail="Issue not found")
-
-    # 检查权限（作者或管理员可重新打开）
-    if issue.author_id != user_id:
-        is_admin = await check_repository_owner_or_admin(db, repository_id, user_id)
-        if not is_admin:
-            raise AuthorizationException(detail="You don't have permission to reopen this issue")
+    # 使用工具函数检查权限（作者或管理员）
+    await check_resource_author_or_admin(
+        db, issue.author_id, user_id, repository_id, "reopen this issue"
+    )
 
     if issue.status != "closed":
         raise ValidationException(detail="Issue is already open")
@@ -401,38 +395,33 @@ async def create_issue_comment(
 ) -> dict:
     """
     创建 Issue 评论
-    
+
     Args:
         db: 数据库会话
         repository_id: 仓库ID
         issue_number: Issue 编号
         author_id: 作者ID
         content: 评论内容
-    
+
     Returns:
         dict: 创建的评论数据
     """
-    issue = db.query(Issue).filter(
-        Issue.repository_id == repository_id,
-        Issue.issue_number == issue_number
-    ).first()
-    
-    if not issue:
-        raise NotFoundException(detail="Issue not found")
-    
+    # 使用工具函数获取 Issue，不存在则抛出 404
+    issue = await get_issue_or_404(db, repository_id, issue_number)
+
     if not content or not content.strip():
         raise ValidationException(detail="Comment content is required")
-    
+
     comment = IssueComment(
         issue_id=issue.id,
         author_id=author_id,
         content=content.strip()
     )
-    
+
     db.add(comment)
     db.commit()
     db.refresh(comment)
-    
+
     return _build_issue_comment_response(comment)
 
 
@@ -443,33 +432,31 @@ async def list_issue_comments(
 ) -> List[dict]:
     """
     获取 Issue 评论列表
-    
+
     Args:
         db: 数据库会话
         repository_id: 仓库ID
         issue_number: Issue 编号
-    
+
     Returns:
         list: 评论列表
     """
-    issue = db.query(Issue).filter(
-        Issue.repository_id == repository_id,
-        Issue.issue_number == issue_number
-    ).first()
-    
-    if not issue:
-        raise NotFoundException(detail="Issue not found")
-    
+    # 使用工具函数获取 Issue，不存在则抛出 404
+    issue = await get_issue_or_404(db, repository_id, issue_number)
+
+    # 使用 joinedload 预加载作者信息，避免 N+1 查询
     comments = db.query(IssueComment).filter(
         IssueComment.issue_id == issue.id
+    ).options(
+        joinedload(IssueComment.author)
     ).order_by(IssueComment.created_at.asc()).all()
-    
+
     return [_build_issue_comment_response(c) for c in comments]
 
 
 # ==================== Label 管理 ====================
 
-async def list_labels(
+def list_labels(
     db: Session,
     repository_id: int
 ) -> List[dict]:
@@ -487,7 +474,7 @@ async def list_labels(
     return [_build_label_response(label) for label in labels]
 
 
-async def create_label(
+def create_label(
     db: Session,
     repository_id: int,
     name: str,
@@ -536,7 +523,7 @@ async def create_label(
     return _build_label_response(label)
 
 
-async def update_label(
+def update_label(
     db: Session,
     repository_id: int,
     label_id: int,
@@ -581,7 +568,7 @@ async def update_label(
     return _build_label_response(label)
 
 
-async def delete_label(
+def delete_label(
     db: Session,
     repository_id: int,
     label_id: int

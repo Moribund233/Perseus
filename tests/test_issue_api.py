@@ -11,9 +11,19 @@ Issue API 测试
 7. Issue 评论 API - GET/POST /api/repositories/{repo_id}/issues/{issue_number}/comments
 8. Label 管理 API - GET/POST/PATCH/DELETE /api/repositories/{repo_id}/labels
 """
+
+import stat
+
+
+def remove_readonly(func, path, excinfo):
+    """Windows 下删除只读文件的回调函数"""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
 import pytest
 import os
 import shutil
+import stat
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine

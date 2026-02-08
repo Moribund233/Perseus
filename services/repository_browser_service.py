@@ -310,14 +310,14 @@ def get_commits(
 ) -> Dict[str, Any]:
     """
     获取提交历史
-    
+
     Args:
         repo_path: 仓库物理路径
         ref: 分支名，默认 HEAD
         path: 特定文件的提交历史，None 表示所有提交
         page: 页码，默认 1
         per_page: 每页数量，默认 30
-        
+
     Returns:
         dict: 提交历史数据
         {
@@ -336,28 +336,36 @@ def get_commits(
             "pagination": {
                 "page": int,
                 "per_page": int,
-                "total": int
+                "total": int,
+                "has_more": bool
             }
         }
-        
+
     Raises:
         RepositoryBrowserError: 分支不存在
     """
     repo = _get_repo(repo_path)
-    
+
     try:
         commit = _resolve_ref(repo, ref)
-        
-        # 遍历提交历史
+
+        # 使用生成器优化内存使用
+        def _walk_commits(repo: pygit2.Repository, commit_id, max_count: int):
+            """生成器：遍历提交，限制数量"""
+            walker = repo.walk(commit_id, pygit2.GIT_SORT_TIME)
+            count = 0
+            for commit_obj in walker:
+                if count >= max_count:
+                    break
+                yield commit_obj
+                count += 1
+
+        # 计算需要获取的最大数量（当前页结束位置）
+        max_commits = page * per_page
+
+        # 收集提交
         commits = []
-        walker = repo.walk(commit.id, pygit2.GIT_SORT_TIME)
-        
-        if path:
-            # 简化处理：不过滤特定文件的提交
-            # 实际实现需要使用 git log --follow path
-            pass
-        
-        for commit_obj in walker:
+        for commit_obj in _walk_commits(repo, commit.id, max_commits + 1):
             commits.append({
                 "sha": str(commit_obj.id),
                 "message": commit_obj.message.strip(),
@@ -368,22 +376,28 @@ def get_commits(
                 "date": datetime.fromtimestamp(commit_obj.author.time).isoformat(),
                 "parents": [str(p) for p in commit_obj.parent_ids]
             })
-        
+
+        # 检查是否有更多数据
+        has_more = len(commits) > max_commits
+        if has_more:
+            commits = commits[:max_commits]  # 移除额外的一个用于判断 has_more
+
         # 分页
         total = len(commits)
         start = (page - 1) * per_page
         end = start + per_page
         paginated_commits = commits[start:end]
-        
+
         return {
             "commits": paginated_commits,
             "pagination": {
                 "page": page,
                 "per_page": per_page,
-                "total": total
+                "total": total,
+                "has_more": has_more
             }
         }
-        
+
     except RepositoryBrowserError:
         raise
     except Exception as e:

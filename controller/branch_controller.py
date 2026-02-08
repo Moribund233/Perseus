@@ -25,7 +25,7 @@ router = APIRouter(prefix="/api/repositories", tags=["branches"])
 
 @router.get("/{repo_id}/branches")
 @router.get("/{repo_id}/branches/")
-async def get_branches(repo_id: int, db: Session = Depends(get_db)):
+def get_branches(repo_id: int, db: Session = Depends(get_db)):
     """
     获取仓库的所有分支
     
@@ -36,11 +36,11 @@ async def get_branches(repo_id: int, db: Session = Depends(get_db)):
     Returns:
         list[Branch]: 分支列表
     """
-    return await service_get_branches(repo_id, db)
+    return service_get_branches(repo_id, db)
 
 
 @router.get("/{repo_id}/branches/default")
-async def get_default_branch(repo_id: int, db: Session = Depends(get_db)):
+def get_default_branch(repo_id: int, db: Session = Depends(get_db)):
     """
     获取默认分支
     
@@ -54,11 +54,11 @@ async def get_default_branch(repo_id: int, db: Session = Depends(get_db)):
     Raises:
         NotFoundException: 没有默认分支时抛出404异常
     """
-    return await service_get_default_branch(repo_id, db)
+    return service_get_default_branch(repo_id, db)
 
 
 @router.get("/{repo_id}/branches/{branch_name}")
-async def get_branch(repo_id: int, branch_name: str, db: Session = Depends(get_db)):
+def get_branch(repo_id: int, branch_name: str, db: Session = Depends(get_db)):
     """
     获取仓库的特定分支
     
@@ -73,11 +73,11 @@ async def get_branch(repo_id: int, branch_name: str, db: Session = Depends(get_d
     Raises:
         NotFoundException: 分支不存在时抛出404异常
     """
-    return await service_get_branch(repo_id, branch_name, db)
+    return service_get_branch(repo_id, branch_name, db)
 
 
 @router.post("/{repo_id}/branches")
-async def create_branch(repo_id: int, branch_data: dict, db: Session = Depends(get_db)):
+def create_branch(repo_id: int, branch_data: dict, db: Session = Depends(get_db)):
     """
     创建新分支
     
@@ -93,11 +93,11 @@ async def create_branch(repo_id: int, branch_data: dict, db: Session = Depends(g
         ValidationException: 请求参数不完整时抛出422异常
         ConflictException: 分支名称已存在时抛出409异常
     """
-    return await service_create_branch(repo_id, branch_data, db)
+    return service_create_branch(repo_id, branch_data, db)
 
 
 @router.put("/{repo_id}/branches/{branch_name}")
-async def update_branch(repo_id: int, branch_name: str, branch_data: dict, db: Session = Depends(get_db)):
+def update_branch(repo_id: int, branch_name: str, branch_data: dict, db: Session = Depends(get_db)):
     """
     更新分支信息
     
@@ -113,11 +113,11 @@ async def update_branch(repo_id: int, branch_name: str, branch_data: dict, db: S
     Raises:
         NotFoundException: 分支不存在时抛出404异常
     """
-    return await service_update_branch(repo_id, branch_name, branch_data, db)
+    return service_update_branch(repo_id, branch_name, branch_data, db)
 
 
 @router.delete("/{repo_id}/branches/{branch_name}")
-async def delete_branch(repo_id: int, branch_name: str, db: Session = Depends(get_db)):
+def delete_branch(repo_id: int, branch_name: str, db: Session = Depends(get_db)):
     """
     删除分支
     
@@ -127,17 +127,17 @@ async def delete_branch(repo_id: int, branch_name: str, db: Session = Depends(ge
         db: 数据库会话
     
     Returns:
-        dict: 成功消息
+        dict: 删除成功消息
     
     Raises:
         NotFoundException: 分支不存在时抛出404异常
-        AuthorizationException: 无法删除默认分支时抛出403异常
+        ConflictException: 尝试删除默认分支时抛出409异常
     """
-    return await service_delete_branch(repo_id, branch_name, db)
+    return service_delete_branch(repo_id, branch_name, db)
 
 
 @router.put("/{repo_id}/branches/{branch_name}/default")
-async def set_default_branch(repo_id: int, branch_name: str, db: Session = Depends(get_db)):
+def set_default_branch(repo_id: int, branch_name: str, db: Session = Depends(get_db)):
     """
     设置默认分支
     
@@ -147,37 +147,43 @@ async def set_default_branch(repo_id: int, branch_name: str, db: Session = Depen
         db: 数据库会话
     
     Returns:
-        dict: 成功消息
+        dict: 设置成功消息
     
     Raises:
         NotFoundException: 分支不存在时抛出404异常
     """
-    branch = await service_get_branch(repo_id, branch_name, db)
-    return await service_set_default_branch(repo_id, branch.id, db)
+    return service_set_default_branch(repo_id, branch_name, db)
 
 
 @router.put("/{repo_id}/branches/{branch_name}/protect")
-async def protect_branch(repo_id: int, branch_name: str, protection_settings: dict, db: Session = Depends(get_db)):
+def protect_branch(
+    repo_id: int,
+    branch_name: str,
+    protection_settings: dict = None,
+    db: Session = Depends(get_db)
+):
     """
     保护分支
-    
+
     Args:
         repo_id: 仓库ID
         branch_name: 分支名称
-        protection_settings: 保护设置
+        protection_settings: 保护设置（可选）
         db: 数据库会话
-    
+
     Returns:
         Branch: 更新后的分支信息
-    
+
     Raises:
         NotFoundException: 分支不存在时抛出404异常
     """
-    return await service_protect_branch(repo_id, branch_name, protection_settings, db)
+    if protection_settings is None:
+        protection_settings = {}
+    return service_protect_branch(repo_id, branch_name, protection_settings, db)
 
 
 @router.put("/{repo_id}/branches/{branch_name}/unprotect")
-async def unprotect_branch(repo_id: int, branch_name: str, db: Session = Depends(get_db)):
+def unprotect_branch(repo_id: int, branch_name: str, db: Session = Depends(get_db)):
     """
     取消分支保护
     
@@ -192,13 +198,13 @@ async def unprotect_branch(repo_id: int, branch_name: str, db: Session = Depends
     Raises:
         NotFoundException: 分支不存在时抛出404异常
     """
-    return await service_unprotect_branch(repo_id, branch_name, db)
+    return service_unprotect_branch(repo_id, branch_name, db)
 
 
 @router.get("/{repo_id}/branches/{branch_name}/protection")
-async def check_branch_protection(repo_id: int, branch_name: str, db: Session = Depends(get_db)):
+def check_branch_protection(repo_id: int, branch_name: str, db: Session = Depends(get_db)):
     """
-    检查分支保护状态
+    检查分支是否受保护
     
     Args:
         repo_id: 仓库ID
@@ -206,9 +212,9 @@ async def check_branch_protection(repo_id: int, branch_name: str, db: Session = 
         db: 数据库会话
     
     Returns:
-        dict: 分支保护状态信息
+        dict: 分支保护状态
     
     Raises:
         NotFoundException: 分支不存在时抛出404异常
     """
-    return await service_check_branch_protection(repo_id, branch_name, db)
+    return service_check_branch_protection(repo_id, branch_name, db)

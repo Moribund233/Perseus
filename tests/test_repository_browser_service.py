@@ -7,10 +7,20 @@
 3. 提交历史 - get_commits
 4. 代码对比 - get_diff
 """
+
+import stat
+
+
+def remove_readonly(func, path, excinfo):
+    """Windows 下删除只读文件的回调函数"""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
 import pytest
 import os
 import tempfile
 import shutil
+import stat
 from datetime import datetime
 
 import pygit2

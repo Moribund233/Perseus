@@ -71,7 +71,7 @@ async def list_pull_requests(
 ):
     """
     获取 PR 列表
-    
+
     Args:
         repo_id: 仓库ID
         status: 状态筛选
@@ -79,7 +79,7 @@ async def list_pull_requests(
         page: 页码
         limit: 每页数量
         db: 数据库会话
-    
+
     Returns:
         dict: PR 列表和分页信息
     """
@@ -131,12 +131,12 @@ async def get_pull_request(
 ):
     """
     获取 PR 详情
-    
+
     Args:
         repo_id: 仓库ID
         pr_number: PR 编号
         db: 数据库会话
-    
+
     Returns:
         dict: PR 详情（包含评论和审查）
     """
@@ -246,12 +246,12 @@ async def list_pr_comments(
 ):
     """
     获取 PR 评论列表
-    
+
     Args:
         repo_id: 仓库ID
         pr_number: PR 编号
         db: 数据库会话
-    
+
     Returns:
         list: 评论列表
     """

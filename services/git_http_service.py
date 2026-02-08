@@ -313,11 +313,206 @@ def process_receive_pack(repo_path: str, data: bytes, user: User) -> bytes:
     except Exception as e:
         raise GitHttpError(f"Failed to open repository: {e}")
 
-    # TODO: 实现接收 packfile 和更新引用
-    # 这里需要解析 packfile 并更新引用
+    # 解析客户端发送的引用更新命令和 packfile
+    commands, packfile_data = _parse_receive_pack_data(data)
 
-    # 返回成功响应
-    return build_receive_pack_response([])
+    if not commands:
+        return build_receive_pack_response([])
+
+    # 验证命令权限并执行更新
+    results = []
+    for cmd in commands:
+        result = _process_push_command(repo, cmd, user, packfile_data)
+        results.append(result)
+
+    return build_receive_pack_response(results)
+
+
+def _parse_receive_pack_data(data: bytes) -> Tuple[list, Optional[bytes]]:
+    """
+    解析 receive-pack 数据，分离命令和 packfile
+
+    Args:
+        data: 客户端发送的原始数据
+
+    Returns:
+        tuple: (命令列表, packfile数据)
+    """
+    commands = []
+    packfile_start = None
+
+    offset = 0
+    while offset < len(data):
+        if offset + 4 > len(data):
+            break
+
+        try:
+            length = int(data[offset:offset+4], 16)
+        except ValueError:
+            break
+
+        if length == 0:
+            offset += 4
+            continue
+
+        if length == 4:  # 0000 分隔符
+            packfile_start = offset + 4
+            break
+
+        line = data[offset+4:offset+length]
+        offset += length
+
+        # 解析命令行: old_sha new_sha ref_name
+        try:
+            line_str = line.decode('utf-8', errors='ignore').strip()
+            parts = line_str.split(' ')
+            if len(parts) >= 3:
+                commands.append({
+                    'old_sha': parts[0],
+                    'new_sha': parts[1],
+                    'ref': parts[2]
+                })
+        except Exception:
+            continue
+
+    packfile = data[packfile_start:] if packfile_start else None
+    return commands, packfile
+
+
+def _process_push_command(
+    repo: pygit2.Repository,
+    cmd: dict,
+    user: User,
+    packfile_data: Optional[bytes]
+) -> dict:
+    """
+    处理单个 push 命令
+
+    Args:
+        repo: Git 仓库对象
+        cmd: 命令字典，包含 old_sha, new_sha, ref
+        user: 操作用户
+        packfile_data: packfile 数据
+
+    Returns:
+        dict: 操作结果
+    """
+    old_sha = cmd['old_sha']
+    new_sha = cmd['new_sha']
+    ref_name = cmd['ref']
+
+    result = {
+        'old_sha': old_sha,
+        'new_sha': new_sha,
+        'ref': ref_name,
+        'status': 'ok'
+    }
+
+    try:
+        # 检查引用是否存在
+        ref = None
+        try:
+            ref = repo.lookup_reference(ref_name)
+        except KeyError:
+            pass
+
+        # 验证 old_sha 是否匹配（防止竞态条件）
+        if ref:
+            current_sha = str(ref.target)
+            if old_sha != '0' * 40 and current_sha != old_sha:
+                result['status'] = 'ng refs/heads/main failed to update (non-fast-forward)'
+                return result
+
+        # 如果提供了 packfile，先解包
+        if packfile_data:
+            _unpack_packfile(repo, packfile_data)
+
+        # 执行引用更新
+        if new_sha == '0' * 40:
+            # 删除引用
+            if ref:
+                ref.delete()
+        else:
+            # 创建或更新引用
+            new_oid = pygit2.Oid(hex=new_sha)
+            if ref:
+                ref.set_target(new_oid)
+            else:
+                repo.create_reference(ref_name, new_oid)
+
+        # 记录 push 日志
+        _log_push_operation(repo, user, cmd)
+
+    except Exception as e:
+        result['status'] = f'ng {ref_name} {str(e)}'
+
+    return result
+
+
+def _unpack_packfile(repo: pygit2.Repository, packfile_data: bytes) -> None:
+    """
+    解包 packfile 数据
+
+    Args:
+        repo: Git 仓库对象
+        packfile_data: packfile 原始数据
+
+    Raises:
+        GitHttpError: 解包失败
+    """
+    import subprocess
+    import tempfile
+    import os
+
+    # 创建临时文件存储 packfile
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.pack') as tmp_pack:
+        tmp_pack.write(packfile_data)
+        tmp_pack_path = tmp_pack.name
+
+    try:
+        # 使用 git unpack-objects 解包
+        result = subprocess.run(
+            ['git', 'unpack-objects'],
+            input=packfile_data,
+            capture_output=True,
+            cwd=repo.path
+        )
+
+        if result.returncode != 0:
+            raise GitHttpError(f"Failed to unpack packfile: {result.stderr.decode()}")
+
+    finally:
+        # 清理临时文件
+        if os.path.exists(tmp_pack_path):
+            os.unlink(tmp_pack_path)
+
+
+def _log_push_operation(repo: pygit2.Repository, user: User, cmd: dict) -> None:
+    """
+    记录 push 操作日志
+
+    Args:
+        repo: Git 仓库对象
+        user: 操作用户
+        cmd: push 命令
+    """
+    import logging
+    import os
+
+    logger = logging.getLogger('git.push')
+
+    # 获取仓库名称
+    repo_name = os.path.basename(repo.path)
+
+    action = 'delete' if cmd['new_sha'] == '0' * 40 else 'update'
+
+    logger.info(
+        f"Push {action}: repo={repo_name}, "
+        f"user={user.username if user else 'anonymous'}, "
+        f"ref={cmd['ref']}, "
+        f"old={cmd['old_sha'][:8]}, "
+        f"new={cmd['new_sha'][:8]}"
+    )
 
 
 def generate_packfile(repo: pygit2.Repository, want_refs: list, have_refs: list) -> bytes:

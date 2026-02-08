@@ -15,10 +15,20 @@
     TEST_USERNAME: 测试用户名 (默认: test)
     TEST_PASSWORD: 测试密码 (默认: test123)
 """
+
+import stat
+
+
+def remove_readonly(func, path, excinfo):
+    """Windows 下删除只读文件的回调函数"""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
 import os
 import sys
 import tempfile
 import shutil
+import stat
 import subprocess
 from pathlib import Path
 
@@ -326,7 +336,7 @@ class RepositoryWorkflowTester:
         """清理临时资源"""
         if self.temp_dir and os.path.exists(self.temp_dir):
             try:
-                shutil.rmtree(self.temp_dir)
+                shutil.rmtree(self.temp_dir, onexc=remove_readonly)
                 self.log(f"清理临时目录: {self.temp_dir}", "INFO")
             except Exception as e:
                 self.log(f"清理临时目录失败: {e}", "WARNING")

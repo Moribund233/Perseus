@@ -10,15 +10,25 @@ from fastapi import Request, Response
 from typing import Optional, Callable
 import logging
 
+from config import get_config
+
+# 日志记录器
+logger = logging.getLogger(__name__)
+
+
+# 获取速率限制配置
+_config = get_config()
+_rate_limit_config = getattr(_config, 'rate_limit', None)
+
+# 使用配置或默认值
+_default_limits = getattr(_rate_limit_config, 'default_limits', ["200 per minute", "1000 per hour"]) if _rate_limit_config else ["200 per minute", "1000 per hour"]
+
 # 创建速率限制器实例
 # 使用客户端 IP 作为标识
 limiter = Limiter(
     key_func=get_remote_address,
-    default_limits=["200 per minute", "1000 per hour"]
+    default_limits=_default_limits
 )
-
-# 日志记录器
-logger = logging.getLogger(__name__)
 
 
 def get_limiter() -> Limiter:
@@ -52,23 +62,53 @@ class RateLimitConfig:
     """
     速率限制配置类
 
-    提供常用的速率限制配置
+    提供常用的速率限制配置，从配置文件读取或使用默认值
+    支持类属性访问和实例属性访问
     """
 
-    # 严格限制 - 用于敏感操作（登录、认证等）
+    # 类属性默认值
     STRICT = ["5 per minute", "20 per hour"]
-
-    # 标准限制 - 用于普通 API
     STANDARD = ["30 per minute", "500 per hour"]
-
-    # 宽松限制 - 用于读取操作
     GENEROUS = ["100 per minute", "2000 per hour"]
-
-    # Git 操作限制 - 用于 Git HTTP 端点
     GIT_OPERATIONS = ["10 per minute", "100 per hour"]
-
-    # 下载限制 - 用于文件下载
     DOWNLOAD = ["20 per minute", "200 per hour"]
+
+    def __init__(self):
+        """初始化，从配置读取或使用默认值"""
+        _config = get_config()
+        _rate_limit_config = getattr(_config, 'rate_limit', None)
+
+        # 严格限制 - 用于敏感操作（登录、认证等）
+        self.STRICT = getattr(_rate_limit_config, 'strict', ["5 per minute", "20 per hour"]) if _rate_limit_config else ["5 per minute", "20 per hour"]
+
+        # 标准限制 - 用于普通 API
+        self.STANDARD = getattr(_rate_limit_config, 'standard', ["30 per minute", "500 per hour"]) if _rate_limit_config else ["30 per minute", "500 per hour"]
+
+        # 宽松限制 - 用于读取操作
+        self.GENEROUS = getattr(_rate_limit_config, 'generous', ["100 per minute", "2000 per hour"]) if _rate_limit_config else ["100 per minute", "2000 per hour"]
+
+        # Git 操作限制 - 用于 Git HTTP 端点
+        self.GIT_OPERATIONS = getattr(_rate_limit_config, 'git_operations', ["10 per minute", "100 per hour"]) if _rate_limit_config else ["10 per minute", "100 per hour"]
+
+        # 下载限制 - 用于文件下载
+        self.DOWNLOAD = getattr(_rate_limit_config, 'download', ["20 per minute", "200 per hour"]) if _rate_limit_config else ["20 per minute", "200 per hour"]
+
+
+# 创建单例实例
+_rate_limit_config_instance = None
+
+
+def get_rate_limit_config() -> RateLimitConfig:
+    """
+    获取速率限制配置实例
+
+    Returns:
+        RateLimitConfig: 速率限制配置实例
+    """
+    global _rate_limit_config_instance
+    if _rate_limit_config_instance is None:
+        _rate_limit_config_instance = RateLimitConfig()
+    return _rate_limit_config_instance
 
 
 # 自定义 key 函数

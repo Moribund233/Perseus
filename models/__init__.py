@@ -1,7 +1,6 @@
 # 模型初始化模块
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, declarative_base
 
 # 数据库连接URL - 会被client初始化时设置
 DATABASE_URL = "sqlite:///./langit.db"

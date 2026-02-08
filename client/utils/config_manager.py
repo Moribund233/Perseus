@@ -571,6 +571,84 @@ class ClientConfigManager:
 
         return self.save_config(config)
 
+    def get_security_config(self) -> Dict[str, Any]:
+        """
+        获取安全配置
+
+        Returns:
+            Dict[str, Any]: 安全配置字典
+        """
+        config = self.load_config()
+        return config.get("security", {})
+
+    def get_secret_key(self) -> Optional[str]:
+        """
+        获取 JWT Secret Key
+
+        Returns:
+            Optional[str]: Secret Key，如果不存在返回 None
+        """
+        return self.get("security.secret_key")
+
+    def set_secret_key(self, secret_key: str) -> bool:
+        """
+        设置 JWT Secret Key
+
+        Args:
+            secret_key: Secret Key
+
+        Returns:
+            bool: 设置成功返回True，否则返回False
+        """
+        if not secret_key or not isinstance(secret_key, str):
+            print("Secret Key 不能为空且必须是字符串")
+            return False
+
+        # 确保 security 部分存在
+        config = self.load_config()
+        if "security" not in config:
+            config["security"] = {}
+
+        config["security"]["secret_key"] = secret_key
+
+        return self.save_config(config)
+
+    def generate_and_save_secret_key(self) -> Optional[str]:
+        """
+        生成并保存新的 JWT Secret Key
+
+        Returns:
+            Optional[str]: 生成的 Secret Key，失败返回 None
+        """
+        import secrets
+
+        # 生成 32 字节的安全随机密钥
+        secret_key = secrets.token_urlsafe(32)
+
+        if self.set_secret_key(secret_key):
+            print(f"已生成并保存新的 JWT Secret Key")
+            return secret_key
+        else:
+            print("保存 JWT Secret Key 失败")
+            return None
+
+    def ensure_secret_key(self) -> Optional[str]:
+        """
+        确保 Secret Key 存在，如果不存在则生成
+
+        Returns:
+            Optional[str]: Secret Key，失败返回 None
+        """
+        # 先尝试从配置读取
+        secret_key = self.get_secret_key()
+
+        if secret_key:
+            return secret_key
+
+        # 如果不存在，生成新的
+        print("JWT Secret Key 不存在，正在生成...")
+        return self.generate_and_save_secret_key()
+
 
 # 创建全局配置管理器实例
 _config_manager: Optional[ClientConfigManager] = None

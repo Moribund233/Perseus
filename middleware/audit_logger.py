@@ -4,29 +4,52 @@
 记录所有 HTTP 请求和响应的关键信息，用于安全审计
 """
 import json
+import os
 import time
 import uuid
 from datetime import datetime
 from typing import Optional
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
+from logging.handlers import RotatingFileHandler
 import logging
+
+from config import get_config
+
+# 获取配置
+_config = get_config()
+_logging_config = _config.logging
 
 # 创建审计日志记录器
 audit_logger = logging.getLogger("audit")
 audit_logger.setLevel(logging.INFO)
 
-# 创建文件处理器
-file_handler = logging.FileHandler("logs/audit.log", encoding="utf-8")
-file_handler.setLevel(logging.INFO)
+# 确保处理器只被添加一次
+if not audit_logger.handlers:
+    # 获取日志路径
+    log_path = _logging_config.audit_log_path
 
-# 创建格式化器
-formatter = logging.Formatter(
-    '%(asctime)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-file_handler.setFormatter(formatter)
-audit_logger.addHandler(file_handler)
+    # 确保日志目录存在
+    log_dir = os.path.dirname(log_path)
+    if log_dir and not os.path.exists(log_dir):
+        os.makedirs(log_dir, exist_ok=True)
+
+    # 创建轮转文件处理器
+    file_handler = RotatingFileHandler(
+        log_path,
+        maxBytes=_logging_config.audit_log_max_size,
+        backupCount=_logging_config.audit_log_backup_count,
+        encoding="utf-8"
+    )
+    file_handler.setLevel(logging.INFO)
+
+    # 创建格式化器
+    formatter = logging.Formatter(
+        '%(asctime)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    file_handler.setFormatter(formatter)
+    audit_logger.addHandler(file_handler)
 
 
 class AuditLoggerMiddleware(BaseHTTPMiddleware):
@@ -57,6 +80,9 @@ class AuditLoggerMiddleware(BaseHTTPMiddleware):
 
     # 敏感操作 HTTP 方法
     SENSITIVE_METHODS = ["POST", "PUT", "DELETE", "PATCH"]
+
+    # 敏感字段（需要过滤）
+    SENSITIVE_FIELDS = ['password', 'token', 'secret', 'authorization', 'api_key', 'access_token', 'refresh_token']
 
     def __init__(
         self,
@@ -115,6 +141,34 @@ class AuditLoggerMiddleware(BaseHTTPMiddleware):
         )
 
         return is_sensitive_method or is_sensitive_path
+
+    def _filter_sensitive_data(self, data: dict) -> dict:
+        """
+        过滤敏感字段
+
+        Args:
+            data: 原始数据字典
+
+        Returns:
+            dict: 过滤后的数据字典
+        """
+        if not isinstance(data, dict):
+            return data
+
+        filtered = {}
+        for key, value in data.items():
+            if any(field in key.lower() for field in self.SENSITIVE_FIELDS):
+                filtered[key] = '***'
+            elif isinstance(value, dict):
+                filtered[key] = self._filter_sensitive_data(value)
+            elif isinstance(value, list):
+                filtered[key] = [
+                    self._filter_sensitive_data(item) if isinstance(item, dict) else item
+                    for item in value
+                ]
+            else:
+                filtered[key] = value
+        return filtered
 
     def _get_client_ip(self, request: Request) -> str:
         """
@@ -184,6 +238,10 @@ class AuditLoggerMiddleware(BaseHTTPMiddleware):
         Returns:
             Response: HTTP 响应
         """
+        # 如果审计日志被禁用，直接处理请求
+        if not _logging_config.audit_log_enabled:
+            return await call_next(request)
+
         # 生成请求 ID
         request_id = str(uuid.uuid4())[:8]
         request.state.request_id = request_id
@@ -207,6 +265,17 @@ class AuditLoggerMiddleware(BaseHTTPMiddleware):
 
         # 检查是否是敏感操作
         is_sensitive = self._is_sensitive_operation(method, path)
+
+        # 可选：记录请求体
+        request_body = None
+        if self.log_request_body and method in ["POST", "PUT", "PATCH"]:
+            try:
+                body = await request.body()
+                if body:
+                    body_json = json.loads(body)
+                    request_body = self._filter_sensitive_data(body_json)
+            except Exception:
+                pass  # 如果无法解析请求体，忽略错误
 
         # 处理请求
         try:
@@ -238,6 +307,10 @@ class AuditLoggerMiddleware(BaseHTTPMiddleware):
                 "is_sensitive": is_sensitive,
                 "error": error_message
             }
+
+            # 如果记录了请求体，添加到日志条目
+            if request_body:
+                audit_entry["request_body"] = request_body
 
             # 记录日志
             log_message = json.dumps(audit_entry, ensure_ascii=False, default=str)

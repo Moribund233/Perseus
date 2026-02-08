@@ -39,9 +39,21 @@ class InitThread(QThread):
             
             # 步骤2: 调用服务端init模块生成配置文件
             self.progress_updated.emit(30, "正在初始化配置文件...")
-            
+
             from init import init_app
             init_app(check_service=self._check_service)
+
+            # 步骤2.5: 确保 JWT Secret Key 存在
+            self.progress_updated.emit(35, "正在检查安全密钥...")
+
+            from client.utils.config_manager import get_client_config_manager
+            config_manager = get_client_config_manager()
+            secret_key = config_manager.ensure_secret_key()
+
+            if secret_key:
+                self.progress_updated.emit(38, "安全密钥已就绪")
+            else:
+                self.progress_updated.emit(38, "安全密钥检查失败，继续使用临时密钥")
             
             # 步骤3: 初始化Nginx服务器
             self.progress_updated.emit(50, "正在初始化Nginx服务器...")

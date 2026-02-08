@@ -6,12 +6,14 @@ Pull Request 服务层
 import os
 import tempfile
 from typing import List, Optional, Dict, Any
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 import pygit2
 
 from models import PullRequest, PRComment, PRReview, Repository, User
 from exception import ValidationException, NotFoundException, ConflictException, AuthorizationException
+from utils.permission_utils import check_resource_author_or_admin, check_repository_permission
+from utils.query_utils import get_pull_request_or_404
 
 
 def _build_pr_response(pr: PullRequest, include_details: bool = False) -> dict:
@@ -140,27 +142,42 @@ async def get_pull_request(
 ) -> dict:
     """
     获取 PR 详情
-    
+
     Args:
         db: 数据库会话
         repository_id: 仓库ID
         pr_number: PR 编号
         include_details: 是否包含详细信息
-    
+
     Returns:
         dict: PR 详情
-    
+
     Raises:
         NotFoundException: PR 不存在
     """
-    pr = db.query(PullRequest).filter(
+    # 使用 joinedload 预加载关联数据，避免 N+1 查询
+    query = db.query(PullRequest).filter(
         PullRequest.repository_id == repository_id,
         PullRequest.pr_number == pr_number
-    ).first()
-    
+    )
+
+    # 预加载关联数据
+    query = query.options(
+        joinedload(PullRequest.author),
+        joinedload(PullRequest.merger)
+    )
+
+    if include_details:
+        query = query.options(
+            joinedload(PullRequest.comments).joinedload(PRComment.author),
+            joinedload(PullRequest.reviews).joinedload(PRReview.reviewer)
+        )
+
+    pr = query.first()
+
     if not pr:
         raise NotFoundException(detail="Pull request not found")
-    
+
     return _build_pr_response(pr, include_details=include_details)
 
 
@@ -250,21 +267,13 @@ async def update_pull_request(
         NotFoundException: PR 不存在
         ForbiddenException: 无权限修改
     """
-    from api.dependencies import check_repository_owner_or_admin
+    # 使用工具函数获取 PR，不存在则抛出 404
+    pr = await get_pull_request_or_404(db, repository_id, pr_number)
 
-    pr = db.query(PullRequest).filter(
-        PullRequest.repository_id == repository_id,
-        PullRequest.pr_number == pr_number
-    ).first()
-
-    if not pr:
-        raise NotFoundException(detail="Pull request not found")
-
-    # 检查权限（仅作者或管理员可修改）
-    if pr.author_id != user_id:
-        is_admin = await check_repository_owner_or_admin(db, repository_id, user_id)
-        if not is_admin:
-            raise AuthorizationException(detail="You don't have permission to update this pull request")
+    # 使用工具函数检查权限（作者或管理员）
+    await check_resource_author_or_admin(
+        db, pr.author_id, user_id, repository_id, "update this pull request"
+    )
 
     # 已合并或关闭的 PR 不能修改
     if pr.status != "open":
@@ -300,21 +309,13 @@ async def close_pull_request(
     Returns:
         dict: 更新后的 PR 数据
     """
-    from api.dependencies import check_repository_owner_or_admin
+    # 使用工具函数获取 PR，不存在则抛出 404
+    pr = await get_pull_request_or_404(db, repository_id, pr_number)
 
-    pr = db.query(PullRequest).filter(
-        PullRequest.repository_id == repository_id,
-        PullRequest.pr_number == pr_number
-    ).first()
-
-    if not pr:
-        raise NotFoundException(detail="Pull request not found")
-
-    # 检查权限（作者或管理员可关闭）
-    if pr.author_id != user_id:
-        is_admin = await check_repository_owner_or_admin(db, repository_id, user_id)
-        if not is_admin:
-            raise AuthorizationException(detail="You don't have permission to close this pull request")
+    # 使用工具函数检查权限（作者或管理员）
+    await check_resource_author_or_admin(
+        db, pr.author_id, user_id, repository_id, "close this pull request"
+    )
 
     if pr.status != "open":
         raise ValidationException(detail=f"Pull request is already {pr.status}")
@@ -476,13 +477,8 @@ async def merge_pull_request(
     Raises:
         ValidationException: 无法合并
     """
-    pr = db.query(PullRequest).filter(
-        PullRequest.repository_id == repository_id,
-        PullRequest.pr_number == pr_number
-    ).first()
-
-    if not pr:
-        raise NotFoundException(detail="Pull request not found")
+    # 使用工具函数获取 PR，不存在则抛出 404
+    pr = await get_pull_request_or_404(db, repository_id, pr_number)
 
     if pr.status != "open":
         raise ValidationException(detail=f"Cannot merge {pr.status} pull request")
@@ -493,8 +489,7 @@ async def merge_pull_request(
         raise NotFoundException(detail="Merger not found")
 
     # 检查合并权限（需要仓库写权限）
-    from api.dependencies import check_repository_permission
-    has_permission = await check_repository_permission(
+    has_permission = check_repository_permission(
         db, repository_id, merger_id, ["owner", "admin", "developer"]
     )
     if not has_permission:
@@ -560,7 +555,7 @@ async def create_pr_comment(
 ) -> dict:
     """
     创建 PR 评论
-    
+
     Args:
         db: 数据库会话
         repository_id: 仓库ID
@@ -571,27 +566,22 @@ async def create_pr_comment(
         line_number: 行号（行级评论）
         commit_hash: 提交哈希（行级评论）
         parent_id: 父评论ID（回复）
-    
+
     Returns:
         dict: 创建的评论数据
     """
-    pr = db.query(PullRequest).filter(
-        PullRequest.repository_id == repository_id,
-        PullRequest.pr_number == pr_number
-    ).first()
-    
-    if not pr:
-        raise NotFoundException(detail="Pull request not found")
-    
+    # 使用工具函数获取 PR，不存在则抛出 404
+    pr = await get_pull_request_or_404(db, repository_id, pr_number)
+
     if not content or not content.strip():
         raise ValidationException(detail="Comment content is required")
-    
+
     # 验证父评论
     if parent_id:
         parent = db.query(PRComment).filter(PRComment.id == parent_id).first()
         if not parent or parent.pull_request_id != pr.id:
             raise ValidationException(detail="Invalid parent comment")
-    
+
     comment = PRComment(
         pull_request_id=pr.id,
         author_id=author_id,
@@ -601,11 +591,11 @@ async def create_pr_comment(
         commit_hash=commit_hash,
         parent_id=parent_id
     )
-    
+
     db.add(comment)
     db.commit()
     db.refresh(comment)
-    
+
     return _build_pr_comment_response(comment)
 
 
@@ -619,7 +609,7 @@ async def create_pr_review(
 ) -> dict:
     """
     创建 PR 审查
-    
+
     Args:
         db: 数据库会话
         repository_id: 仓库ID
@@ -627,27 +617,22 @@ async def create_pr_review(
         reviewer_id: 审查者ID
         status: 审查状态（approved/changes_requested）
         comment: 审查意见
-    
+
     Returns:
         dict: 创建的审查数据
     """
-    pr = db.query(PullRequest).filter(
-        PullRequest.repository_id == repository_id,
-        PullRequest.pr_number == pr_number
-    ).first()
-    
-    if not pr:
-        raise NotFoundException(detail="Pull request not found")
-    
+    # 使用工具函数获取 PR，不存在则抛出 404
+    pr = await get_pull_request_or_404(db, repository_id, pr_number)
+
     if status not in ["approved", "changes_requested"]:
         raise ValidationException(detail="Invalid review status")
-    
+
     # 检查是否已存在审查记录
     existing_review = db.query(PRReview).filter(
         PRReview.pull_request_id == pr.id,
         PRReview.reviewer_id == reviewer_id
     ).first()
-    
+
     if existing_review:
         # 更新现有审查
         existing_review.status = status
@@ -655,7 +640,7 @@ async def create_pr_review(
         db.commit()
         db.refresh(existing_review)
         return _build_pr_review_response(existing_review)
-    
+
     # 创建新审查
     review = PRReview(
         pull_request_id=pr.id,
@@ -663,11 +648,11 @@ async def create_pr_review(
         status=status,
         comment=comment
     )
-    
+
     db.add(review)
     db.commit()
     db.refresh(review)
-    
+
     return _build_pr_review_response(review)
 
 
@@ -678,25 +663,23 @@ async def list_pr_comments(
 ) -> List[dict]:
     """
     获取 PR 评论列表
-    
+
     Args:
         db: 数据库会话
         repository_id: 仓库ID
         pr_number: PR 编号
-    
+
     Returns:
         list: 评论列表
     """
-    pr = db.query(PullRequest).filter(
-        PullRequest.repository_id == repository_id,
-        PullRequest.pr_number == pr_number
-    ).first()
-    
-    if not pr:
-        raise NotFoundException(detail="Pull request not found")
-    
+    # 使用工具函数获取 PR，不存在则抛出 404
+    pr = await get_pull_request_or_404(db, repository_id, pr_number)
+
+    # 使用 joinedload 预加载作者信息，避免 N+1 查询
     comments = db.query(PRComment).filter(
         PRComment.pull_request_id == pr.id
+    ).options(
+        joinedload(PRComment.author)
     ).order_by(PRComment.created_at.asc()).all()
-    
+
     return [_build_pr_comment_response(c) for c in comments]

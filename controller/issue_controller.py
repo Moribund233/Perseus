@@ -67,7 +67,7 @@ class LabelUpdateRequest(BaseModel):
 
 
 @router.get("/api/repositories/{repo_id}/issues")
-async def list_issues(
+def list_issues(
     repo_id: int,
     status: Optional[str] = Query(None, description="状态筛选：open/closed"),
     label: Optional[str] = Query(None, description="标签名称筛选"),
@@ -93,7 +93,7 @@ async def list_issues(
     Returns:
         dict: Issue 列表和分页信息
     """
-    return await service_list_issues(
+    return service_list_issues(
         db=db,
         repository_id=repo_id,
         status=status,
@@ -106,7 +106,7 @@ async def list_issues(
 
 
 @router.post("/api/repositories/{repo_id}/issues")
-async def create_issue(
+def create_issue(
     repo_id: int,
     data: IssueCreateRequest,
     db: Session = Depends(get_db),
@@ -124,7 +124,7 @@ async def create_issue(
     Returns:
         dict: 创建的 Issue 数据
     """
-    return await service_create_issue(
+    return service_create_issue(
         db=db,
         repository_id=repo_id,
         author_id=current_user.id,
@@ -137,7 +137,7 @@ async def create_issue(
 
 
 @router.get("/api/repositories/{repo_id}/issues/{issue_number}")
-async def get_issue(
+def get_issue(
     repo_id: int,
     issue_number: int,
     db: Session = Depends(get_db)
@@ -153,7 +153,7 @@ async def get_issue(
     Returns:
         dict: Issue 详情（包含评论）
     """
-    return await service_get_issue(
+    return service_get_issue(
         db=db,
         repository_id=repo_id,
         issue_number=issue_number,
@@ -259,12 +259,12 @@ async def list_issue_comments(
 ):
     """
     获取 Issue 评论列表
-    
+
     Args:
         repo_id: 仓库ID
         issue_number: Issue 编号
         db: 数据库会话
-    
+
     Returns:
         list: 评论列表
     """
@@ -308,7 +308,7 @@ async def create_issue_comment(
 # ==================== Label 管理 ====================
 
 @router.get("/api/repositories/{repo_id}/labels")
-async def list_labels(
+def list_labels(
     repo_id: int,
     db: Session = Depends(get_db)
 ):
@@ -322,14 +322,14 @@ async def list_labels(
     Returns:
         list: 标签列表
     """
-    return await service_list_labels(
+    return service_list_labels(
         db=db,
         repository_id=repo_id
     )
 
 
 @router.post("/api/repositories/{repo_id}/labels")
-async def create_label(
+def create_label(
     repo_id: int,
     data: LabelCreateRequest,
     db: Session = Depends(get_db)
@@ -345,7 +345,7 @@ async def create_label(
     Returns:
         dict: 创建的标签数据
     """
-    return await service_create_label(
+    return service_create_label(
         db=db,
         repository_id=repo_id,
         name=data.name,
@@ -355,7 +355,7 @@ async def create_label(
 
 
 @router.patch("/api/repositories/{repo_id}/labels/{label_id}")
-async def update_label(
+def update_label(
     repo_id: int,
     label_id: int,
     data: LabelUpdateRequest,
@@ -373,7 +373,7 @@ async def update_label(
     Returns:
         dict: 更新后的标签数据
     """
-    return await service_update_label(
+    return service_update_label(
         db=db,
         repository_id=repo_id,
         label_id=label_id,
@@ -384,7 +384,7 @@ async def update_label(
 
 
 @router.delete("/api/repositories/{repo_id}/labels/{label_id}")
-async def delete_label(
+def delete_label(
     repo_id: int,
     label_id: int,
     db: Session = Depends(get_db)
@@ -400,7 +400,7 @@ async def delete_label(
     Returns:
         dict: 操作结果
     """
-    await service_delete_label(
+    service_delete_label(
         db=db,
         repository_id=repo_id,
         label_id=label_id

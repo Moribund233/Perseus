@@ -18,10 +18,17 @@ import sys
 import pytest
 import base64
 import shutil
+import stat
 from pathlib import Path
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def remove_readonly(func, path, excinfo):
+    """Windows 下删除只读文件的回调函数"""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -88,7 +95,7 @@ class TestPathTraversalSecurity:
         # 清理测试仓库目录
         repo_root = "./repositories"
         if os.path.exists(repo_root):
-            shutil.rmtree(repo_root)
+            shutil.rmtree(repo_root, onexc=remove_readonly)
 
         yield
 
@@ -101,7 +108,7 @@ class TestPathTraversalSecurity:
         db.close()
 
         if os.path.exists(repo_root):
-            shutil.rmtree(repo_root)
+            shutil.rmtree(repo_root, onexc=remove_readonly)
 
     def create_test_user(self, username=TEST_USERNAME, password=TEST_PASSWORD, email=TEST_EMAIL):
         """创建测试用户"""
@@ -219,7 +226,7 @@ class TestSensitiveInformationLeakage:
 
         repo_root = "./repositories"
         if os.path.exists(repo_root):
-            shutil.rmtree(repo_root)
+            shutil.rmtree(repo_root, onexc=remove_readonly)
 
         yield
 
@@ -231,7 +238,7 @@ class TestSensitiveInformationLeakage:
         db.close()
 
         if os.path.exists(repo_root):
-            shutil.rmtree(repo_root)
+            shutil.rmtree(repo_root, onexc=remove_readonly)
 
     def test_user_password_not_in_response(self):
         """测试用户密码不在 API 响应中"""
@@ -343,7 +350,7 @@ class TestAuthenticationSecurity:
 
         repo_root = "./repositories"
         if os.path.exists(repo_root):
-            shutil.rmtree(repo_root)
+            shutil.rmtree(repo_root, onexc=remove_readonly)
 
         yield
 
@@ -355,7 +362,7 @@ class TestAuthenticationSecurity:
         db.close()
 
         if os.path.exists(repo_root):
-            shutil.rmtree(repo_root)
+            shutil.rmtree(repo_root, onexc=remove_readonly)
 
     def test_private_repo_requires_auth(self):
         """测试私有仓库需要认证"""
@@ -459,7 +466,7 @@ class TestRepositoryStorageSecurity:
 
         repo_root = "./repositories"
         if os.path.exists(repo_root):
-            shutil.rmtree(repo_root)
+            shutil.rmtree(repo_root, onexc=remove_readonly)
 
         yield
 
@@ -471,7 +478,7 @@ class TestRepositoryStorageSecurity:
         db.close()
 
         if os.path.exists(repo_root):
-            shutil.rmtree(repo_root)
+            shutil.rmtree(repo_root, onexc=remove_readonly)
 
     def test_repository_path_normalization(self):
         """测试仓库路径规范化"""
@@ -526,7 +533,7 @@ class TestGitObjectSecurity:
 
         repo_root = "./repositories"
         if os.path.exists(repo_root):
-            shutil.rmtree(repo_root)
+            shutil.rmtree(repo_root, onexc=remove_readonly)
 
         yield
 
@@ -538,7 +545,7 @@ class TestGitObjectSecurity:
         db.close()
 
         if os.path.exists(repo_root):
-            shutil.rmtree(repo_root)
+            shutil.rmtree(repo_root, onexc=remove_readonly)
 
     def test_git_object_path_validation(self):
         """测试 Git 对象路径验证"""

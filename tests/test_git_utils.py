@@ -3,10 +3,20 @@ Git 工具模块测试脚本
 
 测试 git_utils.py 的功能
 """
+
+import stat
+
+
+def remove_readonly(func, path, excinfo):
+    """Windows 下删除只读文件的回调函数"""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
 import os
 import sys
 import tempfile
 import shutil
+import stat
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
