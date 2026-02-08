@@ -132,6 +132,7 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
                 routes_to_remove.append(route)
         for route in routes_to_remove:
             app.routes.remove(route)
+        print("[INFO] 生产环境：已禁用错误测试端点 (/api/errors/*)")
 
     return app
 

@@ -211,5 +211,4 @@ python tests/test_remote_security.py
 
 ## 参考文档
 
-- [Nginx 安全配置](NGINX_SECURITY_CONFIG.md)
 - [原始安全测试报告](REMOTE_SECURITY_TEST_REPORT.md)
