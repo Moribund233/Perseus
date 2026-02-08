@@ -119,9 +119,19 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     from controller.issue_controller import router as issue_router
     app.include_router(issue_router)
 
-    # 设置全局异常处理器
+    # 设置全局异常处理器（必须在路由注册之后设置，确保能捕获所有异常）
     from utils.exception_handler import setup_exception_handlers
     setup_exception_handlers(app)
+
+    # 生产环境：禁用错误测试端点
+    if not config.app.debug:
+        # 移除错误测试路由，防止信息泄露
+        routes_to_remove = []
+        for route in app.routes:
+            if hasattr(route, 'path') and route.path.startswith('/api/errors'):
+                routes_to_remove.append(route)
+        for route in routes_to_remove:
+            app.routes.remove(route)
 
     return app
 

@@ -3,7 +3,7 @@
 
 处理与用户相关的HTTP请求，调用服务层方法并返回响应
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from models.db import get_db
 from services.user_service import (
@@ -14,6 +14,7 @@ from services.user_service import (
     delete_user as service_delete_user,
     login_user as service_login_user
 )
+from utils.rate_limiter import limiter, RateLimitConfig
 
 # 创建路由实例
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -108,17 +109,19 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
-def login_user(credentials: dict, db: Session = Depends(get_db)):
+@limiter.limit(RateLimitConfig.STRICT)
+def login_user(request: Request, credentials: dict, db: Session = Depends(get_db)):
     """
     用户登录
-    
+
     Args:
+        request: HTTP请求对象（用于速率限制）
         credentials: 登录凭据（用户名和密码）
         db: 数据库会话
-    
+
     Returns:
         dict: 登录成功信息和用户数据
-    
+
     Raises:
         ValidationException: 请求参数不完整时抛出422异常
         AuthenticationException: 用户名或密码错误时抛出401异常

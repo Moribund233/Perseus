@@ -3,7 +3,7 @@
 
 处理与仓库相关的HTTP请求，调用服务层方法并返回响应
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from models.db import get_db
 from services.repository_service import (
@@ -16,6 +16,7 @@ from services.repository_service import (
     get_public_repositories as service_get_public_repositories,
     check_repository_access as service_check_repository_access
 )
+from utils.rate_limiter import limiter, RateLimitConfig
 
 # 创建路由实例
 router = APIRouter(prefix="/api/repositories", tags=["repositories"])
@@ -84,17 +85,19 @@ def get_repository(repo_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/")
-def create_repository(repo: dict, db: Session = Depends(get_db)):
+@limiter.limit(RateLimitConfig.STANDARD)
+def create_repository(request: Request, repo: dict, db: Session = Depends(get_db)):
     """
     创建新仓库
-    
+
     Args:
+        request: HTTP请求对象（用于速率限制）
         repo: 仓库信息
         db: 数据库会话
-    
+
     Returns:
         Repository: 创建的仓库信息
-    
+
     Raises:
         ValidationException: 请求参数不完整时抛出422异常
         ConflictException: 仓库路径已存在时抛出409异常
