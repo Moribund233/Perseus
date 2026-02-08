@@ -452,16 +452,31 @@ http {{
     include       {mime_types_path};
     default_type  application/octet-stream;
 
+    # 安全加固：隐藏Nginx版本号
+    server_tokens off;
+
     sendfile        on;
     keepalive_timeout  {config.get('keepalive_timeout', 65)};
-    
+
     # 日志配置
     access_log  {access_log_path};
     error_log   {error_log_path};
 
+    # 速率限制配置
+    limit_req_zone $binary_remote_addr zone=api_limit:10m rate=30r/m;
+    limit_req_zone $binary_remote_addr zone=login_limit:10m rate=5r/m;
+    limit_conn_zone $binary_remote_addr zone=conn_limit:10m;
+
     server {{
         listen       {config.get('listen_port', 80)};
         server_name  {config.get('server_name', 'localhost')};
+
+        # 安全响应头
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()" always;
 
         location / {{
             root   {html_dir};
@@ -470,22 +485,74 @@ http {{
 
         # LanGit API代理配置
         location /api/ {{
+            # 速率限制
+            limit_req zone=api_limit burst=10 nodelay;
+            limit_conn conn_limit 20;
+
             proxy_pass http://{config.get('api_host', 'localhost')}:{config.get('api_port', 8000)};
-            proxy_set_header Host $host:$server_port;
+            proxy_set_header Host $http_host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
-            
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+
             # 修改后端返回的重定向URL，确保使用正确的主机名和端口
-            proxy_redirect ~^http://([^/]+)(/.*)$ http://$host:$server_port$2;
-            
+            proxy_redirect ~^http://([^/]+)(/.*)$ http://$http_host$2;
+
+            # 隐藏上游服务器的敏感响应头
+            proxy_hide_header Server;
+            proxy_hide_header X-Powered-By;
+
+            # 安全响应头
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header X-Frame-Options "DENY" always;
+            add_header X-XSS-Protection "1; mode=block" always;
+            add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()" always;
+            add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; media-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" always;
+
             # CORS配置
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods 'GET, POST, PUT, DELETE, OPTIONS' always;
             add_header Access-Control-Allow-Headers 'Content-Type, Authorization' always;
             add_header Access-Control-Allow-Credentials 'true' always;
-            
+
             # 处理OPTIONS请求
+            if ($request_method = 'OPTIONS') {{
+                return 204;
+            }}
+        }}
+
+        # 登录接口 - 严格限流
+        location /api/users/login {{
+            limit_req zone=login_limit burst=3 nodelay;
+            limit_conn conn_limit 5;
+
+            proxy_pass http://{config.get('api_host', 'localhost')}:{config.get('api_port', 8000)}/api/users/login;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+            proxy_redirect ~^http://([^/]+)(/.*)$ http://$http_host$2;
+            proxy_hide_header Server;
+            proxy_hide_header X-Powered-By;
+
+            # 安全响应头
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header X-Frame-Options "DENY" always;
+            add_header X-XSS-Protection "1; mode=block" always;
+            add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()" always;
+            add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; media-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" always;
+
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods 'POST, OPTIONS' always;
+            add_header Access-Control-Allow-Headers 'Content-Type, Authorization' always;
+            add_header Access-Control-Allow-Credentials 'true' always;
+
             if ($request_method = 'OPTIONS') {{
                 return 204;
             }}
@@ -494,45 +561,65 @@ http {{
         # 健康检查路径配置
         location /health {{
             proxy_pass http://{config.get('api_host', 'localhost')}:{config.get('api_port', 8000)}/health;
-            proxy_set_header Host $host:$server_port;
+            proxy_set_header Host $http_host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
-            
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+
             # 修改后端返回的重定向URL，确保使用正确的主机名和端口
-            proxy_redirect ~^http://([^/]+)(/.*)$ http://$host:$server_port$2;
-            
+            proxy_redirect ~^http://([^/]+)(/.*)$ http://$http_host$2;
+
+            # 隐藏上游服务器的敏感响应头
+            proxy_hide_header Server;
+            proxy_hide_header X-Powered-By;
+
+            # 安全响应头
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header X-Frame-Options "DENY" always;
+            add_header X-XSS-Protection "1; mode=block" always;
+            add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()" always;
+            add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; media-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" always;
+
             # CORS配置
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods 'GET, OPTIONS' always;
             add_header Access-Control-Allow-Headers 'Content-Type, Authorization' always;
             add_header Access-Control-Allow-Credentials 'true' always;
-            
+
             # 处理OPTIONS请求
             if ($request_method = 'OPTIONS') {{
                 return 204;
             }}
         }}
-        
+
         # WebSocket代理配置
         location /ws/ {{
             proxy_pass http://{config.get('api_host', 'localhost')}:{config.get('api_port', 8000)}/ws/;
-            
+
             # WebSocket支持
             proxy_http_version 1.1;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection "upgrade";
-            
+
             # 标准代理头
-            proxy_set_header Host $host:$server_port;
+            proxy_set_header Host $http_host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
-            
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+
+            # 隐藏上游服务器的敏感响应头
+            proxy_hide_header Server;
+            proxy_hide_header X-Powered-By;
+
             # 长连接超时设置
             proxy_read_timeout 86400;
             proxy_send_timeout 86400;
-            
+
             # CORS配置
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Credentials 'true' always;

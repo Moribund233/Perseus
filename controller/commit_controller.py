@@ -3,9 +3,11 @@
 
 处理与提交相关的HTTP请求，调用服务层方法并返回响应
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from models.db import get_db
+from models.user import User
+from api.dependencies import get_current_user
 from services.commit_service import (
     get_commits as service_get_commits,
     get_commits_by_branch as service_get_commits_by_branch,
@@ -20,6 +22,7 @@ from services.commit_service import (
     get_commits_by_author as service_get_commits_by_author
 )
 from services.branch_service import get_branch as service_get_branch
+from utils.rate_limiter import limiter, RateLimitConfig
 
 # 创建路由实例
 router = APIRouter(prefix="/api/repositories", tags=["commits"])
@@ -32,18 +35,20 @@ def get_commits(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     branch_name: str = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    获取仓库的提交记录
-    
+    获取仓库的提交记录（需要认证）
+
     Args:
         repo_id: 仓库ID
         limit: 返回记录数量限制（默认100，最大1000）
         offset: 记录偏移量（默认0）
         branch_name: 分支名称（可选，默认获取所有分支）
         db: 数据库会话
-    
+        current_user: 当前认证用户
+
     Returns:
         list[Commit]: 提交记录列表
     """
@@ -179,18 +184,27 @@ def get_commit_by_hash(repo_id: int, commit_hash: str, db: Session = Depends(get
 
 
 @router.post("/{repo_id}/commits")
-def create_commit(repo_id: int, commit_data: dict, db: Session = Depends(get_db)):
+@limiter.limit(RateLimitConfig.STANDARD)
+def create_commit(
+    request: Request,
+    repo_id: int,
+    commit_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
-    创建提交记录
-    
+    创建提交记录（需要认证）
+
     Args:
+        request: HTTP请求对象（用于速率限制）
         repo_id: 仓库ID
         commit_data: 提交信息
         db: 数据库会话
-    
+        current_user: 当前认证用户
+
     Returns:
         Commit: 创建的提交记录
-    
+
     Raises:
         ValidationException: 请求参数不完整时抛出422异常
         ConflictException: 提交哈希已存在时抛出409异常

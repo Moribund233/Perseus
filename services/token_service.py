@@ -132,6 +132,12 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
     """
     验证令牌
 
+    执行严格的令牌验证：
+    1. 检查令牌是否为空或无效格式
+    2. 验证 JWT 签名和结构
+    3. 检查令牌类型匹配
+    4. 验证必需的声明字段
+
     Args:
         token: JWT 令牌
         token_type: 期望的令牌类型（access 或 refresh）
@@ -139,6 +145,28 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
     Returns:
         TokenData: 令牌数据，验证失败返回 None
     """
+    # 严格检查：空令牌、纯空白字符、或明显的无效格式
+    if not token or not isinstance(token, str):
+        logger.warning("Token is empty or not a string")
+        return None
+
+    token = token.strip()
+
+    if not token or token.lower() in ('null', 'undefined', 'none', 'admin', 'user', 'test'):
+        logger.warning(f"Token is empty or contains invalid keyword: {token}")
+        return None
+
+    # 检查 JWT 基本格式（应该包含两个点，分为三个部分）
+    parts = token.split('.')
+    if len(parts) != 3:
+        logger.warning(f"Invalid JWT format: expected 3 parts, got {len(parts)}")
+        return None
+
+    # 检查每个部分是否为空
+    if any(not part.strip() for part in parts):
+        logger.warning("Invalid JWT format: empty part detected")
+        return None
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
@@ -147,10 +175,27 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
             logger.warning(f"Token type mismatch: expected {token_type}, got {payload.get('type')}")
             return None
 
-        user_id: int = int(payload.get("sub"))
-        username: str = payload.get("username")
+        # 检查必需字段
+        user_id = payload.get("sub")
+        username = payload.get("username")
 
         if user_id is None or username is None:
+            logger.warning("Token missing required claims: sub or username")
+            return None
+
+        # 验证 user_id 是有效的整数
+        try:
+            user_id = int(user_id)
+            if user_id <= 0:
+                logger.warning(f"Invalid user_id: {user_id}")
+                return None
+        except (ValueError, TypeError):
+            logger.warning(f"user_id is not a valid integer: {user_id}")
+            return None
+
+        # 验证 username 是非空字符串
+        if not isinstance(username, str) or not username.strip():
+            logger.warning("username is empty or not a string")
             return None
 
         return TokenData(user_id=user_id, username=username)

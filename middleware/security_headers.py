@@ -29,7 +29,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         enable_hsts: bool = False,
         hsts_max_age: int = 31536000,
         csp_policy: Optional[str] = None,
-        allow_iframe: bool = False
+        allow_iframe: bool = False,
+        add_security_headers: bool = True
     ):
         """
         初始化安全响应头中间件
@@ -45,6 +46,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         self.enable_hsts = enable_hsts
         self.hsts_max_age = hsts_max_age
         self.allow_iframe = allow_iframe
+        self.add_security_headers = add_security_headers
 
         # 默认 CSP 策略
         self.csp_policy = csp_policy or (
@@ -82,41 +84,44 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         """
         response: Response = await call_next(request)
 
-        # 防止 MIME 类型嗅探
-        response.headers["X-Content-Type-Options"] = "nosniff"
+        # 如果启用了 Nginx 反向代理，跳过添加这些头（由 Nginx 统一处理）
+        if self.add_security_headers:
+            # 防止 MIME 类型嗅探
+            response.headers["X-Content-Type-Options"] = "nosniff"
 
-        # 防止点击劫持
-        if self.allow_iframe:
-            response.headers["X-Frame-Options"] = "SAMEORIGIN"
-        else:
-            response.headers["X-Frame-Options"] = "DENY"
+            # 防止点击劫持
+            if self.allow_iframe:
+                response.headers["X-Frame-Options"] = "SAMEORIGIN"
+            else:
+                response.headers["X-Frame-Options"] = "DENY"
 
-        # 启用 XSS 过滤器
-        response.headers["X-XSS-Protection"] = "1; mode=block"
+            # 启用 XSS 过滤器
+            response.headers["X-XSS-Protection"] = "1; mode=block"
 
-        # 强制 HTTPS (HSTS)
+            # Referrer 策略
+            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+            # 权限策略
+            response.headers["Permissions-Policy"] = (
+                "accelerometer=(), "
+                "camera=(), "
+                "geolocation=(), "
+                "gyroscope=(), "
+                "magnetometer=(), "
+                "microphone=(), "
+                "payment=(), "
+                "usb=()"
+            )
+
+        # 强制 HTTPS (HSTS) - 始终由应用层控制
         if self.enable_hsts:
             response.headers["Strict-Transport-Security"] = (
                 f"max-age={self.hsts_max_age}; includeSubDomains; preload"
             )
 
-        # 内容安全策略
-        response.headers["Content-Security-Policy"] = self.csp_policy
-
-        # Referrer 策略
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-
-        # 权限策略
-        response.headers["Permissions-Policy"] = (
-            "accelerometer=(), "
-            "camera=(), "
-            "geolocation=(), "
-            "gyroscope=(), "
-            "magnetometer=(), "
-            "microphone=(), "
-            "payment=(), "
-            "usb=()"
-        )
+        # 注意：Content-Security-Policy 由 Nginx 统一添加，避免重复
+        # 如果未使用 Nginx 反向代理，可以启用 add_security_headers
+        # response.headers["Content-Security-Policy"] = self.csp_policy
 
         # 移除可能泄露信息的响应头
         for header in ["server", "x-powered-by"]:

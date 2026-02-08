@@ -12,7 +12,8 @@ from models.user import User
 from services.token_service import verify_token
 
 # 使用 HTTPBearer 从 Authorization 头中提取 token
-security = HTTPBearer()
+# auto_error=True 确保在没有 Authorization 头时自动返回 403
+security = HTTPBearer(auto_error=True)
 
 
 async def get_current_user(
