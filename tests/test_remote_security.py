@@ -132,6 +132,8 @@ class RemoteSecurityTester:
         - 403 Forbidden
         - 404 Not Found (路径不存在)
         - 422 Unprocessable Entity (输入验证失败)
+        - 429 Too Many Requests (速率限制)
+        - 503 Service Unavailable (Nginx速率限制)
         
         Args:
             status_code: HTTP状态码
@@ -140,7 +142,7 @@ class RemoteSecurityTester:
         Returns:
             bool: 攻击是否被阻止
         """
-        blocked_codes = [400, 403, 404, 422]
+        blocked_codes = [400, 403, 404, 422, 429, 503]
         return status_code in blocked_codes
     
     def test_path_traversal(self):
@@ -234,6 +236,8 @@ class RemoteSecurityTester:
             # 对endpoint进行编码处理
             encoded_endpoint = endpoint.replace(' ', '%20')
             status_code, headers, body, response_time = self._make_request("GET", encoded_endpoint)
+            # 添加延迟避免触发速率限制
+            time.sleep(0.5)
             
             # 检测SQL错误信息泄露
             sql_errors = [

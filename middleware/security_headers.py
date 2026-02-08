@@ -100,8 +100,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 f"max-age={self.hsts_max_age}; includeSubDomains; preload"
             )
 
-        # 内容安全策略
-        response.headers["Content-Security-Policy"] = self.csp_policy
+        # 注意：Content-Security-Policy 由 Nginx 统一添加，避免重复
+        # 如果未使用 Nginx 反向代理，可以取消下面的注释
+        # response.headers["Content-Security-Policy"] = self.csp_policy
 
         # Referrer 策略
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
