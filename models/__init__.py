@@ -25,5 +25,8 @@ from models.repository import Repository
 from models.repository_member import RepositoryMember
 from models.branch import Branch
 from models.commit import Commit
+from models.pull_request import PullRequest, PRComment, PRReview
+from models.issue import Issue, Label, IssueComment
 
-__all__ = ["Base", "SessionLocal", "engine", "BaseModel", "User", "Repository", "RepositoryMember", "Branch", "Commit"]
+__all__ = ["Base", "SessionLocal", "engine", "BaseModel", "User", "Repository", "RepositoryMember", "Branch", "Commit",
+           "PullRequest", "PRComment", "PRReview", "Issue", "Label", "IssueComment"]

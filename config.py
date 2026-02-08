@@ -46,13 +46,23 @@ class NginxSettings(BaseSettings):
     api_port: int = Field(default=8000, ge=1, le=65535, description="Nginx API代理端口")
 
 
+class StorageSettings(BaseSettings):
+    """存储配置类"""
+    repo_root: str = Field(default="./repositories", description="Git仓库根目录路径")
+    max_repo_size: int = Field(default=1073741824, ge=0, description="单个仓库最大大小（字节），默认1GB")
+    max_file_size: int = Field(default=104857600, ge=0, description="单个文件最大大小（字节），默认100MB")
+    enable_lfs: bool = Field(default=True, description="是否启用Git LFS")
+    lfs_storage_path: Optional[str] = Field(default=None, description="LFS文件存储路径，默认在repo_root/lfs")
+
+
 class Config(BaseSettings):
     """配置主类"""
     server: ServerSettings = ServerSettings()
     app: AppSettings = AppSettings()
     nginx: NginxSettings = NginxSettings()
+    storage: StorageSettings = StorageSettings()
     system: Optional[SystemSettings] = Field(default=None, description="系统信息")
-    
+
     class Config:
         extra = 'forbid'  # 严格验证配置，禁止额外的配置项
 

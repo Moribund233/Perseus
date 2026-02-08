@@ -111,6 +111,14 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     from api.git_http import router as git_http_router
     app.include_router(git_http_router)
 
+    # 包含Pull Request路由
+    from controller.pull_request_controller import router as pr_router
+    app.include_router(pr_router)
+
+    # 包含Issue路由
+    from controller.issue_controller import router as issue_router
+    app.include_router(issue_router)
+
     # 设置全局异常处理器
     from utils.exception_handler import setup_exception_handlers
     setup_exception_handlers(app)
