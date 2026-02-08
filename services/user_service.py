@@ -10,9 +10,31 @@ from passlib.context import CryptContext
 
 # 密码哈希上下文
 pwd_context = CryptContext(
-    schemes=["bcrypt"], 
+    schemes=["bcrypt"],
     deprecated="auto"
 )
+
+
+def user_to_dict(user: User) -> dict:
+    """
+    将用户对象转换为字典（排除敏感字段）
+
+    Args:
+        user: User 模型对象
+
+    Returns:
+        dict: 用户数据字典（不包含密码）
+    """
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "full_name": user.full_name,
+        "is_active": user.is_active,
+        "is_admin": user.is_admin,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "updated_at": user.updated_at.isoformat() if user.updated_at else None
+    }
 
 
 async def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -55,34 +77,35 @@ async def get_password_hash(password: str) -> str:
 async def get_users(db: Session):
     """
     获取所有用户
-    
+
     Args:
         db: 数据库会话
-    
+
     Returns:
-        list[User]: 用户列表
+        list[dict]: 用户列表（不包含密码）
     """
-    return db.query(User).all()
+    users = db.query(User).all()
+    return [user_to_dict(user) for user in users]
 
 
 async def get_user_by_id(user_id: int, db: Session):
     """
     根据ID获取用户
-    
+
     Args:
         user_id: 用户ID
         db: 数据库会话
-    
+
     Returns:
-        User: 用户信息
-    
+        dict: 用户信息（不包含密码）
+
     Raises:
         NotFoundException: 用户不存在时抛出404异常
     """
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise NotFoundException(detail="User not found")
-    return user
+    return user_to_dict(user)
 
 
 async def create_user(user_data: dict, db: Session):
@@ -122,8 +145,8 @@ async def create_user(user_data: dict, db: Session):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    
-    return db_user
+
+    return user_to_dict(db_user)
 
 
 async def update_user(user_id: int, user_data: dict, db: Session):
@@ -145,15 +168,18 @@ async def update_user(user_id: int, user_data: dict, db: Session):
     if db_user is None:
         raise NotFoundException(detail="User not found")
     
-    # 更新用户信息
+    # 更新用户信息（排除敏感字段）
     for key, value in user_data.items():
+        if key == "password":
+            # 如果更新密码，需要哈希处理
+            value = await get_password_hash(value[:72])
         if hasattr(db_user, key):
             setattr(db_user, key, value)
-    
+
     db.commit()
     db.refresh(db_user)
-    
-    return db_user
+
+    return user_to_dict(db_user)
 
 
 async def delete_user(user_id: int, db: Session):
@@ -215,3 +241,34 @@ async def login_user(credentials: dict, db: Session):
         "is_active": user.is_active,
         "is_admin": user.is_admin
     }
+
+
+def authenticate_user(username: str, password: str, db: Session) -> User | None:
+    """
+    验证用户凭据
+
+    同步版本的认证函数，用于 Git HTTP 协议认证
+
+    Args:
+        username: 用户名
+        password: 密码
+        db: 数据库会话
+
+    Returns:
+        User | None: 认证成功返回用户对象，失败返回 None
+    """
+    # 查找用户
+    user = db.query(User).filter(User.username == username).first()
+
+    if not user:
+        return None
+
+    # 同步验证密码
+    try:
+        # 限制密码长度，避免bcrypt错误
+        if pwd_context.verify(password[:72], user.password):
+            return user
+    except Exception:
+        pass
+
+    return None

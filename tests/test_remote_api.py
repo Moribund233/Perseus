@@ -202,16 +202,16 @@ class RemoteAPITester:
     def test_repository_apis(self):
         """测试仓库相关API"""
         print("\n[测试] 仓库相关API")
-        
+
         endpoints = [
             ("GET", "/api/repositories", "获取仓库列表（无斜杠）"),
             ("GET", "/api/repositories/", "获取仓库列表（有斜杠）"),
             ("GET", "/api/repositories/public", "获取公开仓库"),
         ]
-        
+
         for method, endpoint, description in endpoints:
             status_code, headers, body, has_redirect, redirect_url = self._make_request(method, endpoint)
-            
+
             if has_redirect:
                 self._record_result(
                     f"{description} {endpoint}",
@@ -225,6 +225,9 @@ class RemoteAPITester:
             elif status_code in [200, 401, 403]:
                 self._record_result(f"{description} {endpoint}", TestStatus.PASS, status_code)
                 print(f"  ✅ {description} - 状态码: {status_code}")
+                # 检查响应中是否包含 physical 字段
+                if status_code == 200:
+                    self._check_physical_info(body, description)
             else:
                 self._record_result(
                     f"{description} {endpoint}",
@@ -233,6 +236,28 @@ class RemoteAPITester:
                     f"意外的状态码: {status_code}"
                 )
                 print(f"  ❌ {description} - 状态码: {status_code}")
+
+    def _check_physical_info(self, body: str, description: str):
+        """检查响应中是否包含 physical 字段"""
+        try:
+            import json
+            data = json.loads(body)
+            if isinstance(data, list):
+                # 列表响应
+                if len(data) > 0 and isinstance(data[0], dict):
+                    if "physical" in data[0]:
+                        print(f"     📦 包含 physical 信息: path={data[0]['physical'].get('path', 'N/A')}, exists={data[0]['physical'].get('exists', 'N/A')}")
+                    else:
+                        print(f"     ⚠️  缺少 physical 字段")
+            elif isinstance(data, dict):
+                # 单对象响应
+                if "physical" in data:
+                    print(f"     📦 包含 physical 信息: path={data['physical'].get('path', 'N/A')}, exists={data['physical'].get('exists', 'N/A')}")
+                else:
+                    print(f"     ⚠️  缺少 physical 字段")
+        except Exception:
+            # JSON 解析失败，忽略
+            pass
     
     def test_branch_apis(self):
         """测试分支相关API"""

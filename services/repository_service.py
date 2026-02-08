@@ -12,17 +12,19 @@ from client.utils.git_utils import init_bare_repo, get_repository_storage_path, 
 
 def _build_repo_response(repo: Repository) -> dict:
     """
-    构建包含物理仓库信息的仓库响应数据
-
+    构建仓库响应数据（不包含敏感物理路径信息）n
     Args:
         repo: Repository 模型对象
 
     Returns:
-        dict: 包含物理仓库信息的仓库数据
+        dict: 仓库数据（不包含物理路径）
     """
-    # 获取物理仓库路径和状态
-    physical_path = get_repository_storage_path(repo.path)
-    physical_exists = repo_exists(physical_path)
+    # 获取物理仓库状态（仅检查是否存在，不暴露路径）
+    try:
+        physical_path = get_repository_storage_path(repo.path)
+        physical_exists = repo_exists(physical_path)
+    except Exception:
+        physical_exists = False
 
     return {
         "id": repo.id,
@@ -34,9 +36,8 @@ def _build_repo_response(repo: Repository) -> dict:
         "default_branch": repo.default_branch,
         "created_at": repo.created_at,
         "updated_at": repo.updated_at,
-        "physical": {
-            "path": physical_path,
-            "exists": physical_exists
+        "status": {
+            "initialized": physical_exists
         }
     }
 

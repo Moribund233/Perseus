@@ -1,4 +1,5 @@
 import sys
+import os
 from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,16 +10,16 @@ from config import get_config
 def create_app(config_path: str = "config.toml") -> FastAPI:
     """
     创建FastAPI应用实例
-    
+
     Args:
         config_path: 配置文件路径
-        
+
     Returns:
         FastAPI: FastAPI应用实例
     """
     # 获取配置
     config = get_config(config_path)
-    
+
     # 创建FastAPI应用实例
     app = FastAPI(
         title=config.app.title,
@@ -27,7 +28,26 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
         debug=config.app.debug,
         redirect_slashes=False,  # 禁用尾部斜杠重定向，避免CORS问题
     )
-    
+
+    # 确保日志目录存在
+    os.makedirs("logs", exist_ok=True)
+
+    # 添加安全响应头中间件（最先添加，确保所有响应都包含安全头）
+    from middleware.security_headers import SecurityHeadersMiddleware
+    app.add_middleware(
+        SecurityHeadersMiddleware,
+        enable_hsts=False,  # 开发环境禁用 HSTS，生产环境启用
+        allow_iframe=False
+    )
+
+    # 添加审计日志中间件
+    from middleware.audit_logger import AuditLoggerMiddleware
+    app.add_middleware(AuditLoggerMiddleware)
+
+    # 设置速率限制
+    from utils.rate_limiter import setup_rate_limiter
+    setup_rate_limiter(app)
+
     # 根据是否启用Nginx反向代理来决定是否启用CORS中间件
     if not config.nginx.proxy:
         # 未启用Nginx反向代理，启用FastAPI的CORS中间件
@@ -38,7 +58,7 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
             allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # 限制允许的HTTP方法
             allow_headers=["Content-Type", "Authorization"],  # 限制允许的请求头
         )
-    
+
     # 根路由
     @app.get("/")
     async def root():
@@ -48,7 +68,7 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
             "version": config.app.version,
             "status": "running"
         }
-    
+
     # 健康检查路由
     @app.get("/health")
     async def health_check():
@@ -57,36 +77,40 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
             "timestamp": datetime.now().isoformat(),
             "service": config.app.title
         }
-    
+
     # 包含API路由
     from api.user import router as user_router
     app.include_router(user_router)
-    
+
     # 包含仓库相关API路由
     from api.repository import router as repository_router
     app.include_router(repository_router)
-    
+
     from api.repository_member import router as repository_member_router
     app.include_router(repository_member_router)
-    
+
     from api.branch import router as branch_router
     app.include_router(branch_router)
-    
+
     from api.commit import router as commit_router
     app.include_router(commit_router)
-    
+
     # 包含错误API路由
     from api.error import router as error_router
     app.include_router(error_router)
-    
+
     # 包含WebSocket路由
     from api.websocket import router as websocket_router
     app.include_router(websocket_router)
-    
+
+    # 包含Git HTTP协议路由
+    from api.git_http import router as git_http_router
+    app.include_router(git_http_router)
+
     # 设置全局异常处理器
     from utils.exception_handler import setup_exception_handlers
     setup_exception_handlers(app)
-    
+
     return app
 
 
