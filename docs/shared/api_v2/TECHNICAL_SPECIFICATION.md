@@ -1,6 +1,8 @@
-# LanGit API v2 技术细节文档
+# LanGit 第二阶段开发技术细节文档
 
-> 本文档基于现有项目结构，提供 API v2 各阶段功能的技术实现细节
+> 本文档基于现有项目结构，提供第二阶段开发（代号 API v2）各阶段功能的技术实现细节
+> 
+> **重要提示**：本文档中的 "API v2" 是开发规划代号，实际路由不区分 v1/v2 版本，统一使用 `/api` 前缀
 > 
 > 最后更新：2026-02-10
 
@@ -303,7 +305,7 @@ class NotificationSubscription(BaseModel):
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-router = APIRouter(prefix="/api/v2/notifications", tags=["notifications"])
+router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 
 @router.get("/subscriptions")
 async def get_subscriptions(
@@ -526,7 +528,7 @@ class WebhookDelivery(BaseModel):
 # controller/webhook_controller.py
 from fastapi import APIRouter, Depends
 
-router = APIRouter(prefix="/api/v2/repositories/{repo_id}/webhooks", tags=["webhooks"])
+router = APIRouter(prefix="/api/repositories/{repo_id}/webhooks", tags=["webhooks"])
 
 @router.get("/")
 async def list_webhooks(
@@ -858,7 +860,7 @@ class ChatMessage(BaseModel):
 # controller/chat_controller.py
 from fastapi import APIRouter, Depends
 
-router = APIRouter(prefix="/api/v2/chat", tags=["chat"])
+router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 # ========== 聊天室管理 ==========
 
@@ -1213,8 +1215,7 @@ alembic upgrade head
 ```
 LanGit/
 ├── api/
-│   ├── api_v1.py              # API v1 路由（已存在）
-│   ├── api_v2.py              # 【新增】API v2 路由
+│   ├── api_v1.py              # 统一路由注册（已存在，所有功能模块通过此注册）
 │   ├── dependencies.py        # 依赖注入（已存在）
 │   ├── error.py               # 错误处理（已存在）
 │   └── websocket/
@@ -1462,4 +1463,6 @@ Phase 1 (基础)
 
 **文档结束**
 
-本文档提供了 API v2 各阶段功能的详细技术实现方案，开发时可按此文档进行具体实现。
+本文档提供了第二阶段开发（API v2）各阶段功能的详细技术实现方案，开发时可按此文档进行具体实现。
+
+**再次提醒**：本文档中的 "API v2" 是开发规划代号，实际实现时所有路由统一通过 `api_v1_router` 注册，使用 `/api` 前缀，不区分 v1/v2 版本路径。

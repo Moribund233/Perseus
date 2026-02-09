@@ -1,14 +1,31 @@
-# LanGit API v2 开发规划路线图
+# LanGit 第二阶段开发规划路线图（API v2）
 
-> 本文档记录 LanGit 项目 API v2 版本的开发规划，重点扩展 WebSocket 实时服务功能
+> 本文档记录 LanGit 项目第二阶段开发规划（代号 API v2），重点扩展 WebSocket 实时服务功能
 > 
 > 最后更新：2026-02-10
 
 ---
 
-## 🎯 API v2 版本目标
+## 🎯 关于 "API v2" 的说明
 
-在 API v1 基础上，通过 WebSocket 扩展实时通信功能，提供更丰富的协作体验。
+**重要提示**：本文档中的 "API v2" 是开发规划的代号，用于区分不同阶段的开发目标，**不代表实际的路由版本**。
+
+### 实际路由情况
+- 应用使用统一的 `api_v1_router` 注册所有路由
+- REST API 统一使用 `/api` 前缀
+- WebSocket 统一使用 `/ws` 前缀
+- 不严格区分 v1/v2 版本路径
+
+### 本文档的用途
+- 规划和记录第二阶段的功能开发（实时消息、聊天室、Webhook）
+- 作为开发工作的路线图和参考文档
+- 与 [API v1 开发规划](../api_v1/ROADMAP.md) 形成完整的项目开发历程记录
+
+---
+
+## 🎯 第二阶段开发目标
+
+在第一阶段（API v1）基础上，通过 WebSocket 扩展实时通信功能，提供更丰富的协作体验。
 
 ### 核心方向
 
@@ -98,13 +115,20 @@
 
 ## 🔌 WebSocket 接口规划
 
-### 连接端点
+### 版本说明
+
+**重要**：本文档中的 "API v2" 是功能开发规划的代号，用于区分不同阶段的开发目标。实际应用路由不严格区分 v1/v2 版本：
+- REST API 统一使用 `/api` 前缀
+- WebSocket 统一使用 `/ws` 前缀
+- 所有功能模块通过统一的 `api_v1_router` 注册
+
+### 连接端点（规划）
 
 ```
-WS /ws/v2/connect                    # 建立连接
-WS /ws/v2/notifications              # 通知频道
-WS /ws/v2/chat/{room_id}             # 聊天室频道
-WS /ws/v2/collab/{repo_id}           # 协作频道
+WS /ws/connect                    # 建立连接
+WS /ws/notifications              # 通知频道
+WS /ws/chat/{room_id}             # 聊天室频道
+WS /ws/collab/{repo_id}           # 协作频道
 ```
 
 ### 消息协议
@@ -149,21 +173,21 @@ interface ChatMessage extends WebSocketMessage {
 
 ## 🔗 Webhook API 规划
 
-### REST API 端点
+### REST API 端点（规划）
 
 ```
 # Webhook 管理
-GET    /api/v2/repositories/{repo_id}/webhooks              # 获取 Webhook 列表
-POST   /api/v2/repositories/{repo_id}/webhooks              # 创建 Webhook
-GET    /api/v2/repositories/{repo_id}/webhooks/{hook_id}    # 获取 Webhook 详情
-PATCH  /api/v2/repositories/{repo_id}/webhooks/{hook_id}    # 更新 Webhook
-DELETE /api/v2/repositories/{repo_id}/webhooks/{hook_id}    # 删除 Webhook
-POST   /api/v2/repositories/{repo_id}/webhooks/{hook_id}/test  # 测试 Webhook
+GET    /api/repositories/{repo_id}/webhooks              # 获取 Webhook 列表
+POST   /api/repositories/{repo_id}/webhooks              # 创建 Webhook
+GET    /api/repositories/{repo_id}/webhooks/{hook_id}    # 获取 Webhook 详情
+PATCH  /api/repositories/{repo_id}/webhooks/{hook_id}    # 更新 Webhook
+DELETE /api/repositories/{repo_id}/webhooks/{hook_id}    # 删除 Webhook
+POST   /api/repositories/{repo_id}/webhooks/{hook_id}/test  # 测试 Webhook
 
 # Webhook 投递记录
-GET    /api/v2/repositories/{repo_id}/webhooks/{hook_id}/deliveries  # 获取投递记录
-GET    /api/v2/repositories/{repo_id}/webhooks/{hook_id}/deliveries/{delivery_id}  # 获取投递详情
-POST   /api/v2/repositories/{repo_id}/webhooks/{hook_id}/deliveries/{delivery_id}/redeliver  # 重新投递
+GET    /api/repositories/{repo_id}/webhooks/{hook_id}/deliveries  # 获取投递记录
+GET    /api/repositories/{repo_id}/webhooks/{hook_id}/deliveries/{delivery_id}  # 获取投递详情
+POST   /api/repositories/{repo_id}/webhooks/{hook_id}/deliveries/{delivery_id}/redeliver  # 重新投递
 ```
 
 ### Webhook 数据模型
