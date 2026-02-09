@@ -7,7 +7,7 @@
 - 提交历史
 - 代码对比
 """
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -17,10 +17,8 @@ from services.repository_browser_service import (
     get_tree_entries,
     get_blob_content,
     get_commits,
-    get_diff,
-    RepositoryBrowserError
+    get_diff
 )
-from services.repository_service import get_repository_by_id
 from client.utils.git_utils import get_repository_storage_path
 from exception import NotFoundException
 
@@ -31,21 +29,21 @@ router = APIRouter(prefix="/api/repositories", tags=["repository-browser"])
 def _get_repo_path(repo_id: int, db: Session) -> str:
     """
     获取仓库物理路径
-    
+
     Args:
         repo_id: 仓库ID
         db: 数据库会话
-        
+
     Returns:
         str: 仓库物理路径
-        
+
     Raises:
         NotFoundException: 仓库不存在
     """
     repo = db.query(Repository).filter(Repository.id == repo_id).first()
     if not repo:
         raise NotFoundException(detail="Repository not found")
-    
+
     return get_repository_storage_path(repo.path)
 
 
@@ -72,8 +70,7 @@ def get_repository_tree(
         HTTPException: 仓库或路径不存在
     """
     repo_path = _get_repo_path(repo_id, db)
-    result = get_tree_entries(repo_path, ref=ref, path=path)
-    return result
+    return get_tree_entries(repo_path, ref=ref, path=path)
 
 
 @router.get("/{repo_id}/blob")
@@ -99,8 +96,7 @@ def get_repository_blob(
         HTTPException: 文件不存在或是目录
     """
     repo_path = _get_repo_path(repo_id, db)
-    result = get_blob_content(repo_path, ref=ref, path=path)
-    return result
+    return get_blob_content(repo_path, ref=ref, path=path)
 
 
 @router.get("/{repo_id}/commits")
@@ -130,8 +126,7 @@ def get_repository_commits(
         HTTPException: 仓库不存在
     """
     repo_path = _get_repo_path(repo_id, db)
-    result = get_commits(repo_path, ref=ref, path=path, page=page, per_page=per_page)
-    return result
+    return get_commits(repo_path, ref=ref, path=path, page=page, per_page=per_page)
 
 
 @router.get("/{repo_id}/diff")
@@ -159,5 +154,4 @@ def get_repository_diff(
         HTTPException: 提交不存在
     """
     repo_path = _get_repo_path(repo_id, db)
-    result = get_diff(repo_path, base=base, head=head, path=path)
-    return result
+    return get_diff(repo_path, base=base, head=head, path=path)

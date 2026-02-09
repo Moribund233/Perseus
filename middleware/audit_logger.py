@@ -15,6 +15,7 @@ from logging.handlers import RotatingFileHandler
 import logging
 
 from config import get_config
+from utils.security_utils import filter_sensitive_data, log_security_event
 
 # 获取配置
 _config = get_config()
@@ -81,9 +82,6 @@ class AuditLoggerMiddleware(BaseHTTPMiddleware):
     # 敏感操作 HTTP 方法
     SENSITIVE_METHODS = ["POST", "PUT", "DELETE", "PATCH"]
 
-    # 敏感字段（需要过滤）
-    SENSITIVE_FIELDS = ['password', 'token', 'secret', 'authorization', 'api_key', 'access_token', 'refresh_token']
-
     def __init__(
         self,
         app,
@@ -141,34 +139,6 @@ class AuditLoggerMiddleware(BaseHTTPMiddleware):
         )
 
         return is_sensitive_method or is_sensitive_path
-
-    def _filter_sensitive_data(self, data: dict) -> dict:
-        """
-        过滤敏感字段
-
-        Args:
-            data: 原始数据字典
-
-        Returns:
-            dict: 过滤后的数据字典
-        """
-        if not isinstance(data, dict):
-            return data
-
-        filtered = {}
-        for key, value in data.items():
-            if any(field in key.lower() for field in self.SENSITIVE_FIELDS):
-                filtered[key] = '***'
-            elif isinstance(value, dict):
-                filtered[key] = self._filter_sensitive_data(value)
-            elif isinstance(value, list):
-                filtered[key] = [
-                    self._filter_sensitive_data(item) if isinstance(item, dict) else item
-                    for item in value
-                ]
-            else:
-                filtered[key] = value
-        return filtered
 
     def _get_client_ip(self, request: Request) -> str:
         """
@@ -273,15 +243,16 @@ class AuditLoggerMiddleware(BaseHTTPMiddleware):
                 body = await request.body()
                 if body:
                     body_json = json.loads(body)
-                    request_body = self._filter_sensitive_data(body_json)
+                    # 使用工具函数过滤敏感数据
+                    request_body = filter_sensitive_data(body_json)
             except Exception:
                 pass  # 如果无法解析请求体，忽略错误
 
         # 处理请求
+        error_message = None
         try:
             response = await call_next(request)
             status_code = response.status_code
-            error_message = None
         except Exception as e:
             status_code = 500
             error_message = str(e)
@@ -336,7 +307,7 @@ def log_security_event(
     details: Optional[dict] = None
 ):
     """
-    记录安全事件
+    记录安全事件（兼容旧接口，委托给 utils.security_utils）
 
     用于在非中间件场景中记录安全相关事件，如：
     - 认证失败
@@ -351,14 +322,13 @@ def log_security_event(
         client_ip: 客户端 IP
         details: 额外详情
     """
-    event = {
-        "event_type": event_type,
-        "timestamp": datetime.now().isoformat(),
-        "description": description,
-        "user_id": user_id,
-        "client_ip": client_ip,
-        "details": details or {}
-    }
-
-    log_message = json.dumps(event, ensure_ascii=False, default=str)
-    audit_logger.warning(f"[SECURITY] {log_message}")
+    # 委托给 utils.security_utils 中的函数
+    from utils.security_utils import log_security_event as _log_security_event
+    _log_security_event(
+        event_type=event_type,
+        description=description,
+        user_id=user_id,
+        client_ip=client_ip,
+        details=details,
+        level="warning"
+    )

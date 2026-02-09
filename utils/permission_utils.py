@@ -182,3 +182,153 @@ async def require_repository_permission(
         raise AuthorizationException(
             detail=f"You don't have permission to {action_description}"
         )
+
+
+async def require_repository_owner_or_admin(
+    db: Session,
+    repository_id: int,
+    user_id: int,
+    action_description: str = "perform this action"
+) -> None:
+    """
+    要求用户是仓库所有者或管理员，无权限时抛出异常
+
+    Args:
+        db: 数据库会话
+        repository_id: 仓库ID
+        user_id: 用户ID
+        action_description: 操作描述，用于错误信息
+
+    Raises:
+        AuthorizationException: 无权限时抛出异常
+    """
+    is_owner_or_admin = await check_repository_owner_or_admin(db, repository_id, user_id)
+
+    if not is_owner_or_admin:
+        raise AuthorizationException(
+            detail=f"You don't have permission to {action_description}"
+        )
+
+
+def check_repository_permission_sync(
+    db: Session,
+    repository_id: int,
+    user_id: int,
+    required_roles: list = None
+) -> bool:
+    """
+    同步版本：检查用户在仓库中的权限
+
+    Args:
+        db: 数据库会话
+        repository_id: 仓库ID
+        user_id: 用户ID
+        required_roles: 所需角色列表，默认 ["owner", "admin", "developer"]
+
+    Returns:
+        bool: 是否有权限
+    """
+    from models.user import User
+    from models.repository import Repository
+    from models.repository_member import RepositoryMember
+
+    if required_roles is None:
+        required_roles = ["owner", "admin", "developer"]
+
+    # 检查是否是系统管理员
+    user = db.query(User).filter(User.id == user_id).first()
+    if user and user.is_admin:
+        return True
+
+    # 检查是否是仓库所有者
+    repo = db.query(Repository).filter(Repository.id == repository_id).first()
+    if repo and repo.owner_id == user_id:
+        return True
+
+    # 检查仓库成员角色
+    member = db.query(RepositoryMember).filter(
+        RepositoryMember.repository_id == repository_id,
+        RepositoryMember.user_id == user_id,
+        RepositoryMember.is_active == True
+    ).first()
+
+    if member and member.role in required_roles:
+        return True
+
+    return False
+
+
+def require_repository_permission_sync(
+    db: Session,
+    repository_id: int,
+    user_id: int,
+    required_roles: list = None,
+    action_description: str = "perform this action on this repository"
+) -> None:
+    """
+    同步版本：要求用户具有仓库权限，无权限时抛出异常
+
+    Args:
+        db: 数据库会话
+        repository_id: 仓库ID
+        user_id: 用户ID
+        required_roles: 所需角色列表
+        action_description: 操作描述，用于错误信息
+
+    Raises:
+        AuthorizationException: 无权限时抛出异常
+    """
+    has_permission = check_repository_permission_sync(db, repository_id, user_id, required_roles)
+
+    if not has_permission:
+        raise AuthorizationException(
+            detail=f"You don't have permission to {action_description}"
+        )
+
+
+def require_repository_owner_or_admin_sync(
+    db: Session,
+    repository_id: int,
+    user_id: int,
+    action_description: str = "perform this action"
+) -> None:
+    """
+    同步版本：要求用户是仓库所有者或管理员，无权限时抛出异常
+
+    Args:
+        db: 数据库会话
+        repository_id: 仓库ID
+        user_id: 用户ID
+        action_description: 操作描述，用于错误信息
+
+    Raises:
+        AuthorizationException: 无权限时抛出异常
+    """
+    from models.user import User
+    from models.repository import Repository
+    from models.repository_member import RepositoryMember
+
+    # 检查是否是系统管理员
+    user = db.query(User).filter(User.id == user_id).first()
+    if user and user.is_admin:
+        return
+
+    # 检查是否是仓库所有者
+    repo = db.query(Repository).filter(Repository.id == repository_id).first()
+    if repo and repo.owner_id == user_id:
+        return
+
+    # 检查是否是仓库管理员
+    member = db.query(RepositoryMember).filter(
+        RepositoryMember.repository_id == repository_id,
+        RepositoryMember.user_id == user_id,
+        RepositoryMember.role.in_(["owner", "admin"]),
+        RepositoryMember.is_active == True
+    ).first()
+
+    if member:
+        return
+
+    raise AuthorizationException(
+        detail=f"You don't have permission to {action_description}"
+    )

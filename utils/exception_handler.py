@@ -18,6 +18,12 @@ from exception import (
     NginxException,
     FileException
 )
+from services.repository_browser_service import (
+    RepositoryBrowserError,
+    RepositoryNotFoundError,
+    PathNotFoundError,
+    InvalidPathError
+)
 
 
 def _is_debug_mode() -> bool:
@@ -97,6 +103,10 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
             }
         )
     
+    # 处理仓库浏览器异常
+    if isinstance(exc, RepositoryBrowserError):
+        return _handle_browser_error(exc, is_debug)
+    
     # 处理其他类型的异常
     # 生产环境返回统一错误信息，不暴露内部细节
     if is_debug:
@@ -116,6 +126,45 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
                 "code": 500,
                 "message": error_msg if is_debug else "Internal Server Error",
                 "type": error_type if is_debug else "InternalServerError"
+            }
+        }
+    )
+
+
+def _handle_browser_error(exc: RepositoryBrowserError, is_debug: bool = False) -> JSONResponse:
+    """
+    处理仓库浏览器异常
+    
+    将 RepositoryBrowserError 及其子类映射到适当的 HTTP 状态码
+    
+    Args:
+        exc: 仓库浏览器异常
+        is_debug: 是否调试模式
+    
+    Returns:
+        JSONResponse: 包含错误信息的JSON响应
+    """
+    # 根据异常类型确定状态码
+    if isinstance(exc, RepositoryNotFoundError):
+        status_code = 404
+    elif isinstance(exc, PathNotFoundError):
+        status_code = 404
+    elif isinstance(exc, InvalidPathError):
+        status_code = 400
+    else:
+        status_code = 500
+    
+    error_msg = str(exc)
+    error_type = exc.__class__.__name__ if is_debug else "RepositoryBrowserError"
+    
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "detail": error_msg,
+            "error": {
+                "code": status_code,
+                "message": error_msg,
+                "type": error_type
             }
         }
     )
@@ -213,6 +262,12 @@ def setup_exception_handlers(app):
     app.add_exception_handler(DatabaseException, global_exception_handler)
     app.add_exception_handler(NginxException, global_exception_handler)
     app.add_exception_handler(FileException, global_exception_handler)
+    
+    # 注册仓库浏览器异常处理器
+    app.add_exception_handler(RepositoryBrowserError, global_exception_handler)
+    app.add_exception_handler(RepositoryNotFoundError, global_exception_handler)
+    app.add_exception_handler(PathNotFoundError, global_exception_handler)
+    app.add_exception_handler(InvalidPathError, global_exception_handler)
     
     # 注册FastAPI内置异常处理器
     from fastapi import HTTPException as FastAPIHTTPException

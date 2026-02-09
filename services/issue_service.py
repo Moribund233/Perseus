@@ -6,89 +6,18 @@ Issue 服务层
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
-from models import Issue, Label, IssueComment, Repository
-from exception import ValidationException, NotFoundException, AuthorizationException
+
+from models import Issue, Label, IssueComment
+from exception import ValidationException, NotFoundException
 from utils.permission_utils import check_resource_author_or_admin
 from utils.query_utils import get_issue_or_404
-
-
-def _build_issue_response(issue: Issue, include_details: bool = False) -> dict:
-    """
-    构建 Issue 响应数据
-    
-    Args:
-        issue: Issue 模型对象
-        include_details: 是否包含详细信息
-    
-    Returns:
-        dict: Issue 数据
-    """
-    data = {
-        "id": issue.id,
-        "issue_number": issue.issue_number,
-        "title": issue.title,
-        "description": issue.description,
-        "status": issue.status,
-        "priority": issue.priority,
-        "repository_id": issue.repository_id,
-        "author": {
-            "id": issue.author.id,
-            "username": issue.author.username,
-            "full_name": issue.author.full_name
-        } if issue.author else None,
-        "assignee": {
-            "id": issue.assignee.id,
-            "username": issue.assignee.username,
-            "full_name": issue.assignee.full_name
-        } if issue.assignee else None,
-        "labels": [
-            {
-                "id": label.id,
-                "name": label.name,
-                "color": label.color
-            } for label in issue.labels
-        ],
-        "created_at": issue.created_at.isoformat() if issue.created_at else None,
-        "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
-    }
-    
-    if issue.status == "closed":
-        if issue.closer:
-            data["closed_by"] = {
-                "id": issue.closer.id,
-                "username": issue.closer.username
-            }
-        else:
-            data["closed_by"] = None
-    
-    if include_details:
-        data["comments"] = [_build_issue_comment_response(c) for c in issue.comments]
-    
-    return data
-
-
-def _build_issue_comment_response(comment: IssueComment) -> dict:
-    """构建 Issue 评论响应数据"""
-    return {
-        "id": comment.id,
-        "content": comment.content,
-        "author": {
-            "id": comment.author.id,
-            "username": comment.author.username,
-            "full_name": comment.author.full_name
-        } if comment.author else None,
-        "created_at": comment.created_at.isoformat() if comment.created_at else None
-    }
-
-
-def _build_label_response(label: Label) -> dict:
-    """构建标签响应数据"""
-    return {
-        "id": label.id,
-        "name": label.name,
-        "color": label.color,
-        "description": label.description
-    }
+from utils.response_builder import (
+    build_issue_response,
+    build_issue_comment_response,
+    build_label_response,
+    build_pagination_response
+)
+from utils.db_utils import paginate, get_next_sequence_number
 
 
 def list_issues(
@@ -103,7 +32,7 @@ def list_issues(
 ) -> Dict[str, Any]:
     """
     获取 Issue 列表
-    
+
     Args:
         db: 数据库会话
         repository_id: 仓库ID
@@ -113,34 +42,33 @@ def list_issues(
         author_id: 作者ID筛选
         page: 页码
         limit: 每页数量
-    
+
     Returns:
         dict: 包含 Issue 列表和分页信息
     """
     query = db.query(Issue).filter(Issue.repository_id == repository_id)
-    
+
     if status:
         query = query.filter(Issue.status == status)
-    
+
     if assignee_id:
         query = query.filter(Issue.assignee_id == assignee_id)
-    
+
     if author_id:
         query = query.filter(Issue.author_id == author_id)
-    
+
     if label:
         query = query.join(Issue.labels).filter(Label.name == label)
-    
-    total = query.count()
-    issues = query.order_by(Issue.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
-    
-    return {
-        "items": [_build_issue_response(issue) for issue in issues],
-        "total": total,
-        "page": page,
-        "limit": limit,
-        "pages": (total + limit - 1) // limit
-    }
+
+    query = query.order_by(Issue.created_at.desc())
+    issues, total = paginate(db, query, page, limit)
+
+    return build_pagination_response(
+        items=[build_issue_response(issue) for issue in issues],
+        total=total,
+        page=page,
+        limit=limit
+    )
 
 
 def get_issue(
@@ -185,7 +113,7 @@ def get_issue(
     if not issue:
         raise NotFoundException(detail="Issue not found")
 
-    return _build_issue_response(issue, include_details=include_details)
+    return build_issue_response(issue, include_details=include_details)
 
 
 def create_issue(
@@ -200,7 +128,7 @@ def create_issue(
 ) -> dict:
     """
     创建 Issue
-    
+
     Args:
         db: 数据库会话
         repository_id: 仓库ID
@@ -210,22 +138,21 @@ def create_issue(
         priority: 优先级
         assignee_id: 指派人ID
         label_ids: 标签ID列表
-    
+
     Returns:
         dict: 创建的 Issue 数据
     """
     if not title or not title.strip():
         raise ValidationException(detail="Title is required")
-    
+
     if priority not in ["low", "medium", "high", "critical"]:
         raise ValidationException(detail="Invalid priority")
-    
+
     # 生成 Issue 编号
-    max_issue_number = db.query(func.max(Issue.issue_number)).filter(
-        Issue.repository_id == repository_id
-    ).scalar()
-    issue_number = (max_issue_number or 0) + 1
-    
+    issue_number = get_next_sequence_number(
+        db, Issue, "issue_number", {"repository_id": repository_id}
+    )
+
     # 创建 Issue
     issue = Issue(
         repository_id=repository_id,
@@ -237,17 +164,17 @@ def create_issue(
         assignee_id=assignee_id,
         status="open"
     )
-    
+
     # 添加标签
     if label_ids:
         labels = db.query(Label).filter(Label.id.in_(label_ids)).all()
         issue.labels = labels
-    
+
     db.add(issue)
     db.commit()
     db.refresh(issue)
-    
-    return _build_issue_response(issue)
+
+    return build_issue_response(issue)
 
 
 async def update_issue(
@@ -307,7 +234,7 @@ async def update_issue(
     db.commit()
     db.refresh(issue)
 
-    return _build_issue_response(issue)
+    return build_issue_response(issue)
 
 
 async def close_issue(
@@ -345,7 +272,7 @@ async def close_issue(
     db.commit()
     db.refresh(issue)
 
-    return _build_issue_response(issue)
+    return build_issue_response(issue)
 
 
 async def reopen_issue(
@@ -383,7 +310,7 @@ async def reopen_issue(
     db.commit()
     db.refresh(issue)
 
-    return _build_issue_response(issue)
+    return build_issue_response(issue)
 
 
 async def create_issue_comment(
@@ -422,7 +349,7 @@ async def create_issue_comment(
     db.commit()
     db.refresh(comment)
 
-    return _build_issue_comment_response(comment)
+    return build_issue_comment_response(comment)
 
 
 async def list_issue_comments(
@@ -451,7 +378,7 @@ async def list_issue_comments(
         joinedload(IssueComment.author)
     ).order_by(IssueComment.created_at.asc()).all()
 
-    return [_build_issue_comment_response(c) for c in comments]
+    return [build_issue_comment_response(c) for c in comments]
 
 
 # ==================== Label 管理 ====================
@@ -462,16 +389,16 @@ def list_labels(
 ) -> List[dict]:
     """
     获取仓库标签列表
-    
+
     Args:
         db: 数据库会话
         repository_id: 仓库ID
-    
+
     Returns:
         list: 标签列表
     """
     labels = db.query(Label).filter(Label.repository_id == repository_id).all()
-    return [_build_label_response(label) for label in labels]
+    return [build_label_response(label) for label in labels]
 
 
 def create_label(
@@ -483,44 +410,44 @@ def create_label(
 ) -> dict:
     """
     创建标签
-    
+
     Args:
         db: 数据库会话
         repository_id: 仓库ID
         name: 标签名称
         color: 标签颜色（十六进制）
         description: 标签描述
-    
+
     Returns:
         dict: 创建的标签数据
     """
     if not name or not name.strip():
         raise ValidationException(detail="Label name is required")
-    
+
     if not color or not color.startswith("#"):
         raise ValidationException(detail="Invalid color format")
-    
+
     # 检查是否已存在
     existing = db.query(Label).filter(
         Label.repository_id == repository_id,
         Label.name == name.strip()
     ).first()
-    
+
     if existing:
         raise ValidationException(detail="Label already exists")
-    
+
     label = Label(
         repository_id=repository_id,
         name=name.strip(),
         color=color,
         description=description
     )
-    
+
     db.add(label)
     db.commit()
     db.refresh(label)
-    
-    return _build_label_response(label)
+
+    return build_label_response(label)
 
 
 def update_label(
@@ -533,7 +460,7 @@ def update_label(
 ) -> dict:
     """
     更新标签
-    
+
     Args:
         db: 数据库会话
         repository_id: 仓库ID
@@ -541,7 +468,7 @@ def update_label(
         name: 新名称
         color: 新颜色
         description: 新描述
-    
+
     Returns:
         dict: 更新后的标签数据
     """
@@ -549,23 +476,23 @@ def update_label(
         Label.id == label_id,
         Label.repository_id == repository_id
     ).first()
-    
+
     if not label:
         raise NotFoundException(detail="Label not found")
-    
+
     if name is not None:
         label.name = name.strip()
-    
+
     if color is not None:
         label.color = color
-    
+
     if description is not None:
         label.description = description
-    
+
     db.commit()
     db.refresh(label)
-    
-    return _build_label_response(label)
+
+    return build_label_response(label)
 
 
 def delete_label(
@@ -575,7 +502,7 @@ def delete_label(
 ) -> None:
     """
     删除标签
-    
+
     Args:
         db: 数据库会话
         repository_id: 仓库ID
@@ -585,9 +512,9 @@ def delete_label(
         Label.id == label_id,
         Label.repository_id == repository_id
     ).first()
-    
+
     if not label:
         raise NotFoundException(detail="Label not found")
-    
+
     db.delete(label)
     db.commit()

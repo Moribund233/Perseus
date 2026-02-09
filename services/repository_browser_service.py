@@ -14,10 +14,26 @@ from datetime import datetime
 import pygit2
 
 from client.utils.git_utils import repo_exists
+from exception import NotFoundException, ValidationException
 
 
 class RepositoryBrowserError(Exception):
-    """仓库浏览错误"""
+    """仓库浏览错误基类"""
+    pass
+
+
+class RepositoryNotFoundError(RepositoryBrowserError):
+    """仓库不存在错误"""
+    pass
+
+
+class PathNotFoundError(RepositoryBrowserError):
+    """路径不存在错误"""
+    pass
+
+
+class InvalidPathError(RepositoryBrowserError):
+    """无效路径错误"""
     pass
 
 
@@ -32,15 +48,15 @@ def _get_repo(repo_path: str) -> pygit2.Repository:
         pygit2.Repository: 仓库对象
         
     Raises:
-        RepositoryBrowserError: 仓库不存在或无法打开
+        RepositoryNotFoundError: 仓库不存在或无法打开
     """
     if not repo_exists(repo_path):
-        raise RepositoryBrowserError(f"Repository not found: {repo_path}")
+        raise RepositoryNotFoundError(f"Repository not found: {repo_path}")
     
     try:
         return pygit2.Repository(repo_path)
     except Exception as e:
-        raise RepositoryBrowserError(f"Failed to open repository: {e}")
+        raise RepositoryNotFoundError(f"Failed to open repository: {e}")
 
 
 def _resolve_ref(repo: pygit2.Repository, ref: str) -> pygit2.Commit:
@@ -49,64 +65,23 @@ def _resolve_ref(repo: pygit2.Repository, ref: str) -> pygit2.Commit:
     
     Args:
         repo: 仓库对象
-        ref: 分支名或提交SHA
+        ref: 引用名称（分支名、标签名或提交SHA）
         
     Returns:
         pygit2.Commit: 提交对象
         
     Raises:
-        RepositoryBrowserError: 引用不存在
+        PathNotFoundError: 引用不存在
     """
     try:
-        # 尝试直接解析为 OID
+        # 尝试直接解析为提交
+        return repo.revparse_single(ref).peel(pygit2.Commit)
+    except (KeyError, ValueError):
+        # 尝试添加 refs/heads/ 前缀
         try:
-            oid = pygit2.Oid(hex=ref)
-            commit = repo.get(oid)
-            if commit:
-                return commit
-        except (ValueError, KeyError):
-            pass
-        
-        # 尝试作为分支名解析
-        try:
-            branch_ref = repo.lookup_reference_dwim(ref)
-            return repo.get(branch_ref.target)
-        except KeyError:
-            pass
-        
-        # 尝试作为完整引用名
-        try:
-            ref_obj = repo.lookup_reference(ref)
-            return repo.get(ref_obj.target)
-        except KeyError:
-            pass
-        
-        raise RepositoryBrowserError(f"Ref not found: {ref}")
-        
-    except RepositoryBrowserError:
-        raise
-    except Exception as e:
-        raise RepositoryBrowserError(f"Ref not found: {ref}")
-
-
-def _get_entry_type(entry) -> str:
-    """
-    获取条目类型字符串
-    
-    Args:
-        entry: 树条目对象
-        
-    Returns:
-        str: "tree" 或 "blob"
-    """
-    # pygit2 中 entry.type 返回整数
-    # entry.type == 3 -> repo.get() 返回 Blob（文件）
-    # entry.type == 2 -> repo.get() 返回 Tree（目录）
-    if entry.type == 3:
-        return "blob"
-    elif entry.type == 2:
-        return "tree"
-    return "unknown"
+            return repo.revparse_single(f"refs/heads/{ref}").peel(pygit2.Commit)
+        except (KeyError, ValueError):
+            raise PathNotFoundError(f"Ref not found: {ref}")
 
 
 def _get_tree(repo: pygit2.Repository, commit: pygit2.Commit, path: str = "") -> pygit2.Tree:
@@ -116,36 +91,33 @@ def _get_tree(repo: pygit2.Repository, commit: pygit2.Commit, path: str = "") ->
     Args:
         repo: 仓库对象
         commit: 提交对象
-        path: 路径（空字符串表示根目录）
+        path: 路径（可选）
         
     Returns:
         pygit2.Tree: 树对象
         
     Raises:
-        RepositoryBrowserError: 路径不存在
+        PathNotFoundError: 路径不存在
+        InvalidPathError: 路径不是目录
     """
-    tree = commit.tree
-    
     if not path:
-        return tree
+        return commit.tree
     
-    # 解析路径
-    parts = [p for p in path.split("/") if p]
-    
-    for part in parts:
-        try:
-            entry = tree[part]
-            entry_type = _get_entry_type(entry)
-            if entry_type != "tree":
-                raise RepositoryBrowserError(f"'{path}' is not a directory")
-            tree = repo.get(entry.id)
-        except KeyError:
-            raise RepositoryBrowserError(f"Path not found: {path}")
-    
-    return tree
+    try:
+        entry = commit.tree[path]
+        if entry.type == pygit2.GIT_OBJECT_TREE:
+            return repo[entry.id]
+        else:
+            raise InvalidPathError(f"'{path}' is not a directory")
+    except KeyError:
+        raise PathNotFoundError(f"Path not found: {path}")
 
 
-def get_tree_entries(repo_path: str, ref: str = "HEAD", path: str = "") -> Dict[str, Any]:
+def get_tree_entries(
+    repo_path: str,
+    ref: str = "HEAD",
+    path: str = ""
+) -> Dict[str, Any]:
     """
     获取文件树条目
     
@@ -155,344 +127,259 @@ def get_tree_entries(repo_path: str, ref: str = "HEAD", path: str = "") -> Dict[
         path: 子目录路径，默认根目录
         
     Returns:
-        dict: 文件树数据
-        {
-            "path": str,
-            "ref": str,
-            "entries": [
-                {
-                    "name": str,
-                    "type": "tree" | "blob",
-                    "mode": str,
-                    "sha": str,
-                    "size": int (仅 blob)
-                }
-            ]
-        }
+        dict: 包含路径列表和条目列表的字典
         
     Raises:
-        RepositoryBrowserError: 仓库或路径不存在
+        RepositoryNotFoundError: 仓库不存在
+        PathNotFoundError: 引用或路径不存在
+        InvalidPathError: 路径不是目录
     """
     repo = _get_repo(repo_path)
+    commit = _resolve_ref(repo, ref)
+    tree = _get_tree(repo, commit, path)
     
-    try:
-        commit = _resolve_ref(repo, ref)
-        tree = _get_tree(repo, commit, path)
-        
-        entries = []
-        for entry in tree:
-            entry_type = _get_entry_type(entry)
-            entry_data = {
-                "name": entry.name,
-                "type": entry_type,
-                "mode": f"{entry.filemode:06o}",
-                "sha": str(entry.id),
-            }
-            
-            if entry_type == "blob":
-                blob = repo.get(entry.id)
-                if blob and isinstance(blob, pygit2.Blob):
-                    entry_data["size"] = blob.size
-                else:
-                    entry_data["size"] = 0
-            
-            entries.append(entry_data)
-        
-        # 排序：目录在前，文件在后，按名称排序
-        entries.sort(key=lambda e: (0 if e["type"] == "tree" else 1, e["name"]))
-        
-        return {
-            "path": path,
-            "ref": ref,
-            "entries": entries
+    # 构建路径列表
+    path_parts = path.split("/") if path else []
+    paths = [{"name": "root", "path": ""}]
+    current_path = ""
+    for part in path_parts:
+        current_path = f"{current_path}/{part}" if current_path else part
+        paths.append({"name": part, "path": current_path})
+    
+    # 构建条目列表
+    entries = []
+    for entry in tree:
+        entry_data = {
+            "name": entry.name,
+            "type": "tree" if entry.type == pygit2.GIT_OBJECT_TREE else "blob",
+            "path": f"{path}/{entry.name}" if path else entry.name,
+            "sha": str(entry.id),
+            "mode": entry.filemode
         }
-        
-    except RepositoryBrowserError:
-        raise
-    except Exception as e:
-        raise RepositoryBrowserError(f"Failed to get tree entries: {e}")
-    finally:
-        repo.free()
+
+        # 如果是文件，添加大小信息
+        if entry.type == pygit2.GIT_OBJECT_BLOB:
+            blob = repo[entry.id]
+            entry_data["size"] = blob.size
+
+        entries.append(entry_data)
+
+    # 按类型排序（目录在前）和名称排序
+    entries.sort(key=lambda x: (0 if x["type"] == "tree" else 1, x["name"]))
+
+    return {
+        "path": path,
+        "ref": ref,
+        "entries": entries
+    }
 
 
-def get_blob_content(repo_path: str, ref: str = "HEAD", path: str = "") -> Dict[str, Any]:
+def get_blob_content(
+    repo_path: str,
+    ref: str = "HEAD",
+    path: str = None
+) -> Dict[str, Any]:
     """
     获取文件内容
     
     Args:
         repo_path: 仓库物理路径
         ref: 分支名或提交SHA，默认 HEAD
-        path: 文件路径
+        path: 文件路径（必填）
         
     Returns:
-        dict: 文件内容数据
-        {
-            "path": str,
-            "ref": str,
-            "sha": str,
-            "size": int,
-            "content": str,
-            "encoding": str,
-            "is_binary": bool
-        }
+        dict: 包含文件内容的字典
         
     Raises:
-        RepositoryBrowserError: 文件不存在或是目录
+        RepositoryNotFoundError: 仓库不存在
+        PathNotFoundError: 引用或文件不存在
+        InvalidPathError: 路径是目录或不是有效文件
     """
+    if not path:
+        raise InvalidPathError("Path is required")
+    
     repo = _get_repo(repo_path)
+    commit = _resolve_ref(repo, ref)
     
     try:
-        commit = _resolve_ref(repo, ref)
-        
-        # 获取目录和文件名
-        dir_path = os.path.dirname(path)
-        file_name = os.path.basename(path)
-        
-        # 规范化路径：如果 dir_path 是空字符串，使用根目录
-        if not dir_path or dir_path == ".":
-            dir_path = ""
-        
-        tree = _get_tree(repo, commit, dir_path)
-        
-        try:
-            entry = tree[file_name]
-        except KeyError:
-            raise RepositoryBrowserError(f"File not found: {path}")
-        
-        entry_type = _get_entry_type(entry)
-        if entry_type != "blob":
-            raise RepositoryBrowserError(f"'{path}' is a directory, not a file")
-        
-        obj = repo.get(entry.id)
-        if not obj or not isinstance(obj, pygit2.Blob):
-            raise RepositoryBrowserError(f"'{path}' is not a valid file")
-        
-        blob = obj
-        
-        # 检测是否为二进制文件
+        entry = commit.tree[path]
+    except KeyError:
+        raise PathNotFoundError(f"File not found: {path}")
+    
+    if entry.type == pygit2.GIT_OBJECT_TREE:
+        raise InvalidPathError(f"'{path}' is a directory, not a file")
+
+    if entry.type != pygit2.GIT_OBJECT_BLOB:
+        raise InvalidPathError(f"'{path}' is not a valid file")
+    
+    blob = repo[entry.id]
+    
+    # 尝试解码为文本
+    try:
+        content = blob.data.decode('utf-8')
         is_binary = False
-        content = ""
-        
-        try:
-            # 尝试作为文本解码
-            content = blob.data.decode("utf-8")
-            encoding = "utf-8"
-        except UnicodeDecodeError:
-            # 可能是二进制文件
-            is_binary = True
-            encoding = "binary"
-            content = ""
-        
-        return {
-            "path": path,
-            "ref": ref,
-            "sha": str(entry.id),
-            "size": blob.size,
-            "content": content,
-            "encoding": encoding,
-            "is_binary": is_binary
-        }
-        
-    except RepositoryBrowserError:
-        raise
-    except Exception as e:
-        raise RepositoryBrowserError(f"Failed to get blob content: {e}")
-    finally:
-        repo.free()
+    except UnicodeDecodeError:
+        content = blob.data.hex()
+        is_binary = True
+    
+    return {
+        "name": os.path.basename(path),
+        "path": path,
+        "sha": str(entry.id),
+        "ref": ref,
+        "content": content,
+        "size": blob.size,
+        "encoding": "utf-8" if not is_binary else "hex",
+        "is_binary": is_binary
+    }
 
 
 def get_commits(
     repo_path: str,
     ref: str = "HEAD",
-    path: Optional[str] = None,
+    path: str = None,
     page: int = 1,
     per_page: int = 30
 ) -> Dict[str, Any]:
     """
     获取提交历史
-
+    
     Args:
         repo_path: 仓库物理路径
-        ref: 分支名，默认 HEAD
-        path: 特定文件的提交历史，None 表示所有提交
+        ref: 分支名或提交SHA，默认 HEAD
+        path: 特定文件路径，None 表示所有提交
         page: 页码，默认 1
         per_page: 每页数量，默认 30
-
+        
     Returns:
-        dict: 提交历史数据
-        {
-            "commits": [
-                {
-                    "sha": str,
-                    "message": str,
-                    "author": {
-                        "name": str,
-                        "email": str
-                    },
-                    "date": str (ISO format),
-                    "parents": [str]
-                }
-            ],
-            "pagination": {
-                "page": int,
-                "per_page": int,
-                "total": int,
-                "has_more": bool
-            }
-        }
-
+        dict: 包含提交列表和分页信息的字典
+        
     Raises:
-        RepositoryBrowserError: 分支不存在
+        RepositoryNotFoundError: 仓库不存在
+        PathNotFoundError: 引用不存在
     """
     repo = _get_repo(repo_path)
-
-    try:
-        commit = _resolve_ref(repo, ref)
-
-        # 使用生成器优化内存使用
-        def _walk_commits(repo: pygit2.Repository, commit_id, max_count: int):
-            """生成器：遍历提交，限制数量"""
-            walker = repo.walk(commit_id, pygit2.GIT_SORT_TIME)
-            count = 0
-            for commit_obj in walker:
-                if count >= max_count:
-                    break
-                yield commit_obj
-                count += 1
-
-        # 计算需要获取的最大数量（当前页结束位置）
-        max_commits = page * per_page
-
-        # 收集提交
-        commits = []
-        for commit_obj in _walk_commits(repo, commit.id, max_commits + 1):
-            commits.append({
-                "sha": str(commit_obj.id),
-                "message": commit_obj.message.strip(),
-                "author": {
-                    "name": commit_obj.author.name,
-                    "email": commit_obj.author.email
-                },
-                "date": datetime.fromtimestamp(commit_obj.author.time).isoformat(),
-                "parents": [str(p) for p in commit_obj.parent_ids]
-            })
-
-        # 检查是否有更多数据
-        has_more = len(commits) > max_commits
-        if has_more:
-            commits = commits[:max_commits]  # 移除额外的一个用于判断 has_more
-
-        # 分页
-        total = len(commits)
-        start = (page - 1) * per_page
-        end = start + per_page
-        paginated_commits = commits[start:end]
-
-        return {
-            "commits": paginated_commits,
-            "pagination": {
-                "page": page,
-                "per_page": per_page,
-                "total": total,
-                "has_more": has_more
-            }
+    commit = _resolve_ref(repo, ref)
+    
+    commits = []
+    walker = repo.walk(commit.id, pygit2.GIT_SORT_TIME)
+    
+    # 如果指定了路径，只获取该文件的提交
+    if path:
+        walker.simplify_first_parent()
+    
+    # 分页
+    skip = (page - 1) * per_page
+    for i, commit_obj in enumerate(walker):
+        if i < skip:
+            continue
+        if i >= skip + per_page:
+            break
+        
+        commits.append({
+            "sha": str(commit_obj.id),
+            "message": commit_obj.message,
+            "author": {
+                "name": commit_obj.author.name,
+                "email": commit_obj.author.email,
+                "date": datetime.fromtimestamp(commit_obj.author.time).isoformat()
+            },
+            "committer": {
+                "name": commit_obj.committer.name,
+                "email": commit_obj.committer.email,
+                "date": datetime.fromtimestamp(commit_obj.committer.time).isoformat()
+            },
+            "date": datetime.fromtimestamp(commit_obj.commit_time).isoformat(),
+            "parents": [str(parent) for parent in commit_obj.parent_ids]
+        })
+    
+    return {
+        "commits": commits,
+        "pagination": {
+            "page": page,
+            "per_page": per_page
         }
-
-    except RepositoryBrowserError:
-        raise
-    except Exception as e:
-        raise RepositoryBrowserError(f"Failed to get commits: {e}")
-    finally:
-        repo.free()
+    }
 
 
 def get_diff(
     repo_path: str,
-    base: Optional[str],
-    head: str,
-    path: Optional[str] = None
+    base: str = None,
+    head: str = None,
+    path: str = None
 ) -> Dict[str, Any]:
     """
     获取代码差异
     
     Args:
         repo_path: 仓库物理路径
-        base: 基准提交，None 表示与空树对比
-        head: 对比提交
-        path: 特定文件的差异，None 表示所有文件
+        base: 基准提交SHA，None 表示与空树对比
+        head: 对比提交SHA（必填）
+        path: 特定文件路径，None 表示所有文件
         
     Returns:
-        dict: 差异数据
-        {
-            "files": [
-                {
-                    "path": str,
-                    "status": str,
-                    "additions": int,
-                    "deletions": int,
-                    "chunks": [...]
-                }
-            ]
-        }
+        dict: 包含差异信息的字典
         
     Raises:
-        RepositoryBrowserError: 提交不存在
+        RepositoryNotFoundError: 仓库不存在
+        PathNotFoundError: 提交不存在
+        InvalidPathError: 无效的提交
     """
+    if not head:
+        raise InvalidPathError("Head commit is required")
+    
     repo = _get_repo(repo_path)
     
-    try:
-        # 解析提交
-        head_commit = _resolve_ref(repo, head)
-        
-        if base:
-            base_commit = _resolve_ref(repo, base)
-            diff = repo.diff(base_commit, head_commit)
-        else:
-            # 与空树对比
-            diff = head_commit.tree.diff_to_tree(swap=True)
-        
-        files = []
-        for patch in diff:
-            file_data = {
-                "path": patch.delta.new_file.path or patch.delta.old_file.path,
-                "status": patch.delta.status_char(),
-                "additions": patch.line_stats[1],
-                "deletions": patch.line_stats[2],
-                "chunks": []
-            }
-            
+    # 获取提交对象
+    head_commit = _resolve_ref(repo, head)
+    
+    if base:
+        base_commit = _resolve_ref(repo, base)
+        diff = repo.diff(base_commit, head_commit)
+    else:
+        # 与空树对比
+        diff = head_commit.tree.diff_to_tree()
+    
+    # 如果指定了路径，过滤差异
+    if path:
+        diff.find_similar()
+    
+    files = []
+    for patch in diff:
+        file_data = {
+            "old_path": patch.delta.old_file.path,
+            "new_path": patch.delta.new_file.path,
+            "status": patch.delta.status_char(),
+            "additions": patch.line_stats[1],
+            "deletions": patch.line_stats[2]
+        }
+
+        # 添加 hunks 信息
+        if patch.delta.status != pygit2.GIT_DELTA_DELETED:
+            hunks = []
             for hunk in patch.hunks:
-                chunk = {
+                hunk_data = {
                     "old_start": hunk.old_start,
                     "old_lines": hunk.old_lines,
                     "new_start": hunk.new_start,
                     "new_lines": hunk.new_lines,
                     "lines": []
                 }
-                
                 for line in hunk.lines:
-                    line_type = "context"
-                    if line.origin == "+":
-                        line_type = "addition"
-                    elif line.origin == "-":
-                        line_type = "deletion"
-                    
-                    chunk["lines"].append({
-                        "type": line_type,
-                        "content": line.content.rstrip("\n\r"),
-                        "old_lineno": line.old_lineno if line.old_lineno != -1 else None,
-                        "new_lineno": line.new_lineno if line.new_lineno != -1 else None
+                    hunk_data["lines"].append({
+                        "origin": line.origin,
+                        "content": line.content
                     })
-                
-                file_data["chunks"].append(chunk)
-            
-            files.append(file_data)
-        
-        return {"files": files}
-        
-    except RepositoryBrowserError:
-        raise
-    except Exception as e:
-        raise RepositoryBrowserError(f"Failed to get diff: {e}")
-    finally:
-        repo.free()
+                hunks.append(hunk_data)
+            file_data["hunks"] = hunks
+
+        files.append(file_data)
+
+    return {
+        "files": files,
+        "stats": {
+            "files_changed": len(files),
+            "additions": sum(f["additions"] for f in files),
+            "deletions": sum(f["deletions"] for f in files)
+        }
+    }

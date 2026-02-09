@@ -4,13 +4,17 @@
 处理与Git仓库相关的所有业务逻辑
 """
 import os
+import shutil
 import logging
 from sqlalchemy.orm import Session
+
 from models import Repository
 from models.branch import Branch
 from models.repository_member import RepositoryMember
 from exception import ValidationException, NotFoundException, ConflictException
 from client.utils.git_utils import init_bare_repo, get_repository_storage_path, repo_exists, GitError
+from utils.response_builder import build_repo_response
+from utils.db_utils import exists
 
 # 日志记录器
 logger = logging.getLogger(__name__)
@@ -24,37 +28,21 @@ ROLE_PRIORITY = {
 }
 
 
-def _build_repo_response(repo: Repository) -> dict:
+def _check_physical_repo_exists(repo: Repository) -> bool:
     """
-    构建仓库响应数据（不包含敏感物理路径信息）
+    检查物理仓库是否存在
 
     Args:
         repo: Repository 模型对象
 
     Returns:
-        dict: 仓库数据（不包含物理路径）
+        bool: 物理仓库是否存在
     """
-    # 获取物理仓库状态（仅检查是否存在，不暴露路径）
     try:
         physical_path = get_repository_storage_path(repo.path)
-        physical_exists = repo_exists(physical_path)
+        return repo_exists(physical_path)
     except Exception:
-        physical_exists = False
-
-    return {
-        "id": repo.id,
-        "name": repo.name,
-        "path": repo.path,
-        "description": repo.description,
-        "is_public": repo.is_public,
-        "owner_id": repo.owner_id,
-        "default_branch": repo.default_branch,
-        "created_at": repo.created_at,
-        "updated_at": repo.updated_at,
-        "status": {
-            "initialized": physical_exists
-        }
-    }
+        return False
 
 
 def get_repositories(db: Session):
@@ -68,8 +56,10 @@ def get_repositories(db: Session):
         list[dict]: 仓库列表（包含物理仓库信息）
     """
     repos = db.query(Repository).all()
-    # 返回包含物理仓库信息的字典列表
-    return [_build_repo_response(repo) for repo in repos]
+    return [
+        build_repo_response(repo, _check_physical_repo_exists(repo))
+        for repo in repos
+    ]
 
 
 def get_repository_by_id(repo_id: int, db: Session):
@@ -89,8 +79,7 @@ def get_repository_by_id(repo_id: int, db: Session):
     repo = db.query(Repository).filter(Repository.id == repo_id).first()
     if repo is None:
         raise NotFoundException(detail="Repository not found")
-    # 返回包含物理仓库信息的字典
-    return _build_repo_response(repo)
+    return build_repo_response(repo, _check_physical_repo_exists(repo))
 
 
 def get_repositories_by_user(user_id: int, db: Session):
@@ -108,13 +97,17 @@ def get_repositories_by_user(user_id: int, db: Session):
     owned_repos = db.query(Repository).filter(Repository.owner_id == user_id).all()
 
     # 查询用户参与的仓库（通过repository_members表）
-    member_repos = db.query(Repository).join(RepositoryMember).filter(RepositoryMember.user_id == user_id).all()
+    member_repos = db.query(Repository).join(RepositoryMember).filter(
+        RepositoryMember.user_id == user_id
+    ).all()
 
     # 合并结果，去重
     all_repos = list(set(owned_repos + member_repos))
 
-    # 返回包含物理仓库信息的字典列表
-    return [_build_repo_response(repo) for repo in all_repos]
+    return [
+        build_repo_response(repo, _check_physical_repo_exists(repo))
+        for repo in all_repos
+    ]
 
 
 def create_repository(repo_data: dict, db: Session):
@@ -137,8 +130,7 @@ def create_repository(repo_data: dict, db: Session):
         raise ValidationException(detail="Name, path and owner_id are required")
 
     # 检查路径是否已存在
-    existing_repo = db.query(Repository).filter(Repository.path == repo_data["path"]).first()
-    if existing_repo:
+    if exists(db, Repository, {"path": repo_data["path"]}):
         raise ConflictException(detail="Repository path already exists")
 
     # 创建新仓库
@@ -180,14 +172,12 @@ def create_repository(repo_data: dict, db: Session):
         init_bare_repo(physical_path)
     except GitError as e:
         # 物理仓库创建失败，记录错误但不阻止创建
-        # 因为数据库记录已经创建，可以后续手动修复
         logger.warning(f"Failed to create physical git repository at {physical_path}: {e}")
     except Exception as e:
         # 其他错误，记录但不阻止
         logger.warning(f"Unexpected error creating git repository: {e}")
 
-    # 返回包含物理仓库信息的字典
-    return _build_repo_response(db_repo)
+    return build_repo_response(db_repo, _check_physical_repo_exists(db_repo))
 
 
 def update_repository(repo_id: int, repo_data: dict, db: Session):
@@ -212,8 +202,7 @@ def update_repository(repo_id: int, repo_data: dict, db: Session):
 
     # 检查路径是否已存在（如果更新了路径）
     if "path" in repo_data and repo_data["path"] != db_repo.path:
-        existing_repo = db.query(Repository).filter(Repository.path == repo_data["path"]).first()
-        if existing_repo:
+        if exists(db, Repository, {"path": repo_data["path"]}):
             raise ConflictException(detail="Repository path already exists")
 
     # 更新仓库信息
@@ -224,8 +213,7 @@ def update_repository(repo_id: int, repo_data: dict, db: Session):
     db.commit()
     db.refresh(db_repo)
 
-    # 返回包含物理仓库信息的字典
-    return _build_repo_response(db_repo)
+    return build_repo_response(db_repo, _check_physical_repo_exists(db_repo))
 
 
 def delete_repository(repo_id: int, db: Session):
@@ -242,7 +230,6 @@ def delete_repository(repo_id: int, db: Session):
     Raises:
         NotFoundException: 仓库不存在时抛出404异常
     """
-    import shutil
     db_repo = db.query(Repository).filter(Repository.id == repo_id).first()
     if db_repo is None:
         raise NotFoundException(detail="Repository not found")
@@ -274,8 +261,10 @@ def get_public_repositories(db: Session):
         list[dict]: 公开仓库列表（包含物理仓库信息）
     """
     repos = db.query(Repository).filter(Repository.is_public == True).all()
-    # 返回包含物理仓库信息的字典列表
-    return [_build_repo_response(repo) for repo in repos]
+    return [
+        build_repo_response(repo, _check_physical_repo_exists(repo))
+        for repo in repos
+    ]
 
 
 def check_repository_access(repo_id: int, user_id: int, db: Session, required_role: str = None):
@@ -316,10 +305,8 @@ def check_repository_access(repo_id: int, user_id: int, db: Session, required_ro
 
     # 如果需要特定角色，检查角色权限
     if required_role:
-        # 角色优先级：owner > admin > developer > readonly
         user_role_priority = ROLE_PRIORITY.get(member.role, 0)
         required_role_priority = ROLE_PRIORITY.get(required_role, 0)
-
         return user_role_priority >= required_role_priority
 
     return True

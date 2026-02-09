@@ -4,92 +4,21 @@ Pull Request 服务层
 处理 Pull Request 相关的所有业务逻辑
 """
 import os
-import tempfile
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
-import pygit2
 
-from models import PullRequest, PRComment, PRReview, Repository, User
-from exception import ValidationException, NotFoundException, ConflictException, AuthorizationException
+from models import PullRequest, PRComment, PRReview, User
+from exception import ValidationException, NotFoundException, AuthorizationException
 from utils.permission_utils import check_resource_author_or_admin, check_repository_permission
 from utils.query_utils import get_pull_request_or_404
-
-
-def _build_pr_response(pr: PullRequest, include_details: bool = False) -> dict:
-    """
-    构建 PR 响应数据
-    
-    Args:
-        pr: PullRequest 模型对象
-        include_details: 是否包含详细信息（评论、审查等）
-    
-    Returns:
-        dict: PR 数据
-    """
-    data = {
-        "id": pr.id,
-        "pr_number": pr.pr_number,
-        "title": pr.title,
-        "description": pr.description,
-        "source_branch": pr.source_branch,
-        "target_branch": pr.target_branch,
-        "status": pr.status,
-        "repository_id": pr.repository_id,
-        "author": {
-            "id": pr.author.id,
-            "username": pr.author.username,
-            "full_name": pr.author.full_name
-        } if pr.author else None,
-        "created_at": pr.created_at.isoformat() if pr.created_at else None,
-        "updated_at": pr.updated_at.isoformat() if pr.updated_at else None,
-    }
-    
-    if pr.status == "merged":
-        data["merged_by"] = {
-            "id": pr.merger.id,
-            "username": pr.merger.username
-        } if pr.merger else None
-        data["merged_commit_hash"] = pr.merged_commit_hash
-    
-    if include_details:
-        data["comments"] = [_build_pr_comment_response(c) for c in pr.comments]
-        data["reviews"] = [_build_pr_review_response(r) for r in pr.reviews]
-    
-    return data
-
-
-def _build_pr_comment_response(comment: PRComment) -> dict:
-    """构建 PR 评论响应数据"""
-    return {
-        "id": comment.id,
-        "content": comment.content,
-        "file_path": comment.file_path,
-        "line_number": comment.line_number,
-        "commit_hash": comment.commit_hash,
-        "author": {
-            "id": comment.author.id,
-            "username": comment.author.username,
-            "full_name": comment.author.full_name
-        } if comment.author else None,
-        "created_at": comment.created_at.isoformat() if comment.created_at else None,
-        "parent_id": comment.parent_id
-    }
-
-
-def _build_pr_review_response(review: PRReview) -> dict:
-    """构建 PR 审查响应数据"""
-    return {
-        "id": review.id,
-        "status": review.status,
-        "comment": review.comment,
-        "reviewer": {
-            "id": review.reviewer.id,
-            "username": review.reviewer.username,
-            "full_name": review.reviewer.full_name
-        } if review.reviewer else None,
-        "created_at": review.created_at.isoformat() if review.created_at else None
-    }
+from utils.response_builder import (
+    build_pr_response,
+    build_pr_comment_response,
+    build_pr_review_response,
+    build_pagination_response
+)
+from utils.db_utils import paginate, get_next_sequence_number
+from utils.git_utils import GitService
 
 
 async def list_pull_requests(
@@ -102,7 +31,7 @@ async def list_pull_requests(
 ) -> Dict[str, Any]:
     """
     获取 PR 列表
-    
+
     Args:
         db: 数据库会话
         repository_id: 仓库ID
@@ -110,28 +39,27 @@ async def list_pull_requests(
         author_id: 作者ID筛选
         page: 页码
         limit: 每页数量
-    
+
     Returns:
         dict: 包含 PR 列表和分页信息
     """
     query = db.query(PullRequest).filter(PullRequest.repository_id == repository_id)
-    
+
     if status:
         query = query.filter(PullRequest.status == status)
-    
+
     if author_id:
         query = query.filter(PullRequest.author_id == author_id)
-    
-    total = query.count()
-    prs = query.order_by(PullRequest.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
-    
-    return {
-        "items": [_build_pr_response(pr) for pr in prs],
-        "total": total,
-        "page": page,
-        "limit": limit,
-        "pages": (total + limit - 1) // limit
-    }
+
+    query = query.order_by(PullRequest.created_at.desc())
+    prs, total = paginate(db, query, page, limit)
+
+    return build_pagination_response(
+        items=[build_pr_response(pr) for pr in prs],
+        total=total,
+        page=page,
+        limit=limit
+    )
 
 
 async def get_pull_request(
@@ -178,7 +106,7 @@ async def get_pull_request(
     if not pr:
         raise NotFoundException(detail="Pull request not found")
 
-    return _build_pr_response(pr, include_details=include_details)
+    return build_pr_response(pr, include_details=include_details)
 
 
 async def create_pull_request(
@@ -192,7 +120,7 @@ async def create_pull_request(
 ) -> dict:
     """
     创建 Pull Request
-    
+
     Args:
         db: 数据库会话
         repository_id: 仓库ID
@@ -201,27 +129,25 @@ async def create_pull_request(
         description: 描述
         source_branch: 源分支
         target_branch: 目标分支
-    
+
     Returns:
         dict: 创建的 PR 数据
-    
+
     Raises:
         ValidationException: 参数验证失败
-        ConflictException: 分支相同或 PR 已存在
     """
     # 验证参数
     if not title or not title.strip():
         raise ValidationException(detail="Title is required")
-    
+
     if source_branch == target_branch:
         raise ValidationException(detail="Source and target branches cannot be the same")
-    
+
     # 生成 PR 编号
-    max_pr_number = db.query(func.max(PullRequest.pr_number)).filter(
-        PullRequest.repository_id == repository_id
-    ).scalar()
-    pr_number = (max_pr_number or 0) + 1
-    
+    pr_number = get_next_sequence_number(
+        db, PullRequest, "pr_number", {"repository_id": repository_id}
+    )
+
     # 创建 PR
     pr = PullRequest(
         repository_id=repository_id,
@@ -233,12 +159,12 @@ async def create_pull_request(
         author_id=author_id,
         status="open"
     )
-    
+
     db.add(pr)
     db.commit()
     db.refresh(pr)
-    
-    return _build_pr_response(pr)
+
+    return build_pr_response(pr)
 
 
 async def update_pull_request(
@@ -288,7 +214,7 @@ async def update_pull_request(
     db.commit()
     db.refresh(pr)
 
-    return _build_pr_response(pr)
+    return build_pr_response(pr)
 
 
 async def close_pull_request(
@@ -324,134 +250,7 @@ async def close_pull_request(
     db.commit()
     db.refresh(pr)
 
-    return _build_pr_response(pr)
-
-
-async def _get_repo_path(db: Session, repository_id: int) -> str:
-    """
-    获取仓库的物理路径
-
-    Args:
-        db: 数据库会话
-        repository_id: 仓库ID
-
-    Returns:
-        str: 仓库物理路径
-    """
-    repo = db.query(Repository).filter(Repository.id == repository_id).first()
-    if not repo:
-        raise NotFoundException(detail="Repository not found")
-
-    # 从配置获取仓库根目录
-    from config import get_config
-    config = get_config()
-    repo_root = config.storage.repo_root
-
-    return os.path.join(repo_root, repo.path)
-
-
-async def _check_merge_conflicts(
-    repo_path: str,
-    source_branch: str,
-    target_branch: str
-) -> bool:
-    """
-    检查分支之间是否有合并冲突
-
-    Args:
-        repo_path: 仓库路径
-        source_branch: 源分支
-        target_branch: 目标分支
-
-    Returns:
-        bool: 是否有冲突
-    """
-    try:
-        repo = pygit2.Repository(repo_path)
-
-        # 获取分支引用
-        source_ref = f"refs/heads/{source_branch}"
-        target_ref = f"refs/heads/{target_branch}"
-
-        # 检查分支是否存在
-        if source_ref not in repo.references or target_ref not in repo.references:
-            return True  # 分支不存在视为有冲突
-
-        # 获取提交
-        source_commit = repo.references[source_ref].peel(pygit2.Commit)
-        target_commit = repo.references[target_ref].peel(pygit2.Commit)
-
-        # 创建临时索引进行合并测试
-        index = repo.merge_commits(target_commit, source_commit)
-
-        # 检查是否有冲突
-        return index.has_conflicts
-
-    except Exception as e:
-        raise ValidationException(detail=f"Failed to check merge conflicts: {str(e)}")
-
-
-async def _perform_git_merge(
-    repo_path: str,
-    source_branch: str,
-    target_branch: str,
-    merger_name: str,
-    merger_email: str,
-    message: str
-) -> str:
-    """
-    执行实际的 Git 合并操作
-
-    Args:
-        repo_path: 仓库路径
-        source_branch: 源分支
-        target_branch: 目标分支
-        merger_name: 合并者名称
-        merger_email: 合并者邮箱
-        message: 合并提交信息
-
-    Returns:
-        str: 合并后的提交哈希
-    """
-    try:
-        repo = pygit2.Repository(repo_path)
-
-        # 获取分支引用
-        source_ref_name = f"refs/heads/{source_branch}"
-        target_ref_name = f"refs/heads/{target_branch}"
-
-        source_commit = repo.references[source_ref_name].peel(pygit2.Commit)
-        target_commit = repo.references[target_ref_name].peel(pygit2.Commit)
-
-        # 创建签名
-        signature = pygit2.Signature(merger_name, merger_email)
-
-        # 执行合并
-        index = repo.merge_commits(target_commit, source_commit)
-
-        if index.has_conflicts:
-            raise ValidationException(detail="Merge conflicts detected")
-
-        # 写入树对象
-        tree_oid = index.write_tree(repo)
-
-        # 创建合并提交
-        parents = [target_commit.id, source_commit.id]
-        commit_oid = repo.create_commit(
-            target_ref_name,  # 更新目标分支
-            signature,  # 作者
-            signature,  # 提交者
-            message,
-            tree_oid,
-            parents
-        )
-
-        return str(commit_oid)
-
-    except ValidationException:
-        raise
-    except Exception as e:
-        raise ValidationException(detail=f"Merge failed: {str(e)}")
+    return build_pr_response(pr)
 
 
 async def merge_pull_request(
@@ -495,21 +294,22 @@ async def merge_pull_request(
     if not has_permission:
         raise AuthorizationException(detail="You don't have permission to merge this pull request")
 
-    # 获取仓库路径
-    repo_path = await _get_repo_path(db, repository_id)
-
-    if not os.path.exists(repo_path):
+    # 使用 GitService 进行 Git 操作
+    try:
+        git_service = GitService.from_repository_id(db, repository_id)
+    except NotFoundException:
         raise NotFoundException(detail="Repository not found on disk")
 
     # 检查是否有冲突
-    has_conflicts = await _check_merge_conflicts(
-        repo_path,
+    has_conflicts = git_service.check_merge_conflicts(
         pr.source_branch,
         pr.target_branch
     )
 
     if has_conflicts:
-        raise ValidationException(detail="Merge conflicts detected. Please resolve conflicts before merging.")
+        raise ValidationException(
+            detail="Merge conflicts detected. Please resolve conflicts before merging."
+        )
 
     # 构建合并提交信息
     merge_message = f"Merge pull request #{pr_number}\n\n{pr.title}"
@@ -518,12 +318,14 @@ async def merge_pull_request(
 
     # 执行实际合并
     try:
-        merged_commit_hash = await _perform_git_merge(
-            repo_path,
+        signature = git_service.create_signature(
+            merger.full_name or merger.username,
+            merger.email or f"{merger.username}@localhost"
+        )
+        merged_commit_hash = git_service.merge_branches(
             pr.source_branch,
             pr.target_branch,
-            merger.full_name or merger.username,
-            merger.email or f"{merger.username}@localhost",
+            signature,
             merge_message
         )
     except ValidationException:
@@ -539,7 +341,7 @@ async def merge_pull_request(
     db.commit()
     db.refresh(pr)
 
-    return _build_pr_response(pr)
+    return build_pr_response(pr)
 
 
 async def create_pr_comment(
@@ -596,7 +398,7 @@ async def create_pr_comment(
     db.commit()
     db.refresh(comment)
 
-    return _build_pr_comment_response(comment)
+    return build_pr_comment_response(comment)
 
 
 async def create_pr_review(
@@ -639,7 +441,7 @@ async def create_pr_review(
         existing_review.comment = comment
         db.commit()
         db.refresh(existing_review)
-        return _build_pr_review_response(existing_review)
+        return build_pr_review_response(existing_review)
 
     # 创建新审查
     review = PRReview(
@@ -653,7 +455,7 @@ async def create_pr_review(
     db.commit()
     db.refresh(review)
 
-    return _build_pr_review_response(review)
+    return build_pr_review_response(review)
 
 
 async def list_pr_comments(
@@ -682,4 +484,4 @@ async def list_pr_comments(
         joinedload(PRComment.author)
     ).order_by(PRComment.created_at.asc()).all()
 
-    return [_build_pr_comment_response(c) for c in comments]
+    return [build_pr_comment_response(c) for c in comments]

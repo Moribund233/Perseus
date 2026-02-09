@@ -18,8 +18,8 @@ from services.repository_service import (
     get_public_repositories,
     create_repository,
     update_repository,
-    _build_repo_response
 )
+from utils.response_builder import build_repo_response
 
 
 def check_repo_response_format(repo_data: dict, test_name: str):
@@ -35,8 +35,8 @@ def check_repo_response_format(repo_data: dict, test_name: str):
 
 
 async def test_build_repo_response():
-    """测试 _build_repo_response 辅助函数"""
-    print("\n=== 测试 _build_repo_response ===")
+    """测试 build_repo_response 辅助函数"""
+    print("\n=== 测试 build_repo_response ===")
 
     db = SessionLocal()
     try:
@@ -46,8 +46,8 @@ async def test_build_repo_response():
             print("  ⚠️ 数据库中没有仓库，跳过测试")
             return
 
-        response = _build_repo_response(repo)
-        check_repo_response_format(response, "_build_repo_response")
+        response = build_repo_response(repo)
+        check_repo_response_format(response, "build_repo_response")
         print(f"  物理路径: {response['physical']['path']}")
         print(f"  物理存在: {response['physical']['exists']}")
 

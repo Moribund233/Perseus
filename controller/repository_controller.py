@@ -6,9 +6,17 @@
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
+
 from models.db import get_db
 from models.user import User
 from api.dependencies import get_current_user, get_current_admin_user
+from utils.permission_utils import (
+    require_repository_permission_sync,
+    require_repository_owner_or_admin_sync
+)
+from utils.rate_limiter import limiter, RateLimitConfig
+from exception import AuthorizationException
+
 from services.repository_service import (
     get_repositories as service_get_repositories,
     get_repository_by_id as service_get_repository_by_id,
@@ -19,8 +27,6 @@ from services.repository_service import (
     get_public_repositories as service_get_public_repositories,
     check_repository_access as service_check_repository_access
 )
-from utils.rate_limiter import limiter, RateLimitConfig
-from exception import AuthorizationException
 
 # 创建路由实例
 router = APIRouter(prefix="/api/repositories", tags=["repositories"])
@@ -52,10 +58,10 @@ def get_repositories(
 def get_public_repositories(db: Session = Depends(get_db)):
     """
     获取所有公开仓库
-    
+
     Args:
         db: 数据库会话
-    
+
     Returns:
         list[Repository]: 公开仓库列表
     """
@@ -160,14 +166,10 @@ def update_repository(
         NotFoundException: 仓库不存在时抛出404异常
         AuthorizationException: 无权限时抛出403异常
     """
-    # 检查权限
-    from api.dependencies import check_repository_permission
-    import asyncio
-    has_permission = asyncio.run(check_repository_permission(
-        db, repo_id, current_user.id, ["owner", "admin"]
-    ))
-    if not has_permission:
-        raise AuthorizationException(detail="You don't have permission to update this repository")
+    # 使用工具函数检查权限（需要所有者或管理员权限）
+    require_repository_owner_or_admin_sync(
+        db, repo_id, current_user.id, "update this repository"
+    )
     return service_update_repository(repo_id, repo, db)
 
 
@@ -195,14 +197,10 @@ def delete_repository(
         NotFoundException: 仓库不存在时抛出404异常
         AuthorizationException: 无权限时抛出403异常
     """
-    # 检查权限（只有所有者或管理员可以删除）
-    from api.dependencies import check_repository_permission
-    import asyncio
-    has_permission = asyncio.run(check_repository_permission(
-        db, repo_id, current_user.id, ["owner"]
-    ))
-    if not has_permission:
-        raise AuthorizationException(detail="You don't have permission to delete this repository")
+    # 使用工具函数检查权限（只有所有者可以删除）
+    require_repository_permission_sync(
+        db, repo_id, current_user.id, ["owner"], "delete this repository"
+    )
     return service_delete_repository(repo_id, db)
 
 

@@ -218,3 +218,61 @@ async def check_repository_owner_or_admin(
     ).first()
 
     return member is not None
+
+
+# ==================== FastAPI 依赖注入函数 ====================
+
+def require_repository_permission_dependency(
+    required_roles: list = None,
+    action_description: str = "perform this action"
+):
+    """
+    创建仓库权限检查依赖
+
+    用于 FastAPI 路由中检查用户是否有仓库操作权限
+
+    Args:
+        required_roles: 所需角色列表
+        action_description: 操作描述
+
+    Returns:
+        依赖函数
+    """
+    async def check_permission(
+        repo_id: int,
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+    ) -> User:
+        from utils.permission_utils import require_repository_permission_sync
+        require_repository_permission_sync(
+            db, repo_id, current_user.id, required_roles, action_description
+        )
+        return current_user
+    return check_permission
+
+
+def require_repository_owner_dependency(
+    action_description: str = "perform this action"
+):
+    """
+    创建仓库所有者权限检查依赖
+
+    用于 FastAPI 路由中检查用户是否是仓库所有者或管理员
+
+    Args:
+        action_description: 操作描述
+
+    Returns:
+        依赖函数
+    """
+    async def check_owner(
+        repo_id: int,
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+    ) -> User:
+        from utils.permission_utils import require_repository_owner_or_admin_sync
+        require_repository_owner_or_admin_sync(
+            db, repo_id, current_user.id, action_description
+        )
+        return current_user
+    return check_owner
