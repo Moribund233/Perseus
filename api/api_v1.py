@@ -6,7 +6,8 @@ API v1 路由统一注册模块
 from fastapi import APIRouter
 
 # 创建 v1 路由主路由器
-api_v1_router = APIRouter(prefix="/api", tags=["api-v1"])
+# 注意：各个控制器已经包含 "/api" 前缀，这里不再添加前缀
+api_v1_router = APIRouter(tags=["api-v1"])
 
 # 导入并注册各模块路由
 # 注意：repository_browser 需要在 repository 之前注册，避免路由冲突
