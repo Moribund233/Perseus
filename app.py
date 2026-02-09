@@ -84,46 +84,9 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
             "service": config.app.title
         }
 
-    # 包含API路由
-    from api.user import router as user_router
-    app.include_router(user_router)
-
-    # 包含仓库代码浏览路由（必须在 repository_router 之前注册）
-    from api.repository_browser import router as browser_router
-    app.include_router(browser_router)
-
-    # 包含仓库相关API路由
-    from api.repository import router as repository_router
-    app.include_router(repository_router)
-
-    from api.repository_member import router as repository_member_router
-    app.include_router(repository_member_router)
-
-    from api.branch import router as branch_router
-    app.include_router(branch_router)
-
-    from api.commit import router as commit_router
-    app.include_router(commit_router)
-
-    # 包含错误API路由
-    from api.error import router as error_router
-    app.include_router(error_router)
-
-    # 包含WebSocket路由
-    from api.websocket import router as websocket_router
-    app.include_router(websocket_router)
-
-    # 包含Git HTTP协议路由
-    from api.git_http import router as git_http_router
-    app.include_router(git_http_router)
-
-    # 包含Pull Request路由
-    from controller.pull_request_controller import router as pr_router
-    app.include_router(pr_router)
-
-    # 包含Issue路由
-    from controller.issue_controller import router as issue_router
-    app.include_router(issue_router)
+    # 包含所有 API v1 路由
+    from api.api_v1 import api_v1_router
+    app.include_router(api_v1_router)
 
     # 设置全局异常处理器（必须在路由注册之后设置，确保能捕获所有异常）
     from utils.exception_handler import setup_exception_handlers
