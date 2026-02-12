@@ -350,7 +350,7 @@ async def git_head(
     # 检查读取权限
     check_read_permission(repo_path, user, db)
 
-    from client.utils.git_utils import get_repository_storage_path
+    from utils.git_utils import get_repository_storage_path
     import os
 
     physical_path = get_repository_storage_path(repo_path)
@@ -407,7 +407,7 @@ async def git_objects(
     # 检查读取权限
     check_read_permission(repo_path, user, db)
 
-    from client.utils.git_utils import get_repository_storage_path
+    from utils.git_utils import get_repository_storage_path
     import os
     import zlib
 

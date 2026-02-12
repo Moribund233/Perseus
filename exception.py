@@ -264,3 +264,43 @@ class InvalidPathException(RepositoryBrowserException):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=detail
         )
+
+
+class AppServiceException(BaseException):
+    """
+    应用服务异常
+
+    用于处理应用服务层操作失败的情况
+    """
+    def __init__(self, detail: str = "App Service Error"):
+        """
+        初始化应用服务异常
+
+        Args:
+            detail: 错误详情
+        """
+        super().__init__(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=detail
+        )
+
+
+class ConfigValidationException(AppServiceException):
+    """
+    配置验证异常
+
+    用于处理配置数据验证失败的情况
+    """
+    def __init__(self, detail: str = "Config Validation Error"):
+        """
+        初始化配置验证异常
+
+        Args:
+            detail: 错误详情
+        """
+        # 直接调用 BaseException 以设置正确的状态码
+        BaseException.__init__(
+            self,
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=detail
+        )

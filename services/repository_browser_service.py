@@ -13,7 +13,7 @@ from datetime import datetime
 
 import pygit2
 
-from client.utils.git_utils import repo_exists
+from utils.git_utils import repo_exists
 from exception import (
     NotFoundException,
     ValidationException,

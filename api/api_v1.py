@@ -10,6 +10,10 @@ from fastapi import APIRouter
 api_v1_router = APIRouter(tags=["api-v1"])
 
 # 导入并注册各模块路由
+# 注意：app_controller 需要最先注册，因为它包含根路由 "/"
+from controller.app_controller import router as app_router
+api_v1_router.include_router(app_router)
+
 # 注意：repository_browser 需要在 repository 之前注册，避免路由冲突
 from controller.repository_browser_controller import router as repository_browser_router
 api_v1_router.include_router(repository_browser_router)

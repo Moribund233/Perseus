@@ -1,6 +1,4 @@
-import sys
 import os
-from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from init import init_app
@@ -65,26 +63,7 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
             allow_headers=["Content-Type", "Authorization"],  # 限制允许的请求头
         )
 
-    # 根路由
-    @app.get("/")
-    async def root():
-        return {
-            "message": "Welcome to LanGit API",
-            "title": config.app.title,
-            "version": config.app.version,
-            "status": "running"
-        }
-
-    # 健康检查路由
-    @app.get("/health")
-    async def health_check():
-        return {
-            "status": "healthy",
-            "timestamp": datetime.now().isoformat(),
-            "service": config.app.title
-        }
-
-    # 包含所有 API v1 路由
+    # 包含所有 API v1 路由（包括根路由、健康检查、应用管理等）
     from api.api_v1 import api_v1_router
     app.include_router(api_v1_router)
 
@@ -176,7 +155,7 @@ def start_server():
         # 开发环境：Uvicorn
         print("Using Uvicorn (development mode)")
         uvicorn.run(
-            "app:app",
+            app,
             host=config.server.host,
             port=config.server.port,
             reload=config.server.reload,
@@ -222,7 +201,7 @@ def start_server():
         # 回退到 Uvicorn
         print("Using Uvicorn (production mode)")
         uvicorn.run(
-            "app:app",
+            app,
             host=config.server.host,
             port=config.server.port,
             log_level=config.server.log_level,

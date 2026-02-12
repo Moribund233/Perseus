@@ -36,16 +36,17 @@ def generate_default_config() -> Dict[str, Any]:
     default_config = Config()
     config_dict = default_config.model_dump()
 
+    # 默认配置：禁用 reload（避免打包后反复重启）
+    config_dict["server"]["workers"] = 1
+    config_dict["server"]["reload"] = False
+
     if sys.platform == "win32":
-        config_dict["server"]["workers"] = 1
-        config_dict["server"]["reload"] = True
         # Windows下将install_path转换为绝对路径
         install_path = config_dict["nginx"].get("install_path", "nginx")
         if install_path:
             config_dict["nginx"]["install_path"] = os.path.abspath(install_path)
     else:
         config_dict["server"]["workers"] = min(4, os.cpu_count() or 2)
-        config_dict["server"]["reload"] = False
         # Linux下install_path不使用，设置为空字符串
         config_dict["nginx"]["install_path"] = ""
 

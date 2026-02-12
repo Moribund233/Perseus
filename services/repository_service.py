@@ -12,7 +12,7 @@ from models import Repository
 from models.branch import Branch
 from models.repository_member import RepositoryMember
 from exception import ValidationException, NotFoundException, ConflictException
-from client.utils.git_utils import init_bare_repo, get_repository_storage_path, repo_exists, GitError
+from utils.git_utils import init_bare_repo, get_repository_storage_path, repo_exists, GitError
 from utils.response_builder import build_repo_response
 from utils.db_utils import exists
 

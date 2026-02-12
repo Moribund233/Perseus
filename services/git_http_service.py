@@ -14,7 +14,7 @@ import pygit2
 from exception import NotFoundException, AuthorizationException
 from models import Repository, User
 from models.repository_member import RepositoryMember
-from client.utils.git_utils import get_repository_storage_path, repo_exists
+from utils.git_utils import get_repository_storage_path, repo_exists
 
 
 class GitHttpError(Exception):

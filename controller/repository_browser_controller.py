@@ -19,7 +19,7 @@ from services.repository_browser_service import (
     get_commits,
     get_diff
 )
-from client.utils.git_utils import get_repository_storage_path
+from utils.git_utils import get_repository_storage_path
 from exception import NotFoundException
 
 # 创建路由实例
