@@ -5,6 +5,24 @@
       <h1 class="error-code">{{ errorCode }}</h1>
       <h2 class="error-title">{{ errorTitle }}</h2>
       <p class="error-message">{{ errorMessage }}</p>
+      
+      <!-- 显示详细信息（调试模式或认证用户） -->
+      <div v-if="errorDetails || errorTraceback" class="error-details">
+        <h3>错误详情</h3>
+        <div v-if="errorDetails" class="detail-section">
+          <h4>详细信息</h4>
+          <pre>{{ errorDetails }}</pre>
+        </div>
+        <div v-if="errorTraceback" class="detail-section">
+          <h4>堆栈跟踪</h4>
+          <pre>{{ errorTraceback }}</pre>
+        </div>
+        <div v-if="requestId" class="detail-section">
+          <h4>请求ID</h4>
+          <p class="request-id">{{ requestId }}</p>
+        </div>
+      </div>
+      
       <div class="error-actions">
         <button @click="goHome" class="btn btn-primary">
           返回首页
@@ -15,10 +33,9 @@
         <button @click="reloadPage" class="btn btn-secondary">
           刷新页面
         </button>
-      </div>
-      <div v-if="errorDetails" class="error-details">
-        <h3>错误详情</h3>
-        <pre>{{ errorDetails }}</pre>
+        <button v-if="canReport" @click="reportError" class="btn btn-warning">
+          报告错误
+        </button>
       </div>
     </div>
   </div>
@@ -36,6 +53,11 @@ const errorCode = ref<number>(404);
 const errorTitle = ref<string>('页面未找到');
 const errorMessage = ref<string>('抱歉，您访问的页面不存在或已被删除');
 const errorDetails = ref<string | null>(null);
+const errorTraceback = ref<string | null>(null);
+const errorType = ref<string>('NotFoundError');
+const requestId = ref<string | null>(null);
+const errorPath = ref<string | null>(null);
+const canReport = ref<boolean>(false);
 
 // 计算错误图标
 const errorIcon = computed(() => {
@@ -65,92 +87,125 @@ const errorIcon = computed(() => {
   }
 });
 
-// 从路由参数中获取错误信息
+// 从后端获取错误信息
+const fetchErrorInfo = async (code: number, message?: string, type?: string, details?: string, reqId?: string) => {
+  try {
+    const params = new URLSearchParams();
+    if (message) params.append('message', message);
+    if (type) params.append('error_type', type);
+    if (details) params.append('details', details);
+    if (reqId) params.append('request_id', reqId);
+    
+    const response = await fetch(`/api/errors/info/${code}?${params.toString()}`);
+    
+    if (response.ok) {
+      const data = await response.json();
+      errorCode.value = data.code || code;
+      errorMessage.value = data.message || message || getDefaultMessage(code);
+      errorType.value = data.type || type || 'UnknownError';
+      errorDetails.value = data.details || null;
+      errorTraceback.value = data.traceback || null;
+      requestId.value = data.request_id || reqId || null;
+      errorPath.value = data.path || null;
+      
+      // 如果有详细信息或堆栈跟踪，允许报告错误
+      canReport.value = !!(data.details || data.traceback);
+    } else {
+      // 使用默认错误信息
+      setDefaultErrorInfo(code, message);
+    }
+  } catch (error) {
+    console.error('Failed to fetch error info:', error);
+    setDefaultErrorInfo(code, message);
+  }
+  
+  // 设置错误标题
+  setErrorTitle();
+};
+
+// 设置默认错误信息
+const setDefaultErrorInfo = (code: number, message?: string) => {
+  errorCode.value = code;
+  errorMessage.value = message || getDefaultMessage(code);
+  canReport.value = false;
+};
+
+// 获取默认错误消息
+const getDefaultMessage = (code: number): string => {
+  const messages: Record<number, string> = {
+    400: '您的请求无效，请检查后重试',
+    401: '您需要登录才能访问此页面',
+    403: '您没有权限访问此页面',
+    404: '抱歉，您访问的页面不存在或已被删除',
+    408: '服务器响应超时，请稍后重试',
+    409: '请求的资源存在冲突，请检查后重试',
+    500: '服务器内部错误，请稍后重试',
+    502: '网关错误，请稍后重试',
+    503: '服务暂时不可用，请稍后重试',
+    504: '网关超时，请稍后重试'
+  };
+  return messages[code] || '发生了未知错误，请稍后重试';
+};
+
+// 设置错误标题
+const setErrorTitle = () => {
+  const titles: Record<number, string> = {
+    400: '请求错误',
+    401: '未授权',
+    403: '禁止访问',
+    404: '页面未找到',
+    408: '请求超时',
+    409: '资源冲突',
+    500: '服务器错误',
+    502: '网关错误',
+    503: '服务不可用',
+    504: '网关超时'
+  };
+  errorTitle.value = titles[errorCode.value] || '未知错误';
+};
+
+// 从路由参数中加载错误信息
 const loadErrorInfo = () => {
-  const code = route.params.code as string;
+  const code = parseInt(route.params.code as string, 10) || 404;
   const message = route.params.message as string;
   const details = route.params.details as string;
+  const type = route.params.type as string;
+  const reqId = route.params.request_id as string;
   
-  if (code) {
-    errorCode.value = parseInt(code, 10);
-  }
-  
-  if (message) {
-    errorMessage.value = message;
-  }
-  
-  if (details) {
-    errorDetails.value = decodeURIComponent(details);
-  }
-  
-  // 根据错误码设置默认标题和消息
-  switch (errorCode.value) {
-    case 400:
-      errorTitle.value = '请求错误';
-      if (!message) {
-        errorMessage.value = '您的请求无效，请检查后重试';
-      }
-      break;
-    case 401:
-      errorTitle.value = '未授权';
-      if (!message) {
-        errorMessage.value = '您需要登录才能访问此页面';
-      }
-      break;
-    case 403:
-      errorTitle.value = '禁止访问';
-      if (!message) {
-        errorMessage.value = '您没有权限访问此页面';
-      }
-      break;
-    case 404:
-      errorTitle.value = '页面未找到';
-      if (!message) {
-        errorMessage.value = '抱歉，您访问的页面不存在或已被删除';
-      }
-      break;
-    case 408:
-      errorTitle.value = '请求超时';
-      if (!message) {
-        errorMessage.value = '服务器响应超时，请稍后重试';
-      }
-      break;
-    case 409:
-      errorTitle.value = '资源冲突';
-      if (!message) {
-        errorMessage.value = '请求的资源存在冲突，请检查后重试';
-      }
-      break;
-    case 500:
-      errorTitle.value = '服务器错误';
-      if (!message) {
-        errorMessage.value = '服务器内部错误，请稍后重试';
-      }
-      break;
-    case 502:
-      errorTitle.value = '网关错误';
-      if (!message) {
-        errorMessage.value = '网关错误，请稍后重试';
-      }
-      break;
-    case 503:
-      errorTitle.value = '服务不可用';
-      if (!message) {
-        errorMessage.value = '服务暂时不可用，请稍后重试';
-      }
-      break;
-    case 504:
-      errorTitle.value = '网关超时';
-      if (!message) {
-        errorMessage.value = '网关超时，请稍后重试';
-      }
-      break;
-    default:
-      errorTitle.value = '未知错误';
-      if (!message) {
-        errorMessage.value = '发生了未知错误，请稍后重试';
-      }
-      break;
+  // 获取错误信息（优先从后端获取）
+  fetchErrorInfo(code, message, type, details, reqId);
+};
+
+// 报告错误
+const reportError = async () => {
+  try {
+    const errorData = {
+      code: errorCode.value,
+      type: errorType.value,
+      message: errorMessage.value,
+      details: errorDetails.value,
+      traceback: errorTraceback.value,
+      path: errorPath.value || window.location.href,
+      timestamp: new Date().toISOString()
+    };
+    
+    const response = await fetch('/api/errors/report', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(errorData)
+    });
+    
+    if (response.ok) {
+      alert('错误已报告，感谢您的反馈！');
+      canReport.value = false;
+    } else {
+      alert('报告错误失败，请稍后重试。');
+    }
+  } catch (error) {
+    console.error('Failed to report error:', error);
+    alert('报告错误失败，请检查网络连接。');
   }
 };
 
@@ -196,7 +251,7 @@ onMounted(() => {
   padding: 40px;
   border-radius: 12px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  max-width: 600px;
+  max-width: 800px;
   width: 100%;
 }
 
@@ -270,8 +325,19 @@ onMounted(() => {
   box-shadow: 0 2px 4px rgba(144, 147, 153, 0.3);
 }
 
+.btn-warning {
+  background-color: #e6a23c;
+  color: white;
+}
+
+.btn-warning:hover {
+  background-color: #ebb563;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(230, 162, 60, 0.3);
+}
+
 .error-details {
-  margin-top: 30px;
+  margin: 30px 0;
   text-align: left;
   background-color: #f5f7fa;
   padding: 20px;
@@ -280,13 +346,29 @@ onMounted(() => {
 }
 
 .error-details h3 {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
-  margin: 0 0 15px;
+  margin: 0 0 20px;
   color: #333;
+  text-align: center;
 }
 
-.error-details pre {
+.detail-section {
+  margin-bottom: 20px;
+}
+
+.detail-section:last-child {
+  margin-bottom: 0;
+}
+
+.detail-section h4 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 10px;
+  color: #555;
+}
+
+.detail-section pre {
   margin: 0;
   padding: 15px;
   background-color: #282c34;
@@ -295,6 +377,18 @@ onMounted(() => {
   overflow-x: auto;
   font-size: 14px;
   line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.request-id {
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  color: #666;
+  background-color: #e4e7ed;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 0;
 }
 
 /* 响应式设计 */
@@ -327,6 +421,15 @@ onMounted(() => {
   .btn {
     width: 100%;
     max-width: 200px;
+  }
+  
+  .error-details {
+    padding: 15px;
+  }
+  
+  .detail-section pre {
+    font-size: 12px;
+    padding: 10px;
   }
 }
 </style>

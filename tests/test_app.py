@@ -87,7 +87,15 @@ def test_health_check():
 def test_cors_headers():
     """
     测试CORS头
+    
+    注意：如果配置中启用了Nginx代理，FastAPI的CORS中间件会被禁用，
+    此时CORS头由Nginx处理，测试会跳过CORS验证
     """
+    from config import get_config
+    
+    # 获取配置
+    config = get_config()
+    
     # 创建应用和测试客户端
     app = create_app()
     client = TestClient(app)
@@ -95,14 +103,21 @@ def test_cors_headers():
     # 发送带有Origin头的请求
     response = client.get("/", headers={"Origin": "http://localhost:3000"})
     
-    # 验证CORS头
+    # 验证响应状态
     assert response.status_code == 200
-    assert "access-control-allow-origin" in response.headers
-    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
     
-    # 发送带有不允许的Origin头的请求
-    response = client.get("/", headers={"Origin": "http://example.com"})
-    
-    # 验证没有CORS头
-    assert response.status_code == 200
-    assert "access-control-allow-origin" not in response.headers
+    # 如果Nginx代理未启用，验证FastAPI的CORS头
+    if not config.nginx.proxy:
+        assert "access-control-allow-origin" in response.headers
+        assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+        
+        # 发送带有不允许的Origin头的请求
+        response = client.get("/", headers={"Origin": "http://example.com"})
+        
+        # 验证没有CORS头
+        assert response.status_code == 200
+        assert "access-control-allow-origin" not in response.headers
+    else:
+        # Nginx代理模式下，CORS由Nginx处理，FastAPI不添加CORS头
+        # 这种情况下只验证响应成功即可
+        pass

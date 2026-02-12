@@ -92,17 +92,6 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     from utils.exception_handler import setup_exception_handlers
     setup_exception_handlers(app)
 
-    # 生产环境：禁用错误测试端点
-    if not config.app.debug:
-        # 移除错误测试路由，防止信息泄露
-        routes_to_remove = []
-        for route in app.routes:
-            if hasattr(route, 'path') and route.path.startswith('/api/errors'):
-                routes_to_remove.append(route)
-        for route in routes_to_remove:
-            app.routes.remove(route)
-        print("[INFO] 生产环境：已禁用错误测试端点 (/api/errors/*)")
-
     return app
 
 
@@ -164,135 +153,84 @@ def get_app(config_path: str = "config.toml") -> FastAPI:
 app = get_app()
 
 
-def run_uvicorn():
+def start_server():
     """
-    使用Uvicorn启动服务器（开发环境）
-    开发环境始终使用1个worker，不需要多进程
+    启动 Web 服务器
     
-    注意：不再支持direct_mode，统一使用子进程方式启动服务
-    通过进程ID跟踪实现可靠的服务管理
+    根据 config.app.debug 自动选择服务器：
+    - debug=True: Uvicorn（开发环境，支持热重载）
+    - debug=False: Gunicorn+Uvicorn（生产环境，Linux）
+    
+    回退机制：Windows/Gunicorn未安装/启动失败时自动使用Uvicorn
     """
     import uvicorn
-    import os
-    import sys
     
-    # 获取配置
     config = get_config()
+    debug = config.app.debug
     
-    # 记录当前进程ID，便于后续管理
-    current_pid = os.getpid()
-    print(f"[INFO] App main process started with PID: {current_pid}")
+    print(f"Starting {config.app.title} v{config.app.version}...")
+    print(f"Environment: {'Development' if debug else 'Production'}")
+    print(f"Server: http://{config.server.host}:{config.server.port}")
     
-    # 启动Uvicorn服务器（开发环境始终使用1个worker）
-    # 注意：在主进程中可以使用reload模式，在子进程中会自动禁用
-    uvicorn.run(
-        "app:app",
-        host=config.server.host,
-        port=config.server.port,
-        reload=config.server.reload,
-        log_level=config.server.log_level,
-        workers=1,  # 开发环境不需要多进程
-        reload_excludes=["frontend/**"]  # 排除前端目录，避免前端更改时后端频繁重载
-    )
-
-
-def run_gunicorn():
-    """
-    使用Gunicorn + Uvicorn Workers启动服务器（生产环境，仅Linux）
-    
-    回退机制：
-    1. Windows系统：自动回退到Uvicorn
-    2. Gunicorn未安装：自动回退到Uvicorn
-    3. Gunicorn启动失败：自动回退到Uvicorn
-    """
-    try:
-        import gunicorn.app.base
+    if debug:
+        # 开发环境：Uvicorn
+        print("Using Uvicorn (development mode)")
+        uvicorn.run(
+            "app:app",
+            host=config.server.host,
+            port=config.server.port,
+            reload=config.server.reload,
+            log_level=config.server.log_level,
+            workers=1,
+            reload_excludes=["frontend/**"]
+        )
+    else:
+        # 生产环境：尝试 Gunicorn
+        is_windows = config.system and config.system.platform == "win32"
         
-        # 获取配置
-        config = get_config()
-        
-        # 检查是否在Windows系统上（使用配置中的系统信息）
-        if config.system and config.system.platform == "win32":
-            print("Gunicorn is not supported on Windows. Falling back to Uvicorn...")
-            run_uvicorn()
-            return
-        
-        class GunicornApp(gunicorn.app.base.BaseApplication):
-            """
-            自定义Gunicorn应用类
-            """
-            
-            def __init__(self, app, options=None):
-                """
-                初始化Gunicorn应用
+        if not is_windows:
+            try:
+                import gunicorn.app.base
                 
-                Args:
-                    app: FastAPI应用实例
-                    options: Gunicorn配置选项
-                """
-                self.options = options or {}
-                self.application = app
-                super().__init__()
-            
-            def load_config(self):
-                """
-                加载Gunicorn配置
-                """
-                for key, value in self.options.items():
-                    if key in self.cfg.settings and value is not None:
-                        self.cfg.set(key.lower(), value)
-            
-            def load(self):
-                """
-                加载FastAPI应用
+                class GunicornApp(gunicorn.app.base.BaseApplication):
+                    def __init__(self, app, options=None):
+                        self.options = options or {}
+                        self.application = app
+                        super().__init__()
+                    def load_config(self):
+                        for key, value in self.options.items():
+                            if key in self.cfg.settings and value is not None:
+                                self.cfg.set(key.lower(), value)
+                    def load(self):
+                        return self.application
                 
-                Returns:
-                    FastAPI: FastAPI应用实例
-                """
-                return self.application
+                print("Using Gunicorn + Uvicorn Workers (production mode)")
+                GunicornApp(app, {
+                    "bind": f"{config.server.host}:{config.server.port}",
+                    "workers": config.server.workers,
+                    "worker_class": "uvicorn.workers.UvicornWorker",
+                    "loglevel": config.server.log_level,
+                    "accesslog": "-",
+                    "errorlog": "-",
+                }).run()
+                return
+            except ImportError:
+                print("Gunicorn not found, using Uvicorn instead...")
+            except Exception as e:
+                print(f"Gunicorn failed ({e}), using Uvicorn instead...")
         
-        # Gunicorn配置选项
-        options = {
-            "bind": f"{config.server.host}:{config.server.port}",
-            "workers": config.server.workers,
-            "worker_class": "uvicorn.workers.UvicornWorker",
-            "loglevel": config.server.log_level,
-            "accesslog": "-",
-            "errorlog": "-",
-        }
-        
-        # 启动Gunicorn服务器
-        GunicornApp(app, options).run()
-    except ImportError:
-        print("Gunicorn library not found. Falling back to Uvicorn...")
-        run_uvicorn()
-    except Exception as e:
-        print(f"Failed to start Gunicorn server: {e}. Falling back to Uvicorn...")
-        run_uvicorn()
+        # 回退到 Uvicorn
+        print("Using Uvicorn (production mode)")
+        uvicorn.run(
+            "app:app",
+            host=config.server.host,
+            port=config.server.port,
+            log_level=config.server.log_level,
+            workers=config.server.workers
+        )
 
 
 if __name__ == "__main__":
-    """
-    主函数入口
-    
-    根据配置文件中的debug配置项决定服务器类型：
-    1. DEBUG=True：使用Uvicorn启动（开发环境）
-    2. DEBUG=False：使用Gunicorn启动（生产环境，仅Linux）
-    """
-    # 初始化应用（只在主进程中执行一次）
+    """主函数入口"""
     init_app()
-    
-    # 获取配置
-    config = get_config()
-    
-    print(f"Starting {config.app.title} v{config.app.version}...")
-    print(f"Environment: {'Development' if config.app.debug else 'Production'}")
-    print(f"Server: http://{config.server.host}:{config.server.port}")
-    print(f"Log Level: {config.server.log_level}")
-    
-    if config.app.debug:
-        print("Using Uvicorn server (development mode)")
-        run_uvicorn()
-    else:
-        print("Using Gunicorn + Uvicorn Workers server (production mode)")
-        run_gunicorn()
+    start_server()

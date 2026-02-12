@@ -14,27 +14,13 @@ from datetime import datetime
 import pygit2
 
 from client.utils.git_utils import repo_exists
-from exception import NotFoundException, ValidationException
-
-
-class RepositoryBrowserError(Exception):
-    """仓库浏览错误基类"""
-    pass
-
-
-class RepositoryNotFoundError(RepositoryBrowserError):
-    """仓库不存在错误"""
-    pass
-
-
-class PathNotFoundError(RepositoryBrowserError):
-    """路径不存在错误"""
-    pass
-
-
-class InvalidPathError(RepositoryBrowserError):
-    """无效路径错误"""
-    pass
+from exception import (
+    NotFoundException,
+    ValidationException,
+    RepositoryNotFoundException,
+    PathNotFoundException,
+    InvalidPathException
+)
 
 
 def _get_repo(repo_path: str) -> pygit2.Repository:
@@ -48,15 +34,15 @@ def _get_repo(repo_path: str) -> pygit2.Repository:
         pygit2.Repository: 仓库对象
         
     Raises:
-        RepositoryNotFoundError: 仓库不存在或无法打开
+        RepositoryNotFoundException: 仓库不存在或无法打开
     """
     if not repo_exists(repo_path):
-        raise RepositoryNotFoundError(f"Repository not found: {repo_path}")
-    
+        raise RepositoryNotFoundException(f"Repository not found: {repo_path}")
+
     try:
         return pygit2.Repository(repo_path)
     except Exception as e:
-        raise RepositoryNotFoundError(f"Failed to open repository: {e}")
+        raise RepositoryNotFoundException(f"Failed to open repository: {e}")
 
 
 def _resolve_ref(repo: pygit2.Repository, ref: str) -> pygit2.Commit:
@@ -71,7 +57,7 @@ def _resolve_ref(repo: pygit2.Repository, ref: str) -> pygit2.Commit:
         pygit2.Commit: 提交对象
         
     Raises:
-        PathNotFoundError: 引用不存在
+        PathNotFoundException: 引用不存在
     """
     try:
         # 尝试直接解析为提交
@@ -81,7 +67,7 @@ def _resolve_ref(repo: pygit2.Repository, ref: str) -> pygit2.Commit:
         try:
             return repo.revparse_single(f"refs/heads/{ref}").peel(pygit2.Commit)
         except (KeyError, ValueError):
-            raise PathNotFoundError(f"Ref not found: {ref}")
+            raise PathNotFoundException(f"Ref not found: {ref}")
 
 
 def _get_tree(repo: pygit2.Repository, commit: pygit2.Commit, path: str = "") -> pygit2.Tree:
@@ -97,20 +83,20 @@ def _get_tree(repo: pygit2.Repository, commit: pygit2.Commit, path: str = "") ->
         pygit2.Tree: 树对象
         
     Raises:
-        PathNotFoundError: 路径不存在
-        InvalidPathError: 路径不是目录
+        PathNotFoundException: 路径不存在
+        InvalidPathException: 路径不是目录
     """
     if not path:
         return commit.tree
-    
+
     try:
         entry = commit.tree[path]
         if entry.type == pygit2.GIT_OBJECT_TREE:
             return repo[entry.id]
         else:
-            raise InvalidPathError(f"'{path}' is not a directory")
+            raise InvalidPathException(f"'{path}' is not a directory")
     except KeyError:
-        raise PathNotFoundError(f"Path not found: {path}")
+        raise PathNotFoundException(f"Path not found: {path}")
 
 
 def get_tree_entries(
@@ -130,9 +116,9 @@ def get_tree_entries(
         dict: 包含路径列表和条目列表的字典
         
     Raises:
-        RepositoryNotFoundError: 仓库不存在
-        PathNotFoundError: 引用或路径不存在
-        InvalidPathError: 路径不是目录
+        RepositoryNotFoundException: 仓库不存在
+        PathNotFoundException: 引用或路径不存在
+        InvalidPathException: 路径不是目录
     """
     repo = _get_repo(repo_path)
     commit = _resolve_ref(repo, ref)
@@ -191,12 +177,12 @@ def get_blob_content(
         dict: 包含文件内容的字典
         
     Raises:
-        RepositoryNotFoundError: 仓库不存在
-        PathNotFoundError: 引用或文件不存在
-        InvalidPathError: 路径是目录或不是有效文件
+        RepositoryNotFoundException: 仓库不存在
+        PathNotFoundException: 引用或文件不存在
+        InvalidPathException: 路径是目录或不是有效文件
     """
     if not path:
-        raise InvalidPathError("Path is required")
+        raise InvalidPathException("Path is required")
     
     repo = _get_repo(repo_path)
     commit = _resolve_ref(repo, ref)
@@ -204,13 +190,13 @@ def get_blob_content(
     try:
         entry = commit.tree[path]
     except KeyError:
-        raise PathNotFoundError(f"File not found: {path}")
-    
+        raise PathNotFoundException(f"File not found: {path}")
+
     if entry.type == pygit2.GIT_OBJECT_TREE:
-        raise InvalidPathError(f"'{path}' is a directory, not a file")
+        raise InvalidPathException(f"'{path}' is a directory, not a file")
 
     if entry.type != pygit2.GIT_OBJECT_BLOB:
-        raise InvalidPathError(f"'{path}' is not a valid file")
+        raise InvalidPathException(f"'{path}' is not a valid file")
     
     blob = repo[entry.id]
     
@@ -255,8 +241,8 @@ def get_commits(
         dict: 包含提交列表和分页信息的字典
         
     Raises:
-        RepositoryNotFoundError: 仓库不存在
-        PathNotFoundError: 引用不存在
+        RepositoryNotFoundException: 仓库不存在
+        PathNotFoundException: 引用不存在
     """
     repo = _get_repo(repo_path)
     commit = _resolve_ref(repo, ref)
@@ -321,12 +307,12 @@ def get_diff(
         dict: 包含差异信息的字典
         
     Raises:
-        RepositoryNotFoundError: 仓库不存在
-        PathNotFoundError: 提交不存在
-        InvalidPathError: 无效的提交
+        RepositoryNotFoundException: 仓库不存在
+        PathNotFoundException: 提交不存在
+        InvalidPathException: 无效的提交
     """
     if not head:
-        raise InvalidPathError("Head commit is required")
+        raise InvalidPathException("Head commit is required")
     
     repo = _get_repo(repo_path)
     

@@ -29,10 +29,10 @@ from services.repository_browser_service import (
     get_tree_entries,
     get_blob_content,
     get_commits,
-    get_diff,
-    RepositoryBrowserError
+    get_diff
 )
-from client.utils.git_utils import init_bare_repo, get_repository_storage_path
+from exception import RepositoryBrowserException
+from utils.git_utils import init_bare_repo, get_repository_storage_path
 
 
 # ==================== Fixtures ====================
@@ -154,21 +154,21 @@ class TestGetTreeEntries:
     
     def test_get_tree_with_nonexistent_path(self, sample_bare_repo):
         """测试获取不存在的路径"""
-        with pytest.raises(RepositoryBrowserError) as exc_info:
+        with pytest.raises(RepositoryBrowserException) as exc_info:
             get_tree_entries(sample_bare_repo, ref="master", path="nonexistent")
-        
+
         assert "not found" in str(exc_info.value).lower()
-    
+
     def test_get_tree_with_nonexistent_ref(self, sample_bare_repo):
         """测试获取不存在的分支"""
-        with pytest.raises(RepositoryBrowserError) as exc_info:
+        with pytest.raises(RepositoryBrowserException) as exc_info:
             get_tree_entries(sample_bare_repo, ref="nonexistent-branch", path="")
-        
+
         assert "not found" in str(exc_info.value).lower()
-    
+
     def test_get_tree_with_invalid_repo(self):
         """测试无效的仓库路径"""
-        with pytest.raises(RepositoryBrowserError):
+        with pytest.raises(RepositoryBrowserException):
             get_tree_entries("/invalid/path", ref="master", path="")
     
     def test_tree_entry_structure(self, sample_bare_repo):
@@ -215,16 +215,16 @@ class TestGetBlobContent:
     
     def test_get_nonexistent_file(self, sample_bare_repo):
         """测试获取不存在的文件"""
-        with pytest.raises(RepositoryBrowserError) as exc_info:
+        with pytest.raises(RepositoryBrowserException) as exc_info:
             get_blob_content(sample_bare_repo, ref="master", path="nonexistent.py")
-        
+
         assert "not found" in str(exc_info.value).lower()
-    
+
     def test_get_directory_as_file(self, sample_bare_repo):
         """测试将目录作为文件获取"""
-        with pytest.raises(RepositoryBrowserError) as exc_info:
+        with pytest.raises(RepositoryBrowserException) as exc_info:
             get_blob_content(sample_bare_repo, ref="master", path="src")
-        
+
         assert "is a directory" in str(exc_info.value).lower() or "not a file" in str(exc_info.value).lower()
 
 
@@ -261,7 +261,7 @@ class TestGetCommits:
     
     def test_get_commits_with_nonexistent_ref(self, sample_bare_repo):
         """测试获取不存在的分支提交"""
-        with pytest.raises(RepositoryBrowserError):
+        with pytest.raises(RepositoryBrowserException):
             get_commits(sample_bare_repo, ref="nonexistent-branch")
 
 
@@ -286,5 +286,5 @@ class TestGetDiff:
     
     def test_get_diff_with_nonexistent_commit(self, sample_bare_repo):
         """测试获取不存在的提交差异"""
-        with pytest.raises(RepositoryBrowserError):
+        with pytest.raises(RepositoryBrowserException):
             get_diff(sample_bare_repo, base="invalid", head="also-invalid")

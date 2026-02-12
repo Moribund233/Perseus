@@ -21,7 +21,7 @@ import stat
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from client.utils.git_utils import (
+from utils.git_utils import (
     init_bare_repo,
     repo_exists,
     get_repo_info,

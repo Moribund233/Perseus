@@ -33,7 +33,7 @@ from models.db import get_db
 from models.user import User
 from models.repository import Repository
 from app import create_app
-from client.utils.git_utils import init_bare_repo, get_repository_storage_path
+from utils.git_utils import init_bare_repo, get_repository_storage_path
 
 TEST_DATABASE_URL = "sqlite:///./test_physical_repo.db"
 engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})

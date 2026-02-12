@@ -30,7 +30,7 @@ from sqlalchemy.orm import sessionmaker
 from models.base import Base
 from models.db import get_db
 from app import create_app
-from client.utils.git_utils import init_bare_repo, get_repository_storage_path
+from utils.git_utils import init_bare_repo, get_repository_storage_path
 
 
 # 测试数据库配置

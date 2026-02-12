@@ -37,7 +37,7 @@ from sqlalchemy.orm import sessionmaker
 from models.base import Base
 from models.db import get_db
 from app import create_app
-from client.utils.git_utils import get_repository_storage_path, init_bare_repo
+from utils.git_utils import get_repository_storage_path, init_bare_repo
 
 
 # 测试数据库配置
@@ -482,7 +482,7 @@ class TestRepositoryStorageSecurity:
 
     def test_repository_path_normalization(self):
         """测试仓库路径规范化"""
-        from client.utils.git_utils import get_repository_storage_path
+        from utils.git_utils import get_repository_storage_path
 
         # 测试正常路径
         normal_path = get_repository_storage_path("user/repo")
@@ -495,7 +495,7 @@ class TestRepositoryStorageSecurity:
 
     def test_repository_outside_root_not_accessible(self):
         """测试无法访问仓库根目录之外的文件"""
-        from client.utils.git_utils import get_repository_storage_path
+        from utils.git_utils import get_repository_storage_path
 
         # 获取仓库根目录
         repo_root = "./repositories"

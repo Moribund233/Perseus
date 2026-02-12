@@ -33,7 +33,7 @@ from models.base import Base
 from models.db import get_db
 from models import Repository, User, PullRequest, PRComment, PRReview
 from app import create_app
-from client.utils.git_utils import init_bare_repo
+from utils.git_utils import init_bare_repo
 from services.token_service import create_token_pair
 
 
