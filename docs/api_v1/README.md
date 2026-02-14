@@ -39,6 +39,12 @@
 |------|------|
 | [git_http.md](./git_http.md) | Git Smart HTTP 协议（clone/push/pull 命令行操作） |
 
+### 系统管理 API
+
+| 文档 | 描述 |
+|------|------|
+| [app_management.md](./app_management.md) | 应用管理 API（配置管理、健康检查、日志管理、应用控制） |
+
 ### 其他 API
 
 | 模块 | 路径 | 描述 |

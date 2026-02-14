@@ -12,7 +12,7 @@ from typing import Optional
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from utils.logging_utils import get_named_logger, ensure_log_dir
+from utils.logging_utils import get_async_logger, ensure_log_dir
 from utils.security_utils import filter_sensitive_data
 
 
@@ -58,7 +58,7 @@ class AuditLoggerMiddleware(BaseHTTPMiddleware):
         self.log_response_body = log_response_body
         self.exclude_paths = exclude_paths or ["/health", "/docs", "/openapi.json"]
         self.enabled = enabled
-        self._audit_logger = get_named_logger("audit")
+        self._audit_logger = get_async_logger("audit")
 
     def _should_log(self, path: str) -> bool:
         """检查是否应该记录该路径"""

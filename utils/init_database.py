@@ -12,12 +12,12 @@ from sqlalchemy.orm import sessionmaker
 
 # 导入模型
 from models import Base, engine, SessionLocal
-from utils.logging_utils import get_logger
+from utils.logging_utils import get_async_logger
 
 # 密码哈希上下文
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-logger = get_logger("database")
+logger = get_async_logger("database")
 
 
 class DatabaseInitializer:

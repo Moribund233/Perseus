@@ -2,9 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from init import init_app
 from config import get_config
-from utils.logging_utils import get_logger
+from utils.logging_utils import get_async_logger, shutdown_async_logging
 
-logger = get_logger("app")
+logger = get_async_logger("app")
 
 
 def create_app(config_path: str = "config.toml") -> FastAPI:
@@ -216,5 +216,9 @@ def start_server():
 
 if __name__ == "__main__":
     """主函数入口"""
-    init_app()
-    start_server()
+    try:
+        init_app()
+        start_server()
+    finally:
+        # 确保异步日志系统优雅关闭
+        shutdown_async_logging()

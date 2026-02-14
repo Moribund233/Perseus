@@ -20,7 +20,7 @@ from utils.port_utils import (
     check_and_terminate_running_service as _check_and_terminate_service,
     terminate_all_python_services as _terminate_all_services,
 )
-from utils.logging_utils import ensure_log_dir, init_logging, get_logger
+from utils.logging_utils import ensure_log_dir, init_async_logging, get_async_logger, shutdown_async_logging
 
 
 class AppInitializer:
@@ -30,7 +30,7 @@ class AppInitializer:
         self.config_path = config_path
         self.config_manager = ConfigManager(config_path)
         self._utils_config_manager = get_config_manager(config_path)
-        self._logger = get_logger("init")
+        self._logger = get_async_logger("init")
 
     def _gen_default_config(self) -> Dict[str, Any]:
         """生成默认配置"""
@@ -89,14 +89,21 @@ class AppInitializer:
             return False
 
     def _init_logging(self) -> bool:
-        """初始化日志目录和日志系统"""
+        """初始化日志目录和异步日志系统"""
         try:
             log_dir = ensure_log_dir()
-            init_logging(log_dir=str(log_dir), level="info")
+            init_async_logging(
+                log_dir=str(log_dir),
+                app_name="langit",
+                level="info",
+                console_output=True
+            )
             self._logger.info(f"日志目录: {log_dir}")
+            self._logger.info("异步日志系统已启动")
             return True
         except Exception as e:
-            self._logger.error(f"日志初始化失败: {e}")
+            # 使用 print 因为日志可能还未初始化
+            print(f"日志初始化失败: {e}")
             return False
 
     def _check_service_port(self) -> bool:

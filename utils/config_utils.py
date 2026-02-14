@@ -12,9 +12,9 @@ from typing import Any, Dict, List, Optional
 import toml
 
 from config import Config
-from utils.logging_utils import get_logger
+from utils.logging_utils import get_async_logger
 
-logger = get_logger("config")
+logger = get_async_logger("config")
 
 
 def generate_default_config() -> Dict[str, Any]:

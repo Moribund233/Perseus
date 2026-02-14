@@ -5,9 +5,9 @@ WebSocket消息处理器模块
 """
 from api.websocket.handlers import notification, sync, progress
 from api.websocket.manager import manager
-from utils.logging_utils import get_logger
+from utils.logging_utils import get_async_logger
 
-logger = get_logger("websocket")
+logger = get_async_logger("websocket")
 
 
 def register_all_handlers():
