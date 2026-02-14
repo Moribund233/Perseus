@@ -1,8 +1,10 @@
-import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from init import init_app
 from config import get_config
+from utils.logging_utils import get_logger
+
+logger = get_logger("app")
 
 
 def create_app(config_path: str = "config.toml") -> FastAPI:
@@ -27,21 +29,18 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
         redirect_slashes=False,  # 禁用尾部斜杠重定向，避免CORS问题
     )
 
-    # 确保日志目录存在
-    os.makedirs("logs", exist_ok=True)
-
     # 添加安全响应头中间件（最先添加，确保所有响应都包含安全头）
     from middleware.security_headers import SecurityHeadersMiddleware
     # 根据debug配置自动启用HSTS：非debug模式（生产环境）启用HSTS
     enable_hsts = not config.app.debug
-    # 如果启用了Nginx反向代理，让Nginx处理基础安全头，应用只处理HSTS
-    add_security_headers = not config.nginx.proxy
+    # 如果启用了反向代理，让代理服务器处理基础安全头，应用只处理HSTS
+    add_security_headers = not config.proxy.proxy
     app.add_middleware(
         SecurityHeadersMiddleware,
         enable_hsts=enable_hsts,  # 生产环境启用 HSTS，开发环境禁用
         hsts_max_age=31536000,  # HSTS max-age: 1年
         allow_iframe=False,
-        add_security_headers=add_security_headers  # Nginx代理时跳过基础安全头
+        add_security_headers=add_security_headers  # 代理服务器处理时跳过基础安全头
     )
 
     # 添加审计日志中间件
@@ -52,9 +51,9 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     from utils.rate_limiter import setup_rate_limiter
     setup_rate_limiter(app)
 
-    # 根据是否启用Nginx反向代理来决定是否启用CORS中间件
-    if not config.nginx.proxy:
-        # 未启用Nginx反向代理，启用FastAPI的CORS中间件
+    # 根据是否启用反向代理来决定是否启用CORS中间件
+    if not config.proxy.proxy:
+        # 未启用反向代理，启用FastAPI的CORS中间件
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],  # 允许所有来源，生产环境中应该限制为特定域名
@@ -143,17 +142,23 @@ def start_server():
     回退机制：Windows/Gunicorn未安装/启动失败时自动使用Uvicorn
     """
     import uvicorn
+    from utils.port_utils import get_pid_manager
     
     config = get_config()
     debug = config.app.debug
     
-    print(f"Starting {config.app.title} v{config.app.version}...")
-    print(f"Environment: {'Development' if debug else 'Production'}")
-    print(f"Server: http://{config.server.host}:{config.server.port}")
+    # 记录主进程PID（覆盖写模式，新启动自动覆盖旧内容）
+    pid_manager = get_pid_manager()
+    pid_file = pid_manager.write_pid()
+    logger.info(f"PID file created: {pid_file} (PID: {pid_manager.read_pid()})")
     
+    logger.info(f"Starting {config.app.title} v{config.app.version}")
+    logger.info(f"Environment: {'Development' if debug else 'Production'}")
+    logger.info(f"Server: http://{config.server.host}:{config.server.port}")
+
     if debug:
         # 开发环境：Uvicorn
-        print("Using Uvicorn (development mode)")
+        logger.info("Using Uvicorn (development mode)")
         uvicorn.run(
             app,
             host=config.server.host,
@@ -183,7 +188,7 @@ def start_server():
                     def load(self):
                         return self.application
                 
-                print("Using Gunicorn + Uvicorn Workers (production mode)")
+                logger.info("Using Gunicorn + Uvicorn Workers (production mode)")
                 GunicornApp(app, {
                     "bind": f"{config.server.host}:{config.server.port}",
                     "workers": config.server.workers,
@@ -194,12 +199,12 @@ def start_server():
                 }).run()
                 return
             except ImportError:
-                print("Gunicorn not found, using Uvicorn instead...")
+                logger.warning("Gunicorn not found, using Uvicorn instead")
             except Exception as e:
-                print(f"Gunicorn failed ({e}), using Uvicorn instead...")
-        
+                logger.warning(f"Gunicorn failed ({e}), using Uvicorn instead")
+
         # 回退到 Uvicorn
-        print("Using Uvicorn (production mode)")
+        logger.info("Using Uvicorn (production mode)")
         uvicorn.run(
             app,
             host=config.server.host,

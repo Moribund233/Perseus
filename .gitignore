@@ -143,6 +143,7 @@ Thumbs.db
 
 # Custom
 *.log
+*.pid
 nginx/
 repositories/
 

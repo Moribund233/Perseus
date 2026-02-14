@@ -1,125 +1,240 @@
+"""
+异常处理测试模块
+
+测试自定义异常类和异常处理器的功能
+"""
 import pytest
-from fastapi.testclient import TestClient
-from app import create_app
-from app import AppSingleton
-from config import reset_module_config_manager
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+from exception import (
+    BaseException,
+    ValidationException,
+    AuthenticationException,
+    AuthorizationException,
+    NotFoundException,
+    ConflictException,
+    DatabaseException,
+    FileException,
+    RepositoryBrowserException,
+    RepositoryNotFoundException,
+    PathNotFoundException,
+    InvalidPathException,
+)
+from utils.exception_handler import (
+    global_exception_handler,
+    http_exception_handler,
+    validation_exception_handler,
+)
 
 
-@pytest.fixture
-def test_client():
-    """
-    创建测试客户端
-    
-    Yields:
-        TestClient: FastAPI测试客户端
-    """
-    # 重置应用单例和配置管理器
-    app_singleton = AppSingleton()
-    app_singleton.reset()
-    reset_module_config_manager()
-    
-    # 创建应用和测试客户端
-    app = create_app()
-    client = TestClient(app)
-    
-    yield client
+class MockRequest:
+    """模拟请求对象"""
+    def __init__(self):
+        self.state = type('State', (), {})()
 
 
-class TestExceptionHandling:
-    """
-    测试异常处理机制
-    """
-    
-    def test_custom_exception_handling(self, test_client):
-        """
-        测试自定义异常处理
-        """
-        # 使用错误API路由测试各种自定义异常
-        exception_types = [
-            ("validation", 400),  # 实际状态码是400，不是422
-            ("authentication", 401),
-            ("authorization", 403),
-            ("not-found", 404),
-            ("conflict", 409),
-            ("database", 500),
-            ("nginx", 500),
-            ("file", 500)
-        ]
-        
-        for exception_type, expected_status in exception_types:
-            response = test_client.get(f"/api/errors/{exception_type}")
-            
-            # 验证响应状态码
-            assert response.status_code == expected_status
-            
-            # 验证响应格式
-            assert "error" in response.json()
-            assert "code" in response.json()["error"]
-            assert "message" in response.json()["error"]
-            assert "type" in response.json()["error"]
-            
-            # 验证错误码
-            assert response.json()["error"]["code"] == expected_status
-    
-    def test_unhandled_exception_handling(self, test_client):
-        """
-        测试未处理异常的处理
-        
-        注意：在测试环境中，FastAPI的TestClient会直接抛出异常，而不是返回HTTP响应
-        这是TestClient的正常行为，用于测试时能够更直接地看到错误
-        """
-        # 访问会抛出未处理异常的路由
-        with pytest.raises(Exception) as excinfo:
-            test_client.get("/api/errors/server")
-        
-        # 验证异常信息
-        assert "Unexpected server error" in str(excinfo.value)
-    
-    def test_division_by_zero_exception(self, test_client):
-        """
-        测试除零异常的处理
-        
-        注意：在测试环境中，FastAPI的TestClient会直接抛出异常，而不是返回HTTP响应
-        这是TestClient的正常行为，用于测试时能够更直接地看到错误
-        """
-        # 访问会抛出除零异常的路由
-        with pytest.raises(ZeroDivisionError) as excinfo:
-            test_client.get("/api/errors/division-by-zero")
-        
-        # 验证异常信息
-        assert "division by zero" in str(excinfo.value)
-    
-    def test_user_api_exception_handling(self, test_client):
-        """
-        测试用户API的异常处理
-        """
-        # 测试获取不存在的用户
-        response = test_client.get("/api/users/999999")
-        
-        # 验证响应状态码
+class TestCustomExceptions:
+    """测试自定义异常类"""
+
+    def test_validation_exception(self):
+        """测试验证异常"""
+        exc = ValidationException("参数验证失败")
+        assert exc.status_code == 400
+        assert exc.detail == "参数验证失败"
+
+    def test_authentication_exception(self):
+        """测试认证异常"""
+        exc = AuthenticationException("认证失败")
+        assert exc.status_code == 401
+        assert "WWW-Authenticate" in exc.headers
+
+    def test_authorization_exception(self):
+        """测试授权异常"""
+        exc = AuthorizationException("权限不足")
+        assert exc.status_code == 403
+        assert exc.detail == "权限不足"
+
+    def test_not_found_exception(self):
+        """测试资源不存在异常"""
+        exc = NotFoundException("用户不存在")
+        assert exc.status_code == 404
+        assert exc.detail == "用户不存在"
+
+    def test_conflict_exception(self):
+        """测试资源冲突异常"""
+        exc = ConflictException("资源已存在")
+        assert exc.status_code == 409
+        assert exc.detail == "资源已存在"
+
+    def test_database_exception(self):
+        """测试数据库异常"""
+        exc = DatabaseException("数据库连接失败")
+        assert exc.status_code == 500
+        assert exc.detail == "数据库连接失败"
+
+    def test_file_exception(self):
+        """测试文件操作异常"""
+        exc = FileException("文件读取失败")
+        assert exc.status_code == 500
+        assert exc.detail == "文件读取失败"
+
+    def test_repository_browser_exceptions(self):
+        """测试仓库浏览器异常"""
+        exc1 = RepositoryNotFoundException("仓库不存在")
+        assert exc1.status_code == 404
+
+        exc2 = PathNotFoundException("路径不存在")
+        assert exc2.status_code == 404
+
+        exc3 = InvalidPathException("无效路径")
+        assert exc3.status_code == 400
+
+
+class TestExceptionHandlers:
+    """测试异常处理器"""
+
+    @pytest.fixture
+    def mock_request(self):
+        """创建模拟请求"""
+        return MockRequest()
+
+    @pytest.mark.asyncio
+    async def test_validation_exception_handler(self, mock_request):
+        """测试验证异常处理器"""
+        exc = ValidationException("参数错误")
+        response = await global_exception_handler(mock_request, exc)
+
+        assert isinstance(response, JSONResponse)
+        assert response.status_code == 400
+        import json
+        data = json.loads(response.body)
+        assert data["error"]["code"] == 400
+        assert "参数错误" in data["error"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_not_found_exception_handler(self, mock_request):
+        """测试资源不存在异常处理器"""
+        exc = NotFoundException("用户不存在")
+        response = await global_exception_handler(mock_request, exc)
+
+        assert isinstance(response, JSONResponse)
         assert response.status_code == 404
-        
-        # 验证响应格式
-        assert "error" in response.json()
-        assert "code" in response.json()["error"]
-        assert "message" in response.json()["error"]
-        assert "type" in response.json()["error"]
-        
-        # 验证错误信息
-        assert response.json()["error"]["code"] == 404
-        assert "User not found" in response.json()["error"]["message"]
-        assert response.json()["error"]["type"] == "NotFoundException"
-    
-    def test_validation_error_handling(self, test_client):
-        """
-        测试验证错误的处理
-        
-        注意：由于我们的API使用的是dict而不是Pydantic模型，所以当缺少必填字段时
-        会抛出KeyError异常，而不是触发Pydantic的ValidationError
-        """
-        # 测试创建用户时不提供必填字段
-        with pytest.raises(Exception) as excinfo:
-            test_client.post("/api/users/", json={})
-        
-        # 验证异常信息
-        assert "username" in str(excinfo.value) or "KeyError" in str(excinfo.value)
+        import json
+        data = json.loads(response.body)
+        assert data["error"]["code"] == 404
+
+    @pytest.mark.asyncio
+    async def test_database_exception_handler(self, mock_request):
+        """测试数据库异常处理器"""
+        exc = DatabaseException("数据库错误")
+        response = await global_exception_handler(mock_request, exc)
+
+        assert isinstance(response, JSONResponse)
+        assert response.status_code == 500
+        import json
+        data = json.loads(response.body)
+        assert data["error"]["code"] == 500
+
+    @pytest.mark.asyncio
+    async def test_generic_exception_handler(self, mock_request):
+        """测试通用异常处理器"""
+        exc = ValueError("普通错误")
+        response = await global_exception_handler(mock_request, exc)
+
+        assert isinstance(response, JSONResponse)
+        assert response.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_http_exception_handler(self, mock_request):
+        """测试HTTP异常处理器"""
+        from fastapi import HTTPException
+
+        exc = HTTPException(status_code=403, detail="禁止访问")
+        response = await http_exception_handler(mock_request, exc)
+
+        assert isinstance(response, JSONResponse)
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_http_exception_handler_5xx(self, mock_request):
+        """测试HTTP 5xx异常处理器"""
+        from fastapi import HTTPException
+
+        exc = HTTPException(status_code=503, detail="服务不可用")
+        response = await http_exception_handler(mock_request, exc)
+
+        assert isinstance(response, JSONResponse)
+        assert response.status_code == 503
+
+    @pytest.mark.asyncio
+    async def test_validation_error_handler(self, mock_request):
+        """测试Pydantic验证错误处理器"""
+        from pydantic import ValidationError
+
+        # 创建一个模拟的验证错误
+        exc = ValidationError.from_exception_data(
+            "test",
+            [
+                {
+                    "type": "missing",
+                    "loc": ("field1",),
+                    "msg": "字段缺失",
+                    "input": None,
+                }
+            ],
+        )
+        response = await validation_exception_handler(mock_request, exc)
+
+        assert isinstance(response, JSONResponse)
+        assert response.status_code == 400
+        import json
+        data = json.loads(response.body)
+        assert data["error"]["code"] == 400
+        assert "Validation Error" in data["error"]["message"]
+
+
+class TestExceptionResponseFormat:
+    """测试异常响应格式"""
+
+    @pytest.fixture
+    def mock_request(self):
+        """创建模拟请求"""
+        return MockRequest()
+
+    @pytest.mark.asyncio
+    async def test_error_response_structure(self, mock_request):
+        """测试错误响应结构"""
+        exc = ValidationException("测试错误")
+        response = await global_exception_handler(mock_request, exc)
+
+        import json
+        data = json.loads(response.body)
+
+        # 验证响应结构
+        assert "detail" in data
+        assert "error" in data
+        assert "code" in data["error"]
+        assert "message" in data["error"]
+        assert "type" in data["error"]
+
+    @pytest.mark.asyncio
+    async def test_error_code_consistency(self, mock_request):
+        """测试错误码一致性"""
+        test_cases = [
+            (ValidationException("错误"), 400),
+            (AuthenticationException("错误"), 401),
+            (AuthorizationException("错误"), 403),
+            (NotFoundException("错误"), 404),
+            (ConflictException("错误"), 409),
+            (DatabaseException("错误"), 500),
+            (FileException("错误"), 500),
+        ]
+
+        for exc, expected_code in test_cases:
+            response = await global_exception_handler(mock_request, exc)
+            assert response.status_code == expected_code
+
+            import json
+            data = json.loads(response.body)
+            assert data["error"]["code"] == expected_code

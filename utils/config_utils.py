@@ -12,6 +12,9 @@ from typing import Any, Dict, List, Optional
 import toml
 
 from config import Config
+from utils.logging_utils import get_logger
+
+logger = get_logger("config")
 
 
 def generate_default_config() -> Dict[str, Any]:
@@ -40,15 +43,8 @@ def generate_default_config() -> Dict[str, Any]:
     config_dict["server"]["workers"] = 1
     config_dict["server"]["reload"] = False
 
-    if sys.platform == "win32":
-        # Windows下将install_path转换为绝对路径
-        install_path = config_dict["nginx"].get("install_path", "nginx")
-        if install_path:
-            config_dict["nginx"]["install_path"] = os.path.abspath(install_path)
-    else:
+    if sys.platform != "win32":
         config_dict["server"]["workers"] = min(4, os.cpu_count() or 2)
-        # Linux下install_path不使用，设置为空字符串
-        config_dict["nginx"]["install_path"] = ""
 
     config_dict["system"] = system_info
 
@@ -108,10 +104,10 @@ class ConfigManager:
             with open(self.config_path, "r", encoding="utf-8") as f:
                 return toml.load(f)
         except (toml.TomlDecodeError, PermissionError, IsADirectoryError) as e:
-            print(f"加载配置文件失败 ({self.config_path}): {type(e).__name__}: {e}")
+            logger.error(f"加载配置文件失败 ({self.config_path}): {type(e).__name__}: {e}")
             return {}
         except Exception as e:
-            print(f"加载配置文件失败 ({self.config_path}): {type(e).__name__}: {e}")
+            logger.error(f"加载配置文件失败 ({self.config_path}): {type(e).__name__}: {e}")
             return {}
 
     def save_config(self, config: Dict[str, Any]) -> bool:
@@ -133,7 +129,7 @@ class ConfigManager:
                 toml.dump(config, f)
             return True
         except (PermissionError, IsADirectoryError, IOError) as e:
-            print(f"保存配置文件失败 ({self.config_path}): {type(e).__name__}: {e}")
+            logger.error(f"保存配置文件失败 ({self.config_path}): {type(e).__name__}: {e}")
             return False
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -233,14 +229,14 @@ class ConfigManager:
         """
         return self.get("app", {})
 
-    def get_nginx_config(self) -> Dict[str, Any]:
+    def get_proxy_config(self) -> Dict[str, Any]:
         """
-        获取Nginx配置
+        获取代理配置
 
         Returns:
-            Dict[str, Any]: Nginx配置字典
+            Dict[str, Any]: 代理配置字典
         """
-        return self.get("nginx", {})
+        return self.get("proxy", {})
 
     def get_storage_config(self) -> Dict[str, Any]:
         """
@@ -280,7 +276,7 @@ class ConfigManager:
             bool: 设置成功返回True，否则返回False
         """
         if not secret_key or not isinstance(secret_key, str):
-            print("Secret Key 不能为空且必须是字符串")
+            logger.warning("Secret Key 不能为空且必须是字符串")
             return False
         return self.set("security.secret_key", secret_key)
 
@@ -293,10 +289,10 @@ class ConfigManager:
         """
         secret_key = secrets.token_urlsafe(32)
         if self.set_secret_key(secret_key):
-            print("已生成并保存新的 JWT Secret Key")
+            logger.info("已生成并保存新的 JWT Secret Key")
             return secret_key
         else:
-            print("保存 JWT Secret Key 失败")
+            logger.error("保存 JWT Secret Key 失败")
             return None
 
     def ensure_secret_key(self) -> Optional[str]:
@@ -310,7 +306,7 @@ class ConfigManager:
         if secret_key:
             return secret_key
 
-        print("JWT Secret Key 不存在，正在生成...")
+        logger.info("JWT Secret Key 不存在，正在生成...")
         return self.generate_and_save_secret_key()
 
     def get_repo_root(self) -> str:
@@ -333,7 +329,7 @@ class ConfigManager:
             bool: 设置成功返回True，否则返回False
         """
         if not isinstance(repo_root, str) or not repo_root.strip():
-            print("仓库根目录路径不能为空")
+            logger.warning("仓库根目录路径不能为空")
             return False
         return self.set("storage.repo_root", os.path.abspath(repo_root.strip()))
 
@@ -390,27 +386,6 @@ class ConfigManager:
             if server["log_level"] not in valid_levels:
                 errors.append(f"日志级别必须是以下之一: {', '.join(valid_levels)}")
 
-        # 验证Nginx配置
-        nginx = config.get("nginx", {})
-
-        # 验证listen_port
-        if "listen_port" in nginx:
-            try:
-                listen_port = int(nginx["listen_port"])
-                if listen_port < 1 or listen_port > 65535:
-                    errors.append("Nginx监听端口必须是1-65535之间的整数")
-            except (ValueError, TypeError):
-                errors.append("Nginx监听端口必须是1-65535之间的整数")
-
-        # 验证api_port
-        if "api_port" in nginx:
-            try:
-                api_port = int(nginx["api_port"])
-                if api_port < 1 or api_port > 65535:
-                    errors.append("Nginx API端口必须是1-65535之间的整数")
-            except (ValueError, TypeError):
-                errors.append("Nginx API端口必须是1-65535之间的整数")
-
         return len(errors) == 0, errors
 
     def reset_to_defaults(self) -> bool:
@@ -424,7 +399,7 @@ class ConfigManager:
             default_config = generate_default_config()
             return self.save_config(default_config)
         except Exception as e:
-            print(f"重置配置失败: {e}")
+            logger.error(f"重置配置失败: {e}")
             return False
 
 

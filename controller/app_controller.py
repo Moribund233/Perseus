@@ -69,6 +69,7 @@ class ConfigResponse(BaseModel):
     success: bool
     data: Optional[Dict[str, Any]] = None
     errors: list = Field(default_factory=list)
+    hints: list = Field(default_factory=list, description="提示信息列表，如需要重启的提示")
 
 
 class ConfigUpdateRequest(BaseModel):
@@ -173,12 +174,12 @@ async def update_config_endpoint(
         request: 配置更新请求
 
     Returns:
-        ConfigResponse: 更新结果
+        ConfigResponse: 更新结果（包含重启提示）
     """
     is_debug, is_admin = permission
     app_service = get_app_service()
 
-    success, errors = app_service.update_config(
+    success, errors, hints = app_service.update_config(
         request.config,
         is_debug=is_debug,
         is_admin=is_admin
@@ -186,7 +187,8 @@ async def update_config_endpoint(
 
     return ConfigResponse(
         success=success,
-        errors=errors
+        errors=errors,
+        hints=hints
     )
 
 
@@ -301,3 +303,104 @@ async def restart_endpoint(
         success=success,
         message="应用将在稍后重启" if success else "重启失败"
     )
+
+
+# ============== 日志管理接口 ==============
+
+
+class LogInfoResponse(BaseModel):
+    """日志信息响应模型"""
+    log_dir: str
+    today_dir: str
+    today_files: list
+    available_dates: list
+
+
+class LogContentResponse(BaseModel):
+    """日志内容响应模型"""
+    date: str
+    log_name: str
+    lines: int
+    total_lines: int
+    content: str
+    exists: bool
+
+
+class LogCleanupResponse(BaseModel):
+    """日志清理响应模型"""
+    success: bool
+    deleted_count: int
+    keep_days: int
+
+
+@router.get("/api/app/logs", response_model=LogInfoResponse)
+async def get_log_info_endpoint(
+    permission: tuple = Depends(check_app_permission)
+):
+    """
+    获取日志系统信息
+
+    Returns:
+        LogInfoResponse: 日志目录、文件列表等信息
+    """
+    app_service = get_app_service()
+    log_info = app_service.get_log_info()
+
+    return LogInfoResponse(**log_info)
+
+
+@router.get("/api/app/logs/content", response_model=LogContentResponse)
+async def get_log_content_endpoint(
+    date: Optional[str] = Query(None, description="日期 (YYYY-MM-DD)，默认为今天"),
+    log_name: str = Query("app", description="日志文件名，如 app, error"),
+    lines: int = Query(100, ge=1, le=1000, description="返回行数（1-1000）"),
+    level: Optional[str] = Query(None, description="过滤级别 (debug/info/warning/error/critical)"),
+    permission: tuple = Depends(check_app_permission)
+):
+    """
+    获取日志内容
+
+    Args:
+        date: 日期字符串，格式 YYYY-MM-DD
+        log_name: 日志文件名（不含扩展名）
+        lines: 返回的行数（从末尾开始）
+        level: 过滤日志级别
+
+    Returns:
+        LogContentResponse: 日志内容和元数据
+    """
+    app_service = get_app_service()
+    log_content = app_service.get_log_content(
+        date=date,
+        log_name=log_name,
+        lines=lines,
+        level=level
+    )
+
+    return LogContentResponse(**log_content)
+
+
+@router.post("/api/app/logs/cleanup", response_model=LogCleanupResponse)
+async def cleanup_logs_endpoint(
+    keep_days: int = Query(30, ge=1, le=365, description="保留天数（1-365）"),
+    permission: tuple = Depends(check_app_permission)
+):
+    """
+    清理旧日志文件
+
+    Args:
+        keep_days: 保留最近多少天的日志
+
+    Returns:
+        LogCleanupResponse: 清理结果
+    """
+    is_debug, is_admin = permission
+    app_service = get_app_service()
+
+    result = app_service.cleanup_old_logs(
+        keep_days=keep_days,
+        is_debug=is_debug,
+        is_admin=is_admin
+    )
+
+    return LogCleanupResponse(**result)

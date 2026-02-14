@@ -29,21 +29,9 @@ class SystemSettings(BaseSettings):
     python_version_info: Dict[str, Any] = Field(description="Python版本信息")
 
 
-class NginxSettings(BaseSettings):
-    """Nginx配置类"""
-    enabled: bool = Field(default=True, description="是否启用Nginx")
-    proxy: bool = Field(default=True, description="是否启用Nginx代理")
-    version: str = Field(default="1.26.0", description="Nginx版本")
-    mirror_url: Optional[str] = Field(default=None, description="Nginx镜像URL")
-    install_path: str = Field(default="nginx", description="Nginx安装路径（仅Windows使用，Linux忽略）")
-    config_path: Optional[str] = Field(default=None, description="Nginx配置文件路径（可选，默认根据install_path生成）")
-    worker_processes: str = Field(default="auto", description="Nginx工作进程数")
-    worker_connections: int = Field(default=1024, ge=1, description="Nginx工作进程最大连接数")
-    keepalive_timeout: int = Field(default=65, ge=0, description="Nginx长连接超时时间")
-    listen_port: int = Field(default=8080, ge=1, le=65535, description="Nginx监听端口")
-    server_name: str = Field(default="localhost", description="Nginx服务器名称")
-    api_host: str = Field(default="localhost", description="Nginx API代理主机")
-    api_port: int = Field(default=8000, ge=1, le=65535, description="Nginx API代理端口")
+class ProxySettings(BaseSettings):
+    """代理配置类"""
+    proxy: bool = Field(default=True, description="是否启用反向代理（保留用于服务端内部判断）")
 
 
 class StorageSettings(BaseSettings):
@@ -85,7 +73,7 @@ class Config(BaseSettings):
     """配置主类"""
     server: ServerSettings = ServerSettings()
     app: AppSettings = AppSettings()
-    nginx: NginxSettings = NginxSettings()
+    proxy: ProxySettings = ProxySettings()
     storage: StorageSettings = StorageSettings()
     security: SecuritySettings = SecuritySettings()
     logging: LoggingSettings = LoggingSettings()

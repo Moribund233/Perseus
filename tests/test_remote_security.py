@@ -62,7 +62,7 @@ class RemoteSecurityTester:
         初始化安全测试器
 
         Args:
-            base_url: API基础URL，默认为Nginx代理地址
+            base_url: API基础URL，默认为代理服务器地址
         """
         self.base_url = base_url.rstrip('/')
         self.test_results: List[SecurityTestResult] = []
@@ -133,7 +133,7 @@ class RemoteSecurityTester:
         - 404 Not Found (路径不存在)
         - 422 Unprocessable Entity (输入验证失败)
         - 429 Too Many Requests (速率限制)
-        - 503 Service Unavailable (Nginx速率限制)
+        - 503 Service Unavailable (代理服务器速率限制)
         
         Args:
             status_code: HTTP状态码
@@ -469,12 +469,9 @@ class RemoteSecurityTester:
                 if pattern.lower() in body.lower():
                     leaked_info.append(pattern)
 
-            # 检查服务器版本泄露（Nginx版本信息是预期的，不算漏洞）
+            # 检查服务器版本泄露
             server_header = headers.get('Server', '')
-            if server_header and 'nginx' in server_header.lower():
-                # Nginx 服务器标识是预期的，不视为漏洞
-                pass
-            elif server_header and any(x in server_header.lower() for x in ['apache', 'python', 'uvicorn']):
+            if server_header and any(x in server_header.lower() for x in ['apache', 'nginx', 'python', 'uvicorn']):
                 leaked_info.append(f"Server: {server_header}")
 
             if leaked_info:
@@ -760,7 +757,7 @@ class RemoteSecurityTester:
 
 def main():
     """主函数"""
-    # 支持命令行参数指定服务器地址，默认Nginx代理地址
+    # 支持命令行参数指定服务器地址，默认代理服务器地址
     base_url = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8080"
     
     print("\n" + "=" * 70)

@@ -15,8 +15,4 @@ __all__ = [
     # init_database
     "DatabaseInitializer",
     "init_database",
-    # nginx_config
-    "NginxConfigGenerator",
-    "get_nginx_config_generator",
-    "generate_nginx_config",
 ]

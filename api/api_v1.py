@@ -39,9 +39,13 @@ api_v1_router.include_router(pull_request_router)
 from controller.issue_controller import router as issue_router
 api_v1_router.include_router(issue_router)
 
-# 错误测试路由（仅开发环境使用）
+# 错误处理路由
 from api.error import router as error_router
 api_v1_router.include_router(error_router)
+
+# 错误测试路由（仅开发环境使用）
+from api.test_error_routes import router as test_error_router
+api_v1_router.include_router(test_error_router)
 
 # Git HTTP 协议路由
 from controller.git_http_controller import router as git_http_router

@@ -12,9 +12,12 @@ from sqlalchemy.orm import sessionmaker
 
 # 导入模型
 from models import Base, engine, SessionLocal
+from utils.logging_utils import get_logger
 
 # 密码哈希上下文
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+logger = get_logger("database")
 
 
 class DatabaseInitializer:
@@ -52,7 +55,7 @@ class DatabaseInitializer:
                 Base.metadata.create_all(bind=engine)
             return True
         except Exception as e:
-            print(f"数据库表创建失败: {e}")
+            logger.error(f"数据库表创建失败: {e}")
             return False
 
     def create_test_data(self) -> bool:
@@ -72,7 +75,7 @@ class DatabaseInitializer:
             return True
         except Exception as e:
             session.rollback()
-            print(f"创建测试数据失败: {e}")
+            logger.error(f"创建测试数据失败: {e}")
             return False
         finally:
             session.close()
@@ -113,7 +116,7 @@ class DatabaseInitializer:
         session.add(test_user)
 
         session.commit()
-        print("测试用户数据创建成功")
+        logger.info("测试用户数据创建成功")
 
     def _create_test_repositories(self, session) -> None:
         """
@@ -160,7 +163,7 @@ class DatabaseInitializer:
             session.add(repo)
 
         session.commit()
-        print("测试仓库数据创建成功")
+        logger.info("测试仓库数据创建成功")
 
         # 创建分支数据
         for repo in test_repos:
@@ -183,7 +186,7 @@ class DatabaseInitializer:
             session.add(dev_branch)
 
         session.commit()
-        print("测试分支数据创建成功")
+        logger.info("测试分支数据创建成功")
 
         # 创建提交数据
         branches = session.query(Branch).all()
@@ -205,7 +208,7 @@ class DatabaseInitializer:
             session.add(initial_commit)
 
         session.commit()
-        print("测试提交数据创建成功")
+        logger.info("测试提交数据创建成功")
 
 
 def init_database(

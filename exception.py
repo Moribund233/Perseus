@@ -130,32 +130,13 @@ class ConflictException(BaseException):
 class DatabaseException(BaseException):
     """
     数据库异常
-    
+
     用于处理数据库操作失败的情况
     """
     def __init__(self, detail: str = "Database Operation Failed"):
         """
         初始化数据库异常
-        
-        Args:
-            detail: 错误详情
-        """
-        super().__init__(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=detail
-        )
 
-
-class NginxException(BaseException):
-    """
-    Nginx异常
-    
-    用于处理Nginx相关操作失败的情况
-    """
-    def __init__(self, detail: str = "Nginx Operation Failed"):
-        """
-        初始化Nginx异常
-        
         Args:
             detail: 错误详情
         """
