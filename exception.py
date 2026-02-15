@@ -187,65 +187,50 @@ class RepositoryBrowserException(BaseException):
 class RepositoryNotFoundException(RepositoryBrowserException):
     """
     仓库不存在异常
-    
+
     用于处理请求的仓库不存在的情况
     """
     def __init__(self, detail: str = "Repository Not Found"):
         """
         初始化仓库不存在异常
-        
+
         Args:
             detail: 错误详情
         """
-        # 直接调用 BaseException 以设置正确的状态码
-        BaseException.__init__(
-            self,
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=detail
-        )
-
+        super().__init__(detail=detail)
+        self.status_code = status.HTTP_404_NOT_FOUND
 
 class PathNotFoundException(RepositoryBrowserException):
     """
     路径不存在异常
-    
+
     用于处理请求的路径不存在的情况
     """
     def __init__(self, detail: str = "Path Not Found"):
         """
         初始化路径不存在异常
-        
+
         Args:
             detail: 错误详情
         """
-        # 直接调用 BaseException 以设置正确的状态码
-        BaseException.__init__(
-            self,
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=detail
-        )
-
+        super().__init__(detail=detail)
+        self.status_code = status.HTTP_404_NOT_FOUND
 
 class InvalidPathException(RepositoryBrowserException):
     """
     无效路径异常
-    
+
     用于处理路径格式无效的情况
     """
     def __init__(self, detail: str = "Invalid Path"):
         """
         初始化无效路径异常
-        
+
         Args:
             detail: 错误详情
         """
-        # 直接调用 BaseException 以设置正确的状态码
-        BaseException.__init__(
-            self,
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=detail
-        )
-
+        super().__init__(detail=detail)
+        self.status_code = status.HTTP_400_BAD_REQUEST
 
 class AppServiceException(BaseException):
     """
@@ -279,9 +264,5 @@ class ConfigValidationException(AppServiceException):
         Args:
             detail: 错误详情
         """
-        # 直接调用 BaseException 以设置正确的状态码
-        BaseException.__init__(
-            self,
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=detail
-        )
+        super().__init__(detail=detail)
+        self.status_code = status.HTTP_400_BAD_REQUEST

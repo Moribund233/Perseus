@@ -344,12 +344,24 @@ def get_diff(
     # 获取提交对象
     head_commit = _resolve_ref(repo, head)
     
+    # 检查空仓库
+    if head_commit is None:
+        raise PathNotFoundException(f"Ref not found: {head} (empty repository)")
+    
     if base:
         base_commit = _resolve_ref(repo, base)
-        diff = repo.diff(base_commit, head_commit)
+        # 检查 base 提交是否存在
+        if base_commit is None:
+            raise PathNotFoundException(f"Base ref not found: {base}")
+        # 使用树对象进行比较，避免在裸仓库中使用repo.diff
+        diff = base_commit.tree.diff_to_tree(head_commit.tree)
     else:
-        # 与空树对比
-        diff = head_commit.tree.diff_to_tree()
+        # 与空树对比 - 使用空树对象
+        # 创建一个空的树
+        empty_tree_builder = repo.TreeBuilder()
+        empty_tree_id = empty_tree_builder.write()
+        empty_tree = repo[empty_tree_id]
+        diff = empty_tree.diff_to_tree(head_commit.tree)
     
     # 如果指定了路径，过滤差异
     if path:

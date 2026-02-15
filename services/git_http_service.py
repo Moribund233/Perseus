@@ -125,8 +125,8 @@ def check_git_permission(repo_path: str, user: Optional[User], action: str, db: 
     if action == "read":
         return True
     elif action == "write":
-        # 只有 maintainer 和 owner 角色可以写入
-        return member.role in ["maintainer", "owner"]
+        # owner, admin 和 developer 角色可以写入
+        return member.role in ["owner", "admin", "developer"]
 
     return False
 
@@ -461,30 +461,18 @@ def _unpack_packfile(repo: pygit2.Repository, packfile_data: bytes) -> None:
         GitHttpError: 解包失败
     """
     import subprocess
-    import tempfile
-    import os
 
-    # 创建临时文件存储 packfile
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.pack') as tmp_pack:
-        tmp_pack.write(packfile_data)
-        tmp_pack_path = tmp_pack.name
+    # 使用 git unpack-objects 解包，从标准输入读取 packfile 数据
+    result = subprocess.run(
+        ['git', 'unpack-objects'],
+        input=packfile_data,
+        capture_output=True,
+        cwd=repo.path
+    )
 
-    try:
-        # 使用 git unpack-objects 解包
-        result = subprocess.run(
-            ['git', 'unpack-objects'],
-            input=packfile_data,
-            capture_output=True,
-            cwd=repo.path
-        )
-
-        if result.returncode != 0:
-            raise GitHttpError(f"Failed to unpack packfile: {result.stderr.decode()}")
-
-    finally:
-        # 清理临时文件
-        if os.path.exists(tmp_pack_path):
-            os.unlink(tmp_pack_path)
+    if result.returncode != 0:
+        stderr = result.stderr.decode() if result.stderr else "Unknown error"
+        raise GitHttpError(f"Failed to unpack packfile: {stderr}")
 
 
 def _log_push_operation(repo: pygit2.Repository, user: User, cmd: dict) -> None:
@@ -578,35 +566,31 @@ def build_packfile_response(repo: pygit2.Repository, objects: set) -> bytes:
     Returns:
         bytes: 响应数据
     """
-    # 使用 git pack-objects 命令生成 packfile
     import subprocess
-    import tempfile
 
     # 创建对象列表
     obj_list = "\n".join(str(oid) for oid in objects)
 
     try:
-        # 使用 git pack-objects 生成 packfile
+        # 使用 git pack-objects 生成 packfile（使用二进制模式）
         result = subprocess.run(
             ["git", "pack-objects", "--stdout", "--delta-base-offset"],
-            input=obj_list,
+            input=obj_list.encode('utf-8'),
             capture_output=True,
-            text=True,
-            cwd=repo.path,
-            encoding='utf-8',
-            errors='ignore'
+            cwd=repo.path
         )
 
         if result.returncode != 0:
             # 如果 git 命令失败，返回 NAK
-            return b"0008NAK\n0000"
+            stderr = result.stderr.decode() if result.stderr else "Unknown error"
+            raise GitHttpError(f"pack-objects failed: {stderr}")
 
-        pack_data = result.stdout.encode('latin-1') if isinstance(result.stdout, str) else result.stdout
-
-        # 使用 side-band-64k 编码
-        return encode_sideband(pack_data)
+        # 使用 side-band-64k 编码 packfile 数据
+        return encode_sideband(result.stdout)
 
     except Exception as e:
+        if isinstance(e, GitHttpError):
+            raise
         # 如果失败，返回 NAK
         return b"0008NAK\n0000"
 
