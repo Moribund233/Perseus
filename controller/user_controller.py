@@ -65,6 +65,7 @@ def get_user(
     return service_get_user_by_id(user_id, db)
 
 
+@router.post("")
 @router.post("/")
 def create_user(user: dict, db: Session = Depends(get_db)):
     """

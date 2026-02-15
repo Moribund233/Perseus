@@ -184,6 +184,7 @@ def get_commit_by_hash(repo_id: int, commit_hash: str, db: Session = Depends(get
 
 
 @router.post("/{repo_id}/commits")
+@router.post("/{repo_id}/commits/")
 @limiter.limit(RateLimitConfig.STANDARD)
 def create_commit(
     request: Request,

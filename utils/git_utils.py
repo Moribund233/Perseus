@@ -284,7 +284,7 @@ def perform_git_merge(
 
 def init_bare_repo(repo_path: str) -> bool:
     """
-    初始化一个 bare Git 仓库
+    初始化一个 bare Git 仓库（空仓库，无初始提交）
 
     Args:
         repo_path: 仓库目录路径
@@ -305,7 +305,7 @@ def init_bare_repo(repo_path: str) -> bool:
         if os.path.exists(os.path.join(repo_path, "HEAD")):
             return False
 
-        # 创建 bare 仓库
+        # 创建 bare 仓库（空仓库，无初始提交）
         pygit2.init_repository(repo_path, bare=True)
 
         return True

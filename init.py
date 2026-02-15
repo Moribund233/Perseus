@@ -71,7 +71,11 @@ class AppInitializer:
 
     def _init_database(self, create_test_data: bool = False) -> bool:
         """初始化数据库"""
-        if init_database(create_test_data=create_test_data):
+        # 根据 debug 配置决定是否创建测试数据
+        config = self.config_manager.get_config()
+        should_create_test_data = create_test_data or config.app.debug
+
+        if init_database(create_test_data=should_create_test_data):
             self._logger.info("数据库初始化完成")
             return True
         else:

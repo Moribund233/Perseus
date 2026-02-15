@@ -1,5 +1,5 @@
-// API基础配置
-export const API_BASE_URL = 'http://192.168.31.248:8080';
+// API基础配置 - 从环境变量读取
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // 通用请求配置
 interface RequestOptions {

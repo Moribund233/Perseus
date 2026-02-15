@@ -45,19 +45,19 @@ def _get_repo(repo_path: str) -> pygit2.Repository:
         raise RepositoryNotFoundException(f"Failed to open repository: {e}")
 
 
-def _resolve_ref(repo: pygit2.Repository, ref: str) -> pygit2.Commit:
+def _resolve_ref(repo: pygit2.Repository, ref: str) -> Optional[pygit2.Commit]:
     """
     解析引用为提交对象
-    
+
     Args:
         repo: 仓库对象
         ref: 引用名称（分支名、标签名或提交SHA）
-        
+
     Returns:
-        pygit2.Commit: 提交对象
-        
+        pygit2.Commit: 提交对象，如果仓库为空则返回 None
+
     Raises:
-        PathNotFoundException: 引用不存在
+        PathNotFoundException: 引用不存在（非空仓库）
     """
     try:
         # 尝试直接解析为提交
@@ -67,6 +67,9 @@ def _resolve_ref(repo: pygit2.Repository, ref: str) -> pygit2.Commit:
         try:
             return repo.revparse_single(f"refs/heads/{ref}").peel(pygit2.Commit)
         except (KeyError, ValueError):
+            # 检查仓库是否为空（没有提交）
+            if repo.is_empty:
+                return None
             raise PathNotFoundException(f"Ref not found: {ref}")
 
 
@@ -106,15 +109,15 @@ def get_tree_entries(
 ) -> Dict[str, Any]:
     """
     获取文件树条目
-    
+
     Args:
         repo_path: 仓库物理路径
         ref: 分支名或提交SHA，默认 HEAD
         path: 子目录路径，默认根目录
-        
+
     Returns:
         dict: 包含路径列表和条目列表的字典
-        
+
     Raises:
         RepositoryNotFoundException: 仓库不存在
         PathNotFoundException: 引用或路径不存在
@@ -122,6 +125,16 @@ def get_tree_entries(
     """
     repo = _get_repo(repo_path)
     commit = _resolve_ref(repo, ref)
+
+    # 空仓库处理
+    if commit is None:
+        return {
+            "path": path,
+            "ref": ref,
+            "entries": [],
+            "is_empty": True
+        }
+
     tree = _get_tree(repo, commit, path)
     
     # 构建路径列表
@@ -229,24 +242,36 @@ def get_commits(
 ) -> Dict[str, Any]:
     """
     获取提交历史
-    
+
     Args:
         repo_path: 仓库物理路径
         ref: 分支名或提交SHA，默认 HEAD
         path: 特定文件路径，None 表示所有提交
         page: 页码，默认 1
         per_page: 每页数量，默认 30
-        
+
     Returns:
         dict: 包含提交列表和分页信息的字典
-        
+
     Raises:
         RepositoryNotFoundException: 仓库不存在
         PathNotFoundException: 引用不存在
     """
     repo = _get_repo(repo_path)
     commit = _resolve_ref(repo, ref)
-    
+
+    # 空仓库处理
+    if commit is None:
+        return {
+            "commits": [],
+            "pagination": {
+                "page": page,
+                "per_page": per_page,
+                "total": 0
+            },
+            "is_empty": True
+        }
+
     commits = []
     walker = repo.walk(commit.id, pygit2.GIT_SORT_TIME)
     

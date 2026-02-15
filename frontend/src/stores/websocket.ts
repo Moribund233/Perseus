@@ -94,11 +94,14 @@ export const useWebSocketStore = defineStore('websocket', () => {
       client.value.close();
     }
 
+    // 从环境变量获取 WebSocket 基础 URL
+    const wsBaseUrl = import.meta.env.VITE_WS_BASE_URL;
+
     // 创建新连接，传入事件处理器
     const wsConfig = {
       url: token
-        ? `ws://192.168.31.248:8080/ws/?token=${encodeURIComponent(token)}`
-        : 'ws://192.168.31.248:8080/ws/',
+        ? `${wsBaseUrl}/ws/?token=${encodeURIComponent(token)}`
+        : `${wsBaseUrl}/ws/`,
       onOpen: () => {
         isConnected.value = true;
         console.log('[WebSocketStore] 连接已建立');

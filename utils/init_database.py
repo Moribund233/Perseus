@@ -4,6 +4,7 @@
 提供数据库表创建和测试数据初始化功能
 """
 import hashlib
+import os
 from typing import Optional
 
 from passlib.context import CryptContext
@@ -13,6 +14,7 @@ from sqlalchemy.orm import sessionmaker
 # 导入模型
 from models import Base, engine, SessionLocal
 from utils.logging_utils import get_async_logger
+from utils.git_utils import init_bare_repo, get_repository_storage_path
 
 # 密码哈希上下文
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -164,6 +166,15 @@ class DatabaseInitializer:
 
         session.commit()
         logger.info("测试仓库数据创建成功")
+
+        # 创建物理 Git 仓库（空仓库）
+        for repo in test_repos:
+            try:
+                physical_path = get_repository_storage_path(repo.path)
+                init_bare_repo(physical_path)
+                logger.info(f"物理仓库创建成功: {physical_path}")
+            except Exception as e:
+                logger.warning(f"物理仓库创建失败 {repo.path}: {e}")
 
         # 创建分支数据
         for repo in test_repos:

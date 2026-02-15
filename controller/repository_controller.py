@@ -111,6 +111,7 @@ def get_repository(
     return service_get_repository_by_id(repo_id, db)
 
 
+@router.post("")
 @router.post("/")
 @limiter.limit(RateLimitConfig.STANDARD)
 def create_repository(

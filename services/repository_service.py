@@ -166,7 +166,7 @@ def create_repository(repo_data: dict, db: Session):
     db.add(owner_member)
     db.commit()
 
-    # 创建物理 Git 仓库
+    # 创建物理 Git 仓库（空仓库，无初始提交）
     try:
         physical_path = get_repository_storage_path(db_repo.path)
         init_bare_repo(physical_path)

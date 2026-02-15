@@ -85,6 +85,7 @@ def get_branch(repo_id: int, branch_name: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{repo_id}/branches")
+@router.post("/{repo_id}/branches/")
 @limiter.limit(RateLimitConfig.STANDARD)
 def create_branch(
     request: Request,

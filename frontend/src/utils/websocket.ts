@@ -4,8 +4,8 @@
  * 提供WebSocket连接管理和消息处理功能
  */
 
-// WebSocket配置
-const WS_BASE_URL = 'ws://192.168.31.248:8080';
+// WebSocket配置 - 从环境变量读取
+const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL;
 
 // 定时器类型定义
 type TimerId = ReturnType<typeof setTimeout>;

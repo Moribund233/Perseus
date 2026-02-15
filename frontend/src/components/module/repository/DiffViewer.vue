@@ -179,7 +179,7 @@ const selectedFileData = computed(() => {
  * 解析后的差异行
  */
 const parsedDiffLines = computed((): DiffLine[] => {
-  if (!selectedFileData.value) return [];
+  if (!selectedFileData.value || !selectedFileData.value.diff) return [];
 
   const lines: DiffLine[] = [];
   const diffLines = selectedFileData.value.diff.split('\n');
@@ -241,7 +241,10 @@ const parsedDiffLines = computed((): DiffLine[] => {
  * 格式化引用名称
  * @param ref 引用
  */
-const formatRef = (ref: string): string => {
+const formatRef = (ref: string | undefined): string => {
+  if (!ref) {
+    return 'N/A';
+  }
   if (ref.length > 12) {
     return ref.substring(0, 7) + '...';
   }

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from models import User
 from exception import ValidationException, NotFoundException, ConflictException, AuthenticationException
 from passlib.context import CryptContext
+from services.token_service import create_token_pair
 
 # 日志记录器
 logger = logging.getLogger(__name__)
@@ -239,14 +240,18 @@ def login_user(credentials: dict, db: Session):
     if not user or not verify_password(credentials["password"], user.password):
         raise AuthenticationException(detail="Invalid username or password")
 
-    # 登录成功，返回用户信息（不包含密码）
+    # 登录成功，创建令牌对
+    tokens = create_token_pair(user)
+
+    # 返回用户信息和令牌
     return {
         "id": user.id,
         "username": user.username,
         "email": user.email,
         "full_name": user.full_name,
         "is_active": user.is_active,
-        "is_admin": user.is_admin
+        "is_admin": user.is_admin,
+        "token": tokens["access_token"]
     }
 
 
