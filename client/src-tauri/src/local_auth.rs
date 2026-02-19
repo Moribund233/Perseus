@@ -186,6 +186,7 @@ pub fn regenerate_credentials() -> Result<LocalAuthConfig, String> {
         jwt_secret_key: generate_jwt_secret_key(),
         local_token: generate_local_token(),
         debug_mode: true,
+        security_password: String::new(),
     };
 
     // 保存到加密配置

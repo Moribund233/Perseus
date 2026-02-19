@@ -4,11 +4,21 @@ import Home from '../views/Home.vue'
 import Log from '../views/Log.vue'
 import Setting from '../views/Setting.vue'
 import Nginx from '../views/Nginx.vue'
+import Guide from '../views/Guide.vue'
 
 /**
  * 路由配置
  */
 const routes = [
+  {
+    path: '/guide',
+    name: 'Guide',
+    component: Guide,
+    meta: {
+      title: '首次启动配置',
+      standalone: true
+    }
+  },
   {
     path: '/',
     component: Layout,

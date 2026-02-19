@@ -548,3 +548,33 @@ pub struct NginxPlatformInfo {
     /// 配置文件路径（Linux系统路径）
     pub config_path: Option<String>,
 }
+
+/**
+ * 服务端检查结果
+ */
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerCheckResult {
+    /// 是否找到服务端
+    pub found: bool,
+    /// 服务端路径
+    pub path: Option<String>,
+    /// 服务端版本
+    pub version: Option<String>,
+    /// 是否自动检测到
+    pub auto_detected: bool,
+}
+
+/**
+ * Git检查结果
+ */
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitCheckResult {
+    /// 是否已安装Git
+    pub installed: bool,
+    /// Git版本
+    pub version: Option<String>,
+    /// Git路径
+    pub path: Option<String>,
+    /// git-http-backend是否可用
+    pub http_backend_available: bool,
+}

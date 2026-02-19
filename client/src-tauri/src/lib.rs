@@ -12,7 +12,6 @@ pub mod nginx_manager;
 pub mod process_manager;
 pub mod secure_config;
 
-
 use tauri::Manager;
 
 /// 运行 Tauri 应用
@@ -80,6 +79,23 @@ pub fn run() {
             commands::get_nginx_proxy_config,
             commands::save_nginx_proxy_config,
             commands::get_nginx_platform_info,
+            // 引导页面
+            commands::check_server_path,
+            commands::validate_and_save_server_path,
+            commands::check_git_installation,
+            commands::mark_guide_completed,
+            commands::is_guide_completed,
+            commands::has_user_config_file,
+            commands::reset_client_config,
+            // 安全配置
+            commands::set_security_password,
+            commands::verify_security_password,
+            commands::has_security_password,
+            commands::get_debug_mode,
+            commands::update_debug_mode,
+            commands::reset_all_tokens,
+            commands::is_elevated,
+            commands::get_jwt_secret_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

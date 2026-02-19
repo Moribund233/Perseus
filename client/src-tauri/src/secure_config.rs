@@ -26,6 +26,9 @@ pub struct SecureConfig {
     /// 是否启用调试模式
     #[serde(default = "default_debug_mode")]
     pub debug_mode: bool,
+    /// 客户端安全密码（用于保护敏感配置）
+    #[serde(default)]
+    pub security_password: String,
 }
 
 fn default_debug_mode() -> bool {
@@ -38,6 +41,7 @@ impl Default for SecureConfig {
             jwt_secret_key: String::new(),
             local_token: String::new(),
             debug_mode: true,
+            security_password: String::new(),
         }
     }
 }
@@ -257,6 +261,7 @@ fn generate_new_secure_config() -> SecureConfig {
         jwt_secret_key,
         local_token,
         debug_mode: true,
+        security_password: String::new(),
     }
 }
 
@@ -303,6 +308,104 @@ pub fn has_secure_config() -> bool {
         .unwrap_or(false)
 }
 
+/**
+ * 设置安全密码
+ */
+pub fn set_security_password(password: String) -> Result<(), String> {
+    let mut config = load_secure_config()?;
+    config.security_password = password;
+    save_secure_config(&config)
+}
+
+/**
+ * 验证安全密码
+ */
+pub fn verify_security_password(password: &str) -> Result<bool, String> {
+    let config = load_secure_config()?;
+    // 如果没有设置密码，返回 true（首次使用）
+    if config.security_password.is_empty() {
+        return Ok(true);
+    }
+    Ok(config.security_password == password)
+}
+
+/**
+ * 检查是否已设置安全密码
+ */
+pub fn has_security_password() -> Result<bool, String> {
+    let config = load_secure_config()?;
+    Ok(!config.security_password.is_empty())
+}
+
+/**
+ * 更新调试模式
+ */
+pub fn update_debug_mode(debug: bool) -> Result<(), String> {
+    let mut config = load_secure_config()?;
+    config.debug_mode = debug;
+    save_secure_config(&config)
+}
+
+/**
+ * 获取调试模式
+ */
+pub fn get_debug_mode() -> Result<bool, String> {
+    let config = load_secure_config()?;
+    Ok(config.debug_mode)
+}
+
+/**
+ * 重置所有安全令牌（JWT密钥和本地Token）
+ * 此操作需要管理员权限
+ */
+pub fn reset_all_tokens() -> Result<(), String> {
+    // 检查是否以管理员/root权限运行
+    if !is_elevated() {
+        return Err("需要管理员权限才能执行此操作".to_string());
+    }
+
+    let mut config = load_secure_config()?;
+    let new_config = generate_new_secure_config();
+
+    // 保留安全密码，只重置令牌
+    config.jwt_secret_key = new_config.jwt_secret_key;
+    config.local_token = new_config.local_token;
+
+    save_secure_config(&config)
+}
+
+/**
+ * 检查是否以提升的权限运行
+ */
+fn is_elevated() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        // Windows: 检查是否以管理员身份运行
+        use std::process::Command;
+        match Command::new("net").args(["session"]).output() {
+            Ok(output) => output.status.success(),
+            Err(_) => false,
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Linux: 检查是否为 root 用户
+        unsafe { libc::getuid() == 0 }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // macOS: 检查是否为 root 用户
+        unsafe { libc::getuid() == 0 }
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+    {
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -313,6 +416,7 @@ mod tests {
             jwt_secret_key: "test_key_123".to_string(),
             local_token: "test_token_456".to_string(),
             debug_mode: true,
+            security_password: String::new(),
         };
 
         let encrypted = encrypt_config(&config).unwrap();

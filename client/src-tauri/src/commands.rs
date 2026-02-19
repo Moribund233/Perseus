@@ -441,3 +441,243 @@ pub fn save_nginx_proxy_config(
 pub fn get_nginx_platform_info() -> Result<crate::models::NginxPlatformInfo, String> {
     Ok(crate::nginx_manager::get_nginx_platform_info())
 }
+
+// ==================== 引导页面命令 ====================
+
+/// 检查服务端路径
+#[tauri::command]
+pub fn check_server_path() -> Result<crate::models::ServerCheckResult, String> {
+    use crate::process_manager::get_server_exe_path;
+
+    match get_server_exe_path() {
+        Ok(path) => {
+            let path_str = path.to_string_lossy().to_string();
+            Ok(crate::models::ServerCheckResult {
+                found: true,
+                path: Some(path_str),
+                version: None,
+                auto_detected: true,
+            })
+        }
+        Err(_) => Ok(crate::models::ServerCheckResult {
+            found: false,
+            path: None,
+            version: None,
+            auto_detected: false,
+        }),
+    }
+}
+
+/// 验证并保存服务端路径
+#[tauri::command]
+pub fn validate_and_save_server_path(
+    path: String,
+) -> Result<crate::models::ServerCheckResult, String> {
+    use crate::config;
+    use std::path::Path;
+
+    let path_obj = Path::new(&path);
+
+    // 检查文件是否存在
+    if !path_obj.exists() {
+        return Ok(crate::models::ServerCheckResult {
+            found: false,
+            path: None,
+            version: None,
+            auto_detected: false,
+        });
+    }
+
+    // 检查文件名是否包含 langit-server
+    let file_name = path_obj.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    if !file_name.contains("langit-server") {
+        return Ok(crate::models::ServerCheckResult {
+            found: false,
+            path: None,
+            version: None,
+            auto_detected: false,
+        });
+    }
+
+    // 保存到配置
+    let mut client_config = config::load_config()?;
+    client_config.server.path.custom_path = Some(path.clone());
+    config::save_config(&client_config)?;
+
+    Ok(crate::models::ServerCheckResult {
+        found: true,
+        path: Some(path),
+        version: None,
+        auto_detected: false,
+    })
+}
+
+/// 检查Git安装
+#[tauri::command]
+pub fn check_git_installation() -> Result<crate::models::GitCheckResult, String> {
+    use std::process::Command;
+
+    // 检查 git --version
+    let version_output = Command::new("git").arg("--version").output();
+
+    match version_output {
+        Ok(output) if output.status.success() => {
+            let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+            // 检查 git-http-backend 是否存在
+            let http_backend_check = if cfg!(target_os = "windows") {
+                Command::new("where")
+                    .arg("git-http-backend")
+                    .output()
+                    .map(|o| o.status.success())
+                    .unwrap_or(false)
+            } else {
+                Command::new("which")
+                    .arg("git-http-backend")
+                    .output()
+                    .map(|o| o.status.success())
+                    .unwrap_or(false)
+            };
+
+            Ok(crate::models::GitCheckResult {
+                installed: true,
+                version: Some(version),
+                path: None,
+                http_backend_available: http_backend_check,
+            })
+        }
+        _ => Ok(crate::models::GitCheckResult {
+            installed: false,
+            version: None,
+            path: None,
+            http_backend_available: false,
+        }),
+    }
+}
+
+/// 标记引导完成
+#[tauri::command]
+pub fn mark_guide_completed() -> Result<(), String> {
+    // 创建一个标记文件来表示引导已完成
+    let config_dir = dirs::config_dir()
+        .ok_or("无法获取配置目录")?
+        .join("langit-client");
+
+    std::fs::write(config_dir.join(".guide_completed"), "1")
+        .map_err(|e| format!("创建标记文件失败: {}", e))?;
+
+    Ok(())
+}
+
+/// 检查是否已完成引导
+#[tauri::command]
+pub fn is_guide_completed() -> Result<bool, String> {
+    let config_dir = dirs::config_dir()
+        .ok_or("无法获取配置目录")?
+        .join("langit-client");
+    let guide_marker = config_dir.join(".guide_completed");
+
+    Ok(guide_marker.exists())
+}
+
+/// 检查是否存在用户配置文件
+/// 用于判断是否需要显示引导页面
+#[tauri::command]
+pub fn has_user_config_file() -> Result<bool, String> {
+    Ok(crate::config::has_user_config())
+}
+
+/// 重置客户端配置
+/// 删除配置文件和引导标记，使应用重新进入引导流程
+#[tauri::command]
+pub fn reset_client_config() -> Result<(), String> {
+    use crate::config;
+
+    // 删除配置文件
+    if let Some(config_path) = config::get_config_path() {
+        if config_path.exists() {
+            std::fs::remove_file(&config_path).map_err(|e| format!("删除配置文件失败: {}", e))?;
+        }
+    }
+
+    // 删除引导标记文件
+    let config_dir = dirs::config_dir()
+        .ok_or("无法获取配置目录")?
+        .join("langit-client");
+    let guide_marker = config_dir.join(".guide_completed");
+    if guide_marker.exists() {
+        std::fs::remove_file(&guide_marker).map_err(|e| format!("删除引导标记失败: {}", e))?;
+    }
+
+    Ok(())
+}
+
+/// 设置客户端安全密码
+#[tauri::command]
+pub fn set_security_password(password: String) -> Result<(), String> {
+    crate::secure_config::set_security_password(password)
+}
+
+/// 验证客户端安全密码
+#[tauri::command]
+pub fn verify_security_password(password: String) -> Result<bool, String> {
+    crate::secure_config::verify_security_password(&password)
+}
+
+/// 检查是否已设置安全密码
+#[tauri::command]
+pub fn has_security_password() -> Result<bool, String> {
+    crate::secure_config::has_security_password()
+}
+
+/// 获取调试模式状态
+#[tauri::command]
+pub fn get_debug_mode() -> Result<bool, String> {
+    crate::secure_config::get_debug_mode()
+}
+
+/// 更新调试模式
+#[tauri::command]
+pub fn update_debug_mode(debug: bool) -> Result<(), String> {
+    crate::secure_config::update_debug_mode(debug)
+}
+
+/// 重置所有安全令牌（需要管理员权限）
+#[tauri::command]
+pub fn reset_all_tokens() -> Result<(), String> {
+    crate::secure_config::reset_all_tokens()
+}
+
+/// 检查是否以提升的权限运行
+#[tauri::command]
+pub fn is_elevated() -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        match Command::new("net").args(["session"]).output() {
+            Ok(output) => Ok(output.status.success()),
+            Err(_) => Ok(false),
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Ok(unsafe { libc::getuid() == 0 })
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        Ok(unsafe { libc::getuid() == 0 })
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+    {
+        Ok(false)
+    }
+}
+
+/// 获取 JWT 密钥
+#[tauri::command]
+pub fn get_jwt_secret_key() -> Result<String, String> {
+    crate::secure_config::get_jwt_secret_key()
+}

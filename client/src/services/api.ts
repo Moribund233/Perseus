@@ -391,10 +391,18 @@ export async function updateAppConfig(config: any): Promise<ConfigResponse> {
 }
 
 /**
- * 重置应用配置
+ * 重置应用配置（服务端配置）
  */
 export async function resetAppConfig(): Promise<ConfigResponse> {
   return invoke('reset_app_config')
+}
+
+/**
+ * 重置客户端配置
+ * 删除配置文件和引导标记，使应用重新进入引导流程
+ */
+export async function resetClientConfig(): Promise<void> {
+  return invoke('reset_client_config')
 }
 
 /**
@@ -441,9 +449,66 @@ export async function getServerUrl(): Promise<string> {
   return invoke('get_server_url')
 }
 
+// ==================== 安全配置 API ====================
+
 /**
- * 获取本地认证 Token
- * 用于 WebSocket 连接认证
+ * 设置客户端安全密码
+ */
+export async function setSecurityPassword(password: string): Promise<void> {
+  return invoke('set_security_password', { password })
+}
+
+/**
+ * 验证客户端安全密码
+ */
+export async function verifySecurityPassword(password: string): Promise<boolean> {
+  return invoke('verify_security_password', { password })
+}
+
+/**
+ * 检查是否已设置安全密码
+ */
+export async function hasSecurityPassword(): Promise<boolean> {
+  return invoke('has_security_password')
+}
+
+/**
+ * 获取调试模式状态
+ */
+export async function getDebugMode(): Promise<boolean> {
+  return invoke('get_debug_mode')
+}
+
+/**
+ * 更新调试模式
+ */
+export async function updateDebugMode(debug: boolean): Promise<void> {
+  return invoke('update_debug_mode', { debug })
+}
+
+/**
+ * 重置所有安全令牌（需要管理员权限）
+ */
+export async function resetAllTokens(): Promise<void> {
+  return invoke('reset_all_tokens')
+}
+
+/**
+ * 检查是否以提升的权限运行
+ */
+export async function isElevated(): Promise<boolean> {
+  return invoke('is_elevated')
+}
+
+/**
+ * 获取 JWT 密钥
+ */
+export async function getJwtSecretKey(): Promise<string> {
+  return invoke('get_jwt_secret_key')
+}
+
+/**
+ * 获取本地 Token
  */
 export async function getLocalToken(): Promise<string> {
   return invoke('get_local_token')
@@ -631,4 +696,70 @@ export interface NginxPlatformInfo {
  */
 export async function getNginxPlatformInfo(): Promise<NginxPlatformInfo> {
   return invoke('get_nginx_platform_info')
+}
+
+// ==================== 引导页面 API ====================
+
+/**
+ * 服务端检查结果
+ */
+export interface ServerCheckResult {
+  found: boolean
+  path?: string
+  version?: string
+  autoDetected: boolean
+}
+
+/**
+ * Git检查结果
+ */
+export interface GitCheckResult {
+  installed: boolean
+  version?: string
+  path?: string
+  httpBackendAvailable: boolean
+}
+
+/**
+ * 检查服务端路径
+ */
+export async function checkServerPath(): Promise<ServerCheckResult> {
+  return invoke('check_server_path')
+}
+
+/**
+ * 验证并保存服务端路径
+ * @param path 服务端可执行文件路径
+ */
+export async function validateAndSaveServerPath(path: string): Promise<ServerCheckResult> {
+  return invoke('validate_and_save_server_path', { path })
+}
+
+/**
+ * 检查Git安装
+ */
+export async function checkGitInstallation(): Promise<GitCheckResult> {
+  return invoke('check_git_installation')
+}
+
+/**
+ * 标记引导完成
+ */
+export async function markGuideCompleted(): Promise<void> {
+  return invoke('mark_guide_completed')
+}
+
+/**
+ * 检查是否已完成引导
+ */
+export async function isGuideCompleted(): Promise<boolean> {
+  return invoke('is_guide_completed')
+}
+
+/**
+ * 检查是否存在用户配置文件
+ * 用于判断是否需要显示引导页面
+ */
+export async function hasUserConfigFile(): Promise<boolean> {
+  return invoke('has_user_config_file')
 }

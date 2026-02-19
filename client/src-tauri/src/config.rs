@@ -200,6 +200,11 @@ pub fn has_user_config() -> bool {
     get_user_config_path().map(|p| p.exists()).unwrap_or(false)
 }
 
+/// 获取用户配置文件路径
+pub fn get_config_path() -> Option<PathBuf> {
+    get_user_config_path().ok()
+}
+
 /// 检查是否存在 client.toml 配置文件（应用程序目录）
 pub fn has_app_dir_config() -> bool {
     get_app_dir_config_path()
