@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import Alert from '../components/Alert.vue'
+import Card from '../components/Card.vue'
+import StatusBadge from '../components/StatusBadge.vue'
 import { useServiceStore, type BasicSystemInfo } from '../stores'
 import {
   startService,
@@ -348,45 +351,46 @@ onUnmounted(() => {
 <template>
   <div class="home">
     <h1 class="page-title">控制台</h1>
-    
+
     <!-- 错误提示 -->
-    <div v-if="error" class="error-alert">
-      <svg class="error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/>
-        <line x1="12" y1="8" x2="12" y2="12"/>
-        <line x1="12" y1="16" x2="12.01" y2="16"/>
-      </svg>
-      <span>{{ error }}</span>
-      <button class="close-btn" @click="error = null">×</button>
-    </div>
-    
+    <Alert
+      v-if="error"
+      type="error"
+      closable
+      @close="error = null"
+    >
+      {{ error }}
+    </Alert>
+
     <!-- 服务控制卡片 -->
-    <div class="card service-card">
-      <div class="card-header">
+    <Card
+      title="服务状态"
+      custom-class="service-card"
+    >
+      <template #header>
         <div class="service-info">
-          <h2 class="card-title">服务状态</h2>
-          <span class="tag" :class="getStatusTagClass(serviceStatus)">
-            {{ getStatusText(serviceStatus) }}
-          </span>
+          <StatusBadge :status="serviceStatus || 'default'" />
         </div>
+      </template>
+      <template #actions>
         <button class="btn btn-secondary btn-sm" @click="refreshStatus" :disabled="isLoading">
-          <svg class="btn-icon" :class="{ spinning: isLoading }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="23 4 23 10 17 10"/>
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-          </svg>
+          <img
+            src="@/assets/icons/refresh.svg"
+            class="btn-icon"
+            :class="{ spinning: isLoading }"
+            alt="refresh"
+          />
           刷新
         </button>
-      </div>
-      
+      </template>
+
       <div class="service-controls">
         <button
           class="btn btn-success"
           @click="handleStartService"
           :disabled="isLoading || serviceStatus === 'running' || serviceStatus === 'starting' || serviceStatus === null"
         >
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="5 3 19 12 5 21 5 3"/>
-          </svg>
+          <img src="@/assets/icons/play.svg" class="btn-icon icon-white" alt="play" />
           启动服务
         </button>
 
@@ -395,10 +399,7 @@ onUnmounted(() => {
           @click="handleStopService"
           :disabled="isLoading || serviceStatus === 'stopped' || serviceStatus === 'stopping' || serviceStatus === null"
         >
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="6" y="4" width="4" height="16"/>
-            <rect x="14" y="4" width="4" height="16"/>
-          </svg>
+          <img src="@/assets/icons/stop.svg" class="btn-icon icon-white" alt="stop" />
           停止服务
         </button>
 
@@ -407,19 +408,16 @@ onUnmounted(() => {
           @click="handleRestartService"
           :disabled="isLoading || serviceStatus !== 'running'"
         >
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="23 4 23 10 17 10"/>
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-          </svg>
+          <img src="@/assets/icons/refresh.svg" class="btn-icon icon-white" alt="restart" />
           重启服务
         </button>
       </div>
-      
+
       <div v-if="isLoading" class="loading-indicator">
         <div class="spinner"></div>
         <span>正在处理...</span>
       </div>
-    </div>
+    </Card>
     
     <!-- 性能监控（始终显示，使用本地系统信息） -->
     <div class="performance-grid">
@@ -813,46 +811,7 @@ onUnmounted(() => {
   max-width: 1200px;
 }
 
-.page-title {
-  font-size: var(--font-size-2xl);
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: var(--spacing-lg);
-}
-
-.error-alert {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  background-color: rgba(239, 68, 68, 0.1);
-  border: 1px solid var(--error-color);
-  border-radius: var(--border-radius-md);
-  color: var(--error-color);
-  margin-bottom: var(--spacing-lg);
-}
-
-.error-icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-}
-
-.close-btn {
-  margin-left: auto;
-  background: none;
-  border: none;
-  color: var(--error-color);
-  font-size: 20px;
-  cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
+/* 服务控制 */
 .service-card {
   margin-bottom: var(--spacing-lg);
 }
@@ -869,43 +828,7 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
-.btn-sm {
-  padding: var(--spacing-xs) var(--spacing-sm);
-  font-size: var(--font-size-sm);
-}
-
-.btn-icon {
-  width: 18px;
-  height: 18px;
-}
-
-.btn-icon.spinning {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.loading-indicator {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  margin-top: var(--spacing-md);
-  color: var(--text-secondary);
-}
-
-.spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--border-color);
-  border-top-color: var(--primary-color);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
+/* 性能监控网格 */
 .performance-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -913,11 +836,11 @@ onUnmounted(() => {
   margin-bottom: var(--spacing-lg);
 }
 
+/* 指标卡片 */
 .metric-card {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
-  /* 启用 GPU 加速，防止卡片更新时的闪烁 */
   transform: translateZ(0);
   will-change: transform;
 }
@@ -984,10 +907,10 @@ onUnmounted(() => {
   color: var(--text-primary);
 }
 
+/* 网络图 */
 .sparkline {
   height: 40px;
   margin-top: auto;
-  /* 启用 GPU 加速，减少闪烁 */
   transform: translateZ(0);
   will-change: transform;
   backface-visibility: hidden;
@@ -996,7 +919,6 @@ onUnmounted(() => {
 .sparkline svg {
   width: 100%;
   height: 100%;
-  /* 防止 SVG 重绘时的闪烁 */
   shape-rendering: geometricPrecision;
 }
 
@@ -1036,11 +958,16 @@ onUnmounted(() => {
   background-color: var(--info-color);
 }
 
+/* 卡片间距 */
 .process-card,
-.system-card {
+.system-card,
+.requests-card,
+.git-card,
+.health-card {
   margin-bottom: var(--spacing-lg);
 }
 
+/* 信息网格 */
 .process-info,
 .system-info {
   display: grid;
@@ -1048,34 +975,7 @@ onUnmounted(() => {
   gap: var(--spacing-md);
 }
 
-.info-item {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-sm) 0;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.info-item:last-child {
-  border-bottom: none;
-}
-
-.info-label {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
-
-.info-value {
-  font-size: var(--font-size-md);
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-/* 请求统计卡片样式 */
-.requests-card {
-  margin-bottom: var(--spacing-lg);
-}
-
+/* 请求统计 */
 .requests-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -1104,11 +1004,7 @@ onUnmounted(() => {
   color: var(--text-secondary);
 }
 
-/* Git操作状态卡片样式 */
-.git-card {
-  margin-bottom: var(--spacing-lg);
-}
-
+/* Git 状态 */
 .git-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -1168,11 +1064,7 @@ onUnmounted(() => {
   color: var(--text-secondary);
 }
 
-/* 健康状态卡片样式 */
-.health-card {
-  margin-bottom: var(--spacing-lg);
-}
-
+/* 健康状态 */
 .health-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -1197,23 +1089,5 @@ onUnmounted(() => {
   font-size: var(--font-size-md);
   font-weight: 600;
   color: var(--text-primary);
-}
-
-/* 文本颜色工具类 */
-.text-success {
-  color: var(--success-color);
-}
-
-.text-warning {
-  color: var(--warning-color);
-}
-
-.text-error {
-  color: var(--error-color);
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 </style>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import Alert from '../components/Alert.vue'
 import {
   isServiceRunning
 } from '../services/api'
@@ -343,25 +344,19 @@ onUnmounted(() => {
     <h1 class="page-title">日志</h1>
 
     <!-- 服务未启动提示 -->
-    <div v-if="!isServiceRunningStatus" class="info-alert">
-      <svg class="info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/>
-        <line x1="12" y1="16" x2="12" y2="12"/>
-        <line x1="12" y1="8" x2="12.01" y2="8"/>
-      </svg>
-      <span>服务未启动，请前往控制台启动服务以查看日志</span>
-    </div>
+    <Alert v-if="!isServiceRunningStatus" type="info">
+      服务未启动，请前往控制台启动服务以查看日志
+    </Alert>
 
     <!-- 错误提示 -->
-    <div v-else-if="error" class="error-alert">
-      <svg class="error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/>
-        <line x1="12" y1="8" x2="12" y2="12"/>
-        <line x1="12" y1="16" x2="12.01" y2="16"/>
-      </svg>
-      <span>{{ error }}</span>
-      <button class="close-btn" @click="error = null">×</button>
-    </div>
+    <Alert
+      v-else-if="error"
+      type="error"
+      closable
+      @close="error = null"
+    >
+      {{ error }}
+    </Alert>
 
     <!-- 工具栏 -->
     <div class="toolbar card">
@@ -401,10 +396,7 @@ onUnmounted(() => {
       <div class="toolbar-group search-group">
         <label class="toolbar-label">搜索</label>
         <div class="search-box">
-          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"/>
-            <path d="M21 21l-4.35-4.35"/>
-          </svg>
+          <img src="@/assets/icons/search.svg" class="search-icon" alt="search" />
           <input
             v-model="searchQuery"
             type="text"
@@ -428,34 +420,22 @@ onUnmounted(() => {
       <!-- 操作按钮 -->
       <div class="toolbar-group actions">
         <button class="btn btn-secondary btn-sm" @click="refreshLogs">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="23 4 23 10 17 10"/>
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-          </svg>
+          <img src="@/assets/icons/refresh.svg" class="btn-icon" alt="refresh" />
           刷新
         </button>
 
         <button class="btn btn-secondary btn-sm" @click="scrollToBottom">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
+          <img src="@/assets/icons/chevron-down.svg" class="btn-icon" alt="bottom" />
           底部
         </button>
 
         <button class="btn btn-secondary btn-sm" @click="exportLogs" :disabled="logEntries.length === 0">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
+          <img src="@/assets/icons/download.svg" class="btn-icon" alt="download" />
           导出
         </button>
 
         <button class="btn btn-secondary btn-sm" @click="clearDisplay" :disabled="logEntries.length === 0">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-          </svg>
+          <img src="@/assets/icons/trash.svg" class="btn-icon" alt="clear" />
           清空
         </button>
       </div>
@@ -472,13 +452,7 @@ onUnmounted(() => {
     <!-- 日志列表 -->
     <div class="log-container card">
       <div v-if="filteredLogEntries.length === 0" class="empty-state">
-        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="16" y1="13" x2="8" y2="13"/>
-          <line x1="16" y1="17" x2="8" y2="17"/>
-          <polyline points="10 9 9 9 8 9"/>
-        </svg>
+        <img src="@/assets/icons/log.svg" class="empty-icon" alt="empty" />
         <p>暂无日志</p>
       </div>
 
@@ -507,86 +481,15 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
+/* 页面标题 */
 .page-title {
-  font-size: var(--font-size-2xl);
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: var(--spacing-lg);
   flex-shrink: 0;
 }
 
-.info-alert {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  background-color: rgba(59, 130, 246, 0.1);
-  border: 1px solid var(--primary-color);
-  border-radius: var(--border-radius-md);
-  color: var(--primary-color);
-  margin-bottom: var(--spacing-md);
-  flex-shrink: 0;
-}
-
-.info-icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-}
-
-.error-alert {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  background-color: rgba(239, 68, 68, 0.1);
-  border: 1px solid var(--error-color);
-  border-radius: var(--border-radius-md);
-  color: var(--error-color);
-  margin-bottom: var(--spacing-md);
-  flex-shrink: 0;
-}
-
-.error-icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-}
-
-.close-btn {
-  margin-left: auto;
-  background: none;
-  border: none;
-  color: var(--error-color);
-  font-size: 20px;
-  cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
+/* 工具栏 */
 .toolbar {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
   margin-bottom: var(--spacing-md);
-  flex-wrap: wrap;
   flex-shrink: 0;
-}
-
-.toolbar-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.toolbar-label {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
 }
 
 .input-sm {
@@ -595,54 +498,9 @@ onUnmounted(() => {
   min-width: 100px;
 }
 
-.filter-group {
-  display: flex;
-  gap: var(--spacing-xs);
-}
-
-.filter-btn {
-  padding: var(--spacing-xs) var(--spacing-sm);
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-sm);
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.filter-btn:hover {
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.filter-btn.active {
-  background-color: var(--primary-color);
-  border-color: var(--primary-color);
-  color: white;
-}
-
 .search-group {
   flex: 1;
   min-width: 200px;
-}
-
-.search-box {
-  position: relative;
-}
-
-.search-icon {
-  position: absolute;
-  left: var(--spacing-sm);
-  top: 50%;
-  transform: translateY(-50%);
-  width: 16px;
-  height: 16px;
-  color: var(--text-muted);
-}
-
-.search-box .input {
-  padding-left: 32px;
 }
 
 .actions {
@@ -666,24 +524,9 @@ onUnmounted(() => {
   accent-color: var(--primary-color);
 }
 
-.btn-sm {
-  padding: var(--spacing-xs) var(--spacing-sm);
-  font-size: var(--font-size-sm);
-}
-
 .btn-icon {
   width: 14px;
   height: 14px;
-}
-
-.btn-icon.spinning {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* WebSocket 状态样式 */
@@ -695,23 +538,8 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: currentColor;
-}
-
-.status-disconnected {
-  color: var(--text-muted);
-}
-
 .status-disconnected .status-dot {
   background-color: var(--text-muted);
-}
-
-.status-connecting {
-  color: var(--warning-color);
 }
 
 .status-connecting .status-dot {
@@ -719,16 +547,8 @@ onUnmounted(() => {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
-.status-connected {
-  color: var(--success-color);
-}
-
 .status-connected .status-dot {
   background-color: var(--success-color);
-}
-
-.status-error {
-  color: var(--error-color);
 }
 
 .status-error .status-dot {
@@ -744,6 +564,7 @@ onUnmounted(() => {
   }
 }
 
+/* 日志统计 */
 .log-stats {
   display: flex;
   align-items: center;
@@ -755,16 +576,15 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
+/* 日志容器 */
 .log-container {
   flex: 1;
   overflow-y: auto;
   padding: 0;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: var(--font-size-sm);
 }
 
-.loading-state,
-.empty-state {
+/* 加载状态 */
+.loading-state {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -773,23 +593,13 @@ onUnmounted(() => {
   color: var(--text-muted);
 }
 
-.spinner {
+.loading-state .spinner {
   width: 24px;
   height: 24px;
-  border: 2px solid var(--border-color);
-  border-top-color: var(--primary-color);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
   margin-bottom: var(--spacing-sm);
 }
 
-.empty-icon {
-  width: 48px;
-  height: 48px;
-  margin-bottom: var(--spacing-md);
-  opacity: 0.5;
-}
-
+/* 日志条目 */
 .log-item {
   display: flex;
   align-items: flex-start;
@@ -811,20 +621,17 @@ onUnmounted(() => {
   color: var(--text-muted);
   white-space: nowrap;
   min-width: 140px;
-  font-size: var(--font-size-sm);
 }
 
 .log-logger {
   color: var(--text-secondary);
   white-space: nowrap;
-  font-size: var(--font-size-sm);
 }
 
 .log-message {
   color: var(--text-primary);
   word-break: break-all;
   flex: 1;
-  font-size: var(--font-size-sm);
 }
 
 .log-item.log-warn .log-message {
@@ -837,10 +644,5 @@ onUnmounted(() => {
 
 .log-item.log-debug .log-message {
   color: var(--text-secondary);
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 </style>

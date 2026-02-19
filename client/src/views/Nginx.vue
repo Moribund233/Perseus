@@ -813,36 +813,33 @@ onMounted(() => {
 }
 
 .page-title {
-  font-size: var(--font-size-2xl);
-  font-weight: 600;
-  color: var(--text-primary);
   margin: 0 0 var(--spacing-xl) 0;
 }
 
 /* 消息提示 */
 .message {
   padding: var(--spacing-md) var(--spacing-lg);
-  border-radius: var(--radius-md);
+  border-radius: var(--border-radius-md);
   margin-bottom: var(--spacing-lg);
   font-size: var(--font-size-sm);
 }
 
 .message.success {
-  background-color: var(--success-color-bg, rgba(34, 197, 94, 0.1));
-  color: var(--success-color, #22c55e);
-  border: 1px solid var(--success-color, #22c55e);
+  background-color: rgba(34, 197, 94, 0.1);
+  color: var(--success-color);
+  border: 1px solid var(--success-color);
 }
 
 .message.error {
-  background-color: var(--error-color-bg, rgba(239, 68, 68, 0.1));
-  color: var(--error-color, #ef4444);
-  border: 1px solid var(--error-color, #ef4444);
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--error-color);
+  border: 1px solid var(--error-color);
 }
 
 .message.info {
-  background-color: var(--info-color-bg, rgba(59, 130, 246, 0.1));
-  color: var(--info-color, #3b82f6);
-  border: 1px solid var(--info-color, #3b82f6);
+  background-color: rgba(59, 130, 246, 0.1);
+  color: var(--info-color);
+  border: 1px solid var(--info-color);
 }
 
 /* 状态卡片 */
@@ -867,38 +864,6 @@ onMounted(() => {
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
-}
-
-.status-badge {
-  padding: var(--spacing-xs) var(--spacing-md);
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-}
-
-.status-badge.status-unloaded {
-  background-color: var(--bg-tertiary);
-  color: var(--text-secondary);
-}
-
-.status-badge.status-running {
-  background-color: var(--success-color-bg, rgba(34, 197, 94, 0.2));
-  color: var(--success-color, #22c55e);
-}
-
-.status-badge.status-stopped {
-  background-color: var(--warning-color-bg, rgba(245, 158, 11, 0.2));
-  color: var(--warning-color, #f59e0b);
-}
-
-.status-badge.status-error {
-  background-color: var(--error-color-bg, rgba(239, 68, 68, 0.2));
-  color: var(--error-color, #ef4444);
-}
-
-.status-badge.status-unknown {
-  background-color: var(--bg-tertiary);
-  color: var(--text-secondary);
 }
 
 /* 状态详情 */
@@ -928,7 +893,7 @@ onMounted(() => {
   font-size: var(--font-size-xs);
   background-color: var(--bg-tertiary);
   padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--radius-sm);
+  border-radius: var(--border-radius-sm);
 }
 
 /* 操作按钮 */
@@ -936,53 +901,6 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-md);
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--border-radius-md);
-  font-size: var(--font-size-md);
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all var(--transition-fast);
-  white-space: nowrap;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background-color: var(--primary-color);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background-color: var(--primary-hover);
-}
-
-.btn-secondary {
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: #475569;
-}
-
-.btn-success {
-  background-color: var(--success-color);
-  color: white;
-}
-
-.btn-success:hover:not(:disabled) {
-  background-color: #059669;
 }
 
 .btn-danger {
@@ -994,15 +912,6 @@ onMounted(() => {
   background-color: #dc2626;
 }
 
-.btn-warning {
-  background-color: var(--warning-color);
-  color: white;
-}
-
-.btn-warning:hover:not(:disabled) {
-  background-color: #d97706;
-}
-
 .btn-info {
   background-color: var(--info-color);
   color: white;
@@ -1012,103 +921,12 @@ onMounted(() => {
   background-color: #0891b2;
 }
 
-.btn-sm {
-  padding: var(--spacing-xs) var(--spacing-sm);
-  font-size: var(--font-size-sm);
-}
-
 .btn.active {
   background-color: var(--primary-color);
   color: white;
 }
 
-/* 加载动画 */
-.loading-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid transparent;
-  border-top-color: currentColor;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* 模态框 */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background-color: var(--bg-secondary);
-  border-radius: var(--radius-lg);
-  width: 90%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-  border: 1px solid var(--border-color);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--spacing-lg);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: var(--font-size-lg);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: var(--font-size-xl);
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-md);
-}
-
-.close-btn:hover {
-  background-color: var(--bg-tertiary);
-}
-
-.modal-body {
-  padding: var(--spacing-lg);
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--spacing-md);
-  padding: var(--spacing-lg);
-  border-top: 1px solid var(--border-color);
-}
-
-/* 表单 */
+/* 表单扩展 */
 .form-group {
   margin-bottom: var(--spacing-lg);
 }
@@ -1121,22 +939,6 @@ onMounted(() => {
   margin-bottom: var(--spacing-sm);
 }
 
-.form-input {
-  width: 100%;
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: var(--font-size-sm);
-  box-sizing: border-box;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--primary-color);
-}
-
 .form-hint {
   display: block;
   margin-top: var(--spacing-xs);
@@ -1147,7 +949,7 @@ onMounted(() => {
 .form-info {
   background-color: var(--bg-tertiary);
   padding: var(--spacing-md);
-  border-radius: var(--radius-md);
+  border-radius: var(--border-radius-md);
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
 }
@@ -1217,41 +1019,8 @@ onMounted(() => {
   gap: var(--spacing-sm);
 }
 
-.forced-badge {
-  font-size: var(--font-size-xs);
-  font-weight: 500;
-  color: var(--warning-color);
-  background-color: rgba(245, 158, 11, 0.1);
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--warning-color);
-}
-
-.form-row {
-  display: flex;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
-  flex-wrap: wrap;
-}
-
 .form-row .form-group {
-  flex: 1;
-  min-width: 200px;
   margin-bottom: 0;
-}
-
-.form-row .form-group-full {
-  flex: 1 1 100%;
-}
-
-.form-group label {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: var(--spacing-sm);
 }
 
 .form-group input[type="checkbox"] {
@@ -1260,17 +1029,7 @@ onMounted(() => {
   cursor: pointer;
 }
 
-.form-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background-color: var(--bg-tertiary);
-}
-
 .config-actions {
-  display: flex;
-  gap: var(--spacing-md);
   justify-content: flex-end;
-  padding-top: var(--spacing-lg);
-  border-top: 1px solid var(--border-color);
 }
 </style>

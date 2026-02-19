@@ -228,6 +228,7 @@ export interface AppearanceConfig {
   theme: string
   language: string
   sidebar_collapsed: boolean
+  custom_css_vars?: Record<string, string>
 }
 
 /**

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
+import Alert from '../components/Alert.vue'
 import {
   updateAppConfig,
   resetAppConfig,
@@ -10,15 +11,15 @@ import {
   type ConfigResponse,
   type ClientConfig
 } from '../services/api'
-import { useServiceStore } from '../stores/service'
+import { useServiceStore, useThemeStore, presetThemes, adjustableCssVars } from '../stores'
 
 /**
  * 配置标签页类型
  */
-type ConfigTab = 'server' | 'client' | 'advanced'
+type ConfigTab = 'theme' | 'server' | 'client' | 'advanced'
 
 // 当前标签页
-const activeTab = ref<ConfigTab>('server')
+const activeTab = ref<ConfigTab>('theme')
 
 // 加载状态
 const isLoading = ref(false)
@@ -261,6 +262,43 @@ const getConnectionStatusText = (): string => {
   return isServiceRunning.value ? '已连接' : '未连接'
 }
 
+// ==================== 主题设置相关 ====================
+
+// 使用 Theme Store
+const themeStore = useThemeStore()
+
+/**
+ * 处理主题切换
+ */
+const handleThemeChange = (themeId: string): void => {
+  themeStore.switchTheme(themeId)
+}
+
+/**
+ * 处理CSS变量变化
+ */
+const handleCssVarChange = (name: string, value: string): void => {
+  if (value) {
+    themeStore.setCssVar(name, value)
+  }
+}
+
+/**
+ * 获取CSS变量占位符
+ */
+const getCssVarPlaceholder = (name: string): string => {
+  // 从computed style获取当前值
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return value || '默认'
+}
+
+/**
+ * 重置CSS变量
+ */
+const handleResetCssVars = (): void => {
+  themeStore.resetCustomCssVars()
+}
+
 onMounted(() => {
   loadConfigs()
 
@@ -278,24 +316,23 @@ onMounted(() => {
     <h1 class="page-title">设置</h1>
     
     <!-- 消息提示 -->
-    <div v-if="error" class="alert alert-error">
-      <svg class="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/>
-        <line x1="12" y1="8" x2="12" y2="12"/>
-        <line x1="12" y1="16" x2="12.01" y2="16"/>
-      </svg>
-      <span>{{ error }}</span>
-      <button class="close-btn" @click="error = null">×</button>
-    </div>
-    
-    <div v-if="successMessage" class="alert alert-success">
-      <svg class="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-        <polyline points="22 4 12 14.01 9 11.01"/>
-      </svg>
-      <span>{{ successMessage }}</span>
-      <button class="close-btn" @click="successMessage = null">×</button>
-    </div>
+    <Alert
+      v-if="error"
+      type="error"
+      closable
+      @close="error = null"
+    >
+      {{ error }}
+    </Alert>
+
+    <Alert
+      v-if="successMessage"
+      type="success"
+      closable
+      @close="successMessage = null"
+    >
+      {{ successMessage }}
+    </Alert>
     
     <!-- 连接状态卡片 -->
     <div class="card connection-card">
@@ -310,32 +347,41 @@ onMounted(() => {
         @click="checkServerConnection"
         :disabled="serviceStore.isRefreshing"
       >
-        <svg class="btn-icon" :class="{ spinning: serviceStore.isRefreshing }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="23 4 23 10 17 10"/>
-          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-        </svg>
+        <img
+          src="@/assets/icons/refresh.svg"
+          class="btn-icon"
+          :class="{ spinning: serviceStore.isRefreshing }"
+          alt="refresh"
+        />
         检查连接
       </button>
     </div>
     
     <!-- 标签页 -->
     <div class="tabs">
-      <button 
-        class="tab-btn" 
+      <button
+        class="tab-btn"
+        :class="{ active: activeTab === 'theme' }"
+        @click="activeTab = 'theme'"
+      >
+        主题
+      </button>
+      <button
+        class="tab-btn"
         :class="{ active: activeTab === 'server' }"
         @click="activeTab = 'server'"
       >
         服务端配置
       </button>
-      <button 
-        class="tab-btn" 
+      <button
+        class="tab-btn"
         :class="{ active: activeTab === 'client' }"
         @click="activeTab = 'client'"
       >
         客户端配置
       </button>
-      <button 
-        class="tab-btn" 
+      <button
+        class="tab-btn"
         :class="{ active: activeTab === 'advanced' }"
         @click="activeTab = 'advanced'"
       >
@@ -343,16 +389,66 @@ onMounted(() => {
       </button>
     </div>
     
+    <!-- 主题配置 -->
+    <div v-show="activeTab === 'theme'" class="config-section">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">主题选择</h2>
+        </div>
+
+        <div class="theme-grid">
+          <div
+            v-for="theme in presetThemes"
+            :key="theme.id"
+            class="theme-item"
+            :class="{ active: themeStore.currentThemeId === theme.id }"
+            @click="handleThemeChange(theme.id)"
+          >
+            <div
+              class="theme-preview"
+              :style="{ backgroundColor: theme.previewColor }"
+            ></div>
+            <span class="theme-name">{{ theme.name }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">外观设置</h2>
+        </div>
+
+        <div class="form-grid">
+          <div
+            v-for="cssVar in adjustableCssVars"
+            :key="cssVar.name"
+            class="form-group"
+          >
+            <label class="form-label">{{ cssVar.label }}</label>
+            <input
+              v-model="themeStore.customCssVars[cssVar.name]"
+              type="text"
+              class="form-input"
+              :placeholder="getCssVarPlaceholder(cssVar.name)"
+              @change="handleCssVarChange(cssVar.name, themeStore.customCssVars[cssVar.name])"
+            />
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-secondary" @click="handleResetCssVars">
+            重置为默认
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 服务端配置 -->
     <div v-show="activeTab === 'server'" class="config-section">
       <!-- 重启提示 -->
       <div class="card info-card">
         <p class="info-text">
-          <svg class="info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="16" x2="12" y2="12"/>
-            <line x1="12" y1="8" x2="12.01" y2="8"/>
-          </svg>
+          <img src="@/assets/icons/info.svg" class="info-icon icon-info" alt="info" />
           修改主机地址、端口或工作进程数后需要重启服务才能生效
         </p>
       </div>
@@ -409,13 +505,15 @@ onMounted(() => {
       
       <div class="form-actions">
         <button class="btn btn-primary" @click="saveServerConfig" :disabled="isSaving">
-          <svg v-if="isSaving" class="btn-icon spinning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="23 4 23 10 17 10"/>
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-          </svg>
+          <img
+            v-if="isSaving"
+            src="@/assets/icons/loader.svg"
+            class="btn-icon spinning"
+            alt="loading"
+          />
           <span v-else>保存服务端配置</span>
         </button>
-        
+
         <button class="btn btn-secondary" @click="handleResetConfig" :disabled="isSaving">
           重置为默认
         </button>
@@ -511,24 +609,22 @@ onMounted(() => {
       
       <div class="form-actions">
         <button class="btn btn-primary" @click="saveClientConfigHandler" :disabled="isSaving">
-          <svg v-if="isSaving" class="btn-icon spinning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="23 4 23 10 17 10"/>
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-          </svg>
+          <img
+            v-if="isSaving"
+            src="@/assets/icons/loader.svg"
+            class="btn-icon spinning"
+            alt="loading"
+          />
           <span v-else>保存客户端配置</span>
         </button>
       </div>
     </div>
-    
+
     <!-- 高级设置 -->
     <div v-show="activeTab === 'advanced'" class="config-section">
       <div class="card info-card">
         <p class="info-text">
-          <svg class="info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="16" x2="12" y2="12"/>
-            <line x1="12" y1="8" x2="12.01" y2="8"/>
-          </svg>
+          <img src="@/assets/icons/info.svg" class="info-icon icon-info" alt="info" />
           高级设置中的服务端配置项正在开发中，目前仅支持基础服务器设置
         </p>
       </div>
@@ -559,55 +655,7 @@ onMounted(() => {
   max-width: 1000px;
 }
 
-.page-title {
-  font-size: var(--font-size-2xl);
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: var(--spacing-lg);
-}
-
-.alert {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  border-radius: var(--border-radius-md);
-  margin-bottom: var(--spacing-md);
-}
-
-.alert-error {
-  background-color: rgba(239, 68, 68, 0.1);
-  border: 1px solid var(--error-color);
-  color: var(--error-color);
-}
-
-.alert-success {
-  background-color: rgba(16, 185, 129, 0.1);
-  border: 1px solid var(--success-color);
-  color: var(--success-color);
-}
-
-.alert-icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-}
-
-.close-btn {
-  margin-left: auto;
-  background: none;
-  border: none;
-  color: inherit;
-  font-size: 20px;
-  cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
+/* 连接卡片 */
 .connection-card {
   display: flex;
   align-items: center;
@@ -622,223 +670,21 @@ onMounted(() => {
   gap: var(--spacing-md);
 }
 
-.status-indicator {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background-color: var(--text-muted);
-}
-
-.status-online .status-indicator {
-  background-color: var(--success-color);
-  box-shadow: 0 0 8px var(--success-color);
-}
-
-.status-offline .status-indicator {
-  background-color: var(--error-color);
-}
-
-.status-info {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.status-text {
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
 .status-detail {
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
 }
 
-.tabs {
-  display: flex;
-  gap: var(--spacing-xs);
-  margin-bottom: var(--spacing-lg);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.tab-btn {
-  padding: var(--spacing-sm) var(--spacing-lg);
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-secondary);
-  font-size: var(--font-size-md);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.tab-btn:hover {
-  color: var(--text-primary);
-}
-
-.tab-btn.active {
-  color: var(--primary-color);
-  border-bottom-color: var(--primary-color);
-}
-
-.config-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-lg);
-}
-
-.card {
-  padding: var(--spacing-lg);
-}
-
-.card-header {
-  margin-bottom: var(--spacing-lg);
-}
-
-.card-title {
-  font-size: var(--font-size-lg);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: var(--spacing-lg);
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.form-label {
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.input {
-  width: 100%;
-}
-
-.input-group {
-  display: flex;
-  gap: var(--spacing-sm);
-}
-
-.input-group .input {
-  flex: 1;
-}
-
-.checkbox-group {
-  flex-direction: row;
-  align-items: center;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.checkbox-label input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--primary-color);
-}
-
-.form-actions {
-  display: flex;
-  gap: var(--spacing-md);
-  padding-top: var(--spacing-lg);
-  border-top: 1px solid var(--border-color);
-}
-
-.btn-sm {
-  padding: var(--spacing-xs) var(--spacing-sm);
-  font-size: var(--font-size-sm);
-}
-
-.btn-icon {
-  width: 16px;
-  height: 16px;
-}
-
-.btn-icon.spinning {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.danger-zone {
-  border: 1px solid var(--error-color);
-}
-
+/* 危险区域 */
 .danger-zone .card-title {
   color: var(--error-color);
-}
-
-.danger-actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-}
-
-.danger-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-md);
-  background-color: rgba(239, 68, 68, 0.05);
-  border-radius: var(--border-radius-md);
-}
-
-.danger-info h3 {
-  font-size: var(--font-size-md);
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: var(--spacing-xs);
-}
-
-.danger-info p {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
-
-/* 信息提示卡片 */
-.info-card {
-  background-color: rgba(59, 130, 246, 0.1);
-  border: 1px solid var(--primary-color);
-}
-
-.info-text {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  color: var(--primary-color);
-  font-size: var(--font-size-sm);
-  margin: 0;
-}
-
-.info-icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
 }
 
 /* 重启标签 */
 .restart-badge {
   display: inline-block;
   padding: 2px 8px;
-  background-color: var(--warning-color, #f59e0b);
+  background-color: var(--warning-color);
   color: white;
   font-size: var(--font-size-xs);
   border-radius: var(--border-radius-sm);
@@ -847,20 +693,57 @@ onMounted(() => {
 
 /* 帮助文本 */
 .help-text {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-  margin-top: var(--spacing-xs);
   margin-left: 26px;
 }
 
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+input:disabled {
+  background-color: var(--bg-secondary);
 }
 
-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background-color: var(--bg-secondary);
+/* 主题选择网格 */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--spacing-lg);
+  padding: var(--spacing-md);
+}
+
+.theme-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 2px solid transparent;
+}
+
+.theme-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.theme-item.active {
+  border-color: var(--primary-color);
+  background-color: var(--primary-light);
+}
+
+.theme-preview {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.theme-name {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.theme-item.active .theme-name {
+  color: var(--primary-color);
+  font-weight: 600;
 }
 </style>
