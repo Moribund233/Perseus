@@ -610,7 +610,6 @@ fn ensure_nginx_config_files(config_dir: &str) -> Result<(), String> {
                 }
             }
         }
-
     }
 
     Ok(())
@@ -753,12 +752,19 @@ fn stop_linux_nginx() -> NginxActionResponse {
         return success_response_with_status("Nginx未在运行", "stopped", None);
     }
 
-    // 获取配置目录作为工作目录
+    // 获取配置路径和配置目录
+    let conf_path = get_nginx_config_path();
     let config_dir = get_nginx_config_dir();
 
     // 首先尝试使用 quit 命令优雅停止
     let mut quit_cmd = Command::new("nginx");
     quit_cmd.arg("-s").arg("quit");
+
+    // 必须指定配置文件路径，否则nginx找不到PID文件
+    if let Some(ref conf_path) = conf_path {
+        quit_cmd.arg("-c").arg(conf_path);
+    }
+
     if let Some(ref config_dir) = config_dir {
         quit_cmd.current_dir(config_dir);
     }
@@ -776,6 +782,12 @@ fn stop_linux_nginx() -> NginxActionResponse {
             log::info!("Nginx -s quit 未能停止进程，尝试使用 -s stop");
             let mut stop_cmd = Command::new("nginx");
             stop_cmd.arg("-s").arg("stop");
+
+            // 同样必须指定配置文件路径
+            if let Some(ref conf_path) = conf_path {
+                stop_cmd.arg("-c").arg(conf_path);
+            }
+
             if let Some(ref config_dir) = config_dir {
                 stop_cmd.current_dir(config_dir);
             }
