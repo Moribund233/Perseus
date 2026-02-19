@@ -122,6 +122,39 @@ def check_write_permission(repo_path: str, user: User | None, db: Session) -> No
         )
 
 
+def resolve_repository(repo_path: str, db: Session):
+    """
+    解析仓库路径并验证仓库是否存在
+
+    Args:
+        repo_path: 仓库路径（如 username/repo-name）
+        db: 数据库会话
+
+    Returns:
+        Repository: 仓库对象
+
+    Raises:
+        HTTPException: 仓库不存在时抛出 404
+    """
+    from models.repository import Repository
+
+    repo = get_repository_by_path(repo_path, db)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found"
+        )
+
+    # 检查物理仓库是否存在
+    if not check_repository_exists(repo.path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found"
+        )
+
+    return repo
+
+
 @router.get("/{repo_path:path}/info/refs")
 @limiter.limit(RateLimitConfig.GIT_OPERATIONS, key_func=get_git_operation_key)
 async def git_refs(
@@ -188,7 +221,7 @@ async def git_refs(
         check_read_permission(repo_path, user, db)
 
     # 检查物理仓库是否存在
-    if not check_repository_exists(repo_path):
+    if not check_repository_exists(repo.path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Repository not found"
@@ -198,7 +231,7 @@ async def git_refs(
     try:
         backend_service = get_git_backend_service()
         status_code, headers, body = await backend_service.handle_request(
-            repo_path=repo_path,
+            repo_path=repo.path,
             request=request,
             body=None,
             remote_user=user.username if user else None
@@ -266,12 +299,8 @@ async def git_upload_pack(
     Raises:
         HTTPException: 仓库不存在或无权限
     """
-    # 检查仓库是否存在
-    if not check_repository_exists(repo_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Repository not found"
-        )
+    # 解析仓库并验证存在性
+    repo = resolve_repository(repo_path, db)
 
     # 获取认证用户
     user = extract_auth_user(request, db)
@@ -286,7 +315,7 @@ async def git_upload_pack(
         # 调用 git http-backend 处理请求
         backend_service = get_git_backend_service()
         status_code, headers, response_body = await backend_service.handle_request(
-            repo_path=repo_path,
+            repo_path=repo.path,
             request=request,
             body=body,
             remote_user=user.username if user else None
@@ -348,12 +377,8 @@ async def git_receive_pack(
     Raises:
         HTTPException: 仓库不存在或无权限
     """
-    # 检查仓库是否存在
-    if not check_repository_exists(repo_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Repository not found"
-        )
+    # 解析仓库并验证存在性
+    repo = resolve_repository(repo_path, db)
 
     # 获取认证用户
     user = extract_auth_user(request, db)
@@ -368,7 +393,7 @@ async def git_receive_pack(
         # 调用 git http-backend 处理请求
         backend_service = get_git_backend_service()
         status_code, headers, response_body = await backend_service.handle_request(
-            repo_path=repo_path,
+            repo_path=repo.path,
             request=request,
             body=body,
             remote_user=user.username if user else None
@@ -431,12 +456,8 @@ async def git_head(
     Returns:
         Response: HEAD 引用内容
     """
-    # 检查仓库是否存在
-    if not check_repository_exists(repo_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Repository not found"
-        )
+    # 解析仓库并验证存在性
+    repo = resolve_repository(repo_path, db)
 
     # 获取认证用户
     user = extract_auth_user(request, db) if request else None
@@ -448,7 +469,7 @@ async def git_head(
         # 调用 git http-backend 处理请求
         backend_service = get_git_backend_service()
         status_code, headers, body = await backend_service.handle_request(
-            repo_path=repo_path,
+            repo_path=repo.path,
             request=request,
             body=None,
             remote_user=user.username if user else None
@@ -494,12 +515,8 @@ async def git_objects(
     Returns:
         Response: 对象内容
     """
-    # 检查仓库是否存在
-    if not check_repository_exists(repo_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Repository not found"
-        )
+    # 解析仓库并验证存在性
+    repo = resolve_repository(repo_path, db)
 
     # 获取认证用户
     user = extract_auth_user(request, db) if request else None
@@ -511,7 +528,7 @@ async def git_objects(
         # 调用 git http-backend 处理请求
         backend_service = get_git_backend_service()
         status_code, headers, body = await backend_service.handle_request(
-            repo_path=repo_path,
+            repo_path=repo.path,
             request=request,
             body=None,
             remote_user=user.username if user else None
