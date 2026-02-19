@@ -76,16 +76,33 @@ def get_repository_by_path(repo_path: str, db: Session) -> Optional[Repository]:
     Returns:
         Repository: 仓库对象，不存在则返回 None
     """
-    # 尝试直接匹配路径
-    repo = db.query(Repository).filter(Repository.path == repo_path).first()
-    if repo:
-        return repo
+    # 尝试直接匹配路径（支持带或不带前导/后缀的匹配）
+    # 标准化路径：移除前导和尾随的 /
+    normalized_path = repo_path.strip('/')
+    
+    # 移除 .git 后缀（如果存在）
+    if normalized_path.endswith('.git'):
+        normalized_path = normalized_path[:-4]
+    
+    # 尝试多种路径格式匹配
+    path_variations = [
+        repo_path,                    # 原始路径
+        normalized_path,              # 无前后 /，无 .git
+        f"/{normalized_path}",        # 带前导 /
+        f"{normalized_path}/",         # 带尾随 /
+        f"/{normalized_path}/",        # 带前后 /
+    ]
+    
+    for path_var in path_variations:
+        repo = db.query(Repository).filter(Repository.path == path_var).first()
+        if repo:
+            return repo
 
-    # 尝试匹配 /{username}/{repo_name} 格式
-    parts = repo_path.strip('/').split('/')
+    # 尝试匹配 {username}/{repo_name} 格式
+    parts = normalized_path.split('/')
     if len(parts) >= 2:
-        username = parts[0]
-        repo_name = parts[1]
+        username = parts[-2]  # 倒数第二部分作为用户名
+        repo_name = parts[-1]  # 最后一部分作为仓库名
         user = db.query(User).filter(User.username == username).first()
         if user:
             repo = db.query(Repository).filter(
@@ -251,7 +268,7 @@ class GitHttpBackendService:
         request: Request,
         content_length: int = 0,
         remote_user: Optional[str] = None
-    ) -> Dict[str, str]:
+    ) -> Tuple[Dict[str, str], str]:
         """
         准备 git http-backend 的环境变量
         
@@ -264,27 +281,36 @@ class GitHttpBackendService:
             remote_user: 远程用户名（可选）
             
         Returns:
-            Dict[str, str]: 环境变量字典
+            Tuple[Dict[str, str], str]: (环境变量字典, 仓库根目录路径)
         """
         env = os.environ.copy()
-        
+
         # 获取绝对路径
         abs_repo_path = os.path.abspath(repo_path)
-        
+
         # GIT_PROJECT_ROOT 是仓库根目录（所有仓库的父目录）
-        # 如: D:\Project\Python\LanGit\repositories
-        repo_root = os.path.dirname(os.path.dirname(abs_repo_path))
+        # 从配置读取，确保与 get_repository_storage_path 使用相同的配置
+        from utils.config_utils import get_config_manager
+        config_manager = get_config_manager()
+        repo_root = config_manager.get("storage.repo_root", "./repositories")
+        repo_root = os.path.abspath(repo_root)
         
         # 构建 PATH_INFO
         # 请求路径如: /git/testuser/test-repo.git/info/refs
         # 转换为: /testuser/test-repo/info/refs (去掉 /git 前缀，去掉 .git 后缀)
         request_path = request.url.path
         
-        # 移除 /git 前缀
+        # 移除 /git 前缀，确保 PATH_INFO 以 / 开头
         if request_path.startswith('/git/'):
             path_info = request_path[4:]  # 保留 /testuser/test-repo.git/...
+        elif request_path.startswith('/git'):
+            path_info = request_path[4:]  # 处理 /git 情况
         else:
             path_info = request_path
+        
+        # 确保 path_info 以 / 开头（CGI 标准要求）
+        if not path_info.startswith('/'):
+            path_info = '/' + path_info
         
         # 移除 .git 后缀（从仓库名部分）
         # 如: /testuser/test-repo.git/info/refs -> /testuser/test-repo/info/refs
@@ -334,7 +360,7 @@ class GitHttpBackendService:
             if env_header_name not in env:
                 env[env_header_name] = header_value
         
-        return env
+        return env, repo_root
     
     def _parse_cgi_response(self, stdout: bytes) -> Tuple[int, Dict[str, str], bytes]:
         """
@@ -438,18 +464,19 @@ class GitHttpBackendService:
         
         # 准备环境变量
         content_length = len(body) if body else 0
-        env = self._prepare_environment(physical_path, request, content_length, remote_user)
-        
+        env, repo_root = self._prepare_environment(physical_path, request, content_length, remote_user)
+
         try:
             # 使用 asyncio 创建异步子进程
             # 这样可以避免阻塞 FastAPI 的事件循环，支持高并发
+            # cwd 设置为 GIT_PROJECT_ROOT，让 git http-backend 能正确解析 PATH_INFO
             process = await asyncio.create_subprocess_exec(
                 self._git_backend_path, 'http-backend',
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
-                cwd=physical_path if os.path.isdir(physical_path) else os.path.dirname(physical_path)
+                cwd=repo_root
             )
             
             # 设置超时

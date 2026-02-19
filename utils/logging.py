@@ -259,6 +259,11 @@ def init_logging(
         LogManager: 日志管理器实例
     """
     global _log_manager
+
+    # 如果日志系统已经初始化，直接返回现有实例（幂等性）
+    if _log_manager is not None:
+        return _log_manager
+
     _log_manager = LogManager(
         log_dir=log_dir,
         app_name=app_name,
