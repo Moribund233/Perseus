@@ -12,11 +12,11 @@ pub mod nginx_manager;
 pub mod process_manager;
 pub mod secure_config;
 
-use tauri::Manager;
+use tauri::{Manager, RunEvent};
 
 /// 运行 Tauri 应用
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // 初始化日志插件
@@ -97,6 +97,29 @@ pub fn run() {
             commands::is_elevated,
             commands::get_jwt_secret_key,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    // 运行应用并处理退出事件
+    app.run(|_app_handle, event| {
+        match event {
+            RunEvent::ExitRequested { .. } => {
+                log::info!("应用退出请求，执行清理...");
+
+                // 停止 Nginx 服务
+                let nginx_result = nginx_manager::stop_nginx();
+                if !nginx_result.success {
+                    log::warn!("停止 Nginx 失败: {}", nginx_result.message);
+                }
+
+                // 停止服务端进程
+                if let Err(e) = process_manager::stop_server() {
+                    log::warn!("停止服务端失败: {}", e);
+                }
+
+                log::info!("清理完成");
+            }
+            _ => {}
+        }
+    });
 }

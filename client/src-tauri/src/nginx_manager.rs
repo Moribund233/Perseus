@@ -1354,7 +1354,7 @@ pub fn generate_nginx_config(config: &crate::models::NginxProxyConfig, config_di
             nginx_conf.push_str(&format!("            proxy_pass {};\n", config.backend_url));
         }
 
-        nginx_conf.push_str("            proxy_set_header Host $host;\n");
+        nginx_conf.push_str("            proxy_set_header Host $http_host;\n");
         nginx_conf.push_str("            proxy_set_header X-Real-IP $remote_addr;\n");
         nginx_conf
             .push_str("            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n");
@@ -1362,6 +1362,9 @@ pub fn generate_nginx_config(config: &crate::models::NginxProxyConfig, config_di
 
         // 转发所有原始请求头（包括自定义头如 X-LanGit-Local）
         nginx_conf.push_str("            proxy_pass_request_headers on;\n");
+
+        // 处理后端重定向 - 替换Location头中的后端地址为代理地址
+        nginx_conf.push_str("            proxy_redirect ~^http://[^/]+(/.+)$ $scheme://$http_host$1;\n");
 
         // 添加超时设置
         nginx_conf.push_str(&format!(
@@ -1422,7 +1425,7 @@ pub fn generate_nginx_config(config: &crate::models::NginxProxyConfig, config_di
             nginx_conf.push_str(&format!("            proxy_pass {};\n", config.backend_url));
         }
 
-        nginx_conf.push_str("            proxy_set_header Host $host;\n");
+        nginx_conf.push_str("            proxy_set_header Host $http_host;\n");
         nginx_conf.push_str("            proxy_set_header X-Real-IP $remote_addr;\n");
         nginx_conf
             .push_str("            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n");
@@ -1430,6 +1433,9 @@ pub fn generate_nginx_config(config: &crate::models::NginxProxyConfig, config_di
 
         // 转发所有原始请求头（包括自定义头如 X-LanGit-Local）
         nginx_conf.push_str("            proxy_pass_request_headers on;\n");
+
+        // 处理后端重定向 - 替换Location头中的后端地址为代理地址
+        nginx_conf.push_str("            proxy_redirect ~^http://[^/]+(/.+)$ $scheme://$http_host$1;\n");
 
         // 添加超时设置
         nginx_conf.push_str(&format!(
@@ -1469,7 +1475,7 @@ pub fn generate_nginx_config(config: &crate::models::NginxProxyConfig, config_di
             nginx_conf.push_str(&format!("            proxy_pass {};\n", config.backend_url));
         }
 
-        nginx_conf.push_str("            proxy_set_header Host $host;\n");
+        nginx_conf.push_str("            proxy_set_header Host $http_host;\n");
         nginx_conf.push_str("            proxy_set_header X-Real-IP $remote_addr;\n");
         nginx_conf
             .push_str("            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n");
@@ -1477,6 +1483,9 @@ pub fn generate_nginx_config(config: &crate::models::NginxProxyConfig, config_di
 
         // 转发所有原始请求头（包括自定义头如 X-LanGit-Local）
         nginx_conf.push_str("            proxy_pass_request_headers on;\n");
+
+        // 处理后端重定向 - 替换Location头中的后端地址为代理地址
+        nginx_conf.push_str("            proxy_redirect ~^http://[^/]+(/.+)$ $scheme://$http_host$1;\n");
 
         // 添加超时设置
         nginx_conf.push_str(&format!(
