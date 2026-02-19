@@ -7,7 +7,6 @@ use once_cell::sync::Lazy;
  */
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
-use std::time::Duration;
 use sysinfo::System;
 
 use crate::config;
@@ -16,7 +15,7 @@ use crate::config;
 static SERVER_PID: Lazy<Mutex<Option<u32>>> = Lazy::new(|| Mutex::new(None));
 
 /// 全局 System 实例，用于持续监控
-static SYSTEM: Lazy<Mutex<System>> = Lazy::new(|| Mutex::new(System::new_all()));
+pub static SYSTEM: Lazy<Mutex<System>> = Lazy::new(|| Mutex::new(System::new_all()));
 
 /// 默认服务端可执行文件名（向后兼容）
 pub const DEFAULT_SERVER_EXE_NAME: &str = "langit-server.exe";
@@ -249,13 +248,7 @@ pub fn get_server_info() -> Option<ProcessInfo> {
 
     let mut system = SYSTEM.lock().unwrap();
 
-    // 首先刷新所有信息
-    system.refresh_all();
-
-    // 短暂等待以获取CPU使用率差值
-    std::thread::sleep(Duration::from_millis(500));
-
-    // 再次刷新进程和CPU信息
+    // 刷新进程和CPU信息
     system.refresh_process(sysinfo::Pid::from(pid as usize));
     system.refresh_cpu();
 
@@ -284,14 +277,9 @@ pub struct ProcessInfo {
 pub fn get_system_resources() -> SystemResources {
     let mut system = SYSTEM.lock().unwrap();
 
-    // 首先刷新所有信息（包括CPU列表）
-    system.refresh_all();
-
-    // 短暂等待以获取CPU使用率差值
-    std::thread::sleep(Duration::from_millis(500));
-
-    // 再次刷新CPU信息
+    // 刷新CPU和内存信息
     system.refresh_cpu();
+    system.refresh_memory();
 
     let total_memory = system.total_memory();
     let used_memory = system.used_memory();

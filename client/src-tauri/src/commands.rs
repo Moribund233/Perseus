@@ -242,27 +242,29 @@ pub async fn get_health_status() -> Result<serde_json::Value, String> {
 /// 获取本地系统信息
 #[tauri::command]
 pub fn get_local_system_info() -> Result<SystemInfo, String> {
-    use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
+    use sysinfo::System;
 
-    let mut sys = System::new_with_specifics(
-        RefreshKind::new()
-            .with_cpu(CpuRefreshKind::everything())
-            .with_memory(MemoryRefreshKind::everything()),
-    );
+    // 使用全局 SYSTEM 实例，避免每次都重新初始化
+    let mut system = process_manager::SYSTEM.lock().unwrap();
 
-    // 刷新系统信息
-    sys.refresh_all();
+    // 刷新CPU和内存信息
+    system.refresh_cpu();
+    system.refresh_memory();
 
     // 获取CPU信息
-    let cpu_count = sys.cpus().len() as i32;
-    let cpu_freq_mhz = sys.cpus().first().map(|c| c.frequency() as f64);
-    // global_cpu_usage() 需要刷新后才能使用
-    let cpu_percent =
-        sys.cpus().iter().map(|c| c.cpu_usage() as f64).sum::<f64>() / cpu_count as f64;
+    let cpu_count = system.cpus().len() as i32;
+    let cpu_freq_mhz = system.cpus().first().map(|c| c.frequency() as f64);
+    // 计算平均CPU使用率
+    let cpu_percent = system
+        .cpus()
+        .iter()
+        .map(|c| c.cpu_usage() as f64)
+        .sum::<f64>()
+        / cpu_count as f64;
 
     // 获取内存信息（sysinfo 0.30 返回的是字节，转换为GB需要除以 1024 * 1024 * 1024）
-    let memory_total_gb = sys.total_memory() as f64 / (1024.0 * 1024.0 * 1024.0);
-    let memory_used_gb = sys.used_memory() as f64 / (1024.0 * 1024.0 * 1024.0);
+    let memory_total_gb = system.total_memory() as f64 / (1024.0 * 1024.0 * 1024.0);
+    let memory_used_gb = system.used_memory() as f64 / (1024.0 * 1024.0 * 1024.0);
     let memory_percent = if memory_total_gb > 0.0 {
         (memory_used_gb / memory_total_gb) * 100.0
     } else {
@@ -276,7 +278,7 @@ pub fn get_local_system_info() -> Result<SystemInfo, String> {
     // 获取主机名和处理器信息
     // host_name() 和 kernel_version() 是关联函数，不是方法
     let hostname = System::host_name().unwrap_or_else(|| "Unknown".to_string());
-    let processor = sys
+    let processor = system
         .cpus()
         .first()
         .map(|c| c.brand().to_string())
