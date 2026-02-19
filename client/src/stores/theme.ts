@@ -43,37 +43,37 @@ export const presetColorThemes: ColorThemeConfig[] = [
   {
     id: 'dark',
     name: '深色主题',
-    file: '/src/assets/themes/dark.css',
+    file: '/themes/dark.css',
     previewColor: '#3b82f6'
   },
   {
     id: 'light',
     name: '浅色主题',
-    file: '/src/assets/themes/light.css',
+    file: '/themes/light.css',
     previewColor: '#3b82f6'
   },
   {
     id: 'purple',
     name: '紫色主题',
-    file: '/src/assets/themes/purple.css',
+    file: '/themes/purple.css',
     previewColor: '#a78bfa'
   },
   {
     id: 'green',
     name: '绿色主题',
-    file: '/src/assets/themes/green.css',
+    file: '/themes/green.css',
     previewColor: '#5eead4'
   },
   {
     id: 'warm',
     name: '暖色主题',
-    file: '/src/assets/themes/warm.css',
+    file: '/themes/warm.css',
     previewColor: '#f59e0b'
   },
   {
     id: 'blue',
     name: '蓝色主题',
-    file: '/src/assets/themes/blue.css',
+    file: '/themes/blue.css',
     previewColor: '#3b82f6'
   }
 ]
@@ -85,22 +85,22 @@ export const layoutDensityPresets: LayoutDensityConfig[] = [
   {
     id: 'compact',
     name: '紧凑布局',
-    file: '/src/assets/themes/compact.css'
+    file: '/themes/compact.css'
   },
   {
     id: 'default',
     name: '默认布局',
-    file: '/src/assets/themes/default.css'
+    file: '/themes/default.css'
   },
   {
     id: 'comfortable',
     name: '舒适布局',
-    file: '/src/assets/themes/comfortable.css'
+    file: '/themes/comfortable.css'
   },
   {
     id: 'spacious',
     name: '宽松布局',
-    file: '/src/assets/themes/spacious.css'
+    file: '/themes/spacious.css'
   }
 ]
 

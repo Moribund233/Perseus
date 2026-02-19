@@ -171,8 +171,16 @@ pub fn start_server() -> Result<u32, String> {
     // 构建启动命令
     let mut cmd = Command::new(&server_exe);
     cmd.current_dir(&server_dir)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+
+    // Windows: 隐藏控制台窗口，后台运行
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
 
     // 注入环境变量
     for (key, value) in env_vars {
