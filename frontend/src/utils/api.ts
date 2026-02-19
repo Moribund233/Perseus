@@ -140,7 +140,7 @@ export const userApi = {
     credentials: { username: string; password: string },
     rememberMe: boolean = false
   ) => {
-    const response = await apiRequest<LoginResponse>('/api/users/login', {
+    const response = await apiRequest<LoginResponse>('/api/v1/auth/login', {
       method: 'POST',
       body: credentials
     });
@@ -171,7 +171,7 @@ export const userApi = {
       full_name?: string;
       is_active: boolean;
       is_admin: boolean;
-    }>('/api/users', {
+    }>('/api/v1/users', {
       method: 'POST',
       body: userData
     });
@@ -186,7 +186,7 @@ export const userApi = {
     }
 
     // 如果没有，尝试从 API 获取
-    const response = await apiRequest<LoginResponse>('/api/users/me', {
+    const response = await apiRequest<LoginResponse>('/api/v1/users/me', {
       method: 'GET',
       requireAuth: true
     });
@@ -201,7 +201,7 @@ export const userApi = {
 
   // 更新当前用户信息
   updateCurrentUser: async (userData: Partial<LoginResponse>) => {
-    const response = await apiRequest<LoginResponse>('/api/users/me', {
+    const response = await apiRequest<LoginResponse>('/api/v1/users/me', {
       method: 'PUT',
       body: userData,
       requireAuth: true
@@ -240,7 +240,7 @@ export const userApi = {
 export const repositoryApi = {
   // 获取仓库列表
   getRepositories: async () => {
-    return apiRequest<any[]>('/api/repositories', {
+    return apiRequest<any[]>('/api/v1/repositories/', {
       method: 'GET',
       requireAuth: true
     });
@@ -248,7 +248,7 @@ export const repositoryApi = {
 
   // 获取单个仓库
   getRepository: async (repoId: number) => {
-    return apiRequest<any>(`/api/repositories/${repoId}`, {
+    return apiRequest<any>(`/api/v1/repositories/${repoId}`, {
       method: 'GET',
       requireAuth: true
     });
@@ -263,7 +263,7 @@ export const repositoryApi = {
     is_public?: boolean;
     default_branch?: string;
   }) => {
-    return apiRequest<any>('/api/repositories', {
+    return apiRequest<any>('/api/v1/repositories', {
       method: 'POST',
       body: repoData,
       requireAuth: true
@@ -277,7 +277,7 @@ export const repositoryApi = {
     is_public?: boolean;
     default_branch?: string;
   }) => {
-    return apiRequest<any>(`/api/repositories/${repoId}`, {
+    return apiRequest<any>(`/api/v1/repositories/${repoId}`, {
       method: 'PUT',
       body: repoData,
       requireAuth: true
@@ -286,7 +286,7 @@ export const repositoryApi = {
 
   // 删除仓库
   deleteRepository: async (repoId: number) => {
-    return apiRequest<void>(`/api/repositories/${repoId}`, {
+    return apiRequest<void>(`/api/v1/repositories/${repoId}`, {
       method: 'DELETE',
       requireAuth: true
     });
@@ -299,7 +299,7 @@ export const commitApi = {
   getCommits: async (repoId: number, options?: { limit?: number }) => {
     const params = new URLSearchParams();
     if (options?.limit) params.append('limit', options.limit.toString());
-    return apiRequest<any[]>(`/api/repositories/${repoId}/commits?${params.toString()}`, {
+    return apiRequest<any[]>(`/api/v1/repositories/${repoId}/commits?${params.toString()}`, {
       method: 'GET',
       requireAuth: true
     });
@@ -307,7 +307,7 @@ export const commitApi = {
 
   // 获取单个提交详情
   getCommit: async (repoId: number, commitHash: string) => {
-    return apiRequest<any>(`/api/repositories/${repoId}/commits/${commitHash}`, {
+    return apiRequest<any>(`/api/v1/repositories/${repoId}/commits/${commitHash}`, {
       method: 'GET',
       requireAuth: true
     });
@@ -318,7 +318,7 @@ export const commitApi = {
 export const branchApi = {
   // 获取分支列表
   getBranches: async (repoId: number) => {
-    return apiRequest<any[]>(`/api/repositories/${repoId}/branches`, {
+    return apiRequest<any[]>(`/api/v1/repositories/${repoId}/branches`, {
       method: 'GET',
       requireAuth: true
     });
@@ -326,7 +326,7 @@ export const branchApi = {
 
   // 创建分支
   createBranch: async (repoId: number, branchData: { name: string; base_branch?: string }) => {
-    return apiRequest<any>(`/api/repositories/${repoId}/branches`, {
+    return apiRequest<any>(`/api/v1/repositories/${repoId}/branches`, {
       method: 'POST',
       body: branchData,
       requireAuth: true
@@ -335,7 +335,7 @@ export const branchApi = {
 
   // 删除分支
   deleteBranch: async (repoId: number, branchName: string) => {
-    return apiRequest<void>(`/api/repositories/${repoId}/branches/${branchName}`, {
+    return apiRequest<void>(`/api/v1/repositories/${repoId}/branches/${branchName}`, {
       method: 'DELETE',
       requireAuth: true
     });
@@ -349,7 +349,7 @@ export const repositoryBrowserApi = {
     const params = new URLSearchParams();
     params.append('ref', ref);
     if (path) params.append('path', path);
-    return apiRequest<any>(`/api/repositories/${repoId}/tree?${params.toString()}`, {
+    return apiRequest<any>(`/api/v1/repositories/${repoId}/tree?${params.toString()}`, {
       method: 'GET',
       requireAuth: true
     });
@@ -360,7 +360,7 @@ export const repositoryBrowserApi = {
     const params = new URLSearchParams();
     params.append('path', path);
     params.append('ref', ref);
-    return apiRequest<any>(`/api/repositories/${repoId}/blob?${params.toString()}`, {
+    return apiRequest<any>(`/api/v1/repositories/${repoId}/blob?${params.toString()}`, {
       method: 'GET',
       requireAuth: true
     });
@@ -372,7 +372,7 @@ export const repositoryBrowserApi = {
     params.append('ref', ref);
     params.append('limit', limit.toString());
     params.append('offset', offset.toString());
-    return apiRequest<any>(`/api/repositories/${repoId}/commits?${params.toString()}`, {
+    return apiRequest<any>(`/api/v1/repositories/${repoId}/commits?${params.toString()}`, {
       method: 'GET',
       requireAuth: true
     });
@@ -384,7 +384,7 @@ export const repositoryBrowserApi = {
     if (baseRef) params.append('base', baseRef);
     if (headRef) params.append('head', headRef);
     if (path) params.append('path', path);
-    return apiRequest<any>(`/api/repositories/${repoId}/diff?${params.toString()}`, {
+    return apiRequest<any>(`/api/v1/repositories/${repoId}/diff?${params.toString()}`, {
       method: 'GET',
       requireAuth: true
     });

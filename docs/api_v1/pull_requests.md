@@ -2,7 +2,7 @@
 
 ## PR 列表
 
-### GET /api/repositories/{repo_id}/pull-requests
+### GET /api/v1/v1/repositories/{repo_id}/pull-requests
 
 获取 PR 列表。
 
@@ -52,7 +52,7 @@
 
 ## 创建 PR
 
-### POST /api/repositories/{repo_id}/pull-requests
+### POST /api/v1/v1/repositories/{repo_id}/pull-requests
 
 创建 Pull Request（需要认证）。
 
@@ -100,7 +100,7 @@
 
 ## 获取 PR 详情
 
-### GET /api/repositories/{repo_id}/pull-requests/{pr_number}
+### GET /api/v1/v1/repositories/{repo_id}/pull-requests/{pr_number}
 
 获取 PR 详情（包含评论和审查）。
 
@@ -140,7 +140,7 @@
 
 ## 更新 PR
 
-### PATCH /api/repositories/{repo_id}/pull-requests/{pr_number}
+### PATCH /api/v1/v1/repositories/{repo_id}/pull-requests/{pr_number}
 
 更新 Pull Request（需要认证）。
 
@@ -157,7 +157,7 @@
 
 ## 关闭 PR
 
-### POST /api/repositories/{repo_id}/pull-requests/{pr_number}/close
+### POST /api/v1/v1/repositories/{repo_id}/pull-requests/{pr_number}/close
 
 关闭 Pull Request（需要认证）。
 
@@ -165,7 +165,7 @@
 
 ## 合并 PR
 
-### POST /api/repositories/{repo_id}/pull-requests/{pr_number}/merge
+### POST /api/v1/v1/repositories/{repo_id}/pull-requests/{pr_number}/merge
 
 合并 Pull Request（需要认证）。
 
@@ -187,11 +187,11 @@
 
 ## PR 评论
 
-### GET /api/repositories/{repo_id}/pull-requests/{pr_number}/comments
+### GET /api/v1/v1/repositories/{repo_id}/pull-requests/{pr_number}/comments
 
 获取 PR 评论列表。
 
-### POST /api/repositories/{repo_id}/pull-requests/{pr_number}/comments
+### POST /api/v1/v1/repositories/{repo_id}/pull-requests/{pr_number}/comments
 
 创建 PR 评论（需要认证）。
 
@@ -211,7 +211,7 @@
 
 ## PR 审查
 
-### POST /api/repositories/{repo_id}/pull-requests/{pr_number}/reviews
+### POST /api/v1/v1/repositories/{repo_id}/pull-requests/{pr_number}/reviews
 
 创建 PR 审查（需要认证）。
 

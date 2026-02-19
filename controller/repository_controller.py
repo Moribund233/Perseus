@@ -3,7 +3,7 @@
 
 处理与仓库相关的HTTP请求，调用服务层方法并返回响应
 """
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request, status, HTTPException
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -29,13 +29,12 @@ from services.repository_service import (
 )
 
 # 创建路由实例
-router = APIRouter(prefix="/api/repositories", tags=["repositories"])
+router = APIRouter(prefix="/api/v1/repositories", tags=["repositories"])
 
 # 安全方案
 security = HTTPBearer(auto_error=False)
 
 
-@router.get("")
 @router.get("/")
 def get_repositories(
     db: Session = Depends(get_db),
@@ -111,7 +110,6 @@ def get_repository(
     return service_get_repository_by_id(repo_id, db)
 
 
-@router.post("")
 @router.post("/")
 @limiter.limit(RateLimitConfig.STANDARD)
 def create_repository(
@@ -123,9 +121,12 @@ def create_repository(
     """
     创建新仓库（需要认证）
 
+    路径自动生成，格式为: {username}/{repo_name}
+    符合 Git HTTP 标准 URL 格式
+
     Args:
         request: HTTP请求对象（用于速率限制）
-        repo: 仓库信息
+        repo: 仓库信息（包含 name, description, is_public, default_branch 等）
         db: 数据库会话
         current_user: 当前认证用户
 
@@ -136,8 +137,20 @@ def create_repository(
         ValidationException: 请求参数不完整时抛出422异常
         ConflictException: 仓库路径已存在时抛出409异常
     """
+    # 验证必要参数
+    if "name" not in repo:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Repository name is required"
+        )
+
     # 设置当前用户为仓库所有者
     repo["owner_id"] = current_user.id
+
+    # 自动生成路径，格式: {username}/{repo_name}
+    # 这是 Git HTTP 标准 URL 格式，如: admin/test-repo
+    repo["path"] = f"{current_user.username}/{repo['name']}"
+
     return service_create_repository(repo, db)
 
 

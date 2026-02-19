@@ -19,11 +19,10 @@ from services.member_service import (
 )
 
 # 创建路由实例
-router = APIRouter(prefix="/api/repositories", tags=["repository_members"])
+router = APIRouter(prefix="/api/v1/repositories", tags=["repository_members"])
 
 
 @router.get("/{repo_id}/members")
-@router.get("/{repo_id}/members/")
 def get_repository_members(repo_id: int, db: Session = Depends(get_db)):
     """
     获取仓库的所有成员

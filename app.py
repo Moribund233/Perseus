@@ -25,8 +25,7 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
         title=config.app.title,
         description=config.app.description,
         version=config.app.version,
-        debug=config.app.debug,
-        redirect_slashes=False,  # 禁用尾部斜杠重定向，避免CORS问题
+        debug=config.app.debug
     )
 
     # 添加安全响应头中间件（最先添加，确保所有响应都包含安全头）
@@ -90,6 +89,12 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     # 包含所有 API v1 路由（包括根路由、健康检查、应用管理等）
     from api.api_v1 import api_v1_router
     app.include_router(api_v1_router)
+
+    # 注册 Git HTTP 协议路由（根路径，遵循 Gitee/GitHub 标准）
+    # 必须在 API v1 路由之后注册，避免路由冲突
+    # URL 格式: /{username}/{repo_name}.git/...
+    from controller.git_http_controller import router as git_http_router
+    app.include_router(git_http_router)
 
     # 设置全局异常处理器（必须在路由注册之后设置，确保能捕获所有异常）
     from utils.exception_handler import setup_exception_handlers

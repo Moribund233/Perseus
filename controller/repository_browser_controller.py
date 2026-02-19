@@ -23,7 +23,7 @@ from utils.git_utils import get_repository_storage_path
 from exception import NotFoundException
 
 # 创建路由实例
-router = APIRouter(prefix="/api/repositories", tags=["repository-browser"])
+router = APIRouter(prefix="/api/v1/repositories", tags=["repository-browser"])
 
 
 def _get_repo_path(repo_id: int, db: Session) -> str:

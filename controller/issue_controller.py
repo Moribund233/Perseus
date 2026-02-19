@@ -26,7 +26,7 @@ from services.issue_service import (
 )
 
 # 创建路由实例
-router = APIRouter(tags=["issues"])
+router = APIRouter(prefix="/api/v1/repositories", tags=["issues"])
 
 
 class IssueCreateRequest(BaseModel):
@@ -66,7 +66,7 @@ class LabelUpdateRequest(BaseModel):
     description: Optional[str] = Field(None, max_length=255, description="标签描述")
 
 
-@router.get("/api/repositories/{repo_id}/issues")
+@router.get("/{repo_id}/issues")
 def list_issues(
     repo_id: int,
     status: Optional[str] = Query(None, description="状态筛选：open/closed"),
@@ -105,7 +105,7 @@ def list_issues(
     )
 
 
-@router.post("/api/repositories/{repo_id}/issues")
+@router.post("/{repo_id}/issues")
 def create_issue(
     repo_id: int,
     data: IssueCreateRequest,
@@ -136,7 +136,7 @@ def create_issue(
     )
 
 
-@router.get("/api/repositories/{repo_id}/issues/{issue_number}")
+@router.get("/{repo_id}/issues/{issue_number}")
 def get_issue(
     repo_id: int,
     issue_number: int,
@@ -161,7 +161,7 @@ def get_issue(
     )
 
 
-@router.patch("/api/repositories/{repo_id}/issues/{issue_number}")
+@router.patch("/{repo_id}/issues/{issue_number}")
 async def update_issue(
     repo_id: int,
     issue_number: int,
@@ -195,7 +195,7 @@ async def update_issue(
     )
 
 
-@router.post("/api/repositories/{repo_id}/issues/{issue_number}/close")
+@router.post("/{repo_id}/issues/{issue_number}/close")
 async def close_issue(
     repo_id: int,
     issue_number: int,
@@ -222,7 +222,7 @@ async def close_issue(
     )
 
 
-@router.post("/api/repositories/{repo_id}/issues/{issue_number}/reopen")
+@router.post("/{repo_id}/issues/{issue_number}/reopen")
 async def reopen_issue(
     repo_id: int,
     issue_number: int,
@@ -251,7 +251,7 @@ async def reopen_issue(
 
 # ==================== Issue 评论 ====================
 
-@router.get("/api/repositories/{repo_id}/issues/{issue_number}/comments")
+@router.get("/{repo_id}/issues/{issue_number}/comments")
 async def list_issue_comments(
     repo_id: int,
     issue_number: int,
@@ -275,7 +275,7 @@ async def list_issue_comments(
     )
 
 
-@router.post("/api/repositories/{repo_id}/issues/{issue_number}/comments")
+@router.post("/{repo_id}/issues/{issue_number}/comments")
 async def create_issue_comment(
     repo_id: int,
     issue_number: int,
@@ -307,7 +307,7 @@ async def create_issue_comment(
 
 # ==================== Label 管理 ====================
 
-@router.get("/api/repositories/{repo_id}/labels")
+@router.get("/{repo_id}/labels")
 def list_labels(
     repo_id: int,
     db: Session = Depends(get_db)
@@ -328,7 +328,7 @@ def list_labels(
     )
 
 
-@router.post("/api/repositories/{repo_id}/labels")
+@router.post("/{repo_id}/labels")
 def create_label(
     repo_id: int,
     data: LabelCreateRequest,
@@ -354,7 +354,7 @@ def create_label(
     )
 
 
-@router.patch("/api/repositories/{repo_id}/labels/{label_id}")
+@router.patch("/{repo_id}/labels/{label_id}")
 def update_label(
     repo_id: int,
     label_id: int,
@@ -383,7 +383,7 @@ def update_label(
     )
 
 
-@router.delete("/api/repositories/{repo_id}/labels/{label_id}")
+@router.delete("/{repo_id}/labels/{label_id}")
 def delete_label(
     repo_id: int,
     label_id: int,

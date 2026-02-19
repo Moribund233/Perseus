@@ -47,7 +47,7 @@
 
 ## 获取应用配置
 
-### GET /api/app/config
+### GET /api/v1/v1/app/config
 
 获取应用配置信息（需要调试模式或管理员权限）。
 
@@ -95,7 +95,7 @@
 
 ## 更新应用配置
 
-### POST /api/app/config
+### POST /api/v1/v1/app/config
 
 更新应用配置（需要调试模式或管理员权限）。
 
@@ -157,7 +157,7 @@
 
 ## 重置应用配置
 
-### POST /api/app/config/reset
+### POST /api/v1/v1/app/config/reset
 
 将配置重置为默认值（需要调试模式或管理员权限）。
 
@@ -185,7 +185,7 @@
 
 ## 验证配置数据
 
-### POST /api/app/config/validate
+### POST /api/v1/v1/app/config/validate
 
 验证配置数据的有效性（需要调试模式或管理员权限）。
 
@@ -239,7 +239,7 @@
 
 ## 获取应用状态
 
-### GET /api/app/status
+### GET /api/v1/v1/app/status
 
 获取应用运行状态和系统信息（无需认证）。
 
@@ -281,7 +281,7 @@
 
 ## 关闭应用
 
-### POST /api/app/shutdown
+### POST /api/v1/v1/app/shutdown
 
 优雅地关闭应用（需要调试模式或管理员权限）。
 
@@ -312,7 +312,7 @@
 
 ## 重启应用
 
-### POST /api/app/restart
+### POST /api/v1/v1/app/restart
 
 重启应用（需要调试模式或管理员权限）。
 
@@ -345,7 +345,7 @@
 
 ## 获取日志信息
 
-### GET /api/app/logs
+### GET /api/v1/v1/app/logs
 
 获取日志系统的目录和文件信息（需要调试模式或管理员权限）。
 
@@ -379,7 +379,7 @@
 
 ## 获取日志内容
 
-### GET /api/app/logs/content
+### GET /api/v1/v1/app/logs/content
 
 获取指定日志文件的内容（需要调试模式或管理员权限）。
 
@@ -428,7 +428,7 @@
 
 ## 清理旧日志
 
-### POST /api/app/logs/cleanup
+### POST /api/v1/v1/app/logs/cleanup
 
 清理指定天数之前的日志文件（需要调试模式或管理员权限）。
 
@@ -463,15 +463,15 @@
 
 以下接口需要调试模式或管理员权限：
 
-- `GET /api/app/config`
-- `POST /api/app/config`
-- `POST /api/app/config/reset`
-- `POST /api/app/config/validate`
-- `POST /api/app/shutdown`
-- `POST /api/app/restart`
-- `GET /api/app/logs`
-- `GET /api/app/logs/content`
-- `POST /api/app/logs/cleanup`
+- `GET /api/v1/app/config`
+- `POST /api/v1/app/config`
+- `POST /api/v1/app/config/reset`
+- `POST /api/v1/app/config/validate`
+- `POST /api/v1/app/shutdown`
+- `POST /api/v1/app/restart`
+- `GET /api/v1/app/logs`
+- `GET /api/v1/app/logs/content`
+- `POST /api/v1/app/logs/cleanup`
 
 ### 权限检查逻辑
 

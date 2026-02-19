@@ -23,11 +23,10 @@ from services.branch_service import (
 from utils.rate_limiter import limiter, RateLimitConfig
 
 # 创建路由实例
-router = APIRouter(prefix="/api/repositories", tags=["branches"])
+router = APIRouter(prefix="/api/v1/repositories", tags=["branches"])
 
 
 @router.get("/{repo_id}/branches")
-@router.get("/{repo_id}/branches/")
 def get_branches(
     repo_id: int,
     db: Session = Depends(get_db),
@@ -85,7 +84,6 @@ def get_branch(repo_id: int, branch_name: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{repo_id}/branches")
-@router.post("/{repo_id}/branches/")
 @limiter.limit(RateLimitConfig.STANDARD)
 def create_branch(
     request: Request,

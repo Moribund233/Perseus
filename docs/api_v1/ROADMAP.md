@@ -297,10 +297,10 @@ def get_tree_entries(repo_path: str, ref: str = "HEAD", path: str = ""):
 
 **API 端点**：
 ```http
-GET /api/repositories/{repo_id}/tree?ref=master&path=/src
-GET /api/repositories/{repo_id}/blob?ref=master&path=/src/main.py
-GET /api/repositories/{repo_id}/commits?ref=master&limit=20&offset=0
-GET /api/repositories/{repo_id}/diff?head=HEAD&base=HEAD~1
+GET /api/v1/repositories/{repo_id}/tree?ref=master&path=/src
+GET /api/v1/repositories/{repo_id}/blob?ref=master&path=/src/main.py
+GET /api/v1/repositories/{repo_id}/commits?ref=master&limit=20&offset=0
+GET /api/v1/repositories/{repo_id}/diff?head=HEAD&base=HEAD~1
 ```
 
 ### Pull Request 实现
@@ -322,15 +322,15 @@ class PullRequest(BaseModel):
 
 **API 端点**：
 ```
-GET    /api/repositories/{repo_id}/pull-requests              # PR 列表
-POST   /api/repositories/{repo_id}/pull-requests              # 创建 PR
-GET    /api/repositories/{repo_id}/pull-requests/{pr_number}  # PR 详情
-PATCH  /api/repositories/{repo_id}/pull-requests/{pr_number}  # 更新 PR
-POST   /api/repositories/{repo_id}/pull-requests/{pr_number}/close   # 关闭 PR
-POST   /api/repositories/{repo_id}/pull-requests/{pr_number}/merge   # 合并 PR
-GET    /api/repositories/{repo_id}/pull-requests/{pr_number}/comments # 评论列表
-POST   /api/repositories/{repo_id}/pull-requests/{pr_number}/comments # 创建评论
-POST   /api/repositories/{repo_id}/pull-requests/{pr_number}/reviews  # 创建审查
+GET    /api/v1/repositories/{repo_id}/pull-requests              # PR 列表
+POST   /api/v1/repositories/{repo_id}/pull-requests              # 创建 PR
+GET    /api/v1/repositories/{repo_id}/pull-requests/{pr_number}  # PR 详情
+PATCH  /api/v1/repositories/{repo_id}/pull-requests/{pr_number}  # 更新 PR
+POST   /api/v1/repositories/{repo_id}/pull-requests/{pr_number}/close   # 关闭 PR
+POST   /api/v1/repositories/{repo_id}/pull-requests/{pr_number}/merge   # 合并 PR
+GET    /api/v1/repositories/{repo_id}/pull-requests/{pr_number}/comments # 评论列表
+POST   /api/v1/repositories/{repo_id}/pull-requests/{pr_number}/comments # 创建评论
+POST   /api/v1/repositories/{repo_id}/pull-requests/{pr_number}/reviews  # 创建审查
 ```
 
 ### WebSocket 基础实现

@@ -2,7 +2,7 @@
 
 ## 文件树浏览
 
-### GET /api/repositories/{repo_id}/tree
+### GET /api/v1/v1/repositories/{repo_id}/tree
 
 获取仓库的文件树结构。
 
@@ -66,7 +66,7 @@
 
 ## 文件内容查看
 
-### GET /api/repositories/{repo_id}/blob
+### GET /api/v1/v1/repositories/{repo_id}/blob
 
 获取文件内容。
 
@@ -118,7 +118,7 @@
 
 ## 提交历史
 
-### GET /api/repositories/{repo_id}/commits
+### GET /api/v1/v1/repositories/{repo_id}/commits
 
 获取提交历史。
 
@@ -191,7 +191,7 @@
 
 ## 代码对比
 
-### GET /api/repositories/{repo_id}/diff
+### GET /api/v1/v1/repositories/{repo_id}/diff
 
 获取代码差异。
 

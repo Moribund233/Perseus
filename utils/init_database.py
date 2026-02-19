@@ -142,10 +142,11 @@ class DatabaseInitializer:
             return
 
         # 创建测试仓库
+        # 使用新的 URL 格式: /{username}/{repo_name}
         test_repos = [
             Repository(
                 name="test-repo-1",
-                path="/repos/test-repo-1",
+                path="admin/test-repo-1",
                 description="第一个测试仓库",
                 is_public=True,
                 owner_id=admin_user.id,
@@ -153,7 +154,7 @@ class DatabaseInitializer:
             ),
             Repository(
                 name="test-repo-2",
-                path="/repos/test-repo-2",
+                path="admin/test-repo-2",
                 description="第二个测试仓库",
                 is_public=False,
                 owner_id=admin_user.id,

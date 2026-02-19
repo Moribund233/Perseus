@@ -21,7 +21,7 @@
 
 ## 提交列表
 
-### GET /api/repositories/{repo_id}/commits
+### GET /api/v1/v1/repositories/{repo_id}/commits
 
 获取仓库的提交记录（需要认证）。
 
@@ -67,7 +67,7 @@
 
 ## 提交历史树
 
-### GET /api/repositories/{repo_id}/commits/history
+### GET /api/v1/v1/repositories/{repo_id}/commits/history
 
 获取仓库的提交历史树。
 
@@ -106,7 +106,7 @@
 
 ## 统计提交数量
 
-### GET /api/repositories/{repo_id}/commits/count
+### GET /api/v1/v1/repositories/{repo_id}/commits/count
 
 统计仓库的提交数量。
 
@@ -129,7 +129,7 @@
 
 ## 搜索提交
 
-### GET /api/repositories/{repo_id}/commits/search
+### GET /api/v1/v1/repositories/{repo_id}/commits/search
 
 搜索提交记录。
 
@@ -168,7 +168,7 @@
 
 ## 根据作者获取提交
 
-### GET /api/repositories/{repo_id}/commits/author
+### GET /api/v1/v1/repositories/{repo_id}/commits/author
 
 根据作者邮箱获取提交记录。
 
@@ -207,7 +207,7 @@
 
 ## 获取最新提交
 
-### GET /api/repositories/{repo_id}/commits/latest
+### GET /api/v1/v1/repositories/{repo_id}/commits/latest
 
 获取仓库的最新提交。
 
@@ -250,7 +250,7 @@
 
 ## 获取提交详情
 
-### GET /api/repositories/{repo_id}/commits/{commit_hash}
+### GET /api/v1/v1/repositories/{repo_id}/commits/{commit_hash}
 
 根据提交哈希获取提交详情。
 
@@ -293,7 +293,7 @@
 
 ## 创建提交
 
-### POST /api/repositories/{repo_id}/commits
+### POST /api/v1/v1/repositories/{repo_id}/commits
 
 创建提交记录（需要认证）。
 
@@ -372,7 +372,7 @@
 
 ## 获取分支提交
 
-### GET /api/repositories/{repo_id}/branches/{branch_name}/commits
+### GET /api/v1/v1/repositories/{repo_id}/branches/{branch_name}/commits
 
 获取特定分支的提交记录。
 
@@ -412,7 +412,7 @@
 
 ## 统计分支提交数量
 
-### GET /api/repositories/{repo_id}/branches/{branch_name}/commits/count
+### GET /api/v1/v1/repositories/{repo_id}/branches/{branch_name}/commits/count
 
 统计特定分支的提交数量。
 
@@ -510,7 +510,7 @@ async function getCommits(
   if (params?.offset) queryParams.append('offset', params.offset.toString());
   if (params?.branch_name) queryParams.append('branch_name', params.branch_name);
   
-  const url = `/api/repositories/${repoId}/commits?${queryParams.toString()}`;
+  const url = `/api/v1/v1/repositories/${repoId}/commits?${queryParams.toString()}`;
   const response = await fetch(url, {
     headers: token ? { 'Authorization': `Bearer ${token}` } : {},
   });
@@ -533,7 +533,7 @@ async function searchCommits(
   queryParams.append('query', params.query);
   if (params.limit) queryParams.append('limit', params.limit.toString());
   
-  const url = `/api/repositories/${repoId}/commits/search?${queryParams.toString()}`;
+  const url = `/api/v1/v1/repositories/${repoId}/commits/search?${queryParams.toString()}`;
   const response = await fetch(url, {
     headers: token ? { 'Authorization': `Bearer ${token}` } : {},
   });
@@ -552,7 +552,7 @@ async function getCommitDetail(
   commitHash: string,
   token?: string
 ): Promise<Commit> {
-  const url = `/api/repositories/${repoId}/commits/${commitHash}`;
+  const url = `/api/v1/v1/repositories/${repoId}/commits/${commitHash}`;
   const response = await fetch(url, {
     headers: token ? { 'Authorization': `Bearer ${token}` } : {},
   });

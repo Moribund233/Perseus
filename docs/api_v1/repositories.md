@@ -2,7 +2,7 @@
 
 ## 仓库列表
 
-### GET /api/repositories
+### GET /api/v1/repositories
 
 获取所有仓库（需要认证）。
 
@@ -38,7 +38,7 @@
 
 ## 公开仓库列表
 
-### GET /api/repositories/public
+### GET /api/v1/repositories/public
 
 获取所有公开仓库（无需认证）。
 
@@ -68,7 +68,7 @@
 
 ## 获取用户的仓库
 
-### GET /api/repositories/user/{user_id}
+### GET /api/v1/repositories/user/{user_id}
 
 根据用户ID获取仓库列表（需要认证）。
 
@@ -110,7 +110,7 @@
 
 ## 获取单个仓库
 
-### GET /api/repositories/{repo_id}
+### GET /api/v1/repositories/{repo_id}
 
 根据ID获取仓库信息（需要认证）。
 
@@ -157,7 +157,7 @@
 
 ## 创建仓库
 
-### POST /api/repositories/
+### POST /api/v1/repositories/
 
 创建新仓库（需要认证）。
 
@@ -220,7 +220,7 @@
 
 ## 更新仓库
 
-### PUT /api/repositories/{repo_id}
+### PUT /api/v1/repositories/{repo_id}
 
 更新仓库信息（需要认证，仅所有者或管理员可更新）。
 
@@ -278,7 +278,7 @@
 
 ## 删除仓库
 
-### DELETE /api/repositories/{repo_id}
+### DELETE /api/v1/repositories/{repo_id}
 
 删除仓库（需要认证，仅所有者可删除）。
 

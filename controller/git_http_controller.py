@@ -4,10 +4,19 @@ Git HTTP 协议控制器层
 处理 Git Smart HTTP 协议的 HTTP 请求
 通过调用 git http-backend 实现，支持 git clone/push/pull 操作
 
-URL 格式：
-    http://host/git/{username}/{repo-name}
+URL 格式（遵循 Gitee/GitHub 标准，根路径，不包含 API 版本）：
+    https://host/{username}/{repo-name}.git
     
-注意：URL 不需要 .git 后缀
+标准端点：
+    - GET  /{username}/{repo-name}.git/info/refs?service=git-upload-pack
+    - POST /{username}/{repo-name}.git/git-upload-pack
+    - GET  /{username}/{repo-name}.git/info/refs?service=git-receive-pack
+    - POST /{username}/{repo-name}.git/git-receive-pack
+
+使用示例：
+    git clone https://host/username/repo.git
+
+注意：Git HTTP 协议使用根路径，不使用 /api/v1 前缀，这是 Git 客户端的标准要求
 """
 import base64
 from fastapi import APIRouter, Request, Response, Depends, HTTPException, status
@@ -28,7 +37,9 @@ from exception import NotFoundException, AuthorizationException
 from utils.rate_limiter import limiter, RateLimitConfig, get_git_operation_key
 
 # 创建路由实例
-router = APIRouter(prefix="/git", tags=["git-http"])
+# 注意：Git HTTP 路由不使用前缀，直接挂在根路径下
+# 这是 Gitee/GitHub 的标准做法：git clone https://host/username/repo.git
+router = APIRouter(tags=["git-http"])
 
 
 def extract_auth_user(request: Request, db: Session) -> User | None:
@@ -155,10 +166,11 @@ def resolve_repository(repo_path: str, db: Session):
     return repo
 
 
-@router.get("/{repo_path:path}/info/refs")
+@router.get("/{username}/{repo_name}.git/info/refs")
 @limiter.limit(RateLimitConfig.GIT_OPERATIONS, key_func=get_git_operation_key)
 async def git_refs(
-    repo_path: str,
+    username: str,
+    repo_name: str,
     service: str | None = None,
     request: Request = None,
     db: Session = Depends(get_db)
@@ -167,10 +179,11 @@ async def git_refs(
     Git 引用发现端点
 
     处理 Git 客户端的引用发现请求，支持 smart HTTP 协议
-    支持带或不带 .git 后缀的路径
+    URL 格式: /{username}/{repo_name}.git/info/refs?service=git-upload-pack
 
     Args:
-        repo_path: 仓库路径（如 username/repo-name 或 username/repo-name.git）
+        username: 用户名
+        repo_name: 仓库名称（不含 .git 后缀）
         service: 服务类型（git-upload-pack 或 git-receive-pack）
         request: HTTP 请求对象
         db: 数据库会话
@@ -181,6 +194,9 @@ async def git_refs(
     Raises:
         HTTPException: 仓库不存在或无权限
     """
+    # 构建仓库路径
+    repo_path = f"{username}/{repo_name}"
+
     # 获取认证用户（先认证，不管仓库是否存在）
     user = extract_auth_user(request, db)
 
@@ -236,28 +252,28 @@ async def git_refs(
             body=None,
             remote_user=user.username if user else None
         )
-        
+
         # 构建 FastAPI 响应
         response_headers = {}
-        
+
         # 转发重要的响应头
         for header_name in ['Content-Type', 'Cache-Control', 'Pragma', 'Expires']:
             if header_name in headers:
                 response_headers[header_name] = headers[header_name]
-        
+
         # 如果没有 Content-Type，根据服务设置默认值
         if 'Content-Type' not in response_headers:
             if service:
                 response_headers['Content-Type'] = f'application/x-git-{service_name}-advertisement'
             else:
                 response_headers['Content-Type'] = 'text/plain'
-        
+
         return Response(
             content=body,
             status_code=status_code,
             headers=response_headers
         )
-        
+
     except NotFoundException:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -275,10 +291,11 @@ async def git_refs(
         )
 
 
-@router.post("/{repo_path:path}/git-upload-pack")
+@router.post("/{username}/{repo_name}.git/git-upload-pack")
 @limiter.limit(RateLimitConfig.GIT_OPERATIONS, key_func=get_git_operation_key)
 async def git_upload_pack(
-    repo_path: str,
+    username: str,
+    repo_name: str,
     request: Request,
     db: Session = Depends(get_db)
 ):
@@ -286,10 +303,11 @@ async def git_upload_pack(
     Git upload-pack 端点
 
     处理 Git clone/fetch 请求
-    支持带或不带 .git 后缀的路径
+    URL 格式: /{username}/{repo_name}.git/git-upload-pack
 
     Args:
-        repo_path: 仓库路径（支持 .git 后缀）
+        username: 用户名
+        repo_name: 仓库名称（不含 .git 后缀）
         request: HTTP 请求对象
         db: 数据库会话
 
@@ -299,6 +317,9 @@ async def git_upload_pack(
     Raises:
         HTTPException: 仓库不存在或无权限
     """
+    # 构建仓库路径
+    repo_path = f"{username}/{repo_name}"
+
     # 解析仓库并验证存在性
     repo = resolve_repository(repo_path, db)
 
@@ -353,10 +374,11 @@ async def git_upload_pack(
         )
 
 
-@router.post("/{repo_path:path}/git-receive-pack")
+@router.post("/{username}/{repo_name}.git/git-receive-pack")
 @limiter.limit(RateLimitConfig.GIT_OPERATIONS, key_func=get_git_operation_key)
 async def git_receive_pack(
-    repo_path: str,
+    username: str,
+    repo_name: str,
     request: Request,
     db: Session = Depends(get_db)
 ):
@@ -364,10 +386,11 @@ async def git_receive_pack(
     Git receive-pack 端点
 
     处理 Git push 请求
-    支持带或不带 .git 后缀的路径
+    URL 格式: /{username}/{repo_name}.git/git-receive-pack
 
     Args:
-        repo_path: 仓库路径（支持 .git 后缀）
+        username: 用户名
+        repo_name: 仓库名称（不含 .git 后缀）
         request: HTTP 请求对象
         db: 数据库会话
 
@@ -377,6 +400,9 @@ async def git_receive_pack(
     Raises:
         HTTPException: 仓库不存在或无权限
     """
+    # 构建仓库路径
+    repo_path = f"{username}/{repo_name}"
+
     # 解析仓库并验证存在性
     repo = resolve_repository(repo_path, db)
 
@@ -436,9 +462,10 @@ async def git_receive_pack(
         )
 
 
-@router.get("/{repo_path:path}/HEAD")
+@router.get("/{username}/{repo_name}.git/HEAD")
 async def git_head(
-    repo_path: str,
+    username: str,
+    repo_name: str,
     request: Request = None,
     db: Session = Depends(get_db)
 ):
@@ -446,16 +473,20 @@ async def git_head(
     获取 HEAD 引用
 
     用于 dumb HTTP 协议
-    支持带或不带 .git 后缀的路径
+    URL 格式: /{username}/{repo_name}.git/HEAD
 
     Args:
-        repo_path: 仓库路径（支持 .git 后缀）
+        username: 用户名
+        repo_name: 仓库名称（不含 .git 后缀）
         request: HTTP 请求对象
         db: 数据库会话
 
     Returns:
         Response: HEAD 引用内容
     """
+    # 构建仓库路径
+    repo_path = f"{username}/{repo_name}"
+
     # 解析仓库并验证存在性
     repo = resolve_repository(repo_path, db)
 
@@ -493,9 +524,10 @@ async def git_head(
         )
 
 
-@router.get("/{repo_path:path}/objects/{oid:path}")
+@router.get("/{username}/{repo_name}.git/objects/{oid:path}")
 async def git_objects(
-    repo_path: str,
+    username: str,
+    repo_name: str,
     oid: str,
     request: Request = None,
     db: Session = Depends(get_db)
@@ -504,10 +536,11 @@ async def git_objects(
     获取 Git 对象
 
     用于 dumb HTTP 协议
-    支持带或不带 .git 后缀的路径
+    URL 格式: /{username}/{repo_name}.git/objects/{oid}
 
     Args:
-        repo_path: 仓库路径（支持 .git 后缀）
+        username: 用户名
+        repo_name: 仓库名称（不含 .git 后缀）
         oid: 对象 ID
         request: HTTP 请求对象
         db: 数据库会话
@@ -515,6 +548,9 @@ async def git_objects(
     Returns:
         Response: 对象内容
     """
+    # 构建仓库路径
+    repo_path = f"{username}/{repo_name}"
+
     # 解析仓库并验证存在性
     repo = resolve_repository(repo_path, db)
 

@@ -1,0 +1,54 @@
+"""
+认证控制器层
+
+处理用户认证相关的 HTTP 请求，包括登录、登出等
+"""
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+from models.db import get_db
+from services.user_service import login_user as service_login_user
+from utils.rate_limiter import limiter, RateLimitConfig
+
+# 创建路由实例
+router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+
+
+class LoginRequest(BaseModel):
+    """登录请求体"""
+    username: str = Field(..., description="用户名")
+    password: str = Field(..., description="密码")
+
+
+@router.post("/login")
+@limiter.limit(RateLimitConfig.STRICT)
+def login(
+    request: Request,
+    credentials: LoginRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    用户登录
+
+    Args:
+        request: HTTP请求对象（用于速率限制）
+        credentials: 登录凭据（用户名和密码）
+        db: 数据库会话
+
+    Returns:
+        dict: 登录成功信息和用户数据，包含访问令牌
+
+    Raises:
+        ValidationException: 请求参数不完整时抛出422异常
+        AuthenticationException: 用户名或密码错误时抛出401异常
+
+    Example:
+        ```json
+        {
+            "username": "admin",
+            "password": "password123"
+        }
+        ```
+    """
+    return service_login_user(credentials.model_dump(), db)

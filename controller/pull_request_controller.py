@@ -23,7 +23,7 @@ from services.pull_request_service import (
 )
 
 # 创建路由实例
-router = APIRouter(tags=["pull-requests"])
+router = APIRouter(prefix="/api/v1/repositories", tags=["pull-requests"])
 
 
 class PRCreateRequest(BaseModel):
@@ -60,7 +60,7 @@ class PRMergeRequest(BaseModel):
     merge_method: str = Field(default="merge", description="合并方式：merge/squash/rebase")
 
 
-@router.get("/api/repositories/{repo_id}/pull-requests")
+@router.get("/{repo_id}/pull-requests")
 async def list_pull_requests(
     repo_id: int,
     status: Optional[str] = Query(None, description="状态筛选：open/merged/closed"),
@@ -93,7 +93,7 @@ async def list_pull_requests(
     )
 
 
-@router.post("/api/repositories/{repo_id}/pull-requests")
+@router.post("/{repo_id}/pull-requests")
 async def create_pull_request(
     repo_id: int,
     data: PRCreateRequest,
@@ -123,7 +123,7 @@ async def create_pull_request(
     )
 
 
-@router.get("/api/repositories/{repo_id}/pull-requests/{pr_number}")
+@router.get("/{repo_id}/pull-requests/{pr_number}")
 async def get_pull_request(
     repo_id: int,
     pr_number: int,
@@ -148,7 +148,7 @@ async def get_pull_request(
     )
 
 
-@router.patch("/api/repositories/{repo_id}/pull-requests/{pr_number}")
+@router.patch("/{repo_id}/pull-requests/{pr_number}")
 async def update_pull_request(
     repo_id: int,
     pr_number: int,
@@ -179,7 +179,7 @@ async def update_pull_request(
     )
 
 
-@router.post("/api/repositories/{repo_id}/pull-requests/{pr_number}/close")
+@router.post("/{repo_id}/pull-requests/{pr_number}/close")
 async def close_pull_request(
     repo_id: int,
     pr_number: int,
@@ -206,7 +206,7 @@ async def close_pull_request(
     )
 
 
-@router.post("/api/repositories/{repo_id}/pull-requests/{pr_number}/merge")
+@router.post("/{repo_id}/pull-requests/{pr_number}/merge")
 async def merge_pull_request(
     repo_id: int,
     pr_number: int,
@@ -238,7 +238,7 @@ async def merge_pull_request(
 
 # ==================== PR 评论 ====================
 
-@router.get("/api/repositories/{repo_id}/pull-requests/{pr_number}/comments")
+@router.get("/{repo_id}/pull-requests/{pr_number}/comments")
 async def list_pr_comments(
     repo_id: int,
     pr_number: int,
@@ -262,7 +262,7 @@ async def list_pr_comments(
     )
 
 
-@router.post("/api/repositories/{repo_id}/pull-requests/{pr_number}/comments")
+@router.post("/{repo_id}/pull-requests/{pr_number}/comments")
 async def create_pr_comment(
     repo_id: int,
     pr_number: int,
@@ -298,7 +298,7 @@ async def create_pr_comment(
 
 # ==================== PR 审查 ====================
 
-@router.post("/api/repositories/{repo_id}/pull-requests/{pr_number}/reviews")
+@router.post("/{repo_id}/pull-requests/{pr_number}/reviews")
 async def create_pr_review(
     repo_id: int,
     pr_number: int,

@@ -1,16 +1,20 @@
 # Git HTTP API
 
 > 本文档描述 Git Smart HTTP 协议端点，用于命令行 git 操作（clone/push/pull）。
-> 
+>
 > **注意**：这些端点主要用于 Git 命令行客户端，不是给前端 Web 应用直接调用的 REST API。
 
 ## 基础 URL
 
 ```
-http://localhost:8000/git/{username}/{repo-name}
+http://localhost:8000/{username}/{repo-name}.git
 ```
 
-**注意**：URL 不需要 `.git` 后缀。例如：`http://localhost:8000/git/johndoe/my-project`
+**标准 Git 仓库 URL 格式**（遵循 Gitee/GitHub 规范）：
+- 完整 URL: `http://localhost:8000/johndoe/my-project.git`
+- **必须**包含 `.git` 后缀
+- **不使用** `/git/` 前缀
+- **不使用** `/api/v1/` 前缀（Git 客户端标准要求根路径）
 
 ## 支持的 Git 操作
 
@@ -32,13 +36,13 @@ Git HTTP API 支持以下认证方式：
 在 URL 中嵌入用户名密码：
 
 ```bash
-git clone http://username:password@localhost:8000/git/username/repo-name
+git clone http://username:password@localhost:8000/username/repo-name.git
 ```
 
 或在命令行提示时输入：
 
 ```bash
-git clone http://localhost:8000/git/username/repo-name
+git clone http://localhost:8000/username/repo-name.git
 # 提示输入用户名和密码
 ```
 
@@ -62,17 +66,17 @@ git config --global credential.helper store
 
 **公开仓库**
 ```bash
-git clone http://localhost:8000/git/johndoe/my-project
+git clone http://localhost:8000/johndoe/my-project.git
 cd my-project
 ```
 
 **私有仓库**
 ```bash
 # 方式1：URL 中携带凭证
-git clone http://johndoe:mypassword@localhost:8000/git/johndoe/private-project
+git clone http://johndoe:mypassword@localhost:8000/johndoe/private-project.git
 
 # 方式2：交互式输入
-git clone http://localhost:8000/git/johndoe/private-project
+git clone http://localhost:8000/johndoe/private-project.git
 # Username: johndoe
 # Password: ********
 ```
@@ -131,18 +135,18 @@ git push -u origin feature/new-feature
 
 ### 引用发现
 ```
-GET /git/{repo_path}/info/refs?service=git-upload-pack
-GET /git/{repo_path}/info/refs?service=git-receive-pack
+GET /{username}/{repo-name}.git/info/refs?service=git-upload-pack
+GET /{username}/{repo-name}.git/info/refs?service=git-receive-pack
 ```
 
 ### 上传包（Pull/Fetch）
 ```
-POST /git/{repo_path}/git-upload-pack
+POST /{username}/{repo-name}.git/git-upload-pack
 ```
 
 ### 接收包（Push）
 ```
-POST /git/{repo_path}/git-receive-pack
+POST /{username}/{repo-name}.git/git-receive-pack
 ```
 
 ---
@@ -155,7 +159,7 @@ POST /git/{repo_path}/git-receive-pack
 |----------|------|----------|
 | `Authentication required` | 私有仓库未认证 | 提供正确的用户名密码 |
 | `Permission denied` | 无权限推送 | 检查仓库成员权限 |
-| `Repository not found` | 仓库不存在或路径错误 | 检查仓库路径 |
+| `Repository not found` | 仓库不存在或路径错误 | 检查仓库路径格式（username/repo-name） |
 | `Cannot push to protected branch` | 推送到受保护分支 | 使用 PR 流程合并 |
 
 ### HTTP 状态码
@@ -179,7 +183,8 @@ POST /git/{repo_path}/git-receive-pack
 | **认证** | HTTP Basic Auth | Bearer Token |
 | **客户端** | Git 命令行 | 浏览器/HTTP 客户端 |
 | **响应格式** | Git 二进制协议 | JSON |
-| **基础路径** | `/git/` | `/api/` |
+| **基础路径** | `/{username}/{repo}.git` | `/api/v1/` |
+| **URL 后缀** | 必须包含 `.git` | 无后缀 |
 
 ---
 
@@ -194,7 +199,9 @@ POST /git/{repo_path}/git-receive-pack
 
 ## 注意事项
 
-1. **大文件推送**：建议使用 Git LFS 管理大文件
-2. **速率限制**：频繁的 Git 操作可能触发速率限制
-3. **凭证安全**：避免在脚本中硬编码密码，使用 Git 凭证助手
-4. **SSH 替代**：如需更安全的连接，可配置 SSH 访问（如支持）
+1. **URL 格式**：必须使用标准 Git URL 格式 `/{username}/{repo-name}.git`，包含 `.git` 后缀
+2. **路径规范**：数据库中的仓库路径格式为 `username/repo-name`（无斜杠前缀，无 `.git` 后缀）
+3. **大文件推送**：建议使用 Git LFS 管理大文件
+4. **速率限制**：频繁的 Git 操作可能触发速率限制
+5. **凭证安全**：避免在脚本中硬编码密码，使用 Git 凭证助手
+6. **SSH 替代**：如需更安全的连接，可配置 SSH 访问（如支持）

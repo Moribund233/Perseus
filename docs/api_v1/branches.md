@@ -21,7 +21,7 @@
 
 ## 分支列表
 
-### GET /api/repositories/{repo_id}/branches
+### GET /api/v1/v1/repositories/{repo_id}/branches
 
 获取仓库的所有分支（需要认证）。
 
@@ -85,7 +85,7 @@
 
 ## 获取默认分支
 
-### GET /api/repositories/{repo_id}/branches/default
+### GET /api/v1/v1/repositories/{repo_id}/branches/default
 
 获取仓库的默认分支。
 
@@ -123,7 +123,7 @@
 
 ## 获取单个分支
 
-### GET /api/repositories/{repo_id}/branches/{branch_name}
+### GET /api/v1/v1/repositories/{repo_id}/branches/{branch_name}
 
 获取仓库的特定分支。
 
@@ -162,7 +162,7 @@
 
 ## 创建分支
 
-### POST /api/repositories/{repo_id}/branches
+### POST /api/v1/v1/repositories/{repo_id}/branches
 
 创建新分支（需要认证）。
 
@@ -230,7 +230,7 @@
 
 ## 更新分支
 
-### PUT /api/repositories/{repo_id}/branches/{branch_name}
+### PUT /api/v1/v1/repositories/{repo_id}/branches/{branch_name}
 
 更新分支信息（需要认证）。
 
@@ -277,7 +277,7 @@
 
 ## 删除分支
 
-### DELETE /api/repositories/{repo_id}/branches/{branch_name}
+### DELETE /api/v1/v1/repositories/{repo_id}/branches/{branch_name}
 
 删除分支（需要认证）。
 
@@ -321,7 +321,7 @@
 
 ## 设置默认分支
 
-### PUT /api/repositories/{repo_id}/branches/{branch_name}/default
+### PUT /api/v1/v1/repositories/{repo_id}/branches/{branch_name}/default
 
 设置默认分支（需要认证，仅仓库所有者或管理员）。
 
@@ -358,7 +358,7 @@
 
 ## 保护分支
 
-### PUT /api/repositories/{repo_id}/branches/{branch_name}/protect
+### PUT /api/v1/v1/repositories/{repo_id}/branches/{branch_name}/protect
 
 保护分支（需要认证，仅仓库所有者或管理员）。
 
@@ -406,7 +406,7 @@
 
 ## 取消分支保护
 
-### PUT /api/repositories/{repo_id}/branches/{branch_name}/unprotect
+### PUT /api/v1/v1/repositories/{repo_id}/branches/{branch_name}/unprotect
 
 取消分支保护（需要认证，仅仓库所有者或管理员）。
 
@@ -444,7 +444,7 @@
 
 ## 检查分支保护状态
 
-### GET /api/repositories/{repo_id}/branches/{branch_name}/protection
+### GET /api/v1/v1/repositories/{repo_id}/branches/{branch_name}/protection
 
 检查分支是否受保护（需要认证）。
 
@@ -532,7 +532,7 @@ interface ApiResponse<T> {
 ```typescript
 // 获取分支列表
 async function getBranches(repoId: number, token: string): Promise<Branch[]> {
-  const response = await fetch(`/api/repositories/${repoId}/branches`, {
+  const response = await fetch(`/api/v1/v1/repositories/${repoId}/branches`, {
     headers: {
       'Authorization': `Bearer ${token}`,
     },
@@ -552,7 +552,7 @@ async function createBranch(
   data: CreateBranchRequest,
   token: string
 ): Promise<Branch> {
-  const response = await fetch(`/api/repositories/${repoId}/branches`, {
+  const response = await fetch(`/api/v1/v1/repositories/${repoId}/branches`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -576,7 +576,7 @@ async function deleteBranch(
   token: string
 ): Promise<void> {
   const response = await fetch(
-    `/api/repositories/${repoId}/branches/${encodeURIComponent(branchName)}`,
+    `/api/v1/v1/repositories/${repoId}/branches/${encodeURIComponent(branchName)}`,
     {
       method: 'DELETE',
       headers: {

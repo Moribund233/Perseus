@@ -2,7 +2,7 @@
 
 ## Issue 列表
 
-### GET /api/repositories/{repo_id}/issues
+### GET /api/v1/v1/repositories/{repo_id}/issues
 
 获取 Issue 列表。
 
@@ -66,7 +66,7 @@
 
 ## 创建 Issue
 
-### POST /api/repositories/{repo_id}/issues
+### POST /api/v1/v1/repositories/{repo_id}/issues
 
 创建 Issue（需要认证）。
 
@@ -98,7 +98,7 @@
 
 ## 获取 Issue 详情
 
-### GET /api/repositories/{repo_id}/issues/{issue_number}
+### GET /api/v1/v1/repositories/{repo_id}/issues/{issue_number}
 
 获取 Issue 详情（包含评论）。
 
@@ -113,7 +113,7 @@
 
 ## 更新 Issue
 
-### PATCH /api/repositories/{repo_id}/issues/{issue_number}
+### PATCH /api/v1/v1/repositories/{repo_id}/issues/{issue_number}
 
 更新 Issue（需要认证）。
 
@@ -133,7 +133,7 @@
 
 ## 关闭 Issue
 
-### POST /api/repositories/{repo_id}/issues/{issue_number}/close
+### POST /api/v1/v1/repositories/{repo_id}/issues/{issue_number}/close
 
 关闭 Issue（需要认证）。
 
@@ -141,7 +141,7 @@
 
 ## 重新打开 Issue
 
-### POST /api/repositories/{repo_id}/issues/{issue_number}/reopen
+### POST /api/v1/v1/repositories/{repo_id}/issues/{issue_number}/reopen
 
 重新打开 Issue（需要认证）。
 
@@ -149,11 +149,11 @@
 
 ## Issue 评论
 
-### GET /api/repositories/{repo_id}/issues/{issue_number}/comments
+### GET /api/v1/v1/repositories/{repo_id}/issues/{issue_number}/comments
 
 获取 Issue 评论列表。
 
-### POST /api/repositories/{repo_id}/issues/{issue_number}/comments
+### POST /api/v1/v1/repositories/{repo_id}/issues/{issue_number}/comments
 
 创建 Issue 评论（需要认证）。
 
@@ -171,11 +171,11 @@
 
 ### 获取标签列表
 
-#### GET /api/repositories/{repo_id}/labels
+#### GET /api/v1/v1/repositories/{repo_id}/labels
 
 ### 创建标签
 
-#### POST /api/repositories/{repo_id}/labels
+#### POST /api/v1/v1/repositories/{repo_id}/labels
 
 ```json
 {
@@ -187,11 +187,11 @@
 
 ### 更新标签
 
-#### PATCH /api/repositories/{repo_id}/labels/{label_id}
+#### PATCH /api/v1/v1/repositories/{repo_id}/labels/{label_id}
 
 ### 删除标签
 
-#### DELETE /api/repositories/{repo_id}/labels/{label_id}
+#### DELETE /api/v1/v1/repositories/{repo_id}/labels/{label_id}
 
 ---
 

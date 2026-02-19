@@ -25,11 +25,10 @@ from services.branch_service import get_branch as service_get_branch
 from utils.rate_limiter import limiter, RateLimitConfig
 
 # 创建路由实例
-router = APIRouter(prefix="/api/repositories", tags=["commits"])
+router = APIRouter(prefix="/api/v1/repositories", tags=["commits"])
 
 
 @router.get("/{repo_id}/commits")
-@router.get("/{repo_id}/commits/")
 def get_commits(
     repo_id: int,
     limit: int = Query(100, ge=1, le=1000),
@@ -184,7 +183,6 @@ def get_commit_by_hash(repo_id: int, commit_hash: str, db: Session = Depends(get
 
 
 @router.post("/{repo_id}/commits")
-@router.post("/{repo_id}/commits/")
 @limiter.limit(RateLimitConfig.STANDARD)
 def create_commit(
     request: Request,

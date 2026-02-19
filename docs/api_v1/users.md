@@ -2,7 +2,7 @@
 
 ## 用户列表
 
-### GET /api/users
+### GET /api/v1/users
 
 获取所有用户列表（需要认证）。
 
@@ -41,7 +41,7 @@
 
 ## 获取单个用户
 
-### GET /api/users/{user_id}
+### GET /api/v1/users/{user_id}
 
 根据ID获取用户信息（需要认证）。
 
@@ -84,7 +84,7 @@
 
 ## 创建用户
 
-### POST /api/users/
+### POST /api/v1/users/
 
 创建新用户。
 
@@ -139,7 +139,7 @@
 
 ## 更新用户
 
-### PUT /api/users/{user_id}
+### PUT /api/v1/users/{user_id}
 
 更新用户信息（需要认证，只能更新自己的信息或管理员可更新任何用户）。
 
@@ -192,7 +192,7 @@
 
 ## 删除用户
 
-### DELETE /api/users/{user_id}
+### DELETE /api/v1/users/{user_id}
 
 删除用户（需要管理员权限）。
 
@@ -228,7 +228,7 @@
 
 ## 用户登录
 
-### POST /api/users/login
+### POST /api/v1/auth/login
 
 用户登录，获取访问令牌。
 

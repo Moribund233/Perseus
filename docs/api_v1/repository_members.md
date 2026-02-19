@@ -2,7 +2,7 @@
 
 ## 成员列表
 
-### GET /api/repositories/{repo_id}/members
+### GET /api/v1/v1/repositories/{repo_id}/members
 
 获取仓库成员列表（需要认证）。
 
@@ -40,7 +40,7 @@
 
 ## 添加成员
 
-### POST /api/repositories/{repo_id}/members
+### POST /api/v1/v1/repositories/{repo_id}/members
 
 添加成员到仓库（需要管理员权限）。
 
@@ -86,7 +86,7 @@
 
 ## 更新成员角色
 
-### PUT /api/repositories/{repo_id}/members/{user_id}
+### PUT /api/v1/v1/repositories/{repo_id}/members/{user_id}
 
 更新成员角色（需要管理员权限）。
 
@@ -109,7 +109,7 @@
 
 ## 移除成员
 
-### DELETE /api/repositories/{repo_id}/members/{user_id}
+### DELETE /api/v1/v1/repositories/{repo_id}/members/{user_id}
 
 从仓库移除成员（需要管理员权限）。
 

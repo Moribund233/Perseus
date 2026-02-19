@@ -68,41 +68,32 @@ def check_repository_exists(repo_path: str) -> bool:
 def get_repository_by_path(repo_path: str, db: Session) -> Optional[Repository]:
     """
     根据路径获取仓库
-    
+
+    支持标准格式: username/repo-name
+
     Args:
         repo_path: 仓库路径（如 username/repo-name）
         db: 数据库会话
-        
+
     Returns:
         Repository: 仓库对象，不存在则返回 None
     """
-    # 尝试直接匹配路径（支持带或不带前导/后缀的匹配）
+    if not repo_path:
+        return None
+
     # 标准化路径：移除前导和尾随的 /
     normalized_path = repo_path.strip('/')
-    
-    # 移除 .git 后缀（如果存在）
-    if normalized_path.endswith('.git'):
-        normalized_path = normalized_path[:-4]
-    
-    # 尝试多种路径格式匹配
-    path_variations = [
-        repo_path,                    # 原始路径
-        normalized_path,              # 无前后 /，无 .git
-        f"/{normalized_path}",        # 带前导 /
-        f"{normalized_path}/",         # 带尾随 /
-        f"/{normalized_path}/",        # 带前后 /
-    ]
-    
-    for path_var in path_variations:
-        repo = db.query(Repository).filter(Repository.path == path_var).first()
-        if repo:
-            return repo
+
+    # 尝试直接匹配路径
+    repo = db.query(Repository).filter(Repository.path == normalized_path).first()
+    if repo:
+        return repo
 
     # 尝试匹配 {username}/{repo_name} 格式
     parts = normalized_path.split('/')
     if len(parts) >= 2:
-        username = parts[-2]  # 倒数第二部分作为用户名
-        repo_name = parts[-1]  # 最后一部分作为仓库名
+        username = parts[0]  # 第一部分作为用户名
+        repo_name = parts[1]  # 第二部分作为仓库名
         user = db.query(User).filter(User.username == username).first()
         if user:
             repo = db.query(Repository).filter(
@@ -271,22 +262,20 @@ class GitHttpBackendService:
     ) -> Tuple[Dict[str, str], str]:
         """
         准备 git http-backend 的环境变量
-        
+
         设置 CGI 标准环境变量和 Git 特定变量。
-        
+        遵循 Gitee/GitHub 标准 URL 格式: /{username}/{repo_name}.git/info/refs
+
         Args:
-            repo_path: 仓库物理路径，如 ./repositories/testuser/test-repo
+            repo_path: 仓库路径（如 username/repo-name）
             request: HTTP 请求对象
             content_length: 请求体长度
             remote_user: 远程用户名（可选）
-            
+
         Returns:
             Tuple[Dict[str, str], str]: (环境变量字典, 仓库根目录路径)
         """
         env = os.environ.copy()
-
-        # 获取绝对路径
-        abs_repo_path = os.path.abspath(repo_path)
 
         # GIT_PROJECT_ROOT 是仓库根目录（所有仓库的父目录）
         # 从配置读取，确保与 get_repository_storage_path 使用相同的配置
@@ -294,49 +283,38 @@ class GitHttpBackendService:
         config_manager = get_config_manager()
         repo_root = config_manager.get("storage.repo_root", "./repositories")
         repo_root = os.path.abspath(repo_root)
-        
+
         # 构建 PATH_INFO
-        # 请求路径如: /git/testuser/test-repo.git/info/refs
-        # 转换为: /testuser/test-repo/info/refs (去掉 /git 前缀，去掉 .git 后缀)
+        # 标准 URL 格式: /{username}/{repo_name}.git/info/refs
+        # 需要转换为: /{username}/{repo_name}/info/refs（去掉 .git 后缀）
         request_path = request.url.path
-        
-        # 移除 /git 前缀，确保 PATH_INFO 以 / 开头
-        if request_path.startswith('/git/'):
-            path_info = request_path[4:]  # 保留 /testuser/test-repo.git/...
-        elif request_path.startswith('/git'):
-            path_info = request_path[4:]  # 处理 /git 情况
-        else:
-            path_info = request_path
-        
+
         # 确保 path_info 以 / 开头（CGI 标准要求）
-        if not path_info.startswith('/'):
-            path_info = '/' + path_info
-        
+        if not request_path.startswith('/'):
+            request_path = '/' + request_path
+
         # 移除 .git 后缀（从仓库名部分）
-        # 如: /testuser/test-repo.git/info/refs -> /testuser/test-repo/info/refs
-        parts = path_info.strip('/').split('/')
-        if len(parts) >= 2 and parts[1].endswith('.git'):
-            parts[1] = parts[1][:-4]  # 移除 .git
-            path_info = '/' + '/'.join(parts)
-        
+        # 如: /username/repo.git/info/refs -> /username/repo/info/refs
+        path_info = self._normalize_path_info(request_path)
+
         # 设置 CGI 环境变量
         env.update({
             # Git 特定变量
             'GIT_PROJECT_ROOT': repo_root,
             'GIT_HTTP_EXPORT_ALL': '1',  # 允许访问所有仓库
-            
+
             # CGI 标准变量
             'PATH_INFO': path_info,
             'QUERY_STRING': str(request.query_params),
             'REQUEST_METHOD': request.method,
             'CONTENT_TYPE': request.headers.get('content-type', ''),
             'CONTENT_LENGTH': str(content_length),
-            'SCRIPT_NAME': '/git',
+            'SCRIPT_NAME': '',  # 根路径挂载，SCRIPT_NAME 为空
             'SERVER_NAME': request.url.hostname or 'localhost',
             'SERVER_PORT': str(request.url.port or 80),
             'SERVER_PROTOCOL': 'HTTP/1.1',
             'SERVER_SOFTWARE': 'LanGit/0.1.0',
-            
+
             # HTTP 头变量
             'HTTP_HOST': request.headers.get('host', ''),
             'HTTP_USER_AGENT': request.headers.get('user-agent', ''),
@@ -345,7 +323,7 @@ class GitHttpBackendService:
             'HTTP_ACCEPT_LANGUAGE': request.headers.get('accept-language', ''),
             'HTTP_CONNECTION': request.headers.get('connection', ''),
         })
-        
+
         # 添加认证信息
         if remote_user:
             env['REMOTE_USER'] = remote_user
@@ -353,14 +331,40 @@ class GitHttpBackendService:
         else:
             env['REMOTE_USER'] = ''
             env['AUTH_TYPE'] = ''
-        
+
         # 转发其他 HTTP 头
         for header_name, header_value in request.headers.items():
             env_header_name = f'HTTP_{header_name.upper().replace("-", "_")}'
             if env_header_name not in env:
                 env[env_header_name] = header_value
-        
+
         return env, repo_root
+
+    def _normalize_path_info(self, path: str) -> str:
+        """
+        标准化 PATH_INFO，移除 .git 后缀
+
+        Git HTTP 标准 URL 格式为 /{username}/{repo_name}.git/info/refs
+        git http-backend 期望的路径格式为 /{username}/{repo_name}/info/refs
+
+        Args:
+            path: 原始请求路径，如 /username/repo.git/info/refs
+
+        Returns:
+            str: 标准化后的路径，如 /username/repo/info/refs
+        """
+        if not path.startswith('/'):
+            path = '/' + path
+
+        parts = path.strip('/').split('/')
+        if len(parts) >= 2:
+            # 第二部分应该是仓库名，可能带有 .git 后缀
+            repo_name = parts[1]
+            if repo_name.endswith('.git'):
+                parts[1] = repo_name[:-4]  # 移除 .git 后缀
+                path = '/' + '/'.join(parts)
+
+        return path
     
     def _parse_cgi_response(self, stdout: bytes) -> Tuple[int, Dict[str, str], bytes]:
         """

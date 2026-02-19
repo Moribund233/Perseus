@@ -157,24 +157,36 @@ def create_user(user_data: dict, db: Session):
     return user_to_dict(db_user)
 
 
-def update_user(user_id: int, user_data: dict, db: Session):
+def update_user(user_id: int, user_data: dict, db: Session, current_user: User = None):
     """
     更新用户信息
+
+    权限规则：
+    - 普通用户只能更新自己的信息
+    - 管理员可以更新任何用户的信息
 
     Args:
         user_id: 用户ID
         user_data: 更新的用户信息
         db: 数据库会话
+        current_user: 当前认证用户，用于权限检查
 
     Returns:
         User: 更新后的用户信息
 
     Raises:
         NotFoundException: 用户不存在时抛出404异常
+        AuthorizationException: 无权限时抛出403异常
     """
+    from exception import AuthorizationException
+
     db_user = db.query(User).filter(User.id == user_id).first()
     if db_user is None:
         raise NotFoundException(detail="User not found")
+
+    # 权限检查：只能更新自己的信息，或管理员可以更新任何用户
+    if current_user and current_user.id != user_id and not current_user.is_admin:
+        raise AuthorizationException(detail="You don't have permission to update this user")
 
     # 更新用户信息（排除敏感字段）
     for key, value in user_data.items():
