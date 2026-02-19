@@ -248,15 +248,16 @@ pub fn get_server_info() -> Option<ProcessInfo> {
     };
 
     let mut system = SYSTEM.lock().unwrap();
-    // 刷新所有进程和CPU信息
-    system.refresh_processes();
+
+    // 刷新特定进程和CPU信息
+    system.refresh_process(sysinfo::Pid::from(pid as usize));
     system.refresh_cpu();
 
     // 短暂等待以获取CPU使用率差值
     std::thread::sleep(Duration::from_millis(200));
 
     // 再次刷新以获取CPU使用率
-    system.refresh_processes();
+    system.refresh_process(sysinfo::Pid::from(pid as usize));
     system.refresh_cpu();
 
     system

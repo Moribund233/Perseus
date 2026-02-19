@@ -340,6 +340,28 @@ fn find_master_process(processes: &[(u32, Option<u32>)]) -> Option<u32> {
 }
 
 /**
+ * 从PID文件读取Nginx进程ID
+ *
+ * @return 进程ID
+ */
+fn read_pid_from_file() -> Option<u32> {
+    let config_dir = get_nginx_config_dir()?;
+    let pid_file = Path::new(&config_dir).join("logs").join("nginx.pid");
+
+    if !pid_file.exists() {
+        return None;
+    }
+
+    match fs::read_to_string(&pid_file) {
+        Ok(content) => content.trim().parse::<u32>().ok(),
+        Err(e) => {
+            log::warn!("读取PID文件失败: {}", e);
+            None
+        }
+    }
+}
+
+/**
  * 查找Nginx进程
  *
  * @param exe_path Nginx可执行文件路径（Windows）或空字符串（Linux使用系统命令）
@@ -348,6 +370,24 @@ fn find_master_process(processes: &[(u32, Option<u32>)]) -> Option<u32> {
 pub fn find_nginx_process(exe_path: &str) -> Option<u32> {
     use sysinfo::{ProcessRefreshKind, RefreshKind, System};
 
+    // 首先尝试从PID文件读取（最准确的方式）
+    if is_linux() {
+        if let Some(pid) = read_pid_from_file() {
+            // 验证该进程是否确实存在且是nginx
+            let s = System::new_with_specifics(
+                RefreshKind::new().with_processes(ProcessRefreshKind::everything()),
+            );
+
+            if let Some(process) = s.process((pid as usize).into()) {
+                let process_name = process.name().to_lowercase();
+                if process_name == "nginx" {
+                    return Some(pid);
+                }
+            }
+            // PID文件中的进程不存在或不是nginx，继续用其他方式查找
+        }
+    }
+
     let s = System::new_with_specifics(
         RefreshKind::new().with_processes(ProcessRefreshKind::everything()),
     );
@@ -355,10 +395,31 @@ pub fn find_nginx_process(exe_path: &str) -> Option<u32> {
     let mut matched_processes: Vec<(u32, Option<u32>)> = Vec::new();
 
     if is_linux() {
-        // Linux平台：直接按进程名查找
+        // Linux平台：获取配置文件路径用于匹配
+        let config_path = get_nginx_config_path();
+        let config_path_str = config_path
+            .as_ref()
+            .map(|p| p.to_string_lossy().to_string());
+
         for (pid, process) in s.processes() {
-            if process.name().to_lowercase() == "nginx" {
-                matched_processes.push((pid.as_u32(), process.parent().map(|p| p.as_u32())));
+            let process_name = process.name().to_lowercase();
+            if process_name == "nginx" {
+                // 检查进程启动参数是否包含我们的配置文件路径
+                let cmd = process.cmd();
+                let is_our_nginx = if let Some(ref our_config) = config_path_str {
+                    cmd.iter().any(|arg| arg.contains(our_config))
+                } else {
+                    // 如果没有配置路径，检查是否不是openresty
+                    let exe = process
+                        .exe()
+                        .map(|e| e.to_string_lossy().to_lowercase())
+                        .unwrap_or_default();
+                    !exe.contains("openresty")
+                };
+
+                if is_our_nginx {
+                    matched_processes.push((pid.as_u32(), process.parent().map(|p| p.as_u32())));
+                }
             }
         }
     } else {
@@ -1166,6 +1227,14 @@ pub fn generate_nginx_config(config: &crate::models::NginxProxyConfig, config_di
     nginx_conf.push_str("http {\n");
     nginx_conf.push_str(&format!("    include       {}/mime.types;\n", config_dir));
     nginx_conf.push_str("    default_type  application/octet-stream;\n\n");
+    nginx_conf.push_str(&format!(
+        "    access_log    {}/logs/access.log;\n",
+        config_dir
+    ));
+    nginx_conf.push_str(&format!(
+        "    error_log     {}/logs/error.log;\n\n",
+        config_dir
+    ));
     nginx_conf.push_str("    sendfile        on;\n");
     nginx_conf.push_str("    keepalive_timeout  65;\n\n");
 
