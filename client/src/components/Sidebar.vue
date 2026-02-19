@@ -172,7 +172,7 @@ const getIconPath = (iconName: string): string => {
 .menu-icon {
   width: 24px;
   height: 24px;
-  color: var(--text-primary);
+  filter: var(--icon-filter);
 }
 
 .logo-text {
@@ -222,6 +222,11 @@ const getIconPath = (iconName: string): string => {
   width: 26px;
   height: 26px;
   flex-shrink: 0;
+  filter: var(--icon-filter);
+}
+
+.nav-item.active .nav-icon {
+  filter: none;
 }
 
 .nav-text {
@@ -267,6 +272,7 @@ const getIconPath = (iconName: string): string => {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
+  filter: var(--icon-filter);
 }
 
 .theme-text {

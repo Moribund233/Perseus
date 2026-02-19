@@ -38,4 +38,7 @@
   /* 过渡动画 */
   --transition-fast: 0.15s ease;
   --transition-normal: 0.25s ease;
+
+  /* 图标滤镜 - 浅色主题下保持原色 */
+  --icon-filter: none;
 }

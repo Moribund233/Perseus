@@ -441,8 +441,11 @@ body {
 }
 
 .checkbox-group {
+  display: flex;
   flex-direction: row;
   align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
 }
 
 .checkbox-label {
@@ -1138,6 +1141,448 @@ body {
 }
 
 /* ============================================
+   主题选择网格
+   ============================================ */
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--spacing-lg);
+  padding: var(--spacing-md);
+}
+
+.theme-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 2px solid transparent;
+}
+
+.theme-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.theme-item.active {
+  border-color: var(--primary-color);
+  background-color: var(--primary-light);
+}
+
+.theme-preview {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.theme-name {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.theme-item.active .theme-name {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+/* ============================================
+   布局密度网格
+   ============================================ */
+
+.density-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.density-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 2px solid transparent;
+}
+
+.density-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.density-item.active {
+  border-color: var(--primary-color);
+  background-color: var(--primary-light);
+}
+
+.density-preview {
+  width: 60px;
+  height: 60px;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--border-radius-md);
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  gap: 4px;
+}
+
+.density-preview-compact {
+  padding: 2px;
+  gap: 2px;
+}
+
+.density-preview-compact .preview-block {
+  height: 14px;
+  border-radius: 2px;
+}
+
+.density-preview-default {
+  padding: 4px;
+  gap: 4px;
+}
+
+.density-preview-default .preview-block {
+  height: 14px;
+  border-radius: 4px;
+}
+
+.density-preview-comfortable {
+  padding: 6px;
+  gap: 6px;
+}
+
+.density-preview-comfortable .preview-block {
+  height: 12px;
+  border-radius: 6px;
+}
+
+.density-preview-spacious {
+  padding: 8px;
+  gap: 8px;
+}
+
+.density-preview-spacious .preview-block {
+  height: 10px;
+  border-radius: 8px;
+}
+
+.preview-block {
+  background-color: var(--primary-color);
+  opacity: 0.6;
+  flex: 1;
+  min-height: 8px;
+}
+
+.density-name {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.density-item.active .density-name {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+/* ============================================
+   危险操作对话框
+   ============================================ */
+
+.danger-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.danger-dialog {
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-lg);
+  width: 90%;
+  max-width: 500px;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--error-color);
+}
+
+.danger-dialog-header {
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.danger-dialog-title {
+  color: var(--error-color);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  margin: 0;
+}
+
+.danger-dialog-body {
+  padding: var(--spacing-lg);
+}
+
+.danger-dialog-message {
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-lg);
+  line-height: 1.6;
+}
+
+.danger-input {
+  border-color: var(--error-color);
+}
+
+.danger-input:focus {
+  border-color: var(--error-color);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+
+.danger-dialog-footer {
+  padding: var(--spacing-lg);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-md);
+}
+
+/* ============================================
+   敏感配置区域
+   ============================================ */
+
+.sensitive-zone {
+  border: 1px solid var(--warning-color);
+}
+
+.sensitive-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sensitive-header:hover {
+  background-color: var(--bg-hover);
+}
+
+.expand-icon {
+  font-size: 12px;
+  transition: transform 0.3s ease;
+  color: var(--text-secondary);
+}
+
+.expand-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.sensitive-content {
+  padding: var(--spacing-lg);
+  border-top: 1px solid var(--border-color);
+}
+
+.sensitive-description {
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-lg);
+}
+
+.password-verify {
+  max-width: 400px;
+}
+
+.sensitive-section {
+  margin-bottom: var(--spacing-xl);
+  padding-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sensitive-section:last-of-type {
+  border-bottom: none;
+}
+
+.sensitive-section h3 {
+  font-size: var(--font-size-md);
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+.danger-subsection {
+  background-color: var(--bg-tertiary);
+  padding: var(--spacing-lg);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--error-color);
+}
+
+.danger-subsection h3 {
+  color: var(--error-color);
+}
+
+.elevate-warning {
+  color: var(--warning-color);
+  font-size: var(--font-size-sm);
+  margin-top: var(--spacing-sm);
+}
+
+/* 敏感配置在危险区域内的样式 */
+.sensitive-danger-item {
+  cursor: pointer;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.sensitive-danger-item .danger-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sensitive-danger-item .expand-hint {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.sensitive-expanded-content {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border-color);
+}
+
+.sensitive-verify-section {
+  max-width: 400px;
+}
+
+.sensitive-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.sensitive-authenticated-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.sensitive-subsection {
+  padding: var(--spacing-md);
+  background-color: var(--bg-tertiary);
+  border-radius: var(--border-radius-md);
+}
+
+.sensitive-subsection h4 {
+  font-size: var(--font-size-md);
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+.token-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-md);
+}
+
+.token-display-area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.token-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.token-item label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.token-value {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: var(--font-size-sm);
+  background-color: var(--bg-secondary);
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  word-break: break-all;
+  user-select: none;
+}
+
+.token-hint {
+  font-size: var(--font-size-sm);
+  color: var(--warning-color);
+  margin-top: var(--spacing-sm);
+}
+
+.token-reset-section {
+  border: 1px solid var(--error-color);
+}
+
+.danger-item-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md);
+  background-color: rgba(239, 68, 68, 0.05);
+  border-radius: var(--border-radius-md);
+}
+
+.danger-item-inner h5 {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.danger-item-inner p {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.form-actions-inline {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+/* ============================================
+   警告和信息卡片
+   ============================================ */
+
+.warning-card {
+  background-color: rgba(245, 158, 11, 0.1);
+  border: 1px solid var(--warning-color);
+}
+
+.warning-text {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--warning-color);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+/* ============================================
+   复选框组水平布局
+   ============================================ */
+
+.checkbox-group-horizontal {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+}
+
+/* ============================================
    响应式工具
    ============================================ */
 
@@ -1159,5 +1604,22 @@ body {
   .grid-3,
   .grid-4 {
     grid-template-columns: 1fr;
+  }
+  
+  .theme-grid,
+  .density-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .danger-item {
+    flex-direction: column;
+    gap: var(--spacing-md);
+    align-items: flex-start;
+  }
+  
+  .danger-item-inner {
+    flex-direction: column;
+    gap: var(--spacing-md);
+    align-items: flex-start;
   }
 }
