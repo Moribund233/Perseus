@@ -148,11 +148,8 @@ async function selectServerPath() {
   try {
     const { open } = await import('@tauri-apps/plugin-dialog')
     const selected = await open({
-      multiple: false,
-      filters: [
-        { name: '可执行文件', extensions: ['exe', ''] },
-        { name: '所有文件', extensions: ['*'] }
-      ]
+      multiple: false
+      // 不设置filters，允许选择任何文件
     })
     if (selected && typeof selected === 'string') {
       serverPath.value = selected
@@ -192,11 +189,8 @@ async function loadNginxManually() {
   try {
     const { open } = await import('@tauri-apps/plugin-dialog')
     const selected = await open({
-      multiple: false,
-      filters: [
-        { name: 'Nginx可执行文件', extensions: ['exe', ''] },
-        { name: '所有文件', extensions: ['*'] }
-      ]
+      multiple: false
+      // 不设置filters，允许选择任何文件
     })
     if (selected && typeof selected === 'string') {
       isLoading.value = true

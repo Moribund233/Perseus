@@ -219,10 +219,7 @@ async function handleLoadNginx() {
     const selected = await openDialog({
       multiple: false,
       directory: false,
-      filters: [
-        { name: 'Nginx可执行文件', extensions: ['exe', ''] },
-        { name: '所有文件', extensions: ['*'] }
-      ],
+      // 不设置filters，允许选择任何文件
       title: '选择Nginx可执行文件'
     })
 
