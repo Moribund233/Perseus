@@ -662,6 +662,14 @@ export interface NginxProxyConfig {
   enable_hsts: boolean
   hsts_max_age: number
   server_name: string
+  // 性能优化配置
+  connect_timeout: number
+  send_timeout: number
+  read_timeout: number
+  enable_keepalive: boolean
+  keepalive_connections: number
+  worker_processes: string
+  enable_performance: boolean
 }
 
 /**

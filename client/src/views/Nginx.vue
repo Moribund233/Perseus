@@ -61,7 +61,15 @@ const proxyConfig = ref<NginxProxyConfig>({
   cors_headers: 'Content-Type, Authorization',
   enable_hsts: false,
   hsts_max_age: 31536000,
-  server_name: '_'
+  server_name: '_',
+  // 性能优化配置
+  connect_timeout: 30,
+  send_timeout: 30,
+  read_timeout: 30,
+  enable_keepalive: true,
+  keepalive_connections: 32,
+  worker_processes: 'auto',
+  enable_performance: true
 })
 const isSavingConfig = ref(false)
 
@@ -710,6 +718,97 @@ onMounted(() => {
                 placeholder="Content-Type, Authorization"
                 class="form-input"
                 :disabled="!proxyConfig.enabled || !proxyConfig.add_cors_headers"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- 性能优化配置 -->
+        <div class="form-section">
+          <h3>性能优化</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="enable-performance">
+                <input
+                  id="enable-performance"
+                  v-model="proxyConfig.enable_performance"
+                  type="checkbox"
+                />
+                启用性能优化
+              </label>
+              <small class="form-hint">启用TCP优化、缓冲区优化等</small>
+            </div>
+            <div class="form-group">
+              <label for="enable-keepalive">
+                <input
+                  id="enable-keepalive"
+                  v-model="proxyConfig.enable_keepalive"
+                  type="checkbox"
+                />
+                启用长连接
+              </label>
+              <small class="form-hint">减少连接建立开销，提升并发性能</small>
+            </div>
+          </div>
+          <div class="form-row" v-if="proxyConfig.enable_keepalive">
+            <div class="form-group">
+              <label for="keepalive-connections">长连接池大小:</label>
+              <input
+                id="keepalive-connections"
+                v-model.number="proxyConfig.keepalive_connections"
+                type="number"
+                min="1"
+                max="100"
+                class="form-input"
+              />
+              <small class="form-hint">建议: 16-64</small>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="worker-processes">Worker进程数:</label>
+              <input
+                id="worker-processes"
+                v-model="proxyConfig.worker_processes"
+                type="text"
+                placeholder="auto 或数字"
+                class="form-input"
+              />
+              <small class="form-hint">auto表示自动根据CPU核心数</small>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="connect-timeout">连接超时(秒):</label>
+              <input
+                id="connect-timeout"
+                v-model.number="proxyConfig.connect_timeout"
+                type="number"
+                min="1"
+                max="300"
+                class="form-input"
+              />
+            </div>
+            <div class="form-group">
+              <label for="send-timeout">发送超时(秒):</label>
+              <input
+                id="send-timeout"
+                v-model.number="proxyConfig.send_timeout"
+                type="number"
+                min="1"
+                max="300"
+                class="form-input"
+              />
+            </div>
+            <div class="form-group">
+              <label for="read-timeout">读取超时(秒):</label>
+              <input
+                id="read-timeout"
+                v-model.number="proxyConfig.read_timeout"
+                type="number"
+                min="1"
+                max="300"
+                class="form-input"
               />
             </div>
           </div>

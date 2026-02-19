@@ -1208,22 +1208,45 @@ fn find_nginx_exe_in_dir(dir: &Path) -> Result<String, String> {
 }
 
 /**
+ * 从后端URL提取主机地址
+ *
+ * @param backend_url 后端URL，如 http://127.0.0.1:8000
+ * @return 主机地址，如 127.0.0.1:8000
+ */
+fn extract_backend_host(backend_url: &str) -> String {
+    backend_url
+        .trim_start_matches("http://")
+        .trim_start_matches("https://")
+        .to_string()
+}
+
+/**
  * 生成Nginx配置文件内容
  *
  * @param config 代理配置
- * @param config_dir 配置目录路径（用于生成绝对路径）
+ * @param config_dir 配置目录
  * @return nginx.conf内容
  */
 pub fn generate_nginx_config(config: &crate::models::NginxProxyConfig, config_dir: &str) -> String {
     let mut nginx_conf = String::new();
 
     // 基本配置
-    nginx_conf.push_str("worker_processes 1;\n\n");
+    nginx_conf.push_str(&format!(
+        "worker_processes {};\n\n",
+        config.worker_processes
+    ));
     nginx_conf.push_str("# PID文件路径\n");
     nginx_conf.push_str(&format!("pid {}/logs/nginx.pid;\n\n", config_dir));
+
+    // Events配置 - 添加性能优化
     nginx_conf.push_str("events {\n");
     nginx_conf.push_str("    worker_connections 1024;\n");
+    if config.enable_performance && is_linux() {
+        nginx_conf.push_str("    use epoll;\n");
+        nginx_conf.push_str("    multi_accept on;\n");
+    }
     nginx_conf.push_str("}\n\n");
+
     nginx_conf.push_str("http {\n");
     nginx_conf.push_str(&format!("    include       {}/mime.types;\n", config_dir));
     nginx_conf.push_str("    default_type  application/octet-stream;\n\n");
@@ -1236,7 +1259,31 @@ pub fn generate_nginx_config(config: &crate::models::NginxProxyConfig, config_di
         config_dir
     ));
     nginx_conf.push_str("    sendfile        on;\n");
+
+    // 性能优化参数
+    if config.enable_performance {
+        nginx_conf.push_str("    tcp_nopush      on;\n");
+        nginx_conf.push_str("    tcp_nodelay     on;\n");
+        nginx_conf.push_str("    client_body_buffer_size 128k;\n");
+        nginx_conf.push_str("    client_max_body_size 50m;\n");
+    }
+
     nginx_conf.push_str("    keepalive_timeout  65;\n\n");
+
+    // 上游服务器配置（长连接）
+    if config.enable_keepalive {
+        nginx_conf.push_str("    # 上游服务器配置\n");
+        nginx_conf.push_str("    upstream langit_backend {\n");
+        nginx_conf.push_str(&format!(
+            "        server {};\n",
+            extract_backend_host(&config.backend_url)
+        ));
+        nginx_conf.push_str(&format!(
+            "        keepalive {};\n",
+            config.keepalive_connections
+        ));
+        nginx_conf.push_str("    }\n\n");
+    }
 
     // 服务器配置
     nginx_conf.push_str("    server {\n");
@@ -1281,8 +1328,70 @@ pub fn generate_nginx_config(config: &crate::models::NginxProxyConfig, config_di
             config.cors_headers
         ));
 
-        // CORS预检请求处理
+        // CORS预检请求处理 - 使用单独的location避免if指令问题
         nginx_conf.push('\n');
+        nginx_conf.push_str("        # CORS预检请求处理\n");
+        nginx_conf.push_str("        location = /api/v1/auth/login {\n");
+        nginx_conf.push_str("            # 处理OPTIONS预检请求\n");
+        nginx_conf.push_str("            if ($request_method = 'OPTIONS') {\n");
+        nginx_conf.push_str(&format!(
+            "                add_header 'Access-Control-Allow-Origin' '{}';\n",
+            config.cors_origins
+        ));
+        nginx_conf
+            .push_str("                add_header 'Access-Control-Allow-Credentials' 'true';\n");
+        nginx_conf.push_str("                add_header 'Access-Control-Allow-Methods' 'POST, OPTIONS';\n");
+        nginx_conf.push_str("                add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization';\n");
+        nginx_conf.push_str("                add_header 'Access-Control-Max-Age' 1728000;\n");
+        nginx_conf.push_str("                add_header 'Content-Length' 0;\n");
+        nginx_conf.push_str("                return 204;\n");
+        nginx_conf.push_str("            }\n\n");
+
+        // 代理配置
+        if config.enable_keepalive {
+            nginx_conf.push_str("            proxy_pass http://langit_backend;\n");
+        } else {
+            nginx_conf.push_str(&format!("            proxy_pass {};\n", config.backend_url));
+        }
+
+        nginx_conf.push_str("            proxy_set_header Host $host;\n");
+        nginx_conf.push_str("            proxy_set_header X-Real-IP $remote_addr;\n");
+        nginx_conf
+            .push_str("            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n");
+        nginx_conf.push_str("            proxy_set_header X-Forwarded-Proto $scheme;\n");
+
+        // 转发所有原始请求头（包括自定义头如 X-LanGit-Local）
+        nginx_conf.push_str("            proxy_pass_request_headers on;\n");
+
+        // 添加超时设置
+        nginx_conf.push_str(&format!(
+            "            proxy_connect_timeout {}s;\n",
+            config.connect_timeout
+        ));
+        nginx_conf.push_str(&format!(
+            "            proxy_send_timeout {}s;\n",
+            config.send_timeout
+        ));
+        nginx_conf.push_str(&format!(
+            "            proxy_read_timeout {}s;\n",
+            config.read_timeout
+        ));
+
+        // 长连接支持
+        if config.enable_keepalive {
+            nginx_conf.push_str("            proxy_http_version 1.1;\n");
+            nginx_conf.push_str("            proxy_set_header Connection \"\";\n");
+        }
+
+        // 缓冲区设置
+        if config.enable_performance {
+            nginx_conf.push_str("            proxy_buffering on;\n");
+            nginx_conf.push_str("            proxy_buffer_size 4k;\n");
+            nginx_conf.push_str("            proxy_buffers 8 4k;\n");
+        }
+
+        nginx_conf.push_str("        }\n\n");
+
         nginx_conf.push_str("        location / {\n");
         nginx_conf.push_str("            if ($request_method = 'OPTIONS') {\n");
         nginx_conf.push_str(&format!(
@@ -1305,22 +1414,97 @@ pub fn generate_nginx_config(config: &crate::models::NginxProxyConfig, config_di
         nginx_conf.push_str("                add_header 'Content-Length' 0;\n");
         nginx_conf.push_str("                return 204;\n");
         nginx_conf.push_str("            }\n\n");
-        nginx_conf.push_str(&format!("            proxy_pass {};\n", config.backend_url));
+
+        // 代理配置
+        if config.enable_keepalive {
+            nginx_conf.push_str("            proxy_pass http://langit_backend;\n");
+        } else {
+            nginx_conf.push_str(&format!("            proxy_pass {};\n", config.backend_url));
+        }
+
         nginx_conf.push_str("            proxy_set_header Host $host;\n");
         nginx_conf.push_str("            proxy_set_header X-Real-IP $remote_addr;\n");
         nginx_conf
             .push_str("            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n");
         nginx_conf.push_str("            proxy_set_header X-Forwarded-Proto $scheme;\n");
+
+        // 转发所有原始请求头（包括自定义头如 X-LanGit-Local）
+        nginx_conf.push_str("            proxy_pass_request_headers on;\n");
+
+        // 添加超时设置
+        nginx_conf.push_str(&format!(
+            "            proxy_connect_timeout {}s;\n",
+            config.connect_timeout
+        ));
+        nginx_conf.push_str(&format!(
+            "            proxy_send_timeout {}s;\n",
+            config.send_timeout
+        ));
+        nginx_conf.push_str(&format!(
+            "            proxy_read_timeout {}s;\n",
+            config.read_timeout
+        ));
+
+        // 长连接支持
+        if config.enable_keepalive {
+            nginx_conf.push_str("            proxy_http_version 1.1;\n");
+            nginx_conf.push_str("            proxy_set_header Connection \"\";\n");
+        }
+
+        // 缓冲区设置
+        if config.enable_performance {
+            nginx_conf.push_str("            proxy_buffering on;\n");
+            nginx_conf.push_str("            proxy_buffer_size 4k;\n");
+            nginx_conf.push_str("            proxy_buffers 8 4k;\n");
+        }
+
         nginx_conf.push_str("        }\n");
     } else {
         // 无CORS配置
         nginx_conf.push_str("        location / {\n");
-        nginx_conf.push_str(&format!("            proxy_pass {};\n", config.backend_url));
+
+        if config.enable_keepalive {
+            nginx_conf.push_str("            proxy_pass http://langit_backend;\n");
+        } else {
+            nginx_conf.push_str(&format!("            proxy_pass {};\n", config.backend_url));
+        }
+
         nginx_conf.push_str("            proxy_set_header Host $host;\n");
         nginx_conf.push_str("            proxy_set_header X-Real-IP $remote_addr;\n");
         nginx_conf
             .push_str("            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n");
         nginx_conf.push_str("            proxy_set_header X-Forwarded-Proto $scheme;\n");
+
+        // 转发所有原始请求头（包括自定义头如 X-LanGit-Local）
+        nginx_conf.push_str("            proxy_pass_request_headers on;\n");
+
+        // 添加超时设置
+        nginx_conf.push_str(&format!(
+            "            proxy_connect_timeout {}s;\n",
+            config.connect_timeout
+        ));
+        nginx_conf.push_str(&format!(
+            "            proxy_send_timeout {}s;\n",
+            config.send_timeout
+        ));
+        nginx_conf.push_str(&format!(
+            "            proxy_read_timeout {}s;\n",
+            config.read_timeout
+        ));
+
+        // 长连接支持
+        if config.enable_keepalive {
+            nginx_conf.push_str("            proxy_http_version 1.1;\n");
+            nginx_conf.push_str("            proxy_set_header Connection \"\";\n");
+        }
+
+        // 缓冲区设置
+        if config.enable_performance {
+            nginx_conf.push_str("            proxy_buffering on;\n");
+            nginx_conf.push_str("            proxy_buffer_size 4k;\n");
+            nginx_conf.push_str("            proxy_buffers 8 4k;\n");
+        }
+
         nginx_conf.push_str("        }\n");
     }
 

@@ -475,6 +475,49 @@ pub struct NginxProxyConfig {
     pub hsts_max_age: u32,
     /// 服务器名称
     pub server_name: String,
+    /// 连接超时时间（秒）
+    #[serde(default = "default_connect_timeout")]
+    pub connect_timeout: u32,
+    /// 发送超时时间（秒）
+    #[serde(default = "default_send_timeout")]
+    pub send_timeout: u32,
+    /// 读取超时时间（秒）
+    #[serde(default = "default_read_timeout")]
+    pub read_timeout: u32,
+    /// 启用长连接
+    #[serde(default = "default_enable_keepalive")]
+    pub enable_keepalive: bool,
+    /// 长连接池大小
+    #[serde(default = "default_keepalive_connections")]
+    pub keepalive_connections: u32,
+    /// worker进程数（auto表示自动）
+    #[serde(default = "default_worker_processes")]
+    pub worker_processes: String,
+    /// 启用性能优化
+    #[serde(default = "default_enable_performance")]
+    pub enable_performance: bool,
+}
+
+fn default_connect_timeout() -> u32 {
+    30
+}
+fn default_send_timeout() -> u32 {
+    30
+}
+fn default_read_timeout() -> u32 {
+    30
+}
+fn default_enable_keepalive() -> bool {
+    true
+}
+fn default_keepalive_connections() -> u32 {
+    32
+}
+fn default_worker_processes() -> String {
+    String::from("auto")
+}
+fn default_enable_performance() -> bool {
+    true
 }
 
 impl Default for NginxProxyConfig {
@@ -491,6 +534,13 @@ impl Default for NginxProxyConfig {
             enable_hsts: false,
             hsts_max_age: 31536000,
             server_name: String::from("_"),
+            connect_timeout: default_connect_timeout(),
+            send_timeout: default_send_timeout(),
+            read_timeout: default_read_timeout(),
+            enable_keepalive: default_enable_keepalive(),
+            keepalive_connections: default_keepalive_connections(),
+            worker_processes: default_worker_processes(),
+            enable_performance: default_enable_performance(),
         }
     }
 }
