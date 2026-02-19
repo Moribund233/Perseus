@@ -1,0 +1,43 @@
+/**
+ * 暖色主题 - Warm Theme
+ * 落日熔金 - 温暖舒适的琥珀色调
+ * 设计理念：暖调深棕背景 + 琥珀金主色，减少蓝光
+ * 适合：阅读应用、晚间使用、护眼场景
+ */
+
+:root {
+  /* 主色调 - 温暖琥珀金 */
+  --primary-color: #f59e0b;
+  --primary-hover: #d97706;
+  --primary-light: rgba(245, 158, 11, 0.15);
+
+  /* 背景色 - 暖调深棕色系 */
+  --bg-primary: #1c1917;
+  --bg-secondary: #292524;
+  --bg-tertiary: #44403c;
+  --bg-hover: rgba(245, 158, 11, 0.1);
+
+  /* 文字色 - 暖白色系 */
+  --text-primary: #fafaf9;
+  --text-secondary: #d6d3d1;
+  --text-tertiary: #a8a29e;
+
+  /* 边框色 */
+  --border-color: rgba(168, 162, 158, 0.2);
+  --border-light: rgba(168, 162, 158, 0.1);
+
+  /* 状态色 */
+  --success-color: #84cc16;
+  --error-color: #f87171;
+  --warning-color: #fbbf24;
+  --info-color: #f59e0b;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(245, 158, 11, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(245, 158, 11, 0.15);
+
+  /* 过渡动画 */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+}

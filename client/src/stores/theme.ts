@@ -50,19 +50,31 @@ export const presetColorThemes: ColorThemeConfig[] = [
     id: 'light',
     name: '浅色主题',
     file: '/src/assets/themes/light.css',
-    previewColor: '#60a5fa'
+    previewColor: '#3b82f6'
   },
   {
     id: 'purple',
     name: '紫色主题',
     file: '/src/assets/themes/purple.css',
-    previewColor: '#8b5cf6'
+    previewColor: '#a78bfa'
   },
   {
     id: 'green',
     name: '绿色主题',
     file: '/src/assets/themes/green.css',
-    previewColor: '#10b981'
+    previewColor: '#5eead4'
+  },
+  {
+    id: 'warm',
+    name: '暖色主题',
+    file: '/src/assets/themes/warm.css',
+    previewColor: '#f59e0b'
+  },
+  {
+    id: 'blue',
+    name: '蓝色主题',
+    file: '/src/assets/themes/blue.css',
+    previewColor: '#3b82f6'
   }
 ]
 
