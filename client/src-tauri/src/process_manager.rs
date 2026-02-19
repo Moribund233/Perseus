@@ -168,11 +168,18 @@ pub fn start_server() -> Result<u32, String> {
     // 获取环境变量配置
     let env_vars = crate::local_auth::get_server_env_vars()?;
 
+    // 记录环境变量（隐藏敏感信息）
+    log::info!("准备启动服务端，工作目录: {:?}", server_dir);
+    log::info!("环境变量数量: {}", env_vars.len());
+    for (key, _) in &env_vars {
+        log::debug!("环境变量: {} = <hidden>", key);
+    }
+
     // 构建启动命令
     let mut cmd = Command::new(&server_exe);
     cmd.current_dir(&server_dir)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
 
     // Windows: 隐藏控制台窗口，后台运行
     #[cfg(windows)]
@@ -188,12 +195,61 @@ pub fn start_server() -> Result<u32, String> {
     }
 
     // 启动进程
-    let child = cmd.spawn().map_err(|e| format!("启动服务失败: {}", e))?;
+    let mut child = cmd.spawn().map_err(|e| format!("启动服务失败: {}", e))?;
 
     let pid = child.id();
 
     // 保存 PID
     *SERVER_PID.lock().unwrap() = Some(pid);
+
+    // 在后台线程中等待子进程，防止产生僵尸进程
+    std::thread::spawn(move || {
+        // 读取子进程输出以便调试
+        use std::io::{BufRead, BufReader};
+
+        if let Some(stderr) = child.stderr.take() {
+            let reader = BufReader::new(stderr);
+            std::thread::spawn(move || {
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        log::warn!("服务端错误输出: {}", line);
+                    }
+                }
+            });
+        }
+
+        if let Some(stdout) = child.stdout.take() {
+            let reader = BufReader::new(stdout);
+            std::thread::spawn(move || {
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        log::info!("服务端输出: {}", line);
+                    }
+                }
+            });
+        }
+
+        let exit_status = child.wait();
+        match exit_status {
+            Ok(status) => {
+                log::info!(
+                    "服务端进程已退出 (PID: {})，退出码: {:?}",
+                    pid,
+                    status.code()
+                );
+            }
+            Err(e) => {
+                log::error!("等待服务端进程失败 (PID: {}): {}", pid, e);
+            }
+        }
+
+        // 进程退出后清空 PID 记录
+        if let Ok(mut server_pid) = SERVER_PID.lock() {
+            if server_pid.map(|p| p == pid).unwrap_or(false) {
+                *server_pid = None;
+            }
+        }
+    });
 
     Ok(pid)
 }
