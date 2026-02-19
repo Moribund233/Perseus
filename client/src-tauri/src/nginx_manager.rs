@@ -574,6 +574,49 @@ pub fn start_nginx() -> NginxActionResponse {
 }
 
 /**
+ * 确保Nginx配置目录包含必要的文件
+ *
+ * @param config_dir 配置目录路径
+ * @return 操作结果
+ */
+fn ensure_nginx_config_files(config_dir: &str) -> Result<(), String> {
+    let config_path = Path::new(config_dir);
+
+    // 确保logs目录存在
+    let logs_dir = config_path.join("logs");
+    if !logs_dir.exists() {
+        fs::create_dir_all(&logs_dir).map_err(|e| format!("创建logs目录失败: {}", e))?;
+    }
+
+    // 检查mime.types文件是否存在
+    let mime_types_path = config_path.join("mime.types");
+    if !mime_types_path.exists() {
+        // 尝试从系统复制mime.types
+        let system_mime_paths = [
+            "/etc/nginx/mime.types",
+            "/usr/local/nginx/conf/mime.types",
+            "/usr/share/nginx/mime.types",
+        ];
+        for system_path in &system_mime_paths {
+            if Path::new(system_path).exists() {
+                match fs::copy(system_path, &mime_types_path) {
+                    Ok(_) => {
+                        log::info!("已从 {} 复制mime.types", system_path);
+                        break;
+                    }
+                    Err(e) => {
+                        log::warn!("从 {} 复制mime.types失败: {}", system_path, e);
+                    }
+                }
+            }
+        }
+
+    }
+
+    Ok(())
+}
+
+/**
  * 启动Linux系统上的Nginx
  *
  * @return 操作响应
@@ -587,13 +630,33 @@ fn start_linux_nginx() -> NginxActionResponse {
         );
     }
 
+    // 获取配置路径和配置目录
+    let conf_path = get_nginx_config_path();
+    let config_dir = get_nginx_config_dir();
+
+    // 确保配置文件和必要文件存在
+    if let Some(ref config_dir) = config_dir {
+        if let Err(e) = ensure_nginx_config_files(config_dir) {
+            return error_response_with_status(
+                format!("准备Nginx配置文件失败: {}", e),
+                "error",
+                None,
+            );
+        }
+    }
+
     let mut cmd = Command::new("nginx");
     cmd.stdout(Stdio::null()).stderr(Stdio::null());
 
-    if let Some(ref conf_path) = get_nginx_config_path() {
+    if let Some(ref conf_path) = conf_path {
         if conf_path.exists() {
             cmd.arg("-c").arg(conf_path);
         }
+    }
+
+    // 设置工作目录为配置目录，确保PID文件和日志能正确写入
+    if let Some(ref config_dir) = config_dir {
+        cmd.current_dir(config_dir);
     }
 
     match cmd.spawn() {
@@ -690,8 +753,17 @@ fn stop_linux_nginx() -> NginxActionResponse {
         return success_response_with_status("Nginx未在运行", "stopped", None);
     }
 
+    // 获取配置目录作为工作目录
+    let config_dir = get_nginx_config_dir();
+
     // 首先尝试使用 quit 命令优雅停止
-    match Command::new("nginx").arg("-s").arg("quit").output() {
+    let mut quit_cmd = Command::new("nginx");
+    quit_cmd.arg("-s").arg("quit");
+    if let Some(ref config_dir) = config_dir {
+        quit_cmd.current_dir(config_dir);
+    }
+
+    match quit_cmd.output() {
         Ok(_) => {
             for _ in 0..10 {
                 std::thread::sleep(std::time::Duration::from_millis(500));
@@ -702,7 +774,13 @@ fn stop_linux_nginx() -> NginxActionResponse {
 
             // 如果 quit 命令未能停止，尝试使用 stop 命令强制停止
             log::info!("Nginx -s quit 未能停止进程，尝试使用 -s stop");
-            if let Err(e) = Command::new("nginx").arg("-s").arg("stop").output() {
+            let mut stop_cmd = Command::new("nginx");
+            stop_cmd.arg("-s").arg("stop");
+            if let Some(ref config_dir) = config_dir {
+                stop_cmd.current_dir(config_dir);
+            }
+
+            if let Err(e) = stop_cmd.output() {
                 log::error!("执行Nginx stop命令失败: {}", e);
             } else {
                 // 等待进程停止
@@ -1060,20 +1138,21 @@ fn find_nginx_exe_in_dir(dir: &Path) -> Result<String, String> {
  * 生成Nginx配置文件内容
  *
  * @param config 代理配置
+ * @param config_dir 配置目录路径（用于生成绝对路径）
  * @return nginx.conf内容
  */
-pub fn generate_nginx_config(config: &crate::models::NginxProxyConfig) -> String {
+pub fn generate_nginx_config(config: &crate::models::NginxProxyConfig, config_dir: &str) -> String {
     let mut nginx_conf = String::new();
 
     // 基本配置
     nginx_conf.push_str("worker_processes 1;\n\n");
     nginx_conf.push_str("# PID文件路径\n");
-    nginx_conf.push_str("pid logs/nginx.pid;\n\n");
+    nginx_conf.push_str(&format!("pid {}/logs/nginx.pid;\n\n", config_dir));
     nginx_conf.push_str("events {\n");
     nginx_conf.push_str("    worker_connections 1024;\n");
     nginx_conf.push_str("}\n\n");
     nginx_conf.push_str("http {\n");
-    nginx_conf.push_str("    include       mime.types;\n");
+    nginx_conf.push_str(&format!("    include       {}/mime.types;\n", config_dir));
     nginx_conf.push_str("    default_type  application/octet-stream;\n\n");
     nginx_conf.push_str("    sendfile        on;\n");
     nginx_conf.push_str("    keepalive_timeout  65;\n\n");
@@ -1238,8 +1317,12 @@ pub fn save_nginx_proxy_config(
     // 保存配置
     match config::save_config(&client_config) {
         Ok(_) => {
-            // 生成nginx.conf文件
-            let nginx_conf = generate_nginx_config(&client_config.nginx.proxy);
+            // 获取配置目录
+            let config_dir = if is_linux() {
+                get_nginx_config_dir()
+            } else {
+                client_config.nginx.config_dir.clone()
+            };
 
             // 获取配置文件路径
             let conf_path = if is_linux() {
@@ -1252,17 +1335,18 @@ pub fn save_nginx_proxy_config(
                     .map(|dir| Path::new(dir).join("nginx.conf"))
             };
 
-            if let Some(conf_path) = conf_path {
-                // 确保conf目录存在
-                if let Some(parent) = conf_path.parent() {
-                    if let Err(e) = fs::create_dir_all(parent) {
-                        return crate::models::NginxConfigSaveResponse {
-                            success: false,
-                            message: format!("创建配置目录失败: {}", e),
-                            need_restart: was_running,
-                        };
-                    }
+            if let (Some(conf_path), Some(config_dir)) = (conf_path, config_dir) {
+                // 确保所有必要的配置文件存在（包括logs目录和mime.types）
+                if let Err(e) = ensure_nginx_config_files(&config_dir) {
+                    return crate::models::NginxConfigSaveResponse {
+                        success: false,
+                        message: format!("准备Nginx配置文件失败: {}", e),
+                        need_restart: was_running,
+                    };
                 }
+
+                // 生成nginx.conf文件（使用绝对路径）
+                let nginx_conf = generate_nginx_config(&client_config.nginx.proxy, &config_dir);
 
                 // 写入配置文件
                 match fs::write(&conf_path, nginx_conf) {

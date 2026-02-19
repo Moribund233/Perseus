@@ -70,7 +70,7 @@ const router = createRouter({
  * 路由守卫：确保引导完成前无法访问主页面
  * 防止用户通过直接输入URL跳过引导流程
  */
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
   // 如果是访问引导页面，直接允许
   if (to.path === '/guide') {
     next()
