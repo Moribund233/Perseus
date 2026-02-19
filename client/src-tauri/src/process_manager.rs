@@ -16,7 +16,7 @@ use crate::config;
 static SERVER_PID: Lazy<Mutex<Option<u32>>> = Lazy::new(|| Mutex::new(None));
 
 /// 全局 System 实例，用于持续监控
-static SYSTEM: Lazy<Mutex<System>> = Lazy::new(|| Mutex::new(System::new()));
+static SYSTEM: Lazy<Mutex<System>> = Lazy::new(|| Mutex::new(System::new_all()));
 
 /// 默认服务端可执行文件名（向后兼容）
 pub const DEFAULT_SERVER_EXE_NAME: &str = "langit-server.exe";
@@ -249,14 +249,13 @@ pub fn get_server_info() -> Option<ProcessInfo> {
 
     let mut system = SYSTEM.lock().unwrap();
 
-    // 刷新特定进程和CPU信息
-    system.refresh_process(sysinfo::Pid::from(pid as usize));
-    system.refresh_cpu();
+    // 首先刷新所有信息
+    system.refresh_all();
 
     // 短暂等待以获取CPU使用率差值
-    std::thread::sleep(Duration::from_millis(200));
+    std::thread::sleep(Duration::from_millis(500));
 
-    // 再次刷新以获取CPU使用率
+    // 再次刷新进程和CPU信息
     system.refresh_process(sysinfo::Pid::from(pid as usize));
     system.refresh_cpu();
 
@@ -285,22 +284,27 @@ pub struct ProcessInfo {
 pub fn get_system_resources() -> SystemResources {
     let mut system = SYSTEM.lock().unwrap();
 
-    // 刷新CPU和内存信息
-    system.refresh_cpu();
-    system.refresh_memory();
+    // 首先刷新所有信息（包括CPU列表）
+    system.refresh_all();
 
     // 短暂等待以获取CPU使用率差值
-    std::thread::sleep(Duration::from_millis(200));
+    std::thread::sleep(Duration::from_millis(500));
 
-    // 再次刷新
+    // 再次刷新CPU信息
     system.refresh_cpu();
-    system.refresh_memory();
 
     let total_memory = system.total_memory();
     let used_memory = system.used_memory();
 
+    // 计算平均CPU使用率
+    let cpu_usage = if system.cpus().is_empty() {
+        0.0
+    } else {
+        system.cpus().iter().map(|cpu| cpu.cpu_usage()).sum::<f32>() / system.cpus().len() as f32
+    };
+
     SystemResources {
-        cpu_usage: system.global_cpu_info().cpu_usage(),
+        cpu_usage,
         memory_total_mb: (total_memory as f64) / 1024.0 / 1024.0,
         memory_used_mb: (used_memory as f64) / 1024.0 / 1024.0,
         memory_usage_percent: if total_memory > 0 {
