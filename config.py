@@ -31,6 +31,25 @@ class SystemSettings(BaseSettings):
     python_version_info: Dict[str, Any] = Field(description="Python版本信息")
 
 
+class CORSSettings(BaseSettings):
+    """CORS跨域配置类"""
+    # 开发环境默认值
+    allow_origins: list = Field(
+        default=["*"],
+        description="允许的源列表，生产环境应该限制为特定域名"
+    )
+    allow_credentials: bool = Field(default=True, description="是否允许携带凭证")
+    allow_methods: list = Field(
+        default=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        description="允许的HTTP方法"
+    )
+    allow_headers: list = Field(
+        default=["Content-Type", "Authorization", "X-Requested-With"],
+        description="允许的请求头"
+    )
+    max_age: int = Field(default=600, description="预检请求缓存时间（秒）")
+
+
 class ProxySettings(BaseSettings):
     """代理配置类"""
     proxy: bool = Field(default=True, description="是否启用反向代理（保留用于服务端内部判断）")
@@ -77,6 +96,7 @@ class Config(BaseSettings):
     """配置主类"""
     server: ServerSettings = Field(default_factory=ServerSettings)
     app: AppSettings = Field(default_factory=AppSettings)
+    cors: CORSSettings = Field(default_factory=CORSSettings)
     proxy: ProxySettings = Field(default_factory=ProxySettings)
     storage: StorageSettings = Field(default_factory=StorageSettings)
     security: SecuritySettings = Field(default_factory=SecuritySettings)

@@ -13,11 +13,14 @@ import {
   getServerProcessInfo,
   getLocalSystemInfo,
   getAppConfig,
+  updateAppConfig,
   type ServiceStatus,
   type SystemResources,
   type ProcessInfo,
   type SystemInfo,
-  type ServerAppConfig
+  type ServerAppConfig,
+  type CORSConfig,
+  type ConfigResponse
 } from '../services/api'
 
 // 基础系统信息类型
@@ -78,6 +81,18 @@ export const useServiceStore = defineStore('service', () => {
   // 服务端是否启用代理
   const isServerProxyEnabled = computed(() => {
     return serverConfig.value?.proxy?.proxy ?? false
+  })
+
+  // CORS 配置
+  const corsConfig = computed((): CORSConfig | null => {
+    return serverConfig.value?.cors ?? null
+  })
+
+  // 是否使用服务端 CORS（代理模式下不使用）
+  const useServerCORS = computed(() => {
+    // 如果启用了代理，不使用服务端 CORS
+    if (isServerProxyEnabled.value) return false
+    return true
   })
 
   // ============ Actions ============
@@ -286,6 +301,45 @@ export const useServiceStore = defineStore('service', () => {
   }
 
   /**
+   * 更新 CORS 配置
+   * @param corsConfig CORS 配置对象
+   * @returns 更新结果
+   */
+  async function updateCORSConfig(corsConfig: Partial<CORSConfig>): Promise<ConfigResponse> {
+    try {
+      // 如果启用了代理，拒绝更新 CORS 配置
+      if (isServerProxyEnabled.value) {
+        return {
+          success: false,
+          data: null,
+          errors: ['代理模式已启用，CORS 配置由代理服务器管理'],
+          hints: ['如需修改 CORS 配置，请先禁用代理模式']
+        }
+      }
+
+      const config = { cors: corsConfig }
+      const response = await updateAppConfig(config)
+
+      if (response.success) {
+        // 更新本地配置
+        if (serverConfig.value) {
+          serverConfig.value.cors = { ...serverConfig.value.cors, ...corsConfig } as CORSConfig
+        }
+      }
+
+      return response
+    } catch (err) {
+      console.error('更新 CORS 配置失败:', err)
+      return {
+        success: false,
+        data: null,
+        errors: ['更新 CORS 配置失败: ' + String(err)],
+        hints: []
+      }
+    }
+  }
+
+  /**
    * 重置状态（用于测试或重新初始化）
    */
   function reset(): void {
@@ -335,9 +389,12 @@ export const useServiceStore = defineStore('service', () => {
     statusClass,
     canRefresh,
     isServerProxyEnabled,
+    corsConfig,
+    useServerCORS,
     // Actions
     refreshStatus,
     refreshServerConfig,
+    updateCORSConfig,
     startAutoRefresh,
     stopAutoRefresh,
     refreshLocalSystemInfo,

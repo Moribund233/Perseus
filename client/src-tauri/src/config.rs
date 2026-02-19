@@ -279,5 +279,5 @@ pub fn update_local_token(token: String) -> Result<(), String> {
  * 检查是否存在安全配置文件
  */
 pub fn has_secure_config() -> bool {
-    secure_config::has_secure_config()
+    secure_config::has_secure_config().unwrap_or(false)
 }

@@ -156,9 +156,21 @@ export interface ServerServiceConfig {
 /**
  * 服务端配置
  */
+/**
+ * CORS 配置
+ */
+export interface CORSConfig {
+  allow_origins: string[]
+  allow_credentials: boolean
+  allow_methods: string[]
+  allow_headers: string[]
+  max_age: number
+}
+
 export interface ServerAppConfig {
   server?: ServerServiceConfig
   proxy: ServerProxyConfig
+  cors?: CORSConfig
 }
 
 /**

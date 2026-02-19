@@ -58,13 +58,34 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     # 根据是否启用反向代理来决定是否启用CORS中间件
     if not config.proxy.proxy:
         # 未启用反向代理，启用FastAPI的CORS中间件
+        # 使用配置文件中的CORS设置
+        cors_config = config.cors
+
+        # 生产环境安全检查
+        if not config.app.debug:
+            # 生产环境不允许使用通配符
+            if "*" in cors_config.allow_origins:
+                logger.warning(
+                    "生产环境检测到CORS allow_origins包含通配符'*'，"
+                    "这会带来安全风险。建议配置具体的允许域名。"
+                )
+                # 生产环境强制使用安全的默认值
+                allow_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+            else:
+                allow_origins = cors_config.allow_origins
+        else:
+            allow_origins = cors_config.allow_origins
+
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["*"],  # 允许所有来源，生产环境中应该限制为特定域名
-            allow_credentials=True,
-            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # 限制允许的HTTP方法
-            allow_headers=["Content-Type", "Authorization"],  # 限制允许的请求头
+            allow_origins=allow_origins,
+            allow_credentials=cors_config.allow_credentials,
+            allow_methods=cors_config.allow_methods,
+            allow_headers=cors_config.allow_headers,
+            max_age=cors_config.max_age,
         )
+
+        logger.info(f"CORS配置: allow_origins={allow_origins}")
 
     # 包含所有 API v1 路由（包括根路由、健康检查、应用管理等）
     from api.api_v1 import api_v1_router

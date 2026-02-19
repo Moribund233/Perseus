@@ -51,6 +51,18 @@ impl From<SecureConfig> for LocalAuthConfig {
     }
 }
 
+impl From<LocalAuthConfig> for SecureConfig {
+    fn from(config: LocalAuthConfig) -> Self {
+        Self {
+            jwt_secret_key: config.jwt_secret_key,
+            local_token: config.local_token,
+            debug_mode: config.debug_mode,
+            security_password: String::new(),
+            key_version: 0,
+        }
+    }
+}
+
 /// 生成随机字符串（用于 Secret Key 或 Token）
 fn generate_random_string(length: usize) -> String {
     rand::thread_rng()
@@ -182,18 +194,24 @@ pub fn get_server_env_vars() -> Result<Vec<(String, String)>, String> {
 /// 用于安全重置或首次设置
 /// 警告：此函数会强制覆盖已存在的 JWT 密钥和 Token
 pub fn regenerate_credentials() -> Result<LocalAuthConfig, String> {
-    let new_config = SecureConfig {
-        jwt_secret_key: generate_jwt_secret_key(),
-        local_token: generate_local_token(),
-        debug_mode: true,
-        security_password: String::new(),
-    };
-
-    // 保存到加密配置
-    secure_config::save_secure_config(&new_config)?;
+    let new_config = secure_config::rotate_keys()?;
 
     log::info!("已重新生成本地认证凭证");
     Ok(LocalAuthConfig::from(new_config))
+}
+
+/// 轮换密钥
+/// 生成新的 JWT 密钥和本地 Token，并增加密钥版本
+pub fn rotate_keys() -> Result<LocalAuthConfig, String> {
+    let new_config = secure_config::rotate_keys()?;
+
+    log::info!("密钥轮换完成");
+    Ok(LocalAuthConfig::from(new_config))
+}
+
+/// 获取当前密钥版本
+pub fn get_key_version() -> Result<u32, String> {
+    secure_config::get_key_version()
 }
 
 /// 设置调试模式

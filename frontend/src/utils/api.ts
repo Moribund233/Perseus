@@ -1,6 +1,16 @@
 // API基础配置 - 从环境变量读取
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
+// 导入安全存储
+import {
+  getToken,
+  setToken,
+  setUser,
+  getUser,
+  clearAll,
+  StorageOptions
+} from './secureStorage';
+
 // 通用请求配置
 interface RequestOptions {
   method?: string;
@@ -16,22 +26,35 @@ interface ApiResponse<T = any> {
   error?: string;
 }
 
-// 获取认证令牌
-const getAuthToken = (): string | null => {
-  // 这里可以根据实际情况修改，比如从localStorage或cookie中获取
-  return localStorage.getItem('token');
-};
+// 登录响应类型
+interface LoginResponse {
+  id: number;
+  username: string;
+  email: string;
+  full_name?: string;
+  is_active: boolean;
+  is_admin: boolean;
+  token?: string;
+  expires_in?: number;
+}
 
-// 通用API请求函数
+/**
+ * 通用API请求函数
+ *
+ * 安全特性：
+ * - 自动从安全存储获取 Token
+ * - 支持请求超时
+ * - 自动处理 401 未授权错误
+ */
 export const apiRequest = async <T>(
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<ApiResponse<T>> => {
-  const { 
-    method = 'GET', 
-    headers = {}, 
-    body, 
-    requireAuth = false 
+  const {
+    method = 'GET',
+    headers = {},
+    body,
+    requireAuth = false
   } = options;
 
   // 构建请求配置
@@ -40,12 +63,14 @@ export const apiRequest = async <T>(
     headers: {
       'Content-Type': 'application/json',
       ...headers
-    }
+    },
+    // 添加超时信号
+    signal: AbortSignal.timeout(30000) // 30秒超时
   };
 
   // 添加认证令牌（如果需要）
   if (requireAuth) {
-    const token = getAuthToken();
+    const token = getToken();
     if (token) {
       config.headers = {
         ...config.headers,
@@ -70,13 +95,32 @@ export const apiRequest = async <T>(
         data
       };
     } else {
+      // 处理 401 未授权错误
+      if (response.status === 401) {
+        // Token 可能已过期，清除存储
+        clearAll();
+        // 可以在这里触发全局登出事件
+        window.dispatchEvent(new CustomEvent('auth:logout', {
+          detail: { reason: 'token_expired' }
+        }));
+      }
+
       return {
         success: false,
-        error: data.detail || '请求失败'
+        error: data.detail || data.error || '请求失败'
       };
     }
   } catch (error) {
     console.error('API请求错误:', error);
+
+    // 处理超时错误
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return {
+        success: false,
+        error: '请求超时，请稍后重试'
+      };
+    }
+
     return {
       success: false,
       error: error instanceof Error ? error.message : '网络错误'
@@ -86,19 +130,36 @@ export const apiRequest = async <T>(
 
 // 用户相关API
 export const userApi = {
-  // 登录
-  login: async (credentials: { username: string; password: string }) => {
-    return apiRequest<{
-      id: number;
-      username: string;
-      email: string;
-      full_name?: string;
-      is_active: boolean;
-      is_admin: boolean;
-    }>('/api/users/login', {
+  /**
+   * 用户登录
+   *
+   * @param credentials 登录凭证
+   * @param rememberMe 是否记住登录状态
+   */
+  login: async (
+    credentials: { username: string; password: string },
+    rememberMe: boolean = false
+  ) => {
+    const response = await apiRequest<LoginResponse>('/api/users/login', {
       method: 'POST',
       body: credentials
     });
+
+    if (response.success && response.data) {
+      // 保存用户信息（过滤敏感字段）
+      setUser(response.data);
+
+      // 保存 Token 到安全存储
+      if (response.data.token) {
+        const storageOptions: StorageOptions = {
+          rememberMe,
+          expiresIn: response.data.expires_in || 30 * 60 * 1000 // 默认30分钟
+        };
+        setToken(response.data.token, storageOptions);
+      }
+    }
+
+    return response;
   },
 
   // 注册
@@ -118,28 +179,60 @@ export const userApi = {
 
   // 获取当前用户信息
   getCurrentUser: async () => {
-    // 这里假设我们从localStorage获取用户信息
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      return JSON.parse(userStr);
+    // 首先尝试从安全存储获取
+    const user = getUser();
+    if (user) {
+      return user;
     }
+
+    // 如果没有，尝试从 API 获取
+    const response = await apiRequest<LoginResponse>('/api/users/me', {
+      method: 'GET',
+      requireAuth: true
+    });
+
+    if (response.success && response.data) {
+      setUser(response.data);
+      return response.data;
+    }
+
     return null;
+  },
+
+  // 更新当前用户信息
+  updateCurrentUser: async (userData: Partial<LoginResponse>) => {
+    const response = await apiRequest<LoginResponse>('/api/users/me', {
+      method: 'PUT',
+      body: userData,
+      requireAuth: true
+    });
+
+    if (response.success && response.data) {
+      setUser(response.data);
+    }
+
+    return response;
   },
 
   // 登出
   logout: () => {
-    // 清除本地存储的用户信息
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
+    // 清除所有存储
+    clearAll();
   },
 
-  // 保存用户信息到本地存储
+  // 保存用户信息到本地存储（已废弃，使用 setUser 替代）
   saveUserToLocalStorage: (user: any) => {
-    localStorage.setItem('user', JSON.stringify(user));
-    // 如果有令牌，也保存令牌
-    if (user.token) {
-      localStorage.setItem('token', user.token);
-    }
+    setUser(user);
+  },
+
+  // 获取存储的 Token（用于调试）
+  getStoredToken: () => {
+    return getToken();
+  },
+
+  // 检查是否已登录
+  isLoggedIn: () => {
+    return getToken() !== null;
   }
 };
 
@@ -200,246 +293,18 @@ export const repositoryApi = {
   }
 };
 
-// 分支相关API
-export const branchApi = {
-  // 获取仓库分支列表
-  getBranches: async (repoId: number) => {
-    return apiRequest<any[]>(`/api/repositories/${repoId}/branches`, {
-      method: 'GET',
-      requireAuth: true
-    });
-  },
-
-  // 获取单个分支
-  getBranch: async (repoId: number, branchName: string) => {
-    return apiRequest<any>(`/api/repositories/${repoId}/branches/${branchName}`, {
-      method: 'GET',
-      requireAuth: true
-    });
-  },
-
-  // 创建分支
-  createBranch: async (repoId: number, branchData: {
-    name: string;
-    from_branch?: string;
-    from_commit?: string;
-  }) => {
-    return apiRequest<any>(`/api/repositories/${repoId}/branches`, {
-      method: 'POST',
-      body: branchData,
-      requireAuth: true
-    });
-  },
-
-  // 删除分支
-  deleteBranch: async (repoId: number, branchName: string) => {
-    return apiRequest<void>(`/api/repositories/${repoId}/branches/${branchName}`, {
-      method: 'DELETE',
-      requireAuth: true
-    });
-  },
-
-  // 设置默认分支
-  setDefaultBranch: async (repoId: number, branchName: string) => {
-    return apiRequest<any>(`/api/repositories/${repoId}/branches/${branchName}/default`, {
-      method: 'PUT',
-      requireAuth: true
-    });
-  }
+// 导出安全存储相关函数
+export {
+  getToken,
+  setToken,
+  setUser,
+  getUser,
+  clearAll
 };
 
-// 提交相关API
-export const commitApi = {
-  // 获取仓库提交历史
-  getCommits: async (repoId: number, params?: {
-    branch?: string;
-    author?: string;
-    since?: string;
-    until?: string;
-    limit?: number;
-    offset?: number;
-  }) => {
-    let url = `/api/repositories/${repoId}/commits`;
-    if (params) {
-      // 转换所有参数值为字符串
-      const stringParams = Object.entries(params).reduce((acc, [key, value]) => {
-        acc[key] = String(value);
-        return acc;
-      }, {} as Record<string, string>);
-      const queryString = new URLSearchParams(stringParams).toString();
-      if (queryString) {
-        url += `?${queryString}`;
-      }
-    }
-    return apiRequest<any[]>(url, {
-      method: 'GET',
-      requireAuth: true
-    });
-  },
-
-  // 获取单个提交
-  getCommit: async (repoId: number, commitHash: string) => {
-    return apiRequest<any>(`/api/repositories/${repoId}/commits/${commitHash}`, {
-      method: 'GET',
-      requireAuth: true
-    });
-  },
-
-  // 获取分支提交历史
-  getCommitsByBranch: async (repoId: number, branchName: string, params?: {
-    since?: string;
-    until?: string;
-    limit?: number;
-    offset?: number;
-  }) => {
-    let url = `/api/repositories/${repoId}/branches/${branchName}/commits`;
-    if (params) {
-      // 转换所有参数值为字符串
-      const stringParams = Object.entries(params).reduce((acc, [key, value]) => {
-        acc[key] = String(value);
-        return acc;
-      }, {} as Record<string, string>);
-      const queryString = new URLSearchParams(stringParams).toString();
-      if (queryString) {
-        url += `?${queryString}`;
-      }
-    }
-    return apiRequest<any[]>(url, {
-      method: 'GET',
-      requireAuth: true
-    });
-  },
-
-  // 获取最新提交
-  getLatestCommit: async (repoId: number, branchName?: string) => {
-    let url = `/api/repositories/${repoId}/commits/latest`;
-    if (branchName) {
-      url += `?branch=${branchName}`;
-    }
-    return apiRequest<any>(url, {
-      method: 'GET',
-      requireAuth: true
-    });
-  }
-};
-
-// 仓库浏览器 API
-export const repositoryBrowserApi = {
-  /**
-   * 获取仓库文件树
-   * @param repoId 仓库ID
-   * @param ref 分支名或提交SHA，默认为 HEAD
-   * @param path 子目录路径，默认为空（根目录）
-   */
-  getTree: async (repoId: number, ref: string = 'HEAD', path: string = '') => {
-    let url = `/api/repositories/${repoId}/tree?ref=${encodeURIComponent(ref)}`;
-    if (path) {
-      url += `&path=${encodeURIComponent(path)}`;
-    }
-    return apiRequest<{
-      path: string;
-      ref: string;
-      entries: Array<{
-        name: string;
-        type: 'blob' | 'tree';
-        path: string;
-      }>;
-    }>(url, {
-      method: 'GET',
-      requireAuth: true
-    });
-  },
-
-  /**
-   * 获取文件内容
-   * @param repoId 仓库ID
-   * @param path 文件路径
-   * @param ref 分支名或提交SHA，默认为 HEAD
-   */
-  getBlob: async (repoId: number, path: string, ref: string = 'HEAD') => {
-    const url = `/api/repositories/${repoId}/blob?path=${encodeURIComponent(path)}&ref=${encodeURIComponent(ref)}`;
-    return apiRequest<{
-      path: string;
-      ref: string;
-      content: string;
-      size: number;
-      is_binary: boolean;
-    }>(url, {
-      method: 'GET',
-      requireAuth: true
-    });
-  },
-
-  /**
-   * 获取提交历史
-   * @param repoId 仓库ID
-   * @param ref 分支名或提交SHA，默认为 HEAD
-   * @param limit 返回数量限制，默认为 20
-   * @param offset 偏移量，用于分页，默认为 0
-   */
-  getCommits: async (repoId: number, ref: string = 'HEAD', limit: number = 20, offset: number = 0) => {
-    const url = `/api/repositories/${repoId}/commits?ref=${encodeURIComponent(ref)}&limit=${limit}&offset=${offset}`;
-    return apiRequest<{
-      commits: Array<{
-        hash: string;
-        message: string;
-        author: string;
-        author_email: string;
-        timestamp: number;
-        parents: string[];
-      }>;
-      total: number;
-      ref: string;
-    }>(url, {
-      method: 'GET',
-      requireAuth: true
-    });
-  },
-
-  /**
-   * 获取代码对比
-   * @param repoId 仓库ID
-   * @param head 目标分支或提交，默认为 HEAD
-   * @param base 对比基准分支或提交，默认为 head 的父提交
-   */
-  getDiff: async (repoId: number, head: string = 'HEAD', base?: string) => {
-    let url = `/api/repositories/${repoId}/diff?head=${encodeURIComponent(head)}`;
-    if (base) {
-      url += `&base=${encodeURIComponent(base)}`;
-    }
-    return apiRequest<{
-      head: string;
-      base: string;
-      files: Array<{
-        path: string;
-        status: 'added' | 'modified' | 'deleted' | 'renamed';
-        additions: number;
-        deletions: number;
-        diff: string;
-      }>;
-      total_additions: number;
-      total_deletions: number;
-    }>(url, {
-      method: 'GET',
-      requireAuth: true
-    });
-  }
-};
-
-// 通用工具函数
-export const apiUtils = {
-  // 检查用户是否已登录
-  isLoggedIn: (): boolean => {
-    return localStorage.getItem('user') !== null;
-  },
-
-  // 获取用户角色
-  getUserRole: (): string => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      const user = JSON.parse(userStr);
-      return user.is_admin ? 'admin' : 'user';
-    }
-    return 'guest';
-  }
+// 默认导出
+export default {
+  apiRequest,
+  userApi,
+  repositoryApi
 };

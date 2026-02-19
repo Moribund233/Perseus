@@ -244,13 +244,14 @@ class AppService:
         return self._validate_config_data(config_data)
 
     # 允许修改的配置节
-    ALLOWED_CONFIG_SECTIONS = {"server", "proxy", "rate_limit"}
+    ALLOWED_CONFIG_SECTIONS = {"server", "proxy", "rate_limit", "cors"}
     # 禁止修改的配置节（可能导致系统不稳定或安全问题）
     PROTECTED_CONFIG_SECTIONS = {"storage", "security", "app", "logging", "system"}
     # 需要重启才能生效的配置项
     RESTART_REQUIRED_CONFIGS = {
         "server": {"host", "port", "workers"},  # 服务器核心参数需要重启
         "proxy": {"proxy"},  # 代理设置影响中间件加载
+        "cors": {"allow_origins", "allow_credentials", "allow_methods", "allow_headers", "max_age"},  # CORS 配置需要重启才能生效
     }
 
     def _validate_config_data(self, config_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
@@ -338,6 +339,62 @@ class AppService:
                         errors.append(f"rate_limit 不支持 '{key}'，支持的类型: {', '.join(valid_limit_types)}")
                     elif not isinstance(rate_limit[key], list):
                         errors.append(f"rate_limit.{key} 必须是字符串数组")
+
+        # 验证 CORS 配置
+        if "cors" in config_data:
+            cors = config_data["cors"]
+            if not isinstance(cors, dict):
+                errors.append("cors 配置必须是对象")
+            else:
+                # 验证 allow_origins
+                if "allow_origins" in cors:
+                    if not isinstance(cors["allow_origins"], list):
+                        errors.append("cors.allow_origins 必须是字符串数组")
+                    else:
+                        for origin in cors["allow_origins"]:
+                            if not isinstance(origin, str):
+                                errors.append("cors.allow_origins 中的所有项必须是字符串")
+                                break
+                            # 生产环境警告：不允许使用通配符
+                            if origin == "*":
+                                errors.append("生产环境不允许使用通配符 '*'，请配置具体的允许域名")
+
+                # 验证 allow_credentials
+                if "allow_credentials" in cors:
+                    if not isinstance(cors["allow_credentials"], bool):
+                        errors.append("cors.allow_credentials 必须是布尔值")
+
+                # 验证 allow_methods
+                if "allow_methods" in cors:
+                    if not isinstance(cors["allow_methods"], list):
+                        errors.append("cors.allow_methods 必须是字符串数组")
+                    else:
+                        valid_methods = {"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"}
+                        for method in cors["allow_methods"]:
+                            if not isinstance(method, str):
+                                errors.append("cors.allow_methods 中的所有项必须是字符串")
+                                break
+                            if method.upper() not in valid_methods:
+                                errors.append(f"cors.allow_methods 包含无效的 HTTP 方法: {method}")
+
+                # 验证 allow_headers
+                if "allow_headers" in cors:
+                    if not isinstance(cors["allow_headers"], list):
+                        errors.append("cors.allow_headers 必须是字符串数组")
+                    else:
+                        for header in cors["allow_headers"]:
+                            if not isinstance(header, str):
+                                errors.append("cors.allow_headers 中的所有项必须是字符串")
+                                break
+
+                # 验证 max_age
+                if "max_age" in cors:
+                    try:
+                        max_age = int(cors["max_age"])
+                        if max_age < 0 or max_age > 86400:  # 最大 24 小时
+                            errors.append("cors.max_age 必须在 0-86400 秒之间")
+                    except (ValueError, TypeError):
+                        errors.append("cors.max_age 必须是整数（秒）")
 
         return len(errors) == 0, errors
 
