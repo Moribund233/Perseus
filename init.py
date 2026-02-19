@@ -2,14 +2,29 @@
 应用初始化模块
 
 负责服务端完整的初始化流程，包括：
-1. 配置文件生成/验证
-2. 数据库初始化
-3. 仓库根目录创建
-4. 端口冲突检查
-5. JWT Secret Key 生成
+1. 加载 .env 文件（如果存在）
+2. 环境变量检查（JWT Secret Key、Debug 模式）
+3. 配置文件生成/验证
+4. 数据库初始化
+5. 仓库根目录创建
+6. 端口冲突检查
+
+安全要求：
+- JWT Secret Key 必须通过环境变量 LANGIT_SECURITY_SECRET_KEY 设置
+- Debug 模式必须通过环境变量 LANGIT_APP_DEBUG 设置
+- 不再自动生成或写入这些敏感配置到 config.toml
 """
 import os
+import sys
 from typing import Any, Dict, Optional
+
+# 尝试加载 .env 文件（如果存在）
+# 在导入其他模块之前加载，确保环境变量可用
+try:
+    from dotenv import load_dotenv
+    load_dotenv(encoding='utf-8')
+except ImportError:
+    pass  # python-dotenv 未安装，跳过
 
 from config import ConfigManager
 
@@ -20,17 +35,72 @@ from utils.port_utils import (
     check_and_terminate_running_service as _check_and_terminate_service,
     terminate_all_python_services as _terminate_all_services,
 )
-from utils.logging_utils import ensure_log_dir, init_async_logging, get_async_logger, shutdown_async_logging
+from utils.logging import (
+    init_logging,
+    get_logger,
+    get_log_info,
+    cleanup_old_logs,
+)
 
 
 class AppInitializer:
     """应用初始化器，负责服务端完整的初始化流程"""
 
+    # 必需的环境变量
+    REQUIRED_ENV_VARS = [
+        "LANGIT_SECURITY_SECRET_KEY",
+        "LANGIT_APP_DEBUG",
+    ]
+
     def __init__(self, config_path: str = "config.toml"):
         self.config_path = config_path
         self.config_manager = ConfigManager(config_path)
         self._utils_config_manager = get_config_manager(config_path)
-        self._logger = get_async_logger("init")
+        self._logger = get_logger("init")
+
+    def _check_required_env_vars(self) -> bool:
+        """
+        检查必需的环境变量是否已设置
+
+        Returns:
+            bool: 所有必需环境变量都存在返回True，否则返回False
+        """
+        missing_vars = []
+
+        for var_name in self.REQUIRED_ENV_VARS:
+            if not os.environ.get(var_name):
+                missing_vars.append(var_name)
+
+        if missing_vars:
+            print("=" * 70)
+            print("错误：缺少必需的环境变量")
+            print("")
+            for var in missing_vars:
+                print(f"  - {var}")
+            print("")
+            print("请通过以下方式之一设置环境变量：")
+            print("")
+            print("  1. 使用 Tauri Client 启动服务端（推荐）")
+            print("     Client 会自动注入所需的环境变量")
+            print("")
+            print("  2. 手动设置环境变量（PowerShell）：")
+            print("     $env:LANGIT_SECURITY_SECRET_KEY = 'your-secret-key'")
+            print("     $env:LANGIT_APP_DEBUG = 'true'")
+            print("")
+            print("  3. 使用 .env 文件（需要 python-dotenv）：")
+            print("     pip install python-dotenv")
+            print("     在项目根目录创建 .env 文件，包含：")
+            print("     LANGIT_SECURITY_SECRET_KEY=your-secret-key")
+            print("     LANGIT_APP_DEBUG=true")
+            print("")
+            print("安全提示：")
+            print("  - JWT Secret Key 应该是一串随机的安全字符串")
+            print("  - 在生产环境中，请确保使用强密钥并妥善保管")
+            print("  - 不要将该密钥提交到版本控制")
+            print("=" * 70)
+            return False
+
+        return True
 
     def _gen_default_config(self) -> Dict[str, Any]:
         """生成默认配置"""
@@ -60,13 +130,24 @@ class AppInitializer:
         return True
 
     def _init_secret_key(self) -> bool:
-        """初始化 JWT Secret Key"""
-        secret_key = self._utils_config_manager.ensure_secret_key()
+        """检查 JWT Secret Key 是否已设置"""
+        import os
+        secret_key = os.environ.get("LANGIT_SECURITY_SECRET_KEY")
         if secret_key:
-            self._logger.debug("安全密钥已就绪")
+            self._logger.debug("安全密钥已就绪（从环境变量加载）")
             return True
         else:
+            self._logger.error("=" * 60)
             self._logger.error("安全密钥检查失败")
+            self._logger.error("")
+            self._logger.error("环境变量 LANGIT_SECURITY_SECRET_KEY 未设置")
+            self._logger.error("请通过以下方式之一设置：")
+            self._logger.error("  1. 使用 Tauri Client 启动服务端")
+            self._logger.error("  2. 手动设置环境变量：")
+            self._logger.error("     $env:LANGIT_SECURITY_SECRET_KEY = 'your-secret-key'")
+            self._logger.error("     $env:LANGIT_APP_DEBUG = 'true'")
+            self._logger.error("  3. 使用 .env 文件（需要 python-dotenv）")
+            self._logger.error("=" * 60)
             return False
 
     def _init_database(self, create_test_data: bool = False) -> bool:
@@ -93,17 +174,19 @@ class AppInitializer:
             return False
 
     def _init_logging(self) -> bool:
-        """初始化日志目录和异步日志系统"""
+        """初始化日志系统"""
         try:
-            log_dir = ensure_log_dir()
-            init_async_logging(
-                log_dir=str(log_dir),
+            # 使用新的日志系统初始化
+            init_logging(
+                log_dir="logs",
                 app_name="langit",
                 level="info",
-                console_output=True
+                console_output=True,
+                use_date_directory=True,
+                separate_error_log=True,
+                websocket_output=True
             )
-            self._logger.info(f"日志目录: {log_dir}")
-            self._logger.info("异步日志系统已启动")
+            self._logger.info("日志系统已启动")
             return True
         except Exception as e:
             # 使用 print 因为日志可能还未初始化
@@ -132,6 +215,10 @@ class AppInitializer:
             bool: 初始化是否全部成功
         """
         try:
+            # 步骤 0: 检查必需的环境变量
+            if not self._check_required_env_vars():
+                return False
+
             # 步骤 1: 配置文件
             if not self._init_config():
                 return False

@@ -3,38 +3,56 @@ API 依赖模块
 
 提供可复用的 FastAPI 依赖函数，如认证、权限检查等
 """
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from typing import Optional, Union
 
 from models.db import get_db
 from models.user import User
 from services.token_service import verify_token
+from api.local_auth import get_local_auth_user, LocalUser
 
 # 使用 HTTPBearer 从 Authorization 头中提取 token
-# auto_error=True 确保在没有 Authorization 头时自动返回 403
-security = HTTPBearer(auto_error=True)
+# auto_error=False 允许在没有 Authorization 头时继续处理（用于本地认证回退）
+security = HTTPBearer(auto_error=False)
+security_strict = HTTPBearer(auto_error=True)
 
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
-) -> User:
+) -> Union[User, LocalUser]:
     """
-    获取当前认证用户
+    获取当前认证用户（支持本地认证和JWT认证）
 
-    从请求头中提取 JWT Token，验证并返回对应的用户对象
+    优先尝试本地认证（通过 X-LanGit-Local 头），如果失败则尝试 JWT Token 认证
 
     Args:
+        request: FastAPI 请求对象
         credentials: HTTP 认证凭证
         db: 数据库会话
 
     Returns:
-        User: 当前认证用户对象
+        Union[User, LocalUser]: 当前认证用户对象（本地用户或数据库用户）
 
     Raises:
         HTTPException: 认证失败时抛出 401 异常
     """
+    # 首先尝试本地认证
+    local_user = await get_local_auth_user(request, credentials)
+    if local_user:
+        return local_user
+
+    # 本地认证失败，尝试 JWT 认证
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     token = credentials.credentials
     token_data = verify_token(token, token_type="access")
 

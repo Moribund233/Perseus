@@ -3,11 +3,12 @@ WebSocket消息处理器模块
 
 注册所有消息类型处理器
 """
-from api.websocket.handlers import notification, sync, progress
+import logging
+from api.websocket.handlers import notification, sync, progress, log_handler
 from api.websocket.manager import manager
-from utils.logging_utils import get_async_logger
 
-logger = get_async_logger("websocket")
+# 使用标准 logging 避免循环导入
+logger = logging.getLogger("websocket")
 
 
 def register_all_handlers():
@@ -28,5 +29,10 @@ def register_all_handlers():
 
     # 注册广播处理器（管理员功能）
     manager.register_handler("broadcast", notification.handle_broadcast)
+
+    # 注册实时日志处理器
+    manager.register_handler("subscribe_logs", log_handler.handle_subscribe_logs)
+    manager.register_handler("unsubscribe_logs", log_handler.handle_unsubscribe_logs)
+    manager.register_handler("get_log_stats", log_handler.handle_get_log_stats)
 
     logger.debug("WebSocket消息处理器注册完成")

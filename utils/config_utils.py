@@ -12,14 +12,15 @@ from typing import Any, Dict, List, Optional
 import toml
 
 from config import Config
-from utils.logging_utils import get_async_logger
+from utils.logging import get_named_logger
 
-logger = get_async_logger("config")
+logger = get_named_logger("config")
 
 
 def generate_default_config() -> Dict[str, Any]:
     """
     生成默认配置，包含系统信息获取
+    注意：敏感配置（JWT Secret Key、Debug 模式）通过环境变量注入，不写入配置文件
 
     Returns:
         Dict[str, Any]: 默认配置字典
@@ -47,6 +48,17 @@ def generate_default_config() -> Dict[str, Any]:
         config_dict["server"]["workers"] = min(4, os.cpu_count() or 2)
 
     config_dict["system"] = system_info
+
+    # 移除敏感配置项（这些通过环境变量注入，不写入配置文件）
+    # 1. 移除 security.secret_key（JWT Secret Key）
+    if "security" in config_dict and "secret_key" in config_dict["security"]:
+        del config_dict["security"]["secret_key"]
+        logger.debug("已从默认配置中移除 security.secret_key（通过环境变量注入）")
+
+    # 2. 移除 app.debug（调试模式）
+    if "app" in config_dict and "debug" in config_dict["app"]:
+        del config_dict["app"]["debug"]
+        logger.debug("已从默认配置中移除 app.debug（通过环境变量注入）")
 
     return config_dict
 
@@ -259,55 +271,13 @@ class ConfigManager:
     def get_secret_key(self) -> Optional[str]:
         """
         获取JWT Secret Key
+        只能从环境变量 LANGIT_SECURITY_SECRET_KEY 读取
 
         Returns:
             Optional[str]: Secret Key，如果不存在返回None
         """
-        return self.get("security.secret_key")
-
-    def set_secret_key(self, secret_key: str) -> bool:
-        """
-        设置JWT Secret Key
-
-        Args:
-            secret_key: Secret Key
-
-        Returns:
-            bool: 设置成功返回True，否则返回False
-        """
-        if not secret_key or not isinstance(secret_key, str):
-            logger.warning("Secret Key 不能为空且必须是字符串")
-            return False
-        return self.set("security.secret_key", secret_key)
-
-    def generate_and_save_secret_key(self) -> Optional[str]:
-        """
-        生成并保存新的JWT Secret Key
-
-        Returns:
-            Optional[str]: 生成的Secret Key，失败返回None
-        """
-        secret_key = secrets.token_urlsafe(32)
-        if self.set_secret_key(secret_key):
-            logger.info("已生成并保存新的 JWT Secret Key")
-            return secret_key
-        else:
-            logger.error("保存 JWT Secret Key 失败")
-            return None
-
-    def ensure_secret_key(self) -> Optional[str]:
-        """
-        确保Secret Key存在，如果不存在则生成
-
-        Returns:
-            Optional[str]: Secret Key，失败返回None
-        """
-        secret_key = self.get_secret_key()
-        if secret_key:
-            return secret_key
-
-        logger.info("JWT Secret Key 不存在，正在生成...")
-        return self.generate_and_save_secret_key()
+        # 只能从环境变量读取（Client 注入）
+        return os.environ.get("LANGIT_SECURITY_SECRET_KEY")
 
     def get_repo_root(self) -> str:
         """

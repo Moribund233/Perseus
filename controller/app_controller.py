@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from config import get_config
 from services.app_service import get_app_service, AppService
 from api.dependencies import get_current_user
+from api.local_auth import get_local_auth_user, LocalUser
 from exception import AuthorizationException
 
 # 创建路由实例
@@ -88,8 +89,11 @@ class StatusResponse(BaseModel):
     debug_mode: bool
     uptime_seconds: int
     uptime_formatted: str
-    system: Dict[str, Any]
     version: str
+    server_time: str
+    process: Dict[str, Any]
+    requests: Dict[str, Any]
+    git_operations: Dict[str, Any]
 
 
 class ActionResponse(BaseModel):
@@ -102,13 +106,16 @@ class ActionResponse(BaseModel):
 
 
 def check_app_permission(
-    current_user: Optional[Dict[str, Any]] = Depends(get_current_user)
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user),
+    local_user: Optional[LocalUser] = Depends(get_local_auth_user)
 ) -> tuple[bool, bool]:
     """
     检查应用管理权限
+    支持本地认证（Tauri Client）或 JWT 认证（管理员）
 
     Args:
-        current_user: 当前用户信息
+        current_user: 当前用户信息（JWT 认证）
+        local_user: 本地用户对象（本地认证）
 
     Returns:
         tuple[bool, bool]: (是否调试模式, 是否管理员)
@@ -119,7 +126,11 @@ def check_app_permission(
     config = get_config()
     is_debug = config.app.debug
 
-    # 检查是否是管理员
+    # 检查是否是本地认证（Client 具有最高权限）
+    if local_user:
+        return is_debug, True
+
+    # 检查是否是管理员（JWT 认证）
     is_admin = False
     if current_user:
         # 从用户信息中检查管理员权限

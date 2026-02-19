@@ -19,6 +19,104 @@ router = APIRouter(prefix="/ws", tags=["websocket"])
 register_all_handlers()
 
 
+@router.websocket("/logs")
+async def logs_websocket(
+    websocket: WebSocket,
+    token: Optional[str] = Query(None, description="认证token（可选）")
+):
+    """
+    实时日志 WebSocket 端点
+
+    用于接收实时日志推送，替代传统的 HTTP 轮询日志接口
+
+    连接URL格式:
+    - ws://host:port/ws/logs?token=your_jwt_token
+
+    消息协议:
+    客户端 -> 服务端:
+    {
+        "type": "subscribe_logs",
+        "filters": {
+            "levels": ["INFO", "WARNING", "ERROR"],
+            "loggers": ["app", "git"],
+            "keywords": ["error"]
+        },
+        "history_count": 50
+    }
+
+    服务端 -> 客户端:
+    {
+        "type": "log",
+        "timestamp": "2026-02-18 10:30:45",
+        "level": "ERROR",
+        "logger": "app.git",
+        "message": "Git operation failed"
+    }
+    """
+    connection: Optional[Connection] = None
+
+    try:
+        # 接受连接
+        connection = await manager.connect(websocket)
+
+        # 尝试认证（可选）
+        try:
+            user_info = await authenticate_websocket_optional(websocket)
+            if user_info:
+                manager.bind_user(
+                    connection,
+                    user_id=user_info["user_id"],
+                    username=user_info["username"]
+                )
+
+                await connection.send({
+                    "type": "connected",
+                    "connection_id": connection.connection_id,
+                    "authenticated": True,
+                    "channel": "logs",
+                    "message": "日志通道已连接"
+                })
+            else:
+                await connection.send({
+                    "type": "connected",
+                    "connection_id": connection.connection_id,
+                    "authenticated": False,
+                    "channel": "logs",
+                    "message": "日志通道已连接（匿名模式）"
+                })
+        except WebSocketAuthError as e:
+            await websocket.close(code=e.code, reason=e.message)
+            if connection:
+                manager.disconnect(connection)
+            return
+
+        # 主消息循环
+        while connection.is_alive:
+            try:
+                data = await websocket.receive_json()
+                await manager.handle_message(connection, data)
+
+            except WebSocketDisconnect:
+                break
+            except Exception as e:
+                logger.error(f"日志WebSocket异常: {e}")
+                try:
+                    await connection.send({
+                        "type": "error",
+                        "error": f"消息处理失败: {str(e)}"
+                    })
+                except:
+                    break
+
+    finally:
+        if connection:
+            # 取消日志订阅
+            from api.websocket.handlers.log_handler import get_websocket_log_handler
+            handler = get_websocket_log_handler()
+            await handler.subscription_manager.unsubscribe(connection)
+            manager.disconnect(connection)
+
+
 @router.websocket("/")
 async def websocket_endpoint(
     websocket: WebSocket,

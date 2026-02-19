@@ -21,10 +21,10 @@ from exception import (
     PathNotFoundException,
     InvalidPathException
 )
-from utils.logging_utils import get_async_logger
+from utils.logging import get_named_logger
 
 # 创建异常日志记录器
-logger = get_async_logger("exception")
+logger = get_named_logger("exception")
 
 
 def _is_debug_mode() -> bool:
@@ -158,8 +158,12 @@ async def http_exception_handler(request: Request, exc: Exception) -> JSONRespon
         elif exc.status_code >= 400:
             logger.warning(f"HTTP {exc.status_code}: {exc.detail}")
 
+        # 构建响应头，包含原始异常的 headers（如 WWW-Authenticate）
+        headers = exc.headers if exc.headers else {}
+
         return JSONResponse(
             status_code=exc.status_code,
+            headers=headers,
             content={
                 "detail": exc.detail,
                 "error": {

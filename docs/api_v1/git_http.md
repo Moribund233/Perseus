@@ -10,6 +10,8 @@
 http://localhost:8000/git/{username}/{repo-name}
 ```
 
+**注意**：URL 不需要 `.git` 后缀。例如：`http://localhost:8000/git/johndoe/my-project`
+
 ## 支持的 Git 操作
 
 | 操作 | 命令 | 所需权限 | 说明 |

@@ -146,6 +146,7 @@ Thumbs.db
 *.pid
 nginx/
 repositories/
+server/
 
 # node_modules
 node_modules/

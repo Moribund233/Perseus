@@ -478,7 +478,7 @@ class AppService:
         获取应用状态
 
         Returns:
-            Dict[str, Any]: 应用状态信息
+            Dict[str, Any]: 应用状态信息，包含运行时信息、请求统计、Git操作状态等
         """
         config = get_config()
 
@@ -486,22 +486,50 @@ class AppService:
         uptime = datetime.now() - self._start_time
         uptime_seconds = int(uptime.total_seconds())
 
-        # 获取系统信息
-        import platform
-        system_info = {
-            "platform": platform.system(),
-            "python_version": platform.python_version(),
-            "processor": platform.processor(),
-        }
+        # 获取进程信息
+        process_info = self._get_process_info()
+
+        # 获取请求统计
+        requests_info = self._get_requests_info()
+
+        # 获取Git操作状态
+        git_info = self._get_git_operations_info()
 
         return {
             "status": "running",
             "debug_mode": config.app.debug,
             "uptime_seconds": uptime_seconds,
             "uptime_formatted": self._format_uptime(uptime_seconds),
-            "system": system_info,
             "version": "1.0.0",  # TODO: 从版本文件读取
+            "server_time": datetime.now().isoformat(),
+            "process": process_info,
+            "requests": requests_info,
+            "git_operations": git_info,
         }
+
+    def _get_process_info(self) -> Dict[str, Any]:
+        """
+        获取当前进程信息
+
+        Returns:
+            Dict[str, Any]: 进程信息
+        """
+        import psutil
+        import os
+
+        try:
+            process = psutil.Process(os.getpid())
+            memory_info = process.memory_info()
+
+            return {
+                "pid": process.pid,
+                "memory_mb": round(memory_info.rss / (1024 * 1024), 2),
+                "cpu_percent": process.cpu_percent(interval=0.1),
+                "threads": process.num_threads(),
+                "connections": len(process.connections()),
+            }
+        except Exception:
+            return {}
 
     def _format_uptime(self, seconds: int) -> str:
         """
@@ -530,78 +558,76 @@ class AppService:
 
         return "".join(parts)
 
+    def _get_requests_info(self) -> Dict[str, Any]:
+        """
+        获取请求统计信息
+
+        Returns:
+            Dict[str, Any]: 请求统计信息
+        """
+        from middleware.request_stats import get_request_stats
+        return get_request_stats().get_stats()
+
+    def _get_git_operations_info(self) -> Dict[str, Any]:
+        """
+        获取Git操作状态信息
+
+        Returns:
+            Dict[str, Any]: Git操作状态
+        """
+        # TODO: 实现真实的Git操作状态监控
+        # 目前返回占位数据，后续可以接入Git操作队列
+        return {
+            "active_clones": 0,
+            "active_pushes": 0,
+            "queue_size": 0,
+        }
+
     # ==================== 日志服务方法 ====================
 
     def get_log_info(self) -> Dict[str, Any]:
         """
-        获取日志系统信息
+        获取日志系统信息（适配新版日志系统）
 
         Returns:
             Dict[str, Any]: 日志信息，包括日志目录、日志文件列表等
         """
-        from utils.logging_utils import LogManager
+        from utils.logging import get_log_info as get_simple_log_info, LogManager
 
-        log_dir = Path(LogManager.DEFAULT_LOG_DIR)
-        today_dir = log_dir / datetime.now().strftime(LogManager.DATE_FORMAT)
-
-        # 获取所有日志日期目录
-        available_dates = []
-        if log_dir.exists():
-            for item in log_dir.iterdir():
-                if item.is_dir():
-                    try:
-                        # 验证是否为日期格式
-                        datetime.strptime(item.name, "%Y-%m-%d")
-                        available_dates.append(item.name)
-                    except ValueError:
-                        pass
-
-        available_dates.sort(reverse=True)
-
-        # 获取今天的日志文件
-        today_files = []
-        if today_dir.exists():
-            for log_file in today_dir.iterdir():
-                if log_file.suffix == ".log":
-                    stat = log_file.stat()
-                    today_files.append({
-                        "name": log_file.name,
-                        "size": stat.st_size,
-                        "size_formatted": self._format_file_size(stat.st_size),
-                        "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                    })
+        # 使用新版日志系统的信息获取函数，传入默认日志目录
+        info = get_simple_log_info(log_dir=LogManager.DEFAULT_LOG_DIR)
 
         return {
-            "log_dir": str(log_dir),
-            "today_dir": str(today_dir),
-            "today_files": today_files,
-            "available_dates": available_dates[:30],  # 最近30天
+            "log_dir": info["log_dir"],
+            "today_dir": info["today_dir"],
+            "today_files": info["files"],
+            "available_dates": info["available_dates"],
         }
 
     def get_log_content(
         self,
         date: Optional[str] = None,
-        log_name: str = "app",
+        log_name: str = "langit",
         lines: int = 100,
         level: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        获取日志内容
+        获取日志内容（适配新版日志系统）
 
         Args:
             date: 日期字符串 (YYYY-MM-DD)，None 表示今天
-            log_name: 日志文件名（不含扩展名），如 'app', 'error'
+            log_name: 日志文件名（不含扩展名），如 'langit', 'error', 'audit'
             lines: 返回的行数（从末尾开始）
             level: 过滤日志级别 (debug/info/warning/error/critical)
 
         Returns:
             Dict[str, Any]: 日志内容和元数据
         """
-        from utils.logging_utils import LogManager
+        from utils.logging import LogManager, read_log_file
 
-        # 确定日志目录
+        # 确定日期
         if date is None:
-            date = datetime.now().strftime(LogManager.DATE_FORMAT)
+            date = datetime.now().strftime("%Y-%m-%d")
 
         # 验证日期格式
         try:
@@ -609,14 +635,20 @@ class AppService:
         except ValueError:
             raise ValidationException(detail="日期格式无效，应为 YYYY-MM-DD")
 
+        # 构建日志文件路径
         log_dir = Path(LogManager.DEFAULT_LOG_DIR) / date
         log_file = log_dir / f"{log_name}.log"
+
+        # 如果文件不存在，尝试使用默认的 langit.log
+        if not log_file.exists():
+            log_file = log_dir / "langit.log"
 
         if not log_file.exists():
             return {
                 "date": date,
                 "log_name": log_name,
                 "lines": 0,
+                "total_lines": 0,
                 "content": "",
                 "exists": False,
             }
@@ -664,12 +696,15 @@ class AppService:
         """
         self._check_permission(is_debug, is_admin)
 
-        from utils.logging_utils import cleanup_old_logs
+        from utils.logging import cleanup_old_logs, LogManager
 
         if keep_days < 1:
             raise ValidationException(detail="保留天数必须大于等于1")
 
-        deleted_count = cleanup_old_logs(keep_days=keep_days)
+        deleted_count = cleanup_old_logs(
+            keep_days=keep_days,
+            log_dir=LogManager.DEFAULT_LOG_DIR
+        )
 
         return {
             "success": True,

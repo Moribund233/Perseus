@@ -5,9 +5,9 @@ from typing import List, Optional
 import psutil
 
 from config import ConfigManager
-from utils.logging_utils import get_async_logger
+from utils.logging import get_named_logger
 
-logger = get_async_logger("port")
+logger = get_named_logger("port")
 
 
 def get_port_processes(port: int) -> List[int]:

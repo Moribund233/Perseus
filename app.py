@@ -2,9 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from init import init_app
 from config import get_config
-from utils.logging_utils import get_async_logger, shutdown_async_logging
+from utils.logging import get_logger
 
-logger = get_async_logger("app")
+logger = get_logger("app")
 
 
 def create_app(config_path: str = "config.toml") -> FastAPI:
@@ -46,6 +46,10 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     # 添加审计日志中间件
     from middleware.audit_logger import AuditLoggerMiddleware
     app.add_middleware(AuditLoggerMiddleware)
+
+    # 添加请求统计中间件
+    from middleware.request_stats import RequestStatsMiddleware
+    app.add_middleware(RequestStatsMiddleware, exclude_paths=["/health", "/docs", "/openapi.json"])
 
     # 设置速率限制
     from utils.rate_limiter import setup_rate_limiter
@@ -216,9 +220,8 @@ def start_server():
 
 if __name__ == "__main__":
     """主函数入口"""
-    try:
-        init_app()
-        start_server()
-    finally:
-        # 确保异步日志系统优雅关闭
-        shutdown_async_logging()
+    # 初始化应用，如果失败则退出
+    if not init_app():
+        import sys
+        sys.exit(1)
+    start_server()

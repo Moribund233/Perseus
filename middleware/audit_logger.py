@@ -12,7 +12,7 @@ from typing import Optional
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from utils.logging_utils import get_async_logger, ensure_log_dir
+from utils.logging import get_audit_logger
 from utils.security_utils import filter_sensitive_data
 
 
@@ -45,6 +45,16 @@ class AuditLoggerMiddleware(BaseHTTPMiddleware):
     # 敏感操作 HTTP 方法
     SENSITIVE_METHODS = ["POST", "PUT", "DELETE", "PATCH"]
 
+    # 默认排除的路径（健康检查、监控、文档等）
+    DEFAULT_EXCLUDE_PATHS = [
+        "/health",
+        "/docs",
+        "/openapi.json",
+        "/api/app/status",      # 应用状态监控
+        "/api/app/metrics",     # 指标监控
+        "/api/app/health",      # 健康检查
+    ]
+
     def __init__(
         self,
         app,
@@ -56,9 +66,11 @@ class AuditLoggerMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.log_request_body = log_request_body
         self.log_response_body = log_response_body
-        self.exclude_paths = exclude_paths or ["/health", "/docs", "/openapi.json"]
+        # 合并默认排除路径和用户自定义路径
+        self.exclude_paths = self.DEFAULT_EXCLUDE_PATHS + (exclude_paths or [])
         self.enabled = enabled
-        self._audit_logger = get_async_logger("audit")
+        # 使用新的简化版审计日志记录器
+        self._audit_logger = get_audit_logger()
 
     def _should_log(self, path: str) -> bool:
         """检查是否应该记录该路径"""
@@ -183,3 +195,19 @@ class AuditLoggerMiddleware(BaseHTTPMiddleware):
                 self._audit_logger.info(log_message)
 
         return response
+
+
+def setup_audit_logging(app, enabled: bool = True, **kwargs):
+    """
+    配置审计日志中间件
+
+    Args:
+        app: FastAPI 应用实例
+        enabled: 是否启用审计日志
+        **kwargs: 其他配置参数
+    """
+    app.add_middleware(
+        AuditLoggerMiddleware,
+        enabled=enabled,
+        **kwargs
+    )

@@ -15,11 +15,13 @@ class ServerSettings(BaseSettings):
 
 
 class AppSettings(BaseSettings):
-    """应用配置类"""
+    """应用配置类 - 调试模式优先从环境变量 LANGIT_APP_DEBUG 读取"""
+    model_config = SettingsConfigDict(env_prefix="LANGIT_APP_")
+    
     title: str = Field(default="LanGit API", description="应用标题")
     description: str = Field(default="A Git-based collaborative development tool API", description="应用描述")
     version: str = Field(default="0.1.0", description="应用版本")
-    debug: bool = Field(default=True, description="是否启用调试模式")
+    debug: bool = Field(default=False, description="是否启用调试模式，优先从环境变量 LANGIT_APP_DEBUG 读取")
 
 
 class SystemSettings(BaseSettings):
@@ -44,8 +46,10 @@ class StorageSettings(BaseSettings):
 
 
 class SecuritySettings(BaseSettings):
-    """安全配置类"""
-    secret_key: str = Field(default="", description="JWT密钥，为空时自动生成")
+    """安全配置类 - JWT密钥优先从环境变量 LANGIT_SECURITY_SECRET_KEY 读取"""
+    model_config = SettingsConfigDict(env_prefix="LANGIT_SECURITY_")
+    
+    secret_key: str = Field(default="", description="JWT密钥，优先从环境变量 LANGIT_SECURITY_SECRET_KEY 读取")
     access_token_expire_minutes: int = Field(default=30, ge=1, description="访问令牌过期时间（分钟）")
     refresh_token_expire_days: int = Field(default=7, ge=1, description="刷新令牌过期时间（天）")
     algorithm: str = Field(default="HS256", description="JWT加密算法")
@@ -71,13 +75,13 @@ class RateLimitSettings(BaseSettings):
 
 class Config(BaseSettings):
     """配置主类"""
-    server: ServerSettings = ServerSettings()
-    app: AppSettings = AppSettings()
-    proxy: ProxySettings = ProxySettings()
-    storage: StorageSettings = StorageSettings()
-    security: SecuritySettings = SecuritySettings()
-    logging: LoggingSettings = LoggingSettings()
-    rate_limit: RateLimitSettings = RateLimitSettings()
+    server: ServerSettings = Field(default_factory=ServerSettings)
+    app: AppSettings = Field(default_factory=AppSettings)
+    proxy: ProxySettings = Field(default_factory=ProxySettings)
+    storage: StorageSettings = Field(default_factory=StorageSettings)
+    security: SecuritySettings = Field(default_factory=SecuritySettings)
+    logging: LoggingSettings = Field(default_factory=LoggingSettings)
+    rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
     system: Optional[SystemSettings] = Field(default=None, description="系统信息")
 
     model_config = SettingsConfigDict(extra='forbid')  # 严格验证配置，禁止额外的配置项

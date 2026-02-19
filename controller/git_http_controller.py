@@ -2,24 +2,27 @@
 Git HTTP 协议控制器层
 
 处理 Git Smart HTTP 协议的 HTTP 请求
-支持 git clone/push/pull 操作
+通过调用 git http-backend 实现，支持 git clone/push/pull 操作
+
+URL 格式：
+    http://host/git/{username}/{repo-name}
+    
+注意：URL 不需要 .git 后缀
 """
 import base64
 from fastapi import APIRouter, Request, Response, Depends, HTTPException, status
-from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from models.db import get_db
 from models.user import User
 from services.git_http_service import (
-    get_refs,
-    process_upload_pack,
-    process_receive_pack,
     check_git_permission,
     get_repository_by_path,
     check_repository_exists,
+    parse_service_name,
     GitHttpError,
-    parse_service_name
+    get_git_backend_service,
+    GitHttpBackendError
 )
 from exception import NotFoundException, AuthorizationException
 from utils.rate_limiter import limiter, RateLimitConfig, get_git_operation_key
@@ -46,25 +49,25 @@ def extract_auth_user(request: Request, db: Session) -> User | None:
     if not auth_header:
         return None
 
-    try:
-        # 解析 Basic Auth
-        if auth_header.startswith("Basic "):
-            encoded = auth_header[6:]
+    # 解析 Basic Auth
+    if auth_header.startswith("Basic "):
+        encoded = auth_header[6:]
+        try:
             decoded = base64.b64decode(encoded).decode("utf-8")
             username, password = decoded.split(":", 1)
-
-            # 验证用户
-            from services.user_service import authenticate_user
-            return authenticate_user(username, password, db)
-
-        # 解析 Token Auth
-        elif auth_header.startswith("Bearer "):
-            token = auth_header[7:]
-            # TODO: 实现 Token 验证
+        except (base64.binascii.Error, UnicodeDecodeError, ValueError):
+            # 无效的 Basic Auth 格式
             return None
 
-    except Exception:
-        pass
+        # 验证用户
+        from services.user_service import authenticate_user
+        return authenticate_user(username, password, db)
+
+    # 解析 Token Auth
+    elif auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        # TODO: 实现 Token 验证
+        return None
 
     return None
 
@@ -130,10 +133,11 @@ async def git_refs(
     """
     Git 引用发现端点
 
-    处理 Git 客户端的引用发现请求，支持 dumb 和 smart HTTP 协议
+    处理 Git 客户端的引用发现请求，支持 smart HTTP 协议
+    支持带或不带 .git 后缀的路径
 
     Args:
-        repo_path: 仓库路径（如 username/repo-name）
+        repo_path: 仓库路径（如 username/repo-name 或 username/repo-name.git）
         service: 服务类型（git-upload-pack 或 git-receive-pack）
         request: HTTP 请求对象
         db: 数据库会话
@@ -144,53 +148,98 @@ async def git_refs(
     Raises:
         HTTPException: 仓库不存在或无权限
     """
-    # 检查仓库是否存在
+    # 获取认证用户（先认证，不管仓库是否存在）
+    user = extract_auth_user(request, db)
+
+    # 解析服务名称（如果有）
+    service_name = None
+    if service:
+        try:
+            service_name = parse_service_name(service)
+        except GitHttpError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+
+    # 确保仓库存在于数据库中（用于权限检查）
+    repo = get_repository_by_path(repo_path, db)
+    if not repo:
+        # 仓库不存在，但先检查是否需要认证
+        # 如果不存在且未认证，返回 401（让客户端有机会用认证重试）
+        # 如果不存在但已认证，返回 404
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                headers={"WWW-Authenticate": "Basic realm=\"Git\""},
+                detail="Authentication required"
+            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found"
+        )
+
+    # 根据服务类型检查不同的权限
+    if service_name == "receive-pack":
+        # git-receive-pack 需要写权限
+        check_write_permission(repo_path, user, db)
+    else:
+        # 默认或 git-upload-pack 需要读权限
+        check_read_permission(repo_path, user, db)
+
+    # 检查物理仓库是否存在
     if not check_repository_exists(repo_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Repository not found"
         )
 
-    # 获取认证用户
-    user = extract_auth_user(request, db)
-
-    # 检查权限
-    check_read_permission(repo_path, user, db)
-
-    # 如果没有指定服务，返回 dumb HTTP 响应（简单的引用列表）
-    if not service:
-        refs_data = get_refs(repo_path)
-        return Response(
-            content=refs_data,
-            media_type="text/plain"
-        )
-
-    # 解析服务名称
+    # 调用 git http-backend 处理请求
     try:
-        service_name = parse_service_name(service)
-    except GitHttpError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+        backend_service = get_git_backend_service()
+        status_code, headers, body = await backend_service.handle_request(
+            repo_path=repo_path,
+            request=request,
+            body=None,
+            remote_user=user.username if user else None
         )
-
-    # 检查写权限（如果是 receive-pack）
-    if service_name == "receive-pack":
-        check_write_permission(repo_path, user, db)
-
-    # 生成 smart HTTP 响应
-    refs_data = get_refs(repo_path)
-
-    # 构建 smart HTTP 响应头
-    service_line = f"001e# service=git-{service_name}\n".encode()
-    header = service_line + b"0000"
-
-    content = header + refs_data
-
-    return Response(
-        content=content,
-        media_type=f"application/x-git-{service_name}-advertisement"
-    )
+        
+        # 构建 FastAPI 响应
+        response_headers = {}
+        
+        # 转发重要的响应头
+        for header_name in ['Content-Type', 'Cache-Control', 'Pragma', 'Expires']:
+            if header_name in headers:
+                response_headers[header_name] = headers[header_name]
+        
+        # 如果没有 Content-Type，根据服务设置默认值
+        if 'Content-Type' not in response_headers:
+            if service:
+                response_headers['Content-Type'] = f'application/x-git-{service_name}-advertisement'
+            else:
+                response_headers['Content-Type'] = 'text/plain'
+        
+        return Response(
+            content=body,
+            status_code=status_code,
+            headers=response_headers
+        )
+        
+    except NotFoundException:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found"
+        )
+    except GitHttpBackendError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Git backend error: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 
 @router.post("/{repo_path:path}/git-upload-pack")
@@ -204,9 +253,10 @@ async def git_upload_pack(
     Git upload-pack 端点
 
     处理 Git clone/fetch 请求
+    支持带或不带 .git 后缀的路径
 
     Args:
-        repo_path: 仓库路径
+        repo_path: 仓库路径（支持 .git 后缀）
         request: HTTP 请求对象
         db: 数据库会话
 
@@ -233,23 +283,44 @@ async def git_upload_pack(
     body = await request.body()
 
     try:
-        # 处理 upload-pack 请求
-        response_data = process_upload_pack(repo_path, body)
-
-        return Response(
-            content=response_data,
-            media_type="application/x-git-upload-pack-result"
+        # 调用 git http-backend 处理请求
+        backend_service = get_git_backend_service()
+        status_code, headers, response_body = await backend_service.handle_request(
+            repo_path=repo_path,
+            request=request,
+            body=body,
+            remote_user=user.username if user else None
         )
-
+        
+        # 构建响应头
+        response_headers = {}
+        for header_name in ['Content-Type', 'Cache-Control']:
+            if header_name in headers:
+                response_headers[header_name] = headers[header_name]
+        
+        if 'Content-Type' not in response_headers:
+            response_headers['Content-Type'] = 'application/x-git-upload-pack-result'
+        
+        return Response(
+            content=response_body,
+            status_code=status_code,
+            headers=response_headers
+        )
+        
     except NotFoundException:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Repository not found"
         )
-    except GitHttpError as e:
+    except GitHttpBackendError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail=f"Git backend error: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
         )
 
 
@@ -264,9 +335,10 @@ async def git_receive_pack(
     Git receive-pack 端点
 
     处理 Git push 请求
+    支持带或不带 .git 后缀的路径
 
     Args:
-        repo_path: 仓库路径
+        repo_path: 仓库路径（支持 .git 后缀）
         request: HTTP 请求对象
         db: 数据库会话
 
@@ -293,14 +365,30 @@ async def git_receive_pack(
     body = await request.body()
 
     try:
-        # 处理 receive-pack 请求
-        response_data = process_receive_pack(repo_path, body, user)
-
-        return Response(
-            content=response_data,
-            media_type="application/x-git-receive-pack-result"
+        # 调用 git http-backend 处理请求
+        backend_service = get_git_backend_service()
+        status_code, headers, response_body = await backend_service.handle_request(
+            repo_path=repo_path,
+            request=request,
+            body=body,
+            remote_user=user.username if user else None
         )
-
+        
+        # 构建响应头
+        response_headers = {}
+        for header_name in ['Content-Type', 'Cache-Control']:
+            if header_name in headers:
+                response_headers[header_name] = headers[header_name]
+        
+        if 'Content-Type' not in response_headers:
+            response_headers['Content-Type'] = 'application/x-git-receive-pack-result'
+        
+        return Response(
+            content=response_body,
+            status_code=status_code,
+            headers=response_headers
+        )
+        
     except NotFoundException:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -311,10 +399,15 @@ async def git_receive_pack(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e)
         )
-    except GitHttpError as e:
+    except GitHttpBackendError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail=f"Git backend error: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
         )
 
 
@@ -328,9 +421,10 @@ async def git_head(
     获取 HEAD 引用
 
     用于 dumb HTTP 协议
+    支持带或不带 .git 后缀的路径
 
     Args:
-        repo_path: 仓库路径
+        repo_path: 仓库路径（支持 .git 后缀）
         request: HTTP 请求对象
         db: 数据库会话
 
@@ -350,26 +444,31 @@ async def git_head(
     # 检查读取权限
     check_read_permission(repo_path, user, db)
 
-    from utils.git_utils import get_repository_storage_path
-    import os
-
-    physical_path = get_repository_storage_path(repo_path)
-    head_path = os.path.join(physical_path, "HEAD")
-
-    if not os.path.exists(head_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="HEAD not found"
-        )
-
     try:
-        with open(head_path, "rb") as f:
-            content = f.read()
-        return Response(content=content, media_type="text/plain")
+        # 调用 git http-backend 处理请求
+        backend_service = get_git_backend_service()
+        status_code, headers, body = await backend_service.handle_request(
+            repo_path=repo_path,
+            request=request,
+            body=None,
+            remote_user=user.username if user else None
+        )
+        
+        response_headers = {}
+        for header_name in ['Content-Type', 'Cache-Control']:
+            if header_name in headers:
+                response_headers[header_name] = headers[header_name]
+        
+        return Response(
+            content=body,
+            status_code=status_code,
+            headers=response_headers
+        )
+        
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to read HEAD: {e}"
+            detail=f"Failed to get HEAD: {str(e)}"
         )
 
 
@@ -384,9 +483,10 @@ async def git_objects(
     获取 Git 对象
 
     用于 dumb HTTP 协议
+    支持带或不带 .git 后缀的路径
 
     Args:
-        repo_path: 仓库路径
+        repo_path: 仓库路径（支持 .git 后缀）
         oid: 对象 ID
         request: HTTP 请求对象
         db: 数据库会话
@@ -407,31 +507,29 @@ async def git_objects(
     # 检查读取权限
     check_read_permission(repo_path, user, db)
 
-    from utils.git_utils import get_repository_storage_path
-    import os
-    import zlib
-
-    physical_path = get_repository_storage_path(repo_path)
-
-    # 构建对象路径（使用松散对象格式）
-    if len(oid) >= 2:
-        obj_dir = oid[:2]
-        obj_file = oid[2:]
-        obj_path = os.path.join(physical_path, "objects", obj_dir, obj_file)
-
-        if os.path.exists(obj_path):
-            try:
-                with open(obj_path, "rb") as f:
-                    compressed = f.read()
-                    content = zlib.decompress(compressed)
-                return Response(content=content, media_type="application/x-git-loose-object")
-            except Exception as e:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to read object: {e}"
-                )
-
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Object not found"
-    )
+    try:
+        # 调用 git http-backend 处理请求
+        backend_service = get_git_backend_service()
+        status_code, headers, body = await backend_service.handle_request(
+            repo_path=repo_path,
+            request=request,
+            body=None,
+            remote_user=user.username if user else None
+        )
+        
+        response_headers = {}
+        for header_name in ['Content-Type', 'Cache-Control']:
+            if header_name in headers:
+                response_headers[header_name] = headers[header_name]
+        
+        return Response(
+            content=body,
+            status_code=status_code,
+            headers=response_headers
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get object: {str(e)}"
+        )
