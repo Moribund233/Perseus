@@ -16,6 +16,14 @@ import {
  */
 type LogLevel = 'info' | 'warn' | 'error' | 'debug' | 'all'
 
+// 图标路径
+const searchIcon = new URL('../assets/icons/search.svg', import.meta.url).href
+const refreshIcon = new URL('../assets/icons/refresh.svg', import.meta.url).href
+const chevronDownIcon = new URL('../assets/icons/chevron-down.svg', import.meta.url).href
+const downloadIcon = new URL('../assets/icons/download.svg', import.meta.url).href
+const trashIcon = new URL('../assets/icons/trash.svg', import.meta.url).href
+const logIcon = new URL('../assets/icons/log.svg', import.meta.url).href
+
 // 日志数据
 const logEntries = ref<LogEntry[]>([])
 const selectedLevel = ref<LogLevel>('all')
@@ -396,7 +404,7 @@ onUnmounted(() => {
       <div class="toolbar-group search-group">
         <label class="toolbar-label">搜索</label>
         <div class="search-box">
-          <img src="@/assets/icons/search.svg" class="search-icon" alt="search" />
+          <img :src="searchIcon" class="search-icon" alt="search" />
           <input
             v-model="searchQuery"
             type="text"
@@ -420,22 +428,22 @@ onUnmounted(() => {
       <!-- 操作按钮 -->
       <div class="toolbar-group actions">
         <button class="btn btn-secondary btn-sm" @click="refreshLogs">
-          <img src="@/assets/icons/refresh.svg" class="btn-icon" alt="refresh" />
+          <img :src="refreshIcon" class="btn-icon" alt="refresh" />
           刷新
         </button>
 
         <button class="btn btn-secondary btn-sm" @click="scrollToBottom">
-          <img src="@/assets/icons/chevron-down.svg" class="btn-icon" alt="bottom" />
+          <img :src="chevronDownIcon" class="btn-icon" alt="bottom" />
           底部
         </button>
 
         <button class="btn btn-secondary btn-sm" @click="exportLogs" :disabled="logEntries.length === 0">
-          <img src="@/assets/icons/download.svg" class="btn-icon" alt="download" />
+          <img :src="downloadIcon" class="btn-icon" alt="download" />
           导出
         </button>
 
         <button class="btn btn-secondary btn-sm" @click="clearDisplay" :disabled="logEntries.length === 0">
-          <img src="@/assets/icons/trash.svg" class="btn-icon" alt="clear" />
+          <img :src="trashIcon" class="btn-icon" alt="clear" />
           清空
         </button>
       </div>
@@ -452,7 +460,7 @@ onUnmounted(() => {
     <!-- 日志列表 -->
     <div class="log-container card">
       <div v-if="filteredLogEntries.length === 0" class="empty-state">
-        <img src="@/assets/icons/log.svg" class="empty-icon" alt="empty" />
+        <img :src="logIcon" class="empty-icon" alt="empty" />
         <p>暂无日志</p>
       </div>
 
@@ -539,7 +547,7 @@ onUnmounted(() => {
 }
 
 .status-disconnected .status-dot {
-  background-color: var(--text-muted);
+  background-color: var(--text-tertiary);
 }
 
 .status-connecting .status-dot {
@@ -590,7 +598,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: var(--spacing-xl);
-  color: var(--text-muted);
+  color: var(--text-tertiary);
 }
 
 .loading-state .spinner {
@@ -618,7 +626,7 @@ onUnmounted(() => {
 }
 
 .log-time {
-  color: var(--text-muted);
+  color: var(--text-tertiary);
   white-space: nowrap;
   min-width: 140px;
 }

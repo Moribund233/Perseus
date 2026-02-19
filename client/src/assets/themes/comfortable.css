@@ -1,0 +1,29 @@
+/**
+ * 舒适布局 - Comfortable Layout
+ * 较大的圆角、间距和字体，提供更好的阅读体验
+ */
+
+:root {
+  /* 圆角 */
+  --border-radius-sm: 6px;
+  --border-radius-md: 10px;
+  --border-radius-lg: 14px;
+  --border-radius-xl: 20px;
+
+  /* 间距 */
+  --spacing-xs: 6px;
+  --spacing-sm: 10px;
+  --spacing-md: 16px;
+  --spacing-lg: 20px;
+  --spacing-xl: 32px;
+
+  /* 字体大小 */
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-md: 15px;
+  --font-size-lg: 18px;
+  --font-size-xl: 24px;
+
+  /* 侧边栏宽度 */
+  --sidebar-width: 240px;
+}

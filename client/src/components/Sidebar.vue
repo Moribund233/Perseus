@@ -1,15 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { useServiceStore } from '../stores'
-
-// 导入图标
-import logoIcon from '../assets/icons/logo.svg'
-import homeIcon from '../assets/icons/home.svg'
-import logIcon from '../assets/icons/log.svg'
-import proxyIcon from '../assets/icons/proxy.svg'
-import settingIcon from '../assets/icons/setting.svg'
+import { useServiceStore, useThemeStore } from '../stores'
 
 const route = useRoute()
 
@@ -17,9 +10,22 @@ const route = useRoute()
 const serviceStore = useServiceStore()
 const { isRunning, isRefreshing } = storeToRefs(serviceStore)
 
+// 使用主题 Store
+const themeStore = useThemeStore()
+
 // 计算属性：服务状态
 const serviceStatus = computed(() => isRunning.value)
 const isLoading = computed(() => isRefreshing.value)
+
+// 侧边栏折叠状态
+const isCollapsed = ref(false)
+
+/**
+ * 切换侧边栏折叠状态
+ */
+const toggleSidebar = (): void => {
+  isCollapsed.value = !isCollapsed.value
+}
 
 interface NavItem {
   path: string
@@ -27,13 +33,35 @@ interface NavItem {
   icon: string
 }
 
-// 图标映射表
+// 图标路径映射表（使用路径字符串方式）
 const iconMap: Record<string, string> = {
-  home: homeIcon,
-  log: logIcon,
-  proxy: proxyIcon,
-  setting: settingIcon
+  home: new URL('../assets/icons/home.svg', import.meta.url).href,
+  log: new URL('../assets/icons/log.svg', import.meta.url).href,
+  proxy: new URL('../assets/icons/proxy.svg', import.meta.url).href,
+  setting: new URL('../assets/icons/setting.svg', import.meta.url).href,
+  menu: new URL('../assets/icons/menu.svg', import.meta.url).href,
+  sun: new URL('../assets/icons/sun.svg', import.meta.url).href,
+  moon: new URL('../assets/icons/moon.svg', import.meta.url).href
 }
+
+/**
+ * 切换深浅主题
+ */
+const toggleDarkLightTheme = (): void => {
+  const currentTheme = themeStore.currentColorThemeId
+  if (currentTheme === 'light') {
+    themeStore.switchColorTheme('dark')
+  } else {
+    themeStore.switchColorTheme('light')
+  }
+}
+
+/**
+ * 判断当前是否为浅色主题
+ */
+const isLightTheme = computed(() => themeStore.currentColorThemeId === 'light')
+
+
 
 const navItems: NavItem[] = [
   { path: '/home', name: '控制台', icon: 'home' },
@@ -55,12 +83,12 @@ const getIconPath = (iconName: string): string => {
 </script>
 
 <template>
-  <aside class="sidebar">
+  <aside class="sidebar" :class="{ collapsed: isCollapsed }">
     <div class="sidebar-header">
-      <div class="logo">
-        <img :src="logoIcon" class="logo-icon" alt="logo" />
-        <span class="logo-text">LanGit</span>
-      </div>
+      <button class="menu-btn" @click="toggleSidebar" title="切换侧边栏">
+        <img :src="getIconPath('menu')" class="menu-icon" alt="menu" />
+      </button>
+      <span v-show="!isCollapsed" class="logo-text">LanGit</span>
     </div>
 
     <nav class="sidebar-nav">
@@ -70,16 +98,32 @@ const getIconPath = (iconName: string): string => {
         :to="item.path"
         class="nav-item"
         :class="{ active: isActive(item.path) }"
+        :title="item.name"
       >
         <img :src="getIconPath(item.icon)" class="nav-icon" :alt="item.name" />
-        <span class="nav-text">{{ item.name }}</span>
+        <span v-show="!isCollapsed" class="nav-text">{{ item.name }}</span>
       </router-link>
     </nav>
 
     <div class="sidebar-footer">
-      <div class="server-status" :class="{ loading: isLoading }">
+      <button
+        class="theme-toggle-btn"
+        :class="{ collapsed: isCollapsed }"
+        @click="toggleDarkLightTheme"
+        :title="isLightTheme ? '切换到深色主题' : '切换到浅色主题'"
+      >
+        <img
+          :src="isLightTheme ? getIconPath('moon') : getIconPath('sun')"
+          class="theme-icon"
+          :alt="isLightTheme ? 'moon' : 'sun'"
+        />
+        <span v-show="!isCollapsed" class="theme-text">
+          {{ isLightTheme ? '深色模式' : '浅色模式' }}
+        </span>
+      </button>
+      <div class="server-status" :class="{ loading: isLoading, collapsed: isCollapsed }">
         <span class="status-dot" :class="{ online: serviceStatus }"></span>
-        <span class="status-text">{{ serviceStatus ? '服务运行中' : '服务已停止' }}</span>
+        <span v-show="!isCollapsed" class="status-text">{{ serviceStatus ? '在线' : '离线' }}</span>
       </div>
     </div>
   </aside>
@@ -94,23 +138,41 @@ const getIconPath = (iconName: string): string => {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  transition: width var(--transition-normal);
+}
+
+.sidebar.collapsed {
+  width: var(--sidebar-collapsed-width);
 }
 
 .sidebar-header {
-  padding: var(--spacing-lg);
+  padding: var(--spacing-md);
   border-bottom: 1px solid var(--border-color);
-}
-
-.logo {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
 }
 
-.logo-icon {
-  width: 32px;
-  height: 32px;
-  color: var(--primary-color);
+.menu-btn {
+  background: none;
+  border: none;
+  padding: var(--spacing-sm);
+  cursor: pointer;
+  border-radius: var(--border-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-fast);
+}
+
+.menu-btn:hover {
+  background-color: var(--bg-hover);
+}
+
+.menu-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--text-primary);
 }
 
 .logo-text {
@@ -118,6 +180,7 @@ const getIconPath = (iconName: string): string => {
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.5px;
+  white-space: nowrap;
 }
 
 .sidebar-nav {
@@ -125,7 +188,8 @@ const getIconPath = (iconName: string): string => {
   padding: var(--spacing-md);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  justify-content: center;
+  gap: var(--spacing-md);
 }
 
 .nav-item {
@@ -149,20 +213,64 @@ const getIconPath = (iconName: string): string => {
   color: white;
 }
 
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: var(--spacing-md) var(--spacing-sm);
+}
+
 .nav-icon {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   flex-shrink: 0;
 }
 
 .nav-text {
   font-size: var(--font-size-md);
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .sidebar-footer {
   padding: var(--spacing-md);
   border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--bg-tertiary);
+  border: none;
+  border-radius: var(--border-radius-md);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  width: 100%;
+}
+
+.theme-toggle-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.theme-toggle-btn.collapsed {
+  justify-content: center;
+  padding: var(--spacing-sm);
+}
+
+.theme-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.theme-text {
+  white-space: nowrap;
 }
 
 .server-status {
@@ -172,6 +280,12 @@ const getIconPath = (iconName: string): string => {
   padding: var(--spacing-sm) var(--spacing-md);
   background-color: var(--bg-tertiary);
   border-radius: var(--border-radius-md);
+  transition: all var(--transition-fast);
+}
+
+.server-status.collapsed {
+  justify-content: center;
+  padding: var(--spacing-sm);
 }
 
 .status-dot {
@@ -180,6 +294,7 @@ const getIconPath = (iconName: string): string => {
   border-radius: 50%;
   background-color: var(--error-color);
   animation: pulse 2s infinite;
+  flex-shrink: 0;
 }
 
 .status-dot.online {
@@ -198,5 +313,6 @@ const getIconPath = (iconName: string): string => {
 .status-text {
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 </style>

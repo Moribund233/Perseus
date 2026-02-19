@@ -35,29 +35,6 @@
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
 
-  /* 圆角 */
-  --border-radius-sm: 4px;
-  --border-radius-md: 8px;
-  --border-lg: 12px;
-  --border-radius-xl: 16px;
-
-  /* 间距 */
-  --spacing-xs: 4px;
-  --spacing-sm: 8px;
-  --spacing-md: 12px;
-  --spacing-lg: 16px;
-  --spacing-xl: 24px;
-
-  /* 字体大小 */
-  --font-size-xs: 11px;
-  --font-size-sm: 12px;
-  --font-size-md: 14px;
-  --font-size-lg: 16px;
-  --font-size-xl: 20px;
-
-  /* 侧边栏宽度 */
-  --sidebar-width: 220px;
-
   /* 过渡动画 */
   --transition-fast: 0.15s ease;
   --transition-normal: 0.25s ease;

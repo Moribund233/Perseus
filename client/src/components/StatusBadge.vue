@@ -108,12 +108,12 @@ const badgeClass = computed((): string => {
 }
 
 .status-stopped {
-  background-color: rgba(16, 185, 129, 0.2);
-  color: var(--text-muted);
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
 }
 
 .status-stopped .status-dot {
-  background-color: var(--text-muted);
+  background-color: var(--text-tertiary);
 }
 
 .status-error {
@@ -158,6 +158,6 @@ const badgeClass = computed((): string => {
 }
 
 .status-default .status-dot {
-  background-color: var(--text-muted);
+  background-color: var(--text-tertiary);
 }
 </style>

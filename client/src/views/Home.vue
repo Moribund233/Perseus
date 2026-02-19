@@ -17,6 +17,11 @@ import {
  */
 type ServiceStatusType = 'running' | 'stopped' | 'starting' | 'stopping'
 
+// 图标路径
+const refreshIcon = new URL('../assets/icons/refresh.svg', import.meta.url).href
+const playIcon = new URL('../assets/icons/play.svg', import.meta.url).href
+const stopIcon = new URL('../assets/icons/stop.svg', import.meta.url).href
+
 // 使用 Pinia store 管理服务状态
 const serviceStore = useServiceStore()
 const {
@@ -104,38 +109,6 @@ watch(storeLocalSystemInfo, (sysInfo) => {
     })
   }
 }, { immediate: true })
-
-/**
- * 获取状态文本
- */
-const getStatusText = (status: ServiceStatusType | null): string => {
-  if (status === null) {
-    return '检测中...'
-  }
-  const statusMap: Record<ServiceStatusType, string> = {
-    running: '运行中',
-    stopped: '已停止',
-    starting: '启动中',
-    stopping: '停止中'
-  }
-  return statusMap[status]
-}
-
-/**
- * 获取状态标签样式
- */
-const getStatusTagClass = (status: ServiceStatusType | null): string => {
-  if (status === null) {
-    return 'tag-secondary'
-  }
-  const classMap: Record<ServiceStatusType, string> = {
-    running: 'tag-success',
-    stopped: 'tag-error',
-    starting: 'tag-warning',
-    stopping: 'tag-warning'
-  }
-  return classMap[status]
-}
 
 /**
  * 刷新服务状态
@@ -257,10 +230,10 @@ const handleRestartService = async (): Promise<void> => {
 
 /**
  * 开始定时刷新
- * 使用 Pinia store 的自动刷新方法
+ * 使用 Pinia store 的本地系统信息自动刷新方法（2秒间隔，不访问服务端）
  */
 const startAutoRefresh = (): void => {
-  serviceStore.startAutoRefresh(2000)
+  serviceStore.startLocalSystemInfoRefresh(2000)
 }
 
 /**
@@ -375,7 +348,7 @@ onUnmounted(() => {
       <template #actions>
         <button class="btn btn-secondary btn-sm" @click="refreshStatus" :disabled="isLoading">
           <img
-            src="@/assets/icons/refresh.svg"
+            :src="refreshIcon"
             class="btn-icon"
             :class="{ spinning: isLoading }"
             alt="refresh"
@@ -390,7 +363,7 @@ onUnmounted(() => {
           @click="handleStartService"
           :disabled="isLoading || serviceStatus === 'running' || serviceStatus === 'starting' || serviceStatus === null"
         >
-          <img src="@/assets/icons/play.svg" class="btn-icon icon-white" alt="play" />
+          <img :src="playIcon" class="btn-icon icon-white" alt="play" />
           启动服务
         </button>
 
@@ -399,7 +372,7 @@ onUnmounted(() => {
           @click="handleStopService"
           :disabled="isLoading || serviceStatus === 'stopped' || serviceStatus === 'stopping' || serviceStatus === null"
         >
-          <img src="@/assets/icons/stop.svg" class="btn-icon icon-white" alt="stop" />
+          <img :src="stopIcon" class="btn-icon icon-white" alt="stop" />
           停止服务
         </button>
 
@@ -408,7 +381,7 @@ onUnmounted(() => {
           @click="handleRestartService"
           :disabled="isLoading || serviceStatus !== 'running'"
         >
-          <img src="@/assets/icons/refresh.svg" class="btn-icon icon-white" alt="restart" />
+          <img :src="refreshIcon" class="btn-icon icon-white" alt="restart" />
           重启服务
         </button>
       </div>

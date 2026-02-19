@@ -33,6 +33,9 @@ const props = withDefaults(defineProps<Props>(), {
   iconClass: undefined
 })
 
+// 加载图标路径
+const loaderIcon = new URL('../assets/icons/loader.svg', import.meta.url).href
+
 /**
  * 计算按钮类名
  */
@@ -52,7 +55,7 @@ const buttonClass = computed((): string => {
   >
     <img
       v-if="loading"
-      src="@/assets/icons/loader.svg"
+      :src="loaderIcon"
       class="btn-icon spinning"
       alt="loading"
     />

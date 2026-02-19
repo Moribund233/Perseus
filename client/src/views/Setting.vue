@@ -11,12 +11,17 @@ import {
   type ConfigResponse,
   type ClientConfig
 } from '../services/api'
-import { useServiceStore, useThemeStore, presetThemes, adjustableCssVars } from '../stores'
+import { useServiceStore, useThemeStore, presetColorThemes, layoutDensityPresets } from '../stores'
 
 /**
  * 配置标签页类型
  */
 type ConfigTab = 'theme' | 'server' | 'client' | 'advanced'
+
+// 图标路径
+const refreshIcon = new URL('../assets/icons/refresh.svg', import.meta.url).href
+const infoIcon = new URL('../assets/icons/info.svg', import.meta.url).href
+const loaderIcon = new URL('../assets/icons/loader.svg', import.meta.url).href
 
 // 当前标签页
 const activeTab = ref<ConfigTab>('theme')
@@ -95,13 +100,6 @@ const clientConfig = ref<ClientConfig>({
 
 // 日志级别选项（与服务端配置匹配，小写）
 const logLevels = ['debug', 'info', 'warning', 'error', 'critical']
-
-// 主题选项
-const themes = [
-  { value: 'dark', label: '深色主题' },
-  { value: 'light', label: '浅色主题' },
-  { value: 'auto', label: '跟随系统' }
-]
 
 /**
  * 从store同步服务端配置
@@ -268,35 +266,17 @@ const getConnectionStatusText = (): string => {
 const themeStore = useThemeStore()
 
 /**
- * 处理主题切换
+ * 处理颜色主题切换
  */
-const handleThemeChange = (themeId: string): void => {
-  themeStore.switchTheme(themeId)
+const handleColorThemeChange = (themeId: string): void => {
+  themeStore.switchColorTheme(themeId)
 }
 
 /**
- * 处理CSS变量变化
+ * 处理布局密度切换
  */
-const handleCssVarChange = (name: string, value: string): void => {
-  if (value) {
-    themeStore.setCssVar(name, value)
-  }
-}
-
-/**
- * 获取CSS变量占位符
- */
-const getCssVarPlaceholder = (name: string): string => {
-  // 从computed style获取当前值
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-  return value || '默认'
-}
-
-/**
- * 重置CSS变量
- */
-const handleResetCssVars = (): void => {
-  themeStore.resetCustomCssVars()
+const handleLayoutDensityChange = (densityId: string): void => {
+  themeStore.switchLayoutDensity(densityId)
 }
 
 onMounted(() => {
@@ -348,7 +328,7 @@ onMounted(() => {
         :disabled="serviceStore.isRefreshing"
       >
         <img
-          src="@/assets/icons/refresh.svg"
+          :src="refreshIcon"
           class="btn-icon"
           :class="{ spinning: serviceStore.isRefreshing }"
           alt="refresh"
@@ -391,18 +371,19 @@ onMounted(() => {
     
     <!-- 主题配置 -->
     <div v-show="activeTab === 'theme'" class="config-section">
+      <!-- 颜色主题选择 -->
       <div class="card">
         <div class="card-header">
-          <h2 class="card-title">主题选择</h2>
+          <h2 class="card-title">颜色主题</h2>
         </div>
 
         <div class="theme-grid">
           <div
-            v-for="theme in presetThemes"
+            v-for="theme in presetColorThemes"
             :key="theme.id"
             class="theme-item"
-            :class="{ active: themeStore.currentThemeId === theme.id }"
-            @click="handleThemeChange(theme.id)"
+            :class="{ active: themeStore.currentColorThemeId === theme.id }"
+            @click="handleColorThemeChange(theme.id)"
           >
             <div
               class="theme-preview"
@@ -413,32 +394,27 @@ onMounted(() => {
         </div>
       </div>
 
+      <!-- 布局密度选择 -->
       <div class="card">
         <div class="card-header">
-          <h2 class="card-title">外观设置</h2>
+          <h2 class="card-title">布局密度</h2>
         </div>
 
-        <div class="form-grid">
+        <div class="density-grid">
           <div
-            v-for="cssVar in adjustableCssVars"
-            :key="cssVar.name"
-            class="form-group"
+            v-for="density in layoutDensityPresets"
+            :key="density.id"
+            class="density-item"
+            :class="{ active: themeStore.currentLayoutDensityId === density.id }"
+            @click="handleLayoutDensityChange(density.id)"
           >
-            <label class="form-label">{{ cssVar.label }}</label>
-            <input
-              v-model="themeStore.customCssVars[cssVar.name]"
-              type="text"
-              class="form-input"
-              :placeholder="getCssVarPlaceholder(cssVar.name)"
-              @change="handleCssVarChange(cssVar.name, themeStore.customCssVars[cssVar.name])"
-            />
+            <div class="density-preview" :class="`density-preview-${density.id}`">
+              <div class="preview-block"></div>
+              <div class="preview-block"></div>
+              <div class="preview-block"></div>
+            </div>
+            <span class="density-name">{{ density.name }}</span>
           </div>
-        </div>
-
-        <div class="form-actions">
-          <button class="btn btn-secondary" @click="handleResetCssVars">
-            重置为默认
-          </button>
         </div>
       </div>
     </div>
@@ -448,7 +424,7 @@ onMounted(() => {
       <!-- 重启提示 -->
       <div class="card info-card">
         <p class="info-text">
-          <img src="@/assets/icons/info.svg" class="info-icon icon-info" alt="info" />
+          <img :src="infoIcon" class="info-icon icon-info" alt="info" />
           修改主机地址、端口或工作进程数后需要重启服务才能生效
         </p>
       </div>
@@ -507,7 +483,7 @@ onMounted(() => {
         <button class="btn btn-primary" @click="saveServerConfig" :disabled="isSaving">
           <img
             v-if="isSaving"
-            src="@/assets/icons/loader.svg"
+            :src="loaderIcon"
             class="btn-icon spinning"
             alt="loading"
           />
@@ -560,28 +536,6 @@ onMounted(() => {
 
       <div class="card">
         <div class="card-header">
-          <h2 class="card-title">外观设置</h2>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">主题</label>
-          <select v-model="clientConfig.appearance.theme" class="input">
-            <option v-for="theme in themes" :key="theme.value" :value="theme.value">
-              {{ theme.label }}
-            </option>
-          </select>
-        </div>
-
-        <div class="form-group checkbox-group">
-          <label class="checkbox-label">
-            <input v-model="clientConfig.appearance.sidebar_collapsed" type="checkbox" />
-            <span>侧边栏默认折叠</span>
-          </label>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
           <h2 class="card-title">通知设置</h2>
         </div>
 
@@ -611,7 +565,7 @@ onMounted(() => {
         <button class="btn btn-primary" @click="saveClientConfigHandler" :disabled="isSaving">
           <img
             v-if="isSaving"
-            src="@/assets/icons/loader.svg"
+            :src="loaderIcon"
             class="btn-icon spinning"
             alt="loading"
           />
@@ -624,7 +578,7 @@ onMounted(() => {
     <div v-show="activeTab === 'advanced'" class="config-section">
       <div class="card info-card">
         <p class="info-text">
-          <img src="@/assets/icons/info.svg" class="info-icon icon-info" alt="info" />
+          <img :src="infoIcon" class="info-icon icon-info" alt="info" />
           高级设置中的服务端配置项正在开发中，目前仅支持基础服务器设置
         </p>
       </div>
@@ -743,6 +697,103 @@ input:disabled {
 }
 
 .theme-item.active .theme-name {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+/* 布局密度网格 */
+.density-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.density-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 2px solid transparent;
+}
+
+.density-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.density-item.active {
+  border-color: var(--primary-color);
+  background-color: var(--primary-light);
+}
+
+.density-preview {
+  width: 60px;
+  height: 60px;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--border-radius-md);
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  gap: 4px;
+}
+
+.density-preview-compact {
+  padding: 2px;
+  gap: 2px;
+}
+
+.density-preview-compact .preview-block {
+  height: 14px;
+  border-radius: 2px;
+}
+
+.density-preview-default {
+  padding: 4px;
+  gap: 4px;
+}
+
+.density-preview-default .preview-block {
+  height: 14px;
+  border-radius: 4px;
+}
+
+.density-preview-comfortable {
+  padding: 6px;
+  gap: 6px;
+}
+
+.density-preview-comfortable .preview-block {
+  height: 12px;
+  border-radius: 6px;
+}
+
+.density-preview-spacious {
+  padding: 8px;
+  gap: 8px;
+}
+
+.density-preview-spacious .preview-block {
+  height: 10px;
+  border-radius: 8px;
+}
+
+.preview-block {
+  background-color: var(--primary-color);
+  opacity: 0.6;
+  flex: 1;
+  min-height: 8px;
+}
+
+.density-name {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.density-item.active .density-name {
   color: var(--primary-color);
   font-weight: 600;
 }

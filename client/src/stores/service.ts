@@ -219,6 +219,55 @@ export const useServiceStore = defineStore('service', () => {
     }
   }
 
+  // ============ 本地系统信息独立刷新 ============
+  let localSystemInfoTimer: number | null = null
+  async function refreshLocalSystemInfo(): Promise<void> {
+    try {
+      // 获取本地系统信息 - 设置2秒超时
+      const sysInfoPromise = getLocalSystemInfo().catch(() => null)
+      const sysInfo = await Promise.race([
+        sysInfoPromise,
+        new Promise<null>((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout')), 2000)
+        ).catch(() => null)
+      ])
+
+      if (sysInfo) {
+        localSystemInfo.value = sysInfo
+        const basicInfo = extractBasicSystemInfo(sysInfo)
+        if (basicInfo) {
+          basicSystemInfo.value = basicInfo
+        }
+      }
+    } catch (err) {
+      console.error('刷新本地系统信息失败:', err)
+    }
+  }
+
+  /**
+   * 启动本地系统信息自动刷新
+   * @param interval 刷新间隔（毫秒），默认2000ms
+   */
+  function startLocalSystemInfoRefresh(interval: number = 2000): void {
+    if (localSystemInfoTimer !== null) {
+      return
+    }
+    refreshLocalSystemInfo()
+    localSystemInfoTimer = window.setInterval(() => {
+      refreshLocalSystemInfo()
+    }, interval)
+  }
+
+  /**
+   * 停止本地系统信息自动刷新
+   */
+  function stopLocalSystemInfoRefresh(): void {
+    if (localSystemInfoTimer) {
+      clearInterval(localSystemInfoTimer)
+      localSystemInfoTimer = null
+    }
+  }
+
   /**
    * 强制刷新服务端配置
    * 用于需要立即获取最新配置的场景（如设置页保存后）
@@ -265,6 +314,7 @@ export const useServiceStore = defineStore('service', () => {
   // 在 store 卸载时停止自动刷新
   onUnmounted(() => {
     stopAutoRefresh()
+    stopLocalSystemInfoRefresh()
   })
 
   return {
@@ -290,6 +340,9 @@ export const useServiceStore = defineStore('service', () => {
     refreshServerConfig,
     startAutoRefresh,
     stopAutoRefresh,
+    refreshLocalSystemInfo,
+    startLocalSystemInfoRefresh,
+    stopLocalSystemInfoRefresh,
     reset
   }
 })

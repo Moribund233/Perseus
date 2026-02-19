@@ -25,16 +25,18 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>()
 
+// 图标路径映射表
+const iconMap: Record<string, string> = {
+  error: new URL('../assets/icons/error.svg', import.meta.url).href,
+  success: new URL('../assets/icons/success.svg', import.meta.url).href,
+  warning: new URL('../assets/icons/warning.svg', import.meta.url).href,
+  info: new URL('../assets/icons/info.svg', import.meta.url).href
+}
+
 /**
  * 获取默认图标路径
  */
 const getDefaultIcon = (): string => {
-  const iconMap: Record<string, string> = {
-    error: '@/assets/icons/error.svg',
-    success: '@/assets/icons/success.svg',
-    warning: '@/assets/icons/warning.svg',
-    info: '@/assets/icons/info.svg'
-  }
   return iconMap[props.type]
 }
 
