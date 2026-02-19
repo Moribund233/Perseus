@@ -690,6 +690,7 @@ fn stop_linux_nginx() -> NginxActionResponse {
         return success_response_with_status("Nginx未在运行", "stopped", None);
     }
 
+    // 首先尝试使用 quit 命令优雅停止
     match Command::new("nginx").arg("-s").arg("quit").output() {
         Ok(_) => {
             for _ in 0..10 {
@@ -699,19 +700,17 @@ fn stop_linux_nginx() -> NginxActionResponse {
                 }
             }
 
-            if Command::new("systemctl")
-                .arg("stop")
-                .arg("nginx")
-                .output()
-                .is_ok()
-            {
-                std::thread::sleep(std::time::Duration::from_millis(1000));
-                if find_nginx_process("").is_none() {
-                    return success_response_with_status(
-                        "Nginx已通过systemctl停止",
-                        "stopped",
-                        None,
-                    );
+            // 如果 quit 命令未能停止，尝试使用 stop 命令强制停止
+            log::info!("Nginx -s quit 未能停止进程，尝试使用 -s stop");
+            if let Err(e) = Command::new("nginx").arg("-s").arg("stop").output() {
+                log::error!("执行Nginx stop命令失败: {}", e);
+            } else {
+                // 等待进程停止
+                for _ in 0..5 {
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                    if find_nginx_process("").is_none() {
+                        return success_response_with_status("Nginx已停止", "stopped", None);
+                    }
                 }
             }
 

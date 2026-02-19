@@ -169,18 +169,9 @@ pub fn get_auth_headers() -> Result<Vec<(String, String)>, String> {
 pub fn get_server_env_vars() -> Result<Vec<(String, String)>, String> {
     let auth_config = get_local_auth_config()?;
 
-    log::debug!(
-        "获取服务端环境变量 - JWT Key 长度: {}, Token 长度: {}",
-        auth_config.jwt_secret_key.len(),
-        auth_config.local_token.len()
-    );
-
     if auth_config.jwt_secret_key.is_empty() || auth_config.local_token.is_empty() {
-        log::error!("本地认证配置未初始化");
         return Err("本地认证配置未初始化，请先调用 init_local_auth()".to_string());
     }
-
-    log::info!("本地认证配置已就绪，准备生成环境变量");
 
     Ok(vec![
         (
