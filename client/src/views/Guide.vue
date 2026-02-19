@@ -16,7 +16,9 @@ import {
   checkGitInstallation,
   markGuideCompleted,
   setSecurityPassword,
-  type ClientConfig
+  getNginxPlatformInfo,
+  type ClientConfig,
+  type NginxPlatformInfo
 } from '../services/api'
 import { useThemeStore, presetColorThemes, layoutDensityPresets } from '../stores'
 
@@ -57,6 +59,25 @@ const serverCheckStatus = ref<'idle' | 'checking' | 'found' | 'not_found'>('idle
 const nginxStatus = ref<'not_loaded' | 'loaded' | 'skipped'>('not_loaded')
 const nginxDownloadUrl = ref('https://nginx.org/download/nginx-1.24.0.zip')
 const isNginxDownloading = ref(false)
+const nginxPlatformInfo = ref<NginxPlatformInfo | null>(null)
+
+// Nginx平台相关计算属性
+const supportsNginxManualLoad = computed(() => {
+  return nginxPlatformInfo.value?.supports_manual_load ?? false
+})
+
+const supportsNginxDownload = computed(() => {
+  return nginxPlatformInfo.value?.supports_download ?? false
+})
+
+const nginxPlatformDisplayText = computed(() => {
+  if (!nginxPlatformInfo.value) return ''
+  if (nginxPlatformInfo.value.uses_package_manager) {
+    const pm = nginxPlatformInfo.value.package_manager || '包管理器'
+    return `（通过${pm}管理）`
+  }
+  return ''
+})
 
 // ==================== 步骤3: Git ====================
 const gitStatus = ref<'idle' | 'checking' | 'installed' | 'not_installed'>('idle')
@@ -100,6 +121,8 @@ onMounted(async () => {
     await checkGit()
     // 检查Nginx状态
     await checkNginx()
+    // 加载Nginx平台信息
+    await loadNginxPlatformInfo()
   } catch (e) {
     console.error('初始化失败:', e)
   }
@@ -126,7 +149,10 @@ async function selectServerPath() {
     const { open } = await import('@tauri-apps/plugin-dialog')
     const selected = await open({
       multiple: false,
-      filters: [{ name: 'Executable', extensions: ['exe'] }]
+      filters: [
+        { name: '可执行文件', extensions: ['exe', ''] },
+        { name: '所有文件', extensions: ['*'] }
+      ]
     })
     if (selected && typeof selected === 'string') {
       serverPath.value = selected
@@ -151,12 +177,26 @@ async function checkNginx() {
   }
 }
 
+/**
+ * 加载Nginx平台信息
+ */
+async function loadNginxPlatformInfo() {
+  try {
+    nginxPlatformInfo.value = await getNginxPlatformInfo()
+  } catch (e) {
+    console.error('获取Nginx平台信息失败:', e)
+  }
+}
+
 async function loadNginxManually() {
   try {
     const { open } = await import('@tauri-apps/plugin-dialog')
     const selected = await open({
       multiple: false,
-      filters: [{ name: 'Nginx Executable', extensions: ['exe'] }]
+      filters: [
+        { name: 'Nginx可执行文件', extensions: ['exe', ''] },
+        { name: '所有文件', extensions: ['*'] }
+      ]
     })
     if (selected && typeof selected === 'string') {
       isLoading.value = true
@@ -409,7 +449,8 @@ function prevStep() {
         </div>
 
         <div v-else class="nginx-options">
-          <div class="option-group">
+          <!-- 手动载入选项 - 仅Windows支持 -->
+          <div v-if="supportsNginxManualLoad" class="option-group">
             <h3>选项1: 手动载入</h3>
             <p class="option-desc">如果您已安装Nginx，请选择可执行文件</p>
             <Button type="secondary" :loading="isLoading" @click="loadNginxManually">
@@ -417,9 +458,10 @@ function prevStep() {
             </Button>
           </div>
 
-          <div class="option-divider">或</div>
+          <div v-if="supportsNginxManualLoad && supportsNginxDownload" class="option-divider">或</div>
 
-          <div class="option-group">
+          <!-- 自动下载选项 - 仅Windows支持 -->
+          <div v-if="supportsNginxDownload" class="option-group">
             <h3>选项2: 自动下载</h3>
             <p class="option-desc">自动下载并配置Nginx（推荐）</p>
             <input
@@ -435,6 +477,17 @@ function prevStep() {
             >
               下载并配置
             </Button>
+          </div>
+
+          <!-- Linux平台提示 -->
+          <div v-if="!supportsNginxManualLoad && !supportsNginxDownload" class="option-group">
+            <h3>Nginx配置</h3>
+            <p class="option-desc">
+              在Linux系统上，Nginx通过包管理器安装和管理{{ nginxPlatformDisplayText }}
+            </p>
+            <p class="option-desc">
+              请使用系统包管理器安装Nginx，系统将自动检测并使用系统Nginx。
+            </p>
           </div>
         </div>
 

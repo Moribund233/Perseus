@@ -149,16 +149,18 @@ const isCustomUrl = computed(() => {
 
 /**
  * 是否支持手动载入（Windows平台）
+ * 默认false，等待平台信息加载完成后再判断
  */
 const supportsManualLoad = computed(() => {
-  return platformInfo.value?.supports_manual_load ?? true
+  return platformInfo.value?.supports_manual_load ?? false
 })
 
 /**
  * 是否支持下载（Windows平台）
+ * 默认false，等待平台信息加载完成后再判断
  */
 const supportsDownload = computed(() => {
-  return platformInfo.value?.supports_download ?? true
+  return platformInfo.value?.supports_download ?? false
 })
 
 /**
@@ -218,7 +220,7 @@ async function handleLoadNginx() {
       multiple: false,
       directory: false,
       filters: [
-        { name: 'Nginx可执行文件', extensions: ['exe'] },
+        { name: 'Nginx可执行文件', extensions: ['exe', ''] },
         { name: '所有文件', extensions: ['*'] }
       ],
       title: '选择Nginx可执行文件'

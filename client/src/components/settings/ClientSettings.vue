@@ -115,7 +115,10 @@ const selectServerPath = async (): Promise<void> => {
     const { open } = await import('@tauri-apps/plugin-dialog')
     const selected = await open({
       multiple: false,
-      filters: [{ name: 'Executable', extensions: ['exe'] }]
+      filters: [
+        { name: '可执行文件', extensions: ['exe', ''] },
+        { name: '所有文件', extensions: ['*'] }
+      ]
     })
     if (selected && typeof selected === 'string') {
       clientConfig.value.server.path.custom_path = selected

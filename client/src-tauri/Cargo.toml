@@ -47,6 +47,10 @@ pbkdf2 = "0.12"
 # ZIP解压
 zip = "2.2"
 
+# Linux 相关依赖
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
 [dependencies.tauri-plugin-http]
 features = ["unsafe-headers"]
 version = "2.0.0"
