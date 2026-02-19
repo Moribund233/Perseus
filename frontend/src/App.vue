@@ -45,7 +45,7 @@ const isAuthPage = computed(() => {
 // 初始化应用
 onMounted(async () => {
   // 恢复用户状态
-  userStore.restoreUserFromLocalStorage()
+  userStore.restoreUserFromStorage()
   
   // 初始化配置
   await configManager.initializeConfigs()

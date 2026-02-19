@@ -293,6 +293,104 @@ export const repositoryApi = {
   }
 };
 
+// 提交相关API
+export const commitApi = {
+  // 获取提交历史
+  getCommits: async (repoId: number, options?: { limit?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.limit) params.append('limit', options.limit.toString());
+    return apiRequest<any[]>(`/api/repositories/${repoId}/commits?${params.toString()}`, {
+      method: 'GET',
+      requireAuth: true
+    });
+  },
+
+  // 获取单个提交详情
+  getCommit: async (repoId: number, commitHash: string) => {
+    return apiRequest<any>(`/api/repositories/${repoId}/commits/${commitHash}`, {
+      method: 'GET',
+      requireAuth: true
+    });
+  }
+};
+
+// 分支相关API
+export const branchApi = {
+  // 获取分支列表
+  getBranches: async (repoId: number) => {
+    return apiRequest<any[]>(`/api/repositories/${repoId}/branches`, {
+      method: 'GET',
+      requireAuth: true
+    });
+  },
+
+  // 创建分支
+  createBranch: async (repoId: number, branchData: { name: string; base_branch?: string }) => {
+    return apiRequest<any>(`/api/repositories/${repoId}/branches`, {
+      method: 'POST',
+      body: branchData,
+      requireAuth: true
+    });
+  },
+
+  // 删除分支
+  deleteBranch: async (repoId: number, branchName: string) => {
+    return apiRequest<void>(`/api/repositories/${repoId}/branches/${branchName}`, {
+      method: 'DELETE',
+      requireAuth: true
+    });
+  }
+};
+
+// 仓库浏览器相关API
+export const repositoryBrowserApi = {
+  // 获取文件树
+  getTree: async (repoId: number, ref: string = 'HEAD', path: string = '') => {
+    const params = new URLSearchParams();
+    params.append('ref', ref);
+    if (path) params.append('path', path);
+    return apiRequest<any>(`/api/repositories/${repoId}/tree?${params.toString()}`, {
+      method: 'GET',
+      requireAuth: true
+    });
+  },
+
+  // 获取文件内容 (Blob)
+  getBlob: async (repoId: number, path: string, ref: string = 'HEAD') => {
+    const params = new URLSearchParams();
+    params.append('path', path);
+    params.append('ref', ref);
+    return apiRequest<any>(`/api/repositories/${repoId}/blob?${params.toString()}`, {
+      method: 'GET',
+      requireAuth: true
+    });
+  },
+
+  // 获取提交历史
+  getCommits: async (repoId: number, ref: string = 'HEAD', limit: number = 20, offset: number = 0) => {
+    const params = new URLSearchParams();
+    params.append('ref', ref);
+    params.append('limit', limit.toString());
+    params.append('offset', offset.toString());
+    return apiRequest<any>(`/api/repositories/${repoId}/commits?${params.toString()}`, {
+      method: 'GET',
+      requireAuth: true
+    });
+  },
+
+  // 获取文件差异
+  getDiff: async (repoId: number, baseRef?: string, headRef?: string, path?: string) => {
+    const params = new URLSearchParams();
+    if (baseRef) params.append('base', baseRef);
+    if (headRef) params.append('head', headRef);
+    if (path) params.append('path', path);
+    return apiRequest<any>(`/api/repositories/${repoId}/diff?${params.toString()}`, {
+      method: 'GET',
+      requireAuth: true
+    });
+  }
+};
+
 // 导出安全存储相关函数
 export {
   getToken,
@@ -306,5 +404,8 @@ export {
 export default {
   apiRequest,
   userApi,
-  repositoryApi
+  repositoryApi,
+  commitApi,
+  branchApi,
+  repositoryBrowserApi
 };
