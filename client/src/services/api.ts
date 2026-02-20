@@ -783,3 +783,61 @@ export async function isGuideCompleted(): Promise<boolean> {
 export async function hasUserConfigFile(): Promise<boolean> {
   return invoke('has_user_config_file')
 }
+
+// ==================== 压力测试和数据库配置 API ====================
+
+/**
+ * 获取压力测试模式状态
+ */
+export async function getStressTest(): Promise<boolean> {
+  return invoke('get_stress_test')
+}
+
+/**
+ * 更新压力测试模式
+ * @param stress 是否启用压力测试
+ */
+export async function updateStressTest(stress: boolean): Promise<void> {
+  return invoke('update_stress_test', { stress })
+}
+
+/**
+ * 获取所有数据库连接 URL
+ * @returns 数据库类型到 URL 的映射
+ */
+export async function getDatabaseUrls(): Promise<Record<string, string>> {
+  return invoke('get_database_urls')
+}
+
+/**
+ * 获取指定类型的数据库连接 URL
+ * @param dbType 数据库类型: 'sqlite' | 'postgresql' | 'mysql'
+ */
+export async function getDatabaseUrl(dbType: string): Promise<string> {
+  return invoke('get_database_url', { dbType })
+}
+
+/**
+ * 获取数据库类型（从 client.toml 读取）
+ * @returns 当前选择的数据库类型: 'sqlite' | 'postgresql' | 'mysql'
+ */
+export async function getDatabaseType(): Promise<string> {
+  return invoke('get_database_type')
+}
+
+/**
+ * 切换数据库类型（保存到 client.toml）
+ * @param dbType 数据库类型: 'sqlite' | 'postgresql' | 'mysql'
+ */
+export async function switchDatabaseType(dbType: string): Promise<void> {
+  return invoke('switch_database_type', { dbType })
+}
+
+/**
+ * 更新指定类型的数据库连接 URL
+ * @param dbType 数据库类型: 'sqlite' | 'postgresql' | 'mysql'
+ * @param url 数据库连接 URL
+ */
+export async function updateDatabaseUrl(dbType: string, url: string): Promise<void> {
+  return invoke('update_database_url', { dbType, url })
+}

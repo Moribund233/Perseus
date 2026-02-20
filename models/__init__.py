@@ -2,21 +2,6 @@
 模型初始化模块
 
 提供数据库引擎、会话工厂和基础模型类的配置驱动初始化
-
-注意：本模块假设环境变量已由 init 模块预先验证
-必需的环境变量:
-    - DATABASE_URL: 数据库连接URL（必需）
-      例如: sqlite:///./langit.db 或 postgresql://user:pass@localhost/dbname
-    - LANGIT_STRESS_TEST: 压力测试模式标志（必需）
-      例如: "true" 或 "false"
-
-使用示例:
-    # 确保已通过 init 模块完成初始化后再导入
-    from models import engine, SessionLocal, Base
-    
-    # 或使用配置获取函数
-    from models import get_db_config
-    cfg = get_db_config()
 """
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base

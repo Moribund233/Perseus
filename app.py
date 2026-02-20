@@ -2,11 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from init import init_app
-from config import get_config
-from utils.logging import get_logger
-from lifespan import app_lifespan
 
-logger = get_logger("app")
+# 注意：logger 和 config 的导入被延迟到 create_app() 内部
+# 以确保 init_app() 先执行环境变量检查
 
 
 def create_app(config_path: str = "config.toml") -> FastAPI:
@@ -19,6 +17,15 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     Returns:
         FastAPI: FastAPI应用实例
     """
+    # 延迟导入所有可能触发 config/models 加载的模块
+    # 确保 init_app() 先执行环境变量检查
+    from lifespan import app_lifespan
+    from config import get_config
+    from utils.logging import get_logger
+
+    # 获取 logger
+    logger = get_logger("app")
+
     # 获取配置
     config = get_config(config_path)
 
@@ -186,10 +193,6 @@ def get_app(config_path: str = "config.toml") -> FastAPI:
     return app_singleton.get_app(config_path)
 
 
-# 导出应用实例
-app = get_app()
-
-
 def start_server():
     """
     启动 Web 服务器
@@ -202,8 +205,14 @@ def start_server():
     """
     import uvicorn
     from utils.port_utils import get_pid_manager
+    from utils.logging import get_logger
+    from config import get_config
+    
+    # 创建应用实例（在 init_app() 成功之后）
+    app = get_app()
     
     config = get_config()
+    logger = get_logger("app")
     debug = config.app.debug
     
     # 记录主进程PID（覆盖写模式，新启动自动覆盖旧内容）

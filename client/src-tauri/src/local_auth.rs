@@ -59,6 +59,8 @@ impl From<LocalAuthConfig> for SecureConfig {
             debug_mode: config.debug_mode,
             security_password: String::new(),
             key_version: 0,
+            stress_test: false,
+            database_urls: crate::secure_config::default_database_urls(),
         }
     }
 }
@@ -165,13 +167,36 @@ pub fn get_auth_headers() -> Result<Vec<(String, String)>, String> {
     ])
 }
 
-/// 获取用于启动服务端的环境变量
+/**
+ * 获取用于启动服务端的环境变量
+ *
+ * 注入的环境变量：
+ * - LANGIT_SECURITY_SECRET_KEY: JWT 安全密钥
+ * - LANGIT_LOCAL_TOKEN: 本地认证 Token
+ * - LANGIT_APP_DEBUG: 调试模式
+ * - LANGIT_STRESS_TEST: 压力测试模式
+ * - DATABASE_URL: 数据库连接 URL（根据 client.toml 中的 db_type 选择）
+ */
 pub fn get_server_env_vars() -> Result<Vec<(String, String)>, String> {
     let auth_config = get_local_auth_config()?;
 
     if auth_config.jwt_secret_key.is_empty() || auth_config.local_token.is_empty() {
         return Err("本地认证配置未初始化，请先调用 init_local_auth()".to_string());
     }
+
+    // 加载安全配置以获取数据库和压力测试配置
+    let secure_config = secure_config::load_secure_config()?;
+
+    // 从 client.toml 读取当前选择的数据库类型
+    let client_config = crate::config::load_config()?;
+    let db_type = client_config.db_type;
+
+    // 根据 db_type 从钥匙串中获取对应的 URL
+    let database_url = secure_config
+        .database_urls
+        .get(&db_type)
+        .cloned()
+        .unwrap_or_else(|| "sqlite:///./langit.db".to_string());
 
     Ok(vec![
         (
@@ -185,6 +210,14 @@ pub fn get_server_env_vars() -> Result<Vec<(String, String)>, String> {
         (
             "LANGIT_APP_DEBUG".to_string(),
             auth_config.debug_mode.to_string(),
+        ),
+        (
+            "LANGIT_STRESS_TEST".to_string(),
+            secure_config.stress_test.to_string(),
+        ),
+        (
+            "DATABASE_URL".to_string(),
+            database_url,
         ),
     ])
 }

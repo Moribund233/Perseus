@@ -373,6 +373,13 @@ pub struct ClientConfig {
     /// Nginx配置
     #[serde(default)]
     pub nginx: NginxConfig,
+    /// 数据库类型（sqlite/postgresql/mysql）
+    #[serde(default = "default_db_type")]
+    pub db_type: String,
+}
+
+fn default_db_type() -> String {
+    "sqlite".to_string()
 }
 
 /**

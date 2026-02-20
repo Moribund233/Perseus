@@ -99,6 +99,14 @@ pub fn run() {
             // 数据库迁移
             commands::migrate_database,
             commands::test_database_connection,
+            // 压力测试和数据库配置
+            commands::get_stress_test,
+            commands::update_stress_test,
+            commands::get_database_urls,
+            commands::get_database_url,
+            commands::get_database_type,
+            commands::switch_database_type,
+            commands::update_database_url,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

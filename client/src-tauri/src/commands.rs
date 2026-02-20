@@ -704,6 +704,55 @@ pub async fn migrate_database(
 
 /// 测试数据库连接
 #[tauri::command]
-pub async fn test_database_connection(db_url: String) -> Result<crate::models::ConfigResponse, String> {
+pub async fn test_database_connection(
+    db_url: String,
+) -> Result<crate::models::ConfigResponse, String> {
     crate::api_client::test_database_connection(db_url).await
+}
+
+// ==================== 压力测试和数据库配置命令 ====================
+
+/// 获取压力测试模式状态
+#[tauri::command]
+pub fn get_stress_test() -> Result<bool, String> {
+    crate::secure_config::get_stress_test()
+}
+
+/// 更新压力测试模式
+#[tauri::command]
+pub fn update_stress_test(stress: bool) -> Result<(), String> {
+    crate::secure_config::update_stress_test(stress)
+}
+
+/// 获取所有数据库连接 URL
+#[tauri::command]
+pub fn get_database_urls() -> Result<std::collections::HashMap<String, String>, String> {
+    crate::secure_config::get_database_urls()
+}
+
+/// 获取指定类型的数据库连接 URL
+#[tauri::command]
+pub fn get_database_url(db_type: String) -> Result<String, String> {
+    crate::secure_config::get_database_url(&db_type)
+}
+
+/// 获取数据库类型（从 client.toml 读取）
+#[tauri::command]
+pub fn get_database_type() -> Result<String, String> {
+    let config = crate::config::load_config()?;
+    Ok(config.db_type)
+}
+
+/// 切换数据库类型（保存到 client.toml）
+#[tauri::command]
+pub fn switch_database_type(db_type: String) -> Result<(), String> {
+    let mut config = crate::config::load_config()?;
+    config.db_type = db_type;
+    crate::config::save_config(&config)
+}
+
+/// 更新指定类型的数据库连接 URL
+#[tauri::command]
+pub fn update_database_url(db_type: String, url: String) -> Result<(), String> {
+    crate::secure_config::update_database_url(db_type, url)
 }

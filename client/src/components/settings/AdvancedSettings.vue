@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import {ref} from 'vue'
 import {
   getClientConfig,
   saveClientConfig,
@@ -13,9 +13,18 @@ import {
   isElevated,
   getJwtSecretKey,
   getLocalToken,
+  getStressTest,
+  updateStressTest,
+  getDatabaseUrls,
+  updateDatabaseUrl,
   type ClientConfig
 } from '../../services/api'
 import { useRouter } from 'vue-router'
+
+/**
+ * 数据库类型
+ */
+type DatabaseType = 'sqlite' | 'postgresql' | 'mysql'
 
 /**
  * 高级设置组件
@@ -77,7 +86,16 @@ const sensitiveConfig = ref({
   isElevated: false,
   jwtKey: '',
   localToken: '',
-  showTokens: false
+  showTokens: false,
+  // 压力测试模式
+  stressTest: false,
+  // 数据库配置（钥匙串）
+  databaseUrls: {} as Record<string, string>,
+  selectedDbType: 'sqlite' as DatabaseType,
+  showDatabaseUrl: false,
+  isEditingDatabaseUrl: false,
+  tempDatabaseUrl: '',
+  urlValidationError: ''
 })
 
 // 危险操作验证对话框状态
@@ -144,14 +162,20 @@ const saveClientConfigHandler = async (): Promise<void> => {
  */
 const checkSensitiveConfigStatus = async (): Promise<void> => {
   try {
-    const [hasPassword, debugMode, elevated] = await Promise.all([
+    const [hasPassword, debugMode, elevated, stressTest, databaseUrls] = await Promise.all([
       hasSecurityPassword(),
       getDebugMode(),
-      isElevated()
+      isElevated(),
+      getStressTest(),
+      getDatabaseUrls()
     ])
     sensitiveConfig.value.hasPassword = hasPassword
     sensitiveConfig.value.debugMode = debugMode
     sensitiveConfig.value.isElevated = elevated
+    sensitiveConfig.value.stressTest = stressTest
+    sensitiveConfig.value.databaseUrls = databaseUrls
+    // 默认选中 sqlite
+    sensitiveConfig.value.selectedDbType = 'sqlite'
   } catch (err) {
     console.error('检查敏感配置状态失败:', err)
   }
@@ -252,6 +276,105 @@ const handleUpdateDebugMode = async (debug: boolean): Promise<void> => {
   }
 }
 
+/**
+ * 更新压力测试模式
+ */
+const handleUpdateStressTest = async (stress: boolean): Promise<void> => {
+  isSaving.value = true
+  try {
+    await updateStressTest(stress)
+    sensitiveConfig.value.stressTest = stress
+    emit('success', stress ? '压力测试模式已启用' : '压力测试模式已禁用')
+  } catch (err) {
+    console.error('更新压力测试模式失败:', err)
+    emit('error', '更新失败: ' + String(err))
+  } finally {
+    isSaving.value = false
+  }
+}
+
+/**
+ * 获取当前选中的数据库 URL
+ */
+const getCurrentDatabaseUrl = (): string => {
+  return sensitiveConfig.value.databaseUrls[sensitiveConfig.value.selectedDbType] || ''
+}
+
+/**
+ * 验证数据库 URL 格式
+ */
+const validateDatabaseUrl = (url: string, dbType: string): boolean => {
+  const urlLower = url.toLowerCase().trim()
+
+  switch (dbType) {
+    case 'sqlite':
+      return urlLower.startsWith('sqlite://')
+    case 'postgresql':
+      return urlLower.startsWith('postgresql://') || urlLower.startsWith('postgres://')
+    case 'mysql':
+      return urlLower.startsWith('mysql://')
+    default:
+      return false
+  }
+}
+
+/**
+ * 开始编辑数据库 URL
+ */
+const startEditDatabaseUrl = (): void => {
+  sensitiveConfig.value.tempDatabaseUrl = getCurrentDatabaseUrl()
+  sensitiveConfig.value.isEditingDatabaseUrl = true
+  sensitiveConfig.value.urlValidationError = ''
+}
+
+/**
+ * 取消编辑数据库 URL
+ */
+const cancelEditDatabaseUrl = (): void => {
+  sensitiveConfig.value.isEditingDatabaseUrl = false
+  sensitiveConfig.value.tempDatabaseUrl = ''
+  sensitiveConfig.value.urlValidationError = ''
+}
+
+/**
+ * 保存数据库 URL
+ */
+const saveDatabaseUrl = async (): Promise<void> => {
+  const url = sensitiveConfig.value.tempDatabaseUrl.trim()
+  const dbType = sensitiveConfig.value.selectedDbType
+
+  if (!url) {
+    sensitiveConfig.value.urlValidationError = '数据库 URL 不能为空'
+    return
+  }
+
+  // 验证 URL 格式
+  if (!validateDatabaseUrl(url, dbType)) {
+    const prefixMap: Record<string, string> = {
+      sqlite: 'sqlite://',
+      postgresql: 'postgresql://',
+      mysql: 'mysql://'
+    }
+    sensitiveConfig.value.urlValidationError = `URL 格式不正确，${dbType} 类型必须以 ${prefixMap[dbType]} 开头`
+    return
+  }
+
+  isSaving.value = true
+  try {
+    await updateDatabaseUrl(dbType, url)
+    sensitiveConfig.value.databaseUrls[dbType] = url
+    sensitiveConfig.value.isEditingDatabaseUrl = false
+    sensitiveConfig.value.tempDatabaseUrl = ''
+    sensitiveConfig.value.urlValidationError = ''
+    emit('success', `${dbType.toUpperCase()} 数据库连接 URL 已更新`)
+  } catch (err) {
+    console.error('更新数据库 URL 失败:', err)
+    emit('error', '更新数据库 URL 失败: ' + String(err))
+  } finally {
+    isSaving.value = false
+  }
+}
+
 // ==================== 危险操作对话框 ====================
 
 /**
@@ -281,6 +404,32 @@ const openDangerDialog = (
 const closeDangerDialog = (): void => {
   dangerDialog.value.show = false
   dangerInput.value = ''
+}
+
+/**
+ * 掩码显示数据库 URL
+ * 隐藏敏感信息如密码
+ */
+const maskDatabaseUrl = (url: string): string => {
+  if (!url) return ''
+  try {
+    // 尝试解析 URL
+    if (url.startsWith('sqlite://')) {
+      // SQLite URL 通常不包含密码，只显示文件名
+      const parts = url.split('/')
+      const fileName = parts[parts.length - 1] || 'database.db'
+      return `sqlite://***${fileName.slice(-10)}`
+    } else {
+      // PostgreSQL 或 MySQL URL，隐藏用户名密码部分
+      const match = url.match(/^(postgresql|postgres|mysql):\/\/([^@]+)@(.+)$/)
+      if (match) {
+        return `${match[1]}://***@***`
+      }
+      return url.replace(/:\/\/[^@]+@/, '://***@')
+    }
+  } catch {
+    return '***'
+  }
 }
 
 /**
@@ -508,6 +657,110 @@ loadClientConfig()
               </div>
             </div>
 
+            <!-- 压力测试模式（弱保护层） -->
+            <div class="sensitive-subsection">
+              <h4>压力测试设置</h4>
+              <div class="form-group checkbox-group">
+                <label class="checkbox-label">
+                  <input
+                    type="checkbox"
+                    :checked="sensitiveConfig.stressTest"
+                    @change="handleUpdateStressTest(!sensitiveConfig.stressTest)"
+                  />
+                  <span>启用压力测试模式</span>
+                </label>
+                <p class="help-text">启用后服务端将加载压力测试数据，用于性能测试</p>
+              </div>
+            </div>
+
+            <!-- 数据库配置（强保护层：需要管理员权限） -->
+            <div class="sensitive-subsection database-config-section" :class="{ disabled: !sensitiveConfig.isElevated }">
+              <h4>数据库配置</h4>
+              <p v-if="!sensitiveConfig.isElevated" class="elevate-warning">
+                ⚠️ 需要以管理员权限运行才能修改数据库配置
+              </p>
+              <div class="database-config-content" :class="{ disabled: !sensitiveConfig.isElevated }">
+                <!-- 数据库类型选择 + URL 输入 -->
+                <div class="form-group">
+                  <div class="database-config-row">
+                    <!-- 左侧：URL 输入框 -->
+                    <div class="url-input-section">
+                      <label class="form-label">数据库连接 URL</label>
+                      <div v-if="!sensitiveConfig.isEditingDatabaseUrl" class="database-url-display">
+                        <div class="url-value-wrapper">
+                          <span class="url-value">
+                            {{ sensitiveConfig.showDatabaseUrl ? getCurrentDatabaseUrl() : maskDatabaseUrl(getCurrentDatabaseUrl()) }}
+                          </span>
+                        </div>
+                      </div>
+                      <div v-else class="database-url-edit">
+                        <input
+                          v-model="sensitiveConfig.tempDatabaseUrl"
+                          type="text"
+                          class="input"
+                          :class="{ 'input-error': sensitiveConfig.urlValidationError }"
+                          :placeholder="`例如: ${sensitiveConfig.selectedDbType === 'sqlite' ? 'sqlite:///./langit.db' : sensitiveConfig.selectedDbType === 'postgresql' ? 'postgresql://user:pass@localhost/dbname' : 'mysql://user:pass@localhost/dbname'}`"
+                        />
+                        <span v-if="sensitiveConfig.urlValidationError" class="input-error-text">
+                          {{ sensitiveConfig.urlValidationError }}
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- 右侧：数据库类型下拉框 -->
+                    <div class="db-type-select-section">
+                      <label class="form-label">数据库类型</label>
+                      <select
+                        v-model="sensitiveConfig.selectedDbType"
+                        class="input"
+                        :disabled="sensitiveConfig.isEditingDatabaseUrl"
+                      >
+                        <option value="sqlite">SQLite</option>
+                        <option value="postgresql">PostgreSQL</option>
+                        <option value="mysql">MySQL</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- 操作按钮 -->
+                  <div class="url-actions-row">
+                    <div v-if="!sensitiveConfig.isEditingDatabaseUrl" class="url-actions">
+                      <button
+                        class="btn btn-sm btn-secondary"
+                        @click="sensitiveConfig.showDatabaseUrl = !sensitiveConfig.showDatabaseUrl"
+                        :disabled="!sensitiveConfig.isElevated"
+                      >
+                        {{ sensitiveConfig.showDatabaseUrl ? '隐藏' : '显示' }}
+                      </button>
+                      <button
+                        class="btn btn-sm btn-primary"
+                        @click="startEditDatabaseUrl"
+                        :disabled="!sensitiveConfig.isElevated"
+                      >
+                        修改
+                      </button>
+                    </div>
+                    <div v-else class="url-edit-actions">
+                      <button
+                        class="btn btn-sm btn-secondary"
+                        @click="cancelEditDatabaseUrl"
+                      >
+                        取消
+                      </button>
+                      <button
+                        class="btn btn-sm btn-primary"
+                        @click="saveDatabaseUrl"
+                        :disabled="isSaving"
+                      >
+                        保存
+                      </button>
+                    </div>
+                  </div>
+                  <p class="help-text">修改后需要重启服务端才能生效</p>
+                </div>
+              </div>
+            </div>
+
             <!-- Token重置 -->
             <div class="sensitive-subsection token-reset-section">
               <h4>安全令牌管理</h4>
@@ -702,5 +955,135 @@ loadClientConfig()
   color: var(--warning-color);
   margin-top: var(--spacing-md);
   text-align: center;
+}
+
+/* 数据库配置区域样式 */
+.database-config-section {
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  background-color: var(--bg-secondary);
+}
+
+.database-config-content {
+  margin-top: var(--spacing-md);
+}
+
+.database-type-display {
+  margin-bottom: var(--spacing-sm);
+}
+
+.database-type-badge {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.database-type-badge.sqlite {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.database-type-badge.postgresql {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.database-type-badge.mysql {
+  background-color: rgba(234, 179, 8, 0.2);
+  color: #eab308;
+}
+
+/* 数据库配置行布局 */
+.database-config-row {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.url-input-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.db-type-select-section {
+  width: 150px;
+  flex-shrink: 0;
+}
+
+.db-type-select-section select {
+  width: 100%;
+}
+
+.url-actions-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.database-url-display {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.url-value-wrapper {
+  background-color: var(--bg-tertiary);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.url-value {
+  font-family: monospace;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.url-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.database-url-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.database-url-edit .input {
+  font-family: monospace;
+  font-size: var(--font-size-sm);
+}
+
+.url-edit-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: flex-end;
+}
+
+/* 禁用状态样式 */
+.database-config-section.disabled {
+  opacity: 0.7;
+  border-color: var(--border-color);
+}
+
+.database-config-content.disabled {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.database-config-section .elevate-warning {
+  color: var(--warning-color);
+  font-size: var(--font-size-sm);
+  margin: var(--spacing-sm) 0 var(--spacing-md);
+  padding: var(--spacing-sm);
+  background-color: rgba(234, 179, 8, 0.1);
+  border-radius: var(--border-radius-sm);
+  border-left: 3px solid var(--warning-color);
 }
 </style>

@@ -7,13 +7,19 @@ import Alert from '../components/Alert.vue'
 import MigrationProgressModal from '../components/database/MigrationProgressModal.vue'
 import { useDatabaseStore } from '../stores'
 import type { DatabaseType } from '../services/databaseApi'
+import { getDatabaseType, switchDatabaseType } from '../services/api'
 
 /**
  * 数据库配置页面
  * 使用 Pinia Store 管理状态，避免频繁访问配置接口
+ * 数据库类型从客户端加密配置中读取
  */
 
 const dbStore = useDatabaseStore()
+
+// 从加密配置读取的数据库类型
+const clientDbType = ref<DatabaseType>('sqlite')
+const isLoadingClientDbType = ref(false)
 
 // 迁移相关状态
 const showMigrationConfirm = ref(false)
@@ -46,9 +52,19 @@ const config = computed(() => dbStore.editingConfig)
 
 /**
  * 切换数据库类型
+ * 同时更新 client.toml 中的 db_type
  */
-const handleDbTypeChange = (newType: DatabaseType): void => {
+const handleDbTypeChange = async (newType: DatabaseType): Promise<void> => {
   if (!config.value?.db_type || newType === config.value.db_type) return
+
+  // 先更新 client.toml 中的数据库类型
+  try {
+    await switchDatabaseType(newType)
+    clientDbType.value = newType
+  } catch (err) {
+    console.error('切换数据库类型失败:', err)
+    return
+  }
 
   // 如果类型变更，显示迁移确认
   if (dbStore.serverConfig?.db_type && dbStore.serverConfig.db_type !== newType) {
@@ -86,11 +102,29 @@ const onMigrationComplete = async (success: boolean): Promise<void> => {
   pendingDbType.value = null
 }
 
+/**
+ * 从客户端加密配置加载数据库类型
+ */
+const loadClientDbType = async (): Promise<void> => {
+  isLoadingClientDbType.value = true
+  try {
+    const dbType = await getDatabaseType()
+    clientDbType.value = dbType as DatabaseType
+  } catch (err) {
+    console.error('加载客户端数据库类型失败:', err)
+    // 保持默认 sqlite
+  } finally {
+    isLoadingClientDbType.value = false
+  }
+}
+
 // 页面加载
 onMounted(() => {
   if (!dbStore.isConfigLoaded) {
     dbStore.loadConfig()
   }
+  // 从加密配置加载数据库类型
+  loadClientDbType()
 })
 </script>
 
@@ -132,6 +166,22 @@ onMounted(() => {
     </div>
 
     <template v-else>
+      <!-- 客户端加密配置中的数据库类型显示 -->
+      <Card v-if="!isLoadingClientDbType" title="客户端数据库配置" class="mb-lg client-db-info">
+        <div class="client-db-type-display">
+          <div class="db-type-badge" :class="clientDbType">
+            <img :src="icons[clientDbType]" class="badge-icon" :alt="clientDbType" />
+            <span class="badge-text">
+              {{ clientDbType === 'sqlite' ? 'SQLite' :
+                 clientDbType === 'postgresql' ? 'PostgreSQL' : 'MySQL' }}
+            </span>
+          </div>
+          <div class="client-db-info-text">
+            <p>当前客户端配置的数据库类型</p>
+            <p class="hint">修改数据库类型请在「高级设置」-「敏感配置」-「数据库配置」中进行</p>
+          </div>
+        </div>
+      </Card>
       <!-- 数据库类型选择 -->
       <Card title="数据库类型" class="mb-lg">
         <div class="db-type-grid">
@@ -610,6 +660,67 @@ onMounted(() => {
 .empty-state p {
   color: var(--text-secondary);
   margin: 0 0 var(--spacing-md);
+}
+
+/* 客户端数据库配置显示 */
+.client-db-info {
+  background-color: var(--bg-secondary);
+}
+
+.client-db-type-display {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-md);
+}
+
+.db-type-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  font-weight: 600;
+  font-size: var(--font-size-lg);
+}
+
+.db-type-badge.sqlite {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.db-type-badge.postgresql {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.db-type-badge.mysql {
+  background-color: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.badge-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.client-db-info-text {
+  flex: 1;
+}
+
+.client-db-info-text p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-md);
+}
+
+.client-db-info-text .hint {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  margin-top: var(--spacing-xs);
 }
 
 .mb-lg { margin-bottom: var(--spacing-lg); }

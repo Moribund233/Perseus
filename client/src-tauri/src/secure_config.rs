@@ -27,6 +27,43 @@ const SALT_LENGTH: usize = 32;
 const NONCE_LENGTH: usize = 12;
 
 /**
+ * 数据库类型
+ */
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum DatabaseType {
+    #[default]
+    Sqlite,
+    Postgresql,
+    Mysql,
+}
+
+impl DatabaseType {
+    /// 从 DATABASE_URL 中派生数据库类型
+    pub fn from_url(url: &str) -> Self {
+        let url_lower = url.to_lowercase();
+        if url_lower.starts_with("postgresql") || url_lower.starts_with("postgres") {
+            DatabaseType::Postgresql
+        } else if url_lower.starts_with("mysql") {
+            DatabaseType::Mysql
+        } else {
+            DatabaseType::Sqlite
+        }
+    }
+
+    /// 获取默认的数据库 URL
+    pub fn default_url(&self) -> String {
+        match self {
+            DatabaseType::Sqlite => "sqlite:///./langit.db".to_string(),
+            DatabaseType::Postgresql => {
+                "postgresql://user:password@localhost:5432/langit".to_string()
+            }
+            DatabaseType::Mysql => "mysql://user:password@localhost:3306/langit".to_string(),
+        }
+    }
+}
+
+/**
  * 敏感配置数据结构
  */
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,6 +83,26 @@ pub struct SecureConfig {
     /// 密钥版本（用于轮换）
     #[serde(default)]
     pub key_version: u32,
+    /// 是否启用压力测试模式
+    #[serde(default)]
+    pub stress_test: bool,
+    /// 数据库连接 URL 钥匙串（key: 数据库类型, value: URL）
+    #[serde(default = "default_database_urls")]
+    pub database_urls: std::collections::HashMap<String, String>,
+}
+
+pub fn default_database_urls() -> std::collections::HashMap<String, String> {
+    let mut urls = std::collections::HashMap::new();
+    urls.insert("sqlite".to_string(), "sqlite:///./langit.db".to_string());
+    urls.insert(
+        "postgresql".to_string(),
+        "postgresql://user:password@localhost:5432/langit".to_string(),
+    );
+    urls.insert(
+        "mysql".to_string(),
+        "mysql://user:password@localhost:3306/langit".to_string(),
+    );
+    urls
 }
 
 fn default_debug_mode() -> bool {
@@ -60,6 +117,8 @@ impl Default for SecureConfig {
             debug_mode: true,
             security_password: String::new(),
             key_version: 0,
+            stress_test: false,
+            database_urls: default_database_urls(),
         }
     }
 }
@@ -397,18 +456,21 @@ pub fn init_secure_config() -> Result<SecureConfig, String> {
 }
 
 /**
- * 生成新的安全配置
+ * 生成 JWT Secret Key
  */
-fn generate_new_secure_config() -> SecureConfig {
+fn generate_jwt_secret_key() -> String {
     use rand::Rng;
-
-    // 生成 32 字节随机 JWT 密钥
     let jwt_key: Vec<u8> = (0..32).map(|_| rand::thread_rng().gen::<u8>()).collect();
-    let jwt_secret_key = STANDARD.encode(&jwt_key);
+    STANDARD.encode(&jwt_key)
+}
 
-    // 生成本地 Token（增加长度至 32 字节）
+/**
+ * 生成本地 Token
+ */
+fn generate_local_token() -> String {
+    use rand::Rng;
     let token_bytes: Vec<u8> = (0..32).map(|_| rand::thread_rng().gen::<u8>()).collect();
-    let local_token = format!(
+    format!(
         "langit_local_{}_{}",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -418,7 +480,15 @@ fn generate_new_secure_config() -> SecureConfig {
             .encode(&token_bytes)
             .replace("/", "_")
             .replace("+", "-")
-    );
+    )
+}
+
+/**
+ * 生成新的安全配置
+ */
+fn generate_new_secure_config() -> SecureConfig {
+    let jwt_secret_key = generate_jwt_secret_key();
+    let local_token = generate_local_token();
 
     SecureConfig {
         jwt_secret_key,
@@ -426,6 +496,8 @@ fn generate_new_secure_config() -> SecureConfig {
         debug_mode: true,
         security_password: String::new(),
         key_version: 1, // 初始密钥版本
+        stress_test: false,
+        database_urls: default_database_urls(),
     }
 }
 
@@ -509,9 +581,29 @@ pub fn get_key_version() -> Result<u32, String> {
 
 /**
  * 设置安全密码
+ *
+ * 如果配置中还没有 JWT 密钥和本地 Token，会自动生成
+ * 这是初始化加密配置的完整入口点
  */
 pub fn set_security_password(password: String) -> Result<(), String> {
     let mut config = load_secure_config()?;
+
+    // 如果 JWT 密钥或本地 Token 为空，生成新的
+    if config.jwt_secret_key.is_empty() {
+        config.jwt_secret_key = generate_jwt_secret_key();
+        log::info!("已生成新的 JWT Secret Key");
+    }
+
+    if config.local_token.is_empty() {
+        config.local_token = generate_local_token();
+        log::info!("已生成新的本地 Token");
+    }
+
+    // 设置密钥版本（如果是新配置）
+    if config.key_version == 0 {
+        config.key_version = 1;
+    }
+
     config.security_password = password;
     save_secure_config(&config)
 }
@@ -550,6 +642,52 @@ pub fn update_debug_mode(debug: bool) -> Result<(), String> {
 }
 
 /**
+ * 获取压力测试模式
+ */
+pub fn get_stress_test() -> Result<bool, String> {
+    let config = load_secure_config()?;
+    Ok(config.stress_test)
+}
+
+/**
+ * 更新压力测试模式
+ */
+pub fn update_stress_test(stress: bool) -> Result<(), String> {
+    let mut config = load_secure_config()?;
+    config.stress_test = stress;
+    save_secure_config(&config)
+}
+
+/**
+ * 获取所有数据库连接 URL
+ */
+pub fn get_database_urls() -> Result<std::collections::HashMap<String, String>, String> {
+    let config = load_secure_config()?;
+    Ok(config.database_urls)
+}
+
+/**
+ * 获取指定类型的数据库连接 URL
+ */
+pub fn get_database_url(db_type: &str) -> Result<String, String> {
+    let config = load_secure_config()?;
+    config
+        .database_urls
+        .get(db_type)
+        .cloned()
+        .ok_or_else(|| format!("未找到 {} 类型的数据库 URL", db_type))
+}
+
+/**
+ * 更新指定类型的数据库连接 URL
+ */
+pub fn update_database_url(db_type: String, url: String) -> Result<(), String> {
+    let mut config = load_secure_config()?;
+    config.database_urls.insert(db_type, url);
+    save_secure_config(&config)
+}
+
+/**
  * 重置所有令牌
  * 生成新的 JWT 密钥和本地 Token
  */
@@ -579,6 +717,8 @@ mod tests {
             debug_mode: false,
             security_password: "test_password".to_string(),
             key_version: 1,
+            stress_test: false,
+            database_urls: default_database_urls(),
         };
 
         // 加密
