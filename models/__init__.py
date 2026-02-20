@@ -1,80 +1,293 @@
-# 模型初始化模块
+"""
+模型初始化模块
+
+提供数据库引擎、会话工厂和基础模型类的配置驱动初始化
+
+环境变量要求:
+    - DATABASE_URL: 数据库连接URL（必需）
+      例如: sqlite:///./langit.db 或 postgresql://user:pass@localhost/dbname
+    - LANGIT_STRESS_TEST: 压力测试模式标志（必需）
+      例如: "true" 或 "false"
+
+使用示例:
+    # 设置环境变量后导入
+    from models import engine, SessionLocal, Base
+    
+    # 或使用配置获取函数
+    from models import get_db_config
+    cfg = get_db_config()
+"""
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.pool import QueuePool, StaticPool
-import os
+from sqlalchemy.pool import QueuePool
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
 
-# 数据库连接URL - 会被client初始化时设置
-DATABASE_URL = "sqlite:///./langit.db"
+# 尝试获取配置，如果缺少必需的环境变量则给出明确错误提示
+try:
+    from config import get_config
+    from utils.db_validation import (
+        validate_database_config,
+        check_sqlite_stress_test_warning,
+        DatabaseValidationError,
+    )
+    _config = get_config()
+    db_config = _config.database
+    
+    # 验证数据库配置
+    validate_database_config(db_config.url, db_config.db_type)
+    
+    # 检查 SQLite + 压力测试警告
+    warning = check_sqlite_stress_test_warning(db_config.is_sqlite, db_config.is_stress_test)
+    if warning:
+        logger.warning(warning)
+        
+except ValueError as e:
+    error_msg = f"""
+{'='*70}
+数据库配置错误
+{'='*70}
+{str(e)}
+{'='*70}
 
-# 检测是否处于开发/测试模式（高并发测试场景）
-# 通过环境变量控制，可以在压力测试时优化性能
-IS_STRESS_TEST = os.environ.get("LANGIT_STRESS_TEST", "false").lower() == "true"
-IS_DEBUG = os.environ.get("LANGIT_APP_DEBUG", "false").lower() == "true"
+请确保在启动应用前设置了所有必需的环境变量。
 
-# 根据环境选择连接池策略
-if IS_STRESS_TEST:
-    # 压力测试模式：使用更大的连接池，但设置更短的超时
-    # 注意：SQLite 是文件级数据库，真正并发写入仍受限于文件锁
-    logger.info("启用压力测试模式数据库配置")
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={
-            "check_same_thread": False,
-            "timeout": 5,  # SQLite 内部超时5秒
-            "isolation_level": None,  # 使用自动提交模式，减少锁竞争
-        },
-        poolclass=QueuePool,
-        pool_size=5,  # 较小的连接池，避免过度竞争
-        max_overflow=10,  # 最大溢出连接数
-        pool_timeout=5,  # 获取连接超时时间5秒（快速失败）
-        pool_recycle=300,  # 5分钟回收连接
-        pool_pre_ping=True,  # 连接前ping测试
-        echo=False,  # 关闭SQL日志，减少IO
-    )
-elif IS_DEBUG:
-    # 开发模式：标准配置，平衡性能和调试需求
-    logger.info("启用开发模式数据库配置")
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={
-            "check_same_thread": False,
-            "timeout": 10,  # SQLite 内部超时10秒
-        },
-        poolclass=QueuePool,
-        pool_size=10,
-        max_overflow=20,
-        pool_timeout=30,
-        pool_recycle=3600,
-        pool_pre_ping=True,
-    )
-else:
-    # 生产模式：保守配置，稳定性优先
-    logger.info("启用生产模式数据库配置")
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        poolclass=QueuePool,
-        pool_size=10,
-        max_overflow=20,
-        pool_timeout=30,
-        pool_recycle=3600,
-        pool_pre_ping=True,
-    )
+PowerShell 示例:
+    $env:DATABASE_URL = "sqlite:///./langit.db"
+    $env:LANGIT_STRESS_TEST = "false"
+    python main.py
+
+Linux/macOS 示例:
+    export DATABASE_URL="sqlite:///./langit.db"
+    export LANGIT_STRESS_TEST="false"
+    python main.py
+
+{'='*70}
+"""
+    logger.error(error_msg)
+    # 在导入时直接退出，避免循环验证和后续错误
+    sys.exit(1)
+except DatabaseValidationError as e:
+    error_msg = f"""
+{'='*70}
+数据库验证失败
+{'='*70}
+{str(e)}
+{'='*70}
+
+请检查:
+1. DATABASE_URL 格式是否正确
+2. 数据库驱动是否已安装 (pip install psycopg2-binary / pymysql)
+3. 数据库服务器是否可访问
+4. 数据库用户名和密码是否正确
+
+{'='*70}
+"""
+    logger.error(error_msg)
+    sys.exit(1)
+
+
+def _get_sqlite_connect_args():
+    """获取 SQLite 连接参数"""
+    if db_config.is_stress_test:
+        return {
+            "check_same_thread": db_config.sqlite_check_same_thread,
+            "timeout": db_config.stress_sqlite_timeout,
+            "isolation_level": db_config.sqlite_isolation_level,
+        }
+    else:
+        return {
+            "check_same_thread": db_config.sqlite_check_same_thread,
+            "timeout": db_config.sqlite_timeout,
+            "isolation_level": db_config.sqlite_isolation_level,
+        }
+
+
+def _get_postgresql_connect_args():
+    """获取 PostgreSQL 连接参数"""
+    return {
+        "sslmode": db_config.pg_ssl_mode,
+        "connect_timeout": db_config.pg_connect_timeout,
+        "application_name": db_config.pg_application_name,
+    }
+
+
+def _get_mysql_connect_args():
+    """获取 MySQL 连接参数"""
+    return {
+        "charset": db_config.mysql_charset,
+        "connect_timeout": db_config.mysql_connect_timeout,
+        "read_timeout": db_config.mysql_read_timeout,
+        "write_timeout": db_config.mysql_write_timeout,
+    }
+
+
+def _create_engine_with_config():
+    """
+    根据配置创建数据库引擎
+    
+    Returns:
+        Engine: SQLAlchemy引擎实例
+    """
+    db_type = db_config.db_type
+    logger.info(f"数据库类型: {db_type}, URL: {db_config.url}")
+    
+    if db_type == "sqlite":
+        return _create_sqlite_engine()
+    elif db_type == "postgresql":
+        return _create_postgresql_engine()
+    elif db_type == "mysql":
+        return _create_mysql_engine()
+    else:
+        raise ValueError(f"不支持的数据库类型: {db_type}")
+
+
+def _create_sqlite_engine():
+    """创建 SQLite 引擎"""
+    if db_config.is_stress_test:
+        logger.info("启用 SQLite 压力测试模式配置")
+        return create_engine(
+            db_config.url,
+            connect_args=_get_sqlite_connect_args(),
+            poolclass=QueuePool,
+            pool_size=db_config.stress_pool_size,
+            max_overflow=db_config.stress_max_overflow,
+            pool_timeout=db_config.stress_pool_timeout,
+            pool_recycle=db_config.stress_pool_recycle,
+            pool_pre_ping=True,
+            echo=db_config.stress_echo,
+        )
+    elif _config.app.debug:
+        logger.info("启用 SQLite 开发模式配置")
+        return create_engine(
+            db_config.url,
+            connect_args=_get_sqlite_connect_args(),
+            poolclass=QueuePool,
+            pool_size=db_config.pool_size,
+            max_overflow=db_config.max_overflow,
+            pool_timeout=db_config.pool_timeout,
+            pool_recycle=db_config.pool_recycle,
+            pool_pre_ping=True,
+            echo=db_config.echo,
+        )
+    else:
+        logger.info("启用 SQLite 生产模式配置")
+        return create_engine(
+            db_config.url,
+            connect_args=_get_sqlite_connect_args(),
+            poolclass=QueuePool,
+            pool_size=db_config.pool_size,
+            max_overflow=db_config.max_overflow,
+            pool_timeout=db_config.pool_timeout,
+            pool_recycle=db_config.pool_recycle,
+            pool_pre_ping=True,
+            echo=db_config.echo,
+        )
+
+
+def _create_postgresql_engine():
+    """创建 PostgreSQL 引擎"""
+    if db_config.is_stress_test:
+        logger.info("启用 PostgreSQL 压力测试模式配置")
+        return create_engine(
+            db_config.url,
+            connect_args=_get_postgresql_connect_args(),
+            poolclass=QueuePool,
+            pool_size=db_config.stress_pool_size,
+            max_overflow=db_config.stress_max_overflow,
+            pool_timeout=db_config.stress_pool_timeout,
+            pool_recycle=db_config.stress_pool_recycle,
+            pool_pre_ping=True,
+            echo=db_config.stress_echo,
+        )
+    elif _config.app.debug:
+        logger.info("启用 PostgreSQL 开发模式配置")
+        return create_engine(
+            db_config.url,
+            connect_args=_get_postgresql_connect_args(),
+            poolclass=QueuePool,
+            pool_size=db_config.pool_size,
+            max_overflow=db_config.max_overflow,
+            pool_timeout=db_config.pool_timeout,
+            pool_recycle=db_config.pool_recycle,
+            pool_pre_ping=True,
+            echo=db_config.echo,
+        )
+    else:
+        logger.info("启用 PostgreSQL 生产模式配置")
+        return create_engine(
+            db_config.url,
+            connect_args=_get_postgresql_connect_args(),
+            poolclass=QueuePool,
+            pool_size=db_config.pool_size,
+            max_overflow=db_config.max_overflow,
+            pool_timeout=db_config.pool_timeout,
+            pool_recycle=db_config.pool_recycle,
+            pool_pre_ping=True,
+            echo=db_config.echo,
+        )
+
+
+def _create_mysql_engine():
+    """创建 MySQL 引擎"""
+    if db_config.is_stress_test:
+        logger.info("启用 MySQL 压力测试模式配置")
+        return create_engine(
+            db_config.url,
+            connect_args=_get_mysql_connect_args(),
+            poolclass=QueuePool,
+            pool_size=db_config.stress_pool_size,
+            max_overflow=db_config.stress_max_overflow,
+            pool_timeout=db_config.stress_pool_timeout,
+            pool_recycle=db_config.stress_pool_recycle,
+            pool_pre_ping=True,
+            echo=db_config.stress_echo,
+        )
+    elif _config.app.debug:
+        logger.info("启用 MySQL 开发模式配置")
+        return create_engine(
+            db_config.url,
+            connect_args=_get_mysql_connect_args(),
+            poolclass=QueuePool,
+            pool_size=db_config.pool_size,
+            max_overflow=db_config.max_overflow,
+            pool_timeout=db_config.pool_timeout,
+            pool_recycle=db_config.pool_recycle,
+            pool_pre_ping=True,
+            echo=db_config.echo,
+        )
+    else:
+        logger.info("启用 MySQL 生产模式配置")
+        return create_engine(
+            db_config.url,
+            connect_args=_get_mysql_connect_args(),
+            poolclass=QueuePool,
+            pool_size=db_config.pool_size,
+            max_overflow=db_config.max_overflow,
+            pool_timeout=db_config.pool_timeout,
+            pool_recycle=db_config.pool_recycle,
+            pool_pre_ping=True,
+            echo=db_config.echo,
+        )
+
+
+# 创建引擎
+engine = _create_engine_with_config()
 
 
 # 添加连接池事件监听，用于调试和监控
 @event.listens_for(engine, "connect")
 def on_connect(dbapi_conn, connection_record):
     """新连接建立时的回调"""
-    # 设置 SQLite 优化参数
-    dbapi_conn.execute("PRAGMA journal_mode=WAL")  # 使用 WAL 模式提高并发性能
-    dbapi_conn.execute("PRAGMA synchronous=NORMAL")  # 平衡性能和安全性
-    dbapi_conn.execute("PRAGMA cache_size=10000")  # 增加缓存大小
-    dbapi_conn.execute("PRAGMA temp_store=MEMORY")  # 临时表存储在内存
+    # 仅对 SQLite 启用 WAL 模式
+    if db_config.is_sqlite and db_config.enable_wal:
+        # 设置 SQLite 优化参数
+        dbapi_conn.execute(f"PRAGMA journal_mode=WAL")  # 使用 WAL 模式提高并发性能
+        dbapi_conn.execute(f"PRAGMA synchronous={db_config.wal_synchronous}")  # 平衡性能和安全性
+        dbapi_conn.execute(f"PRAGMA cache_size={db_config.wal_cache_size}")  # 增加缓存大小
+        dbapi_conn.execute(f"PRAGMA temp_store={db_config.wal_temp_store}")  # 临时表存储在内存
 
 
 @event.listens_for(engine, "checkout")
@@ -87,6 +300,7 @@ def on_checkout(dbapi_conn, connection_record, connection_proxy):
 def on_checkin(dbapi_conn, connection_record):
     """连接归还到池时的回调"""
     pass
+
 
 # 创建会话工厂
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -104,5 +318,20 @@ from models.commit import Commit
 from models.pull_request import PullRequest, PRComment, PRReview
 from models.issue import Issue, Label, IssueComment
 
-__all__ = ["Base", "SessionLocal", "engine", "BaseModel", "User", "Repository", "RepositoryMember", "Branch", "Commit",
-           "PullRequest", "PRComment", "PRReview", "Issue", "Label", "IssueComment"]
+__all__ = [
+    "Base", "SessionLocal", "engine", "BaseModel",
+    "User", "Repository", "RepositoryMember", "Branch", "Commit",
+    "PullRequest", "PRComment", "PRReview", "Issue", "Label", "IssueComment",
+    # 导出配置相关
+    "get_db_config"
+]
+
+
+def get_db_config():
+    """
+    获取当前数据库配置
+    
+    Returns:
+        DatabaseSettings: 数据库配置对象
+    """
+    return db_config

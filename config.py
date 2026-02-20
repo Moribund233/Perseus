@@ -92,6 +92,130 @@ class RateLimitSettings(BaseSettings):
     download: list = Field(default=["20 per minute", "200 per hour"], description="下载限制")
 
 
+class DatabaseSettings(BaseSettings):
+    """
+    数据库配置类
+    
+    注意：DATABASE_URL 和 IS_STRESS_TEST 仅通过环境变量注入，不写入配置文件
+    - DATABASE_URL: 数据库连接URL，环境变量名称为 DATABASE_URL（必需）
+    - IS_STRESS_TEST: 是否启用压力测试模式，环境变量名称为 LANGIT_STRESS_TEST（必需）
+    """
+    # 环境变量注入的配置（不写入配置文件，无默认值，必须从环境变量读取）
+    url: str = Field(
+        description="数据库连接URL，必须通过环境变量 DATABASE_URL 注入"
+    )
+    is_stress_test: bool = Field(
+        description="是否启用压力测试模式，必须通过环境变量 LANGIT_STRESS_TEST 注入"
+    )
+    
+    # 可写入配置文件的配置项
+    pool_size: int = Field(default=10, ge=1, description="连接池大小")
+    max_overflow: int = Field(default=20, ge=0, description="最大溢出连接数")
+    pool_timeout: int = Field(default=30, ge=1, description="获取连接超时时间（秒）")
+    pool_recycle: int = Field(default=3600, ge=0, description="连接回收时间（秒）")
+    echo: bool = Field(default=False, description="是否打印SQL语句（调试用）")
+    
+    # SQLite 特定配置
+    sqlite_timeout: int = Field(default=10, ge=1, description="SQLite内部超时时间（秒）")
+    sqlite_check_same_thread: bool = Field(default=False, description="是否检查同线程")
+    sqlite_isolation_level: Optional[str] = Field(default=None, description="SQLite隔离级别，null表示自动提交模式")
+    
+    # WAL 模式配置
+    enable_wal: bool = Field(default=True, description="是否启用WAL模式")
+    wal_synchronous: str = Field(default="NORMAL", description="WAL同步模式")
+    wal_cache_size: int = Field(default=10000, description="WAL缓存大小")
+    wal_temp_store: str = Field(default="MEMORY", description="临时表存储位置")
+    
+    # 压力测试模式专用配置（仅在 is_stress_test=true 时生效）
+    stress_pool_size: int = Field(default=5, ge=1, description="压力测试模式：连接池大小")
+    stress_max_overflow: int = Field(default=10, ge=0, description="压力测试模式：最大溢出连接数")
+    stress_pool_timeout: int = Field(default=5, ge=1, description="压力测试模式：获取连接超时时间（秒）")
+    stress_pool_recycle: int = Field(default=300, ge=0, description="压力测试模式：连接回收时间（秒）")
+    stress_sqlite_timeout: int = Field(default=5, ge=1, description="压力测试模式：SQLite内部超时时间（秒）")
+    stress_echo: bool = Field(default=False, description="压力测试模式：是否打印SQL语句")
+    
+    # PostgreSQL 特定配置
+    pg_ssl_mode: str = Field(default="prefer", description="PostgreSQL SSL模式")
+    pg_connect_timeout: int = Field(default=10, ge=1, description="PostgreSQL连接超时时间（秒）")
+    pg_application_name: str = Field(default="langit", description="PostgreSQL应用名称")
+    
+    # MySQL 特定配置
+    mysql_charset: str = Field(default="utf8mb4", description="MySQL字符集")
+    mysql_pool_recycle: int = Field(default=3600, ge=0, description="MySQL连接回收时间（秒）")
+    mysql_connect_timeout: int = Field(default=10, ge=1, description="MySQL连接超时时间（秒）")
+    mysql_read_timeout: int = Field(default=30, ge=1, description="MySQL读取超时时间（秒）")
+    mysql_write_timeout: int = Field(default=30, ge=1, description="MySQL写入超时时间（秒）")
+    
+    model_config = SettingsConfigDict(
+        env_prefix="LANGIT_DATABASE_",
+        extra='ignore'  # 忽略额外的环境变量
+    )
+    
+    @property
+    def db_type(self) -> str:
+        """
+        根据 DATABASE_URL 自动检测数据库类型
+        
+        Returns:
+            str: 数据库类型 (sqlite, postgresql, mysql)
+        """
+        url_lower = self.url.lower()
+        if url_lower.startswith("sqlite"):
+            return "sqlite"
+        elif url_lower.startswith("postgresql") or url_lower.startswith("postgres"):
+            return "postgresql"
+        elif url_lower.startswith("mysql"):
+            return "mysql"
+        else:
+            return "unknown"
+    
+    @property
+    def is_sqlite(self) -> bool:
+        """是否为 SQLite 数据库"""
+        return self.db_type == "sqlite"
+    
+    @property
+    def is_postgresql(self) -> bool:
+        """是否为 PostgreSQL 数据库"""
+        return self.db_type == "postgresql"
+    
+    @property
+    def is_mysql(self) -> bool:
+        """是否为 MySQL 数据库"""
+        return self.db_type == "mysql"
+    
+    def __init__(self, **kwargs):
+        """
+        初始化时从环境变量读取必需配置
+        
+        Raises:
+            ValueError: 当必需的配置项未在环境变量中设置时抛出
+        """
+        # 从环境变量读取 DATABASE_URL（必需）
+        env_url = os.environ.get("DATABASE_URL")
+        if not env_url:
+            raise ValueError(
+                "缺少必需的环境变量: DATABASE_URL\n"
+                "请设置数据库连接URL，例如:\n"
+                "  export DATABASE_URL=\"sqlite:///./langit.db\"\n"
+                "  export DATABASE_URL=\"postgresql://user:pass@localhost/dbname\""
+            )
+        kwargs["url"] = env_url
+        
+        # 从环境变量读取 LANGIT_STRESS_TEST（必需）
+        stress_test = os.environ.get("LANGIT_STRESS_TEST")
+        if stress_test is None:
+            raise ValueError(
+                "缺少必需的环境变量: LANGIT_STRESS_TEST\n"
+                "请设置压力测试模式标志，例如:\n"
+                "  export LANGIT_STRESS_TEST=\"false\"  # 正常模式\n"
+                "  export LANGIT_STRESS_TEST=\"true\"   # 压力测试模式"
+            )
+        kwargs["is_stress_test"] = stress_test.lower() in ("true", "1", "yes")
+        
+        super().__init__(**kwargs)
+
+
 class Config(BaseSettings):
     """配置主类"""
     server: ServerSettings = Field(default_factory=ServerSettings)
@@ -102,6 +226,7 @@ class Config(BaseSettings):
     security: SecuritySettings = Field(default_factory=SecuritySettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
+    database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     system: Optional[SystemSettings] = Field(default=None, description="系统信息")
 
     model_config = SettingsConfigDict(extra='forbid')  # 严格验证配置，禁止额外的配置项

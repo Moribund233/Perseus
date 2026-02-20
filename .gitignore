@@ -139,7 +139,7 @@ config.toml
 Thumbs.db
 
 # Sqlite Database
-*.db
+*.db*
 
 # Custom
 *.log
