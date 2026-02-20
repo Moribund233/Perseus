@@ -6,6 +6,7 @@ import ServerSettings from '../components/settings/ServerSettings.vue'
 import ClientSettings from '../components/settings/ClientSettings.vue'
 import CORSSettings from '../components/settings/CORSSettings.vue'
 import AdvancedSettings from '../components/settings/AdvancedSettings.vue'
+import DeveloperOptions from '../components/settings/DeveloperOptions.vue'
 import {
   resetAppConfig,
   getClientConfig,
@@ -17,13 +18,16 @@ import { useServiceStore } from '../stores'
 /**
  * 配置标签页类型
  */
-type ConfigTab = 'theme' | 'server' | 'client' | 'cors' | 'advanced'
+type ConfigTab = 'theme' | 'server' | 'client' | 'cors' | 'advanced' | 'developer'
 
 // 图标路径
 const refreshIcon = new URL('../assets/icons/refresh.svg', import.meta.url).href
 
 // 当前标签页
 const activeTab = ref<ConfigTab>('theme')
+
+// 开发者选项激活状态（通过高级设置中的安全密码验证）
+const isDeveloperOptionsEnabled = ref(false)
 
 // 加载状态
 const isLoading = ref(false)
@@ -140,6 +144,26 @@ const handleSuccess = (message: string): void => {
 }
 
 /**
+ * 处理开发者选项启用事件
+ */
+const handleDeveloperOptionsEnabled = (): void => {
+  isDeveloperOptionsEnabled.value = true
+  // 自动切换到开发者选项标签页
+  activeTab.value = 'developer'
+}
+
+/**
+ * 处理开发者选项锁定事件
+ */
+const handleDeveloperOptionsLocked = (): void => {
+  isDeveloperOptionsEnabled.value = false
+  // 如果当前在开发者选项标签页，切换回高级设置
+  if (activeTab.value === 'developer') {
+    activeTab.value = 'advanced'
+  }
+}
+
+/**
  * 重置服务端配置
  */
 const handleResetServerConfig = async (): Promise<void> => {
@@ -245,6 +269,19 @@ onMounted(() => {
       >
         高级设置
       </button>
+      <button
+        class="tab-btn"
+        :class="{ 
+          active: activeTab === 'developer',
+          disabled: !isDeveloperOptionsEnabled 
+        }"
+        @click="isDeveloperOptionsEnabled && (activeTab = 'developer')"
+        :disabled="!isDeveloperOptionsEnabled"
+        :title="isDeveloperOptionsEnabled ? '开发者选项' : '请先在高级设置中验证安全密码'"
+      >
+        开发者选项
+        <span v-if="!isDeveloperOptionsEnabled" class="tab-lock-icon">🔒</span>
+      </button>
     </div>
 
     <!-- 主题配置 -->
@@ -275,6 +312,16 @@ onMounted(() => {
     <!-- 高级设置 -->
     <AdvancedSettings
       v-show="activeTab === 'advanced'"
+      :is-developer-enabled="isDeveloperOptionsEnabled"
+      @error="handleError"
+      @success="handleSuccess"
+      @developer-enabled="handleDeveloperOptionsEnabled"
+      @developer-locked="handleDeveloperOptionsLocked"
+    />
+
+    <!-- 开发者选项 -->
+    <DeveloperOptions
+      v-show="activeTab === 'developer'"
       @error="handleError"
       @success="handleSuccess"
     />
@@ -289,5 +336,11 @@ onMounted(() => {
 /* 帮助文本 - Setting 页面特定的缩进 */
 .help-text {
   margin-left: 26px;
+}
+
+/* 标签页锁定图标 */
+.tab-lock-icon {
+  margin-left: var(--spacing-xs);
+  font-size: var(--font-size-sm);
 }
 </style>

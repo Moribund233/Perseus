@@ -275,21 +275,24 @@ async function savePreferences() {
   error.value = ''
 
   try {
-    // 验证安全密码
-    if (securityPassword.value) {
-      if (securityPassword.value.length < 6) {
-        error.value = '安全密码长度至少为6位'
-        isLoading.value = false
-        return
-      }
-      if (securityPassword.value !== confirmPassword.value) {
-        error.value = '两次输入的密码不一致'
-        isLoading.value = false
-        return
-      }
-      // 保存安全密码
-      await setSecurityPassword(securityPassword.value)
+    // 验证安全密码 - 必填项
+    if (!securityPassword.value) {
+      error.value = '请设置安全密码'
+      isLoading.value = false
+      return
     }
+    if (securityPassword.value.length < 6) {
+      error.value = '安全密码长度至少为6位'
+      isLoading.value = false
+      return
+    }
+    if (securityPassword.value !== confirmPassword.value) {
+      error.value = '两次输入的密码不一致'
+      isLoading.value = false
+      return
+    }
+    // 保存安全密码
+    await setSecurityPassword(securityPassword.value)
 
     // 构建最终配置对象
     const finalConfig: ClientConfig = {

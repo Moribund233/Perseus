@@ -630,6 +630,16 @@ body {
   border-bottom-color: var(--primary-color);
 }
 
+.tab-btn.disabled {
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.tab-btn.disabled:hover {
+  color: var(--text-tertiary);
+}
+
 /* ============================================
    工具栏样式
    ============================================ */
