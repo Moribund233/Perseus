@@ -424,7 +424,7 @@ class AppService:
         关闭应用
 
         实现方式：
-        1. 首先尝试优雅关闭（通过全局标志通知服务器停止接收新请求）
+        1. 触发 lifespan 优雅关闭流程（关闭 WebSocket 连接、释放数据库连接池）
         2. 如果 force=True 或优雅关闭超时，则强制终止进程
 
         Args:
@@ -443,13 +443,34 @@ class AppService:
         def _shutdown():
             """执行关闭流程"""
             import time
+            import asyncio
+
             time.sleep(0.5)  # 让响应先返回
 
             if not force:
-                # 尝试优雅关闭：设置全局标志通知服务器
-                _set_shutdown_flag()
-                # 等待现有请求处理完成（最多5秒）
-                time.sleep(2)
+                # 尝试优雅关闭：触发 lifespan 关闭流程
+                try:
+                    from lifespan import get_lifecycle_manager
+                    
+                    manager = get_lifecycle_manager()
+                    
+                    # 创建新的事件循环来运行异步关闭
+                    try:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        loop.run_until_complete(manager.shutdown())
+                        loop.close()
+                        logger.info("优雅关闭完成")
+                        
+                        # 关闭完成后终止进程
+                        _terminate_process()
+                        return
+                    except Exception as loop_error:
+                        logger.error(f"事件循环执行失败: {loop_error}")
+                        raise
+                        
+                except Exception as e:
+                    logger.error(f"优雅关闭失败，将强制终止: {e}")
 
             # 强制终止进程
             _terminate_process()

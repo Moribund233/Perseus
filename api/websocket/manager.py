@@ -393,6 +393,33 @@ class ConnectionManager:
         if self._cleanup_task:
             self._cleanup_task.cancel()
         logger.info("后台清理任务已停止")
+
+    async def heartbeat_checker(self) -> None:
+        """
+        心跳检测任务
+        
+        由 lifespan 管理器启动，用于监控连接健康状态
+        """
+        logger.info("WebSocket心跳检测任务已启动")
+        while self._running:
+            try:
+                await asyncio.sleep(30)  # 每30秒检查一次
+                await self._cleanup_timeout_connections()
+            except asyncio.CancelledError:
+                logger.info("WebSocket心跳检测任务已取消")
+                break
+            except Exception as e:
+                logger.error(f"心跳检测任务异常: {e}")
+
+    @property
+    def active_connections(self) -> Dict[str, 'Connection']:
+        """获取所有活跃连接"""
+        return self._connections
+
+    @property
+    def user_connections(self) -> Dict[int, Set[str]]:
+        """获取用户连接索引"""
+        return self._user_index
     
     async def _cleanup_loop(self) -> None:
         """清理循环，定期移除超时连接"""

@@ -106,7 +106,7 @@ class ActionResponse(BaseModel):
 
 
 def check_app_permission(
-    current_user: Optional[Dict[str, Any]] = Depends(get_current_user),
+    current_user: Optional[Any] = Depends(get_current_user),
     local_user: Optional[LocalUser] = Depends(get_local_auth_user)
 ) -> tuple[bool, bool]:
     """
@@ -114,7 +114,7 @@ def check_app_permission(
     支持本地认证（Tauri Client）或 JWT 认证（管理员）
 
     Args:
-        current_user: 当前用户信息（JWT 认证）
+        current_user: 当前用户信息（JWT 认证）- User对象或字典
         local_user: 本地用户对象（本地认证）
 
     Returns:
@@ -123,6 +123,8 @@ def check_app_permission(
     Raises:
         AuthorizationException: 权限不足
     """
+    from models.user import User
+    
     config = get_config()
     is_debug = config.app.debug
 
@@ -133,9 +135,14 @@ def check_app_permission(
     # 检查是否是管理员（JWT 认证）
     is_admin = False
     if current_user:
-        # 从用户信息中检查管理员权限
-        user_role = current_user.get("role", "")
-        is_admin = user_role == "admin"
+        # 处理 User 对象或字典类型
+        if isinstance(current_user, User):
+            is_admin = current_user.is_admin
+        elif isinstance(current_user, dict):
+            is_admin = current_user.get("is_admin", False)
+        else:
+            # 尝试从对象属性获取
+            is_admin = getattr(current_user, "is_admin", False)
 
     # 调试模式或管理员可以访问
     if not is_debug and not is_admin:

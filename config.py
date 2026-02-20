@@ -109,10 +109,10 @@ class DatabaseSettings(BaseSettings):
     )
     
     # 可写入配置文件的配置项
-    pool_size: int = Field(default=10, ge=1, description="连接池大小")
-    max_overflow: int = Field(default=20, ge=0, description="最大溢出连接数")
-    pool_timeout: int = Field(default=30, ge=1, description="获取连接超时时间（秒）")
-    pool_recycle: int = Field(default=3600, ge=0, description="连接回收时间（秒）")
+    pool_size: int = Field(default=20, ge=1, description="连接池大小（增加以支持高并发）")
+    max_overflow: int = Field(default=40, ge=0, description="最大溢出连接数（增加以支持高并发）")
+    pool_timeout: int = Field(default=10, ge=1, description="获取连接超时时间（秒），减少以避免长时间等待")
+    pool_recycle: int = Field(default=1800, ge=0, description="连接回收时间（秒），减少以更快释放空闲连接")
     echo: bool = Field(default=False, description="是否打印SQL语句（调试用）")
     
     # SQLite 特定配置

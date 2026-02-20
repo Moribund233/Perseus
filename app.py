@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from init import init_app
 from config import get_config
 from utils.logging import get_logger
+from lifespan import app_lifespan
 
 logger = get_logger("app")
 
@@ -20,15 +22,42 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     # 获取配置
     config = get_config(config_path)
 
-    # 创建FastAPI应用实例
+    # 创建FastAPI应用实例，使用lifespan管理生命周期
     app = FastAPI(
         title=config.app.title,
         description=config.app.description,
         version=config.app.version,
-        debug=config.app.debug
+        debug=config.app.debug,
+        lifespan=app_lifespan
     )
 
-    # 添加安全响应头中间件（最先添加，确保所有响应都包含安全头）
+    # 添加并发限制中间件（最先添加，保护服务免受过多并发请求影响）
+    from middleware.concurrency import ConcurrencyMiddleware
+    # 根据是否压力测试调整并发限制
+    if config.database.is_stress_test:
+        max_concurrent = 200  # 压力测试模式允许更多并发
+        max_wait_time = 10.0
+    else:
+        max_concurrent = 100  # 正常模式限制并发
+        max_wait_time = 5.0
+    app.add_middleware(
+        ConcurrencyMiddleware,
+        max_concurrent=max_concurrent,
+        max_wait_time=max_wait_time
+    )
+    logger.info(f"并发限制: max_concurrent={max_concurrent}, max_wait_time={max_wait_time}s")
+
+    # 添加请求超时中间件（防止请求无限期挂起）
+    from middleware.timeout import TimeoutMiddleware
+    # 根据数据库类型调整超时时间
+    if config.database.is_sqlite:
+        timeout_seconds = 30.0  # SQLite 可能需要更长时间
+    else:
+        timeout_seconds = 30.0  # PostgreSQL/MySQL 正常超时
+    app.add_middleware(TimeoutMiddleware, timeout_seconds=timeout_seconds)
+    logger.info(f"请求超时: {timeout_seconds}s")
+
+    # 添加安全响应头中间件（确保所有响应都包含安全头）
     from middleware.security_headers import SecurityHeadersMiddleware
     # 根据debug配置自动启用HSTS：非debug模式（生产环境）启用HSTS
     enable_hsts = not config.app.debug

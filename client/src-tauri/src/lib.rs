@@ -102,24 +102,32 @@ pub fn run() {
 
     // 运行应用并处理退出事件
     app.run(|_app_handle, event| {
-        match event {
-            RunEvent::ExitRequested { .. } => {
-                log::info!("应用退出请求，执行清理...");
+        if let RunEvent::ExitRequested { .. } = event {
+            log::info!("应用退出请求，执行清理...");
 
-                // 停止 Nginx 服务
+            // 检查 Nginx 是否在运行，只有在运行中才尝试停止
+            let nginx_status = nginx_manager::get_nginx_status();
+            if nginx_status.status == "running" {
+                log::info!(
+                    "Nginx 正在运行中 (PID: {:?})，执行停止操作...",
+                    nginx_status.pid
+                );
                 let nginx_result = nginx_manager::stop_nginx();
                 if !nginx_result.success {
                     log::warn!("停止 Nginx 失败: {}", nginx_result.message);
+                } else {
+                    log::info!("Nginx 已停止");
                 }
-
-                // 停止服务端进程
-                if let Err(e) = process_manager::stop_server() {
-                    log::warn!("停止服务端失败: {}", e);
-                }
-
-                log::info!("清理完成");
+            } else {
+                log::info!("Nginx 未在运行，跳过停止操作");
             }
-            _ => {}
+
+            // 停止服务端进程
+            if let Err(e) = process_manager::stop_server() {
+                log::warn!("停止服务端失败: {}", e);
+            }
+
+            log::info!("清理完成");
         }
     });
 }
