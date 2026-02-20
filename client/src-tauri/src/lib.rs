@@ -96,6 +96,9 @@ pub fn run() {
             commands::reset_all_tokens,
             commands::is_elevated,
             commands::get_jwt_secret_key,
+            // 数据库迁移
+            commands::migrate_database,
+            commands::test_database_connection,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

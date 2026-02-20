@@ -48,10 +48,10 @@ const config = computed(() => dbStore.editingConfig)
  * 切换数据库类型
  */
 const handleDbTypeChange = (newType: DatabaseType): void => {
-  if (!config.value || newType === config.value.db_type) return
+  if (!config.value?.db_type || newType === config.value.db_type) return
 
   // 如果类型变更，显示迁移确认
-  if (dbStore.serverConfig && dbStore.serverConfig.db_type !== newType) {
+  if (dbStore.serverConfig?.db_type && dbStore.serverConfig.db_type !== newType) {
     pendingDbType.value = newType
     showMigrationConfirm.value = true
   } else {
@@ -79,7 +79,7 @@ const onMigrationComplete = async (success: boolean): Promise<void> => {
     await dbStore.loadConfig(true)
   } else {
     // 恢复原类型
-    if (dbStore.serverConfig) {
+    if (dbStore.serverConfig?.db_type) {
       dbStore.switchDbType(dbStore.serverConfig.db_type)
     }
   }

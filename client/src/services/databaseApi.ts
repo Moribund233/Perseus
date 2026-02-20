@@ -17,8 +17,8 @@ export type DatabaseType = 'sqlite' | 'postgresql' | 'mysql'
  * 数据库配置
  */
 export interface DatabaseConfig {
-  /** 数据库类型 */
-  db_type: DatabaseType
+  /** 数据库类型（从环境变量派生，可能不存在于配置文件中） */
+  db_type?: DatabaseType
   /** 连接池大小 */
   pool_size: number
   /** 最大溢出连接数 */
@@ -153,23 +153,45 @@ export interface DatabaseStatus {
 
 /**
  * 获取数据库配置
+ * 使用通用的应用配置接口，指定 section 为 database
  */
 export async function getDatabaseConfig(): Promise<DatabaseConfig> {
-  return invoke('get_database_config')
+  const response = await invoke<{ success: boolean; data: DatabaseConfig }>('get_app_config', { section: 'database' })
+  if (!response.success || !response.data) {
+    throw new Error('获取数据库配置失败')
+  }
+  // 如果后端没有返回 db_type，默认为 sqlite
+  if (!response.data.db_type) {
+    response.data.db_type = 'sqlite'
+  }
+  return response.data
 }
 
 /**
  * 更新数据库配置
+ * 使用通用的应用配置更新接口
  */
 export async function updateDatabaseConfig(config: DatabaseConfig): Promise<void> {
-  return invoke('update_database_config', { config })
+  const response = await invoke<{ success: boolean; errors: string[] }>('update_app_config', {
+    config: { database: config }
+  })
+  if (!response.success) {
+    throw new Error(response.errors.join('; ') || '更新数据库配置失败')
+  }
 }
 
 /**
  * 测试数据库连接
+ * 使用通用的配置验证接口
  */
 export async function testDatabaseConnection(config: DatabaseConfig): Promise<ConnectionTestResult> {
-  return invoke('test_database_connection', { config })
+  const response = await invoke<{ success: boolean; errors: string[] }>('validate_app_config', {
+    config: { database: config }
+  })
+  return {
+    success: response.success,
+    message: response.success ? '连接配置验证通过' : (response.errors.join('; ') || '连接配置验证失败')
+  }
 }
 
 /**

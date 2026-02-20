@@ -219,7 +219,7 @@ export const useDatabaseStore = defineStore('database', () => {
   function switchDbType(newType: DatabaseType): boolean {
     if (!editingConfig.value) return false
 
-    const oldType = editingConfig.value.db_type
+    const oldType = editingConfig.value.db_type || 'sqlite'
     if (oldType === newType) return false
 
     editingConfig.value.db_type = newType

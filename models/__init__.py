@@ -3,14 +3,15 @@
 
 提供数据库引擎、会话工厂和基础模型类的配置驱动初始化
 
-环境变量要求:
+注意：本模块假设环境变量已由 init 模块预先验证
+必需的环境变量:
     - DATABASE_URL: 数据库连接URL（必需）
       例如: sqlite:///./langit.db 或 postgresql://user:pass@localhost/dbname
     - LANGIT_STRESS_TEST: 压力测试模式标志（必需）
       例如: "true" 或 "false"
 
 使用示例:
-    # 设置环境变量后导入
+    # 确保已通过 init 模块完成初始化后再导入
     from models import engine, SessionLocal, Base
     
     # 或使用配置获取函数
@@ -21,72 +22,26 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import QueuePool
 import logging
-import sys
 
 logger = logging.getLogger(__name__)
 
-# 尝试获取配置，如果缺少必需的环境变量则给出明确错误提示
-try:
-    from config import get_config
-    from utils.db_validation import (
-        validate_database_config,
-        check_sqlite_stress_test_warning,
-        DatabaseValidationError,
-    )
-    _config = get_config()
-    db_config = _config.database
-    
-    # 验证数据库配置
-    validate_database_config(db_config.url, db_config.db_type)
-    
-    # 检查 SQLite + 压力测试警告
-    warning = check_sqlite_stress_test_warning(db_config.is_sqlite, db_config.is_stress_test)
-    if warning:
-        logger.warning(warning)
-        
-except ValueError as e:
-    error_msg = f"""
-{'='*70}
-数据库配置错误
-{'='*70}
-{str(e)}
-{'='*70}
+# 导入配置 - 环境变量检测由 init 模块统一负责
+from config import get_config
+from utils.db_validation import (
+    validate_database_config,
+    check_sqlite_stress_test_warning,
+)
 
-请确保在启动应用前设置了所有必需的环境变量。
+_config = get_config()
+db_config = _config.database
 
-PowerShell 示例:
-    $env:DATABASE_URL = "sqlite:///./langit.db"
-    $env:LANGIT_STRESS_TEST = "false"
-    python main.py
+# 验证数据库配置
+validate_database_config(db_config.url, db_config.db_type)
 
-Linux/macOS 示例:
-    export DATABASE_URL="sqlite:///./langit.db"
-    export LANGIT_STRESS_TEST="false"
-    python main.py
-
-{'='*70}
-"""
-    logger.error(error_msg)
-    # 在导入时直接退出，避免循环验证和后续错误
-    sys.exit(1)
-except DatabaseValidationError as e:
-    error_msg = f"""
-{'='*70}
-数据库验证失败
-{'='*70}
-{str(e)}
-{'='*70}
-
-请检查:
-1. DATABASE_URL 格式是否正确
-2. 数据库驱动是否已安装 (pip install psycopg2-binary / pymysql)
-3. 数据库服务器是否可访问
-4. 数据库用户名和密码是否正确
-
-{'='*70}
-"""
-    logger.error(error_msg)
-    sys.exit(1)
+# 检查 SQLite + 压力测试警告
+warning = check_sqlite_stress_test_warning(db_config.is_sqlite, db_config.is_stress_test)
+if warning:
+    logger.warning(warning)
 
 
 def _get_sqlite_connect_args():

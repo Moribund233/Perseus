@@ -422,3 +422,94 @@ async def cleanup_logs_endpoint(
     )
 
     return LogCleanupResponse(**result)
+
+
+# ============== 数据库迁移接口 ==============
+
+
+class DatabaseMigrateRequest(BaseModel):
+    """数据库迁移请求模型"""
+    source_type: str = Field(..., description="源数据库类型 (sqlite/postgresql/mysql)")
+    target_type: str = Field(..., description="目标数据库类型 (sqlite/postgresql/mysql)")
+    target_url: str = Field(..., description="目标数据库连接URL")
+
+
+class DatabaseMigrateResponse(BaseModel):
+    """数据库迁移响应模型"""
+    success: bool
+    message: str
+    tables: Optional[Dict[str, int]] = Field(None, description="各表迁移记录数")
+    export_file: Optional[str] = Field(None, description="导出文件路径（保留时）")
+
+
+@router.post("/api/app/database/migrate", response_model=DatabaseMigrateResponse)
+async def migrate_database_endpoint(
+    request: DatabaseMigrateRequest,
+    permission: tuple = Depends(check_app_permission)
+):
+    """
+    执行数据库迁移
+
+    将数据从当前数据库迁移到目标数据库。
+    迁移过程中会：
+    1. 从源数据库导出所有数据到临时文件
+    2. 在目标数据库创建表结构
+    3. 将数据导入到目标数据库
+    4. 清理临时文件
+
+    Args:
+        request: 迁移请求，包含源类型、目标类型和目标URL
+
+    Returns:
+        DatabaseMigrateResponse: 迁移结果
+    """
+    is_debug, is_admin = permission
+    app_service = get_app_service()
+
+    try:
+        result = app_service.migrate_database(
+            source_type=request.source_type,
+            target_type=request.target_type,
+            target_url=request.target_url,
+            is_debug=is_debug,
+            is_admin=is_admin
+        )
+
+        return DatabaseMigrateResponse(
+            success=result.get("success", False),
+            message=result.get("message", ""),
+            tables=result.get("tables"),
+            export_file=result.get("export_file")
+        )
+    except Exception as e:
+        return DatabaseMigrateResponse(
+            success=False,
+            message=f"迁移失败: {str(e)}"
+        )
+
+
+@router.post("/api/app/database/test-connection", response_model=ConfigResponse)
+async def test_database_connection_endpoint(
+    db_url: str = Body(..., embed=True, description="要测试的数据库URL"),
+    permission: tuple = Depends(check_app_permission)
+):
+    """
+    测试数据库连接
+
+    验证数据库URL是否可以正常连接。
+
+    Args:
+        db_url: 数据库连接URL
+
+    Returns:
+        ConfigResponse: 测试结果
+    """
+    app_service = get_app_service()
+
+    is_valid, errors = app_service.test_database_connection(db_url)
+
+    return ConfigResponse(
+        success=is_valid,
+        errors=errors,
+        hints=["连接测试成功"] if is_valid else []
+    )

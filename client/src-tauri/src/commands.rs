@@ -684,3 +684,26 @@ pub fn is_elevated() -> Result<bool, String> {
 pub fn get_jwt_secret_key() -> Result<String, String> {
     crate::secure_config::get_jwt_secret_key()
 }
+
+// ==================== 数据库迁移命令 ====================
+
+/// 执行数据库迁移
+#[tauri::command]
+pub async fn migrate_database(
+    source_type: String,
+    target_type: String,
+    target_url: String,
+) -> Result<crate::api_client::DatabaseMigrateResponse, String> {
+    let request = crate::api_client::DatabaseMigrateRequest {
+        source_type,
+        target_type,
+        target_url,
+    };
+    crate::api_client::migrate_database(request).await
+}
+
+/// 测试数据库连接
+#[tauri::command]
+pub async fn test_database_connection(db_url: String) -> Result<crate::models::ConfigResponse, String> {
+    crate::api_client::test_database_connection(db_url).await
+}

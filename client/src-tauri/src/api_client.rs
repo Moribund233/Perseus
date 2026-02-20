@@ -177,20 +177,22 @@ pub async fn start_service() -> Result<ActionResponse, String> {
 /// 停止服务（带超时）
 pub async fn stop_service_with_timeout(timeout_secs: u64) -> Result<ActionResponse, String> {
     let base_url = get_server_url()?;
-    
+
     // 创建短超时客户端
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(timeout_secs))
         .build()
         .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
-    
+
     let url = format!("{}/api/app/shutdown", base_url);
-    
+
     match client.post(&url).send().await {
         Ok(response) => {
             let status = response.status();
             if status.is_success() {
-                response.json::<ActionResponse>().await
+                response
+                    .json::<ActionResponse>()
+                    .await
                     .map_err(|e| format!("解析响应失败: {}", e))
             } else {
                 Err(format!("请求失败: HTTP {}", status))
@@ -289,4 +291,40 @@ pub async fn validate_app_config(
 ) -> Result<ConfigResponse, String> {
     let client = ApiClient::new()?;
     client.post("/api/app/config/validate", &config).await
+}
+
+// ==================== 数据库迁移 API ====================
+
+/// 数据库迁移请求
+#[derive(Debug, serde::Serialize)]
+pub struct DatabaseMigrateRequest {
+    pub source_type: String,
+    pub target_type: String,
+    pub target_url: String,
+}
+
+/// 数据库迁移响应
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct DatabaseMigrateResponse {
+    pub success: bool,
+    pub message: String,
+    pub tables: Option<serde_json::Value>,
+    pub export_file: Option<String>,
+}
+
+/// 执行数据库迁移
+pub async fn migrate_database(
+    request: DatabaseMigrateRequest,
+) -> Result<DatabaseMigrateResponse, String> {
+    let client = ApiClient::new()?;
+    client.post("/api/app/database/migrate", &request).await
+}
+
+/// 测试数据库连接
+pub async fn test_database_connection(db_url: String) -> Result<ConfigResponse, String> {
+    let client = ApiClient::new()?;
+    let body = serde_json::json!({ "db_url": db_url });
+    client
+        .post("/api/app/database/test-connection", &body)
+        .await
 }

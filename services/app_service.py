@@ -935,6 +935,116 @@ class AppService:
             "keep_days": keep_days,
         }
 
+    def migrate_database(
+        self,
+        source_type: str,
+        target_type: str,
+        target_url: str,
+        is_debug: bool = False,
+        is_admin: bool = False
+    ) -> Dict[str, Any]:
+        """
+        执行数据库迁移
+
+        将数据从当前数据库迁移到目标数据库。
+
+        Args:
+            source_type: 源数据库类型
+            target_type: 目标数据库类型
+            target_url: 目标数据库URL
+            is_debug: 是否调试模式
+            is_admin: 是否管理员
+
+        Returns:
+            Dict[str, Any]: 迁移结果
+        """
+        self._check_permission(is_debug, is_admin)
+
+        try:
+            from utils.migration import DatabaseMigration, MigrationError
+            from config import get_config
+
+            config = get_config()
+            source_url = config.database.url
+
+            logger.info(f"开始数据库迁移: {source_type} -> {target_type}")
+            logger.info(f"源数据库: {source_url}")
+            logger.info(f"目标数据库: {target_url}")
+
+            # 创建迁移器
+            migrator = DatabaseMigration()
+
+            # 执行迁移
+            result = migrator.migrate(source_url, target_url)
+
+            logger.info(f"数据库迁移完成: {result}")
+
+            return {
+                "success": True,
+                "message": f"成功从 {source_type} 迁移到 {target_type}",
+                "tables": result,
+                "export_file": None  # 临时文件已清理
+            }
+
+        except MigrationError as e:
+            logger.error(f"数据库迁移失败: {e}")
+            return {
+                "success": False,
+                "message": f"迁移失败: {str(e)}",
+                "tables": {},
+                "export_file": None
+            }
+        except Exception as e:
+            logger.error(f"数据库迁移时发生错误: {e}")
+            return {
+                "success": False,
+                "message": f"迁移时发生错误: {str(e)}",
+                "tables": {},
+                "export_file": None
+            }
+
+    def test_database_connection(self, db_url: str) -> Tuple[bool, List[str]]:
+        """
+        测试数据库连接
+
+        Args:
+            db_url: 数据库连接URL
+
+        Returns:
+            Tuple[bool, List[str]]: (是否成功, 错误信息列表)
+        """
+        errors = []
+
+        try:
+            from utils.db_validation import validate_database_config
+            from sqlalchemy import create_engine, text
+
+            # 检测数据库类型
+            url_lower = db_url.lower()
+            if url_lower.startswith("sqlite"):
+                db_type = "sqlite"
+            elif url_lower.startswith("postgresql") or url_lower.startswith("postgres"):
+                db_type = "postgresql"
+            elif url_lower.startswith("mysql"):
+                db_type = "mysql"
+            else:
+                return False, ["无法识别的数据库类型"]
+
+            # 验证配置
+            validate_database_config(db_url, db_type)
+
+            # 测试连接
+            engine = create_engine(db_url)
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            engine.dispose()
+
+            return True, []
+
+        except Exception as e:
+            errors.append(f"连接测试失败: {str(e)}")
+            return False, errors
+
     def _format_file_size(self, size_bytes: int) -> str:
         """
         格式化文件大小
