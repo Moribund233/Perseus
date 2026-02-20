@@ -49,16 +49,17 @@ pub async fn start_service() -> Result<ActionResponse, String> {
 /// 停止服务
 #[tauri::command]
 pub async fn stop_service() -> Result<ActionResponse, String> {
-    // 先尝试通过 API 优雅关闭
-    match api_client::stop_service().await {
+    // 先尝试通过 API 优雅关闭（使用3秒短超时，避免服务端挂起时长时间等待）
+    match api_client::stop_service_with_timeout(3).await {
         Ok(response) => {
             if response.success {
                 // 等待一段时间后检查进程是否已停止
                 tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
             }
         }
-        Err(_) => {
-            // API 调用失败，直接强制停止
+        Err(e) => {
+            // API 调用失败，记录日志后直接强制停止
+            log::warn!("优雅关闭失败（{}），将强制停止进程", e);
         }
     }
 

@@ -174,12 +174,35 @@ pub async fn start_service() -> Result<ActionResponse, String> {
     })
 }
 
-/// 停止服务
+/// 停止服务（带超时）
+pub async fn stop_service_with_timeout(timeout_secs: u64) -> Result<ActionResponse, String> {
+    let base_url = get_server_url()?;
+    
+    // 创建短超时客户端
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(timeout_secs))
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
+    
+    let url = format!("{}/api/app/shutdown", base_url);
+    
+    match client.post(&url).send().await {
+        Ok(response) => {
+            let status = response.status();
+            if status.is_success() {
+                response.json::<ActionResponse>().await
+                    .map_err(|e| format!("解析响应失败: {}", e))
+            } else {
+                Err(format!("请求失败: HTTP {}", status))
+            }
+        }
+        Err(e) => Err(format!("请求失败: {}", e)),
+    }
+}
+
+/// 停止服务（默认30秒超时）
 pub async fn stop_service() -> Result<ActionResponse, String> {
-    let client = ApiClient::new()?;
-    client
-        .post("/api/app/shutdown", &serde_json::json!({}))
-        .await
+    stop_service_with_timeout(30).await
 }
 
 /// 重启服务
