@@ -39,6 +39,7 @@ const iconMap: Record<string, string> = {
   log: new URL('../assets/icons/log.svg', import.meta.url).href,
   proxy: new URL('../assets/icons/proxy.svg', import.meta.url).href,
   setting: new URL('../assets/icons/setting.svg', import.meta.url).href,
+  database: new URL('../assets/icons/database.svg', import.meta.url).href,
   menu: new URL('../assets/icons/menu.svg', import.meta.url).href,
   sun: new URL('../assets/icons/sun.svg', import.meta.url).href,
   moon: new URL('../assets/icons/moon.svg', import.meta.url).href
@@ -67,6 +68,7 @@ const navItems: NavItem[] = [
   { path: '/home', name: '控制台', icon: 'home' },
   { path: '/log', name: '日志', icon: 'log' },
   { path: '/nginx', name: '代理', icon: 'proxy' },
+  { path: '/database', name: '数据库', icon: 'database' },
   { path: '/setting', name: '设置', icon: 'setting' }
 ]
 

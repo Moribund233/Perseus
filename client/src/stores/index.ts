@@ -11,3 +11,8 @@ export {
   type ColorThemeConfig,
   type LayoutDensityConfig
 } from './theme'
+export {
+  useDatabaseStore,
+  type DatabaseTypeOption,
+  type DatabaseConfigState
+} from './database'

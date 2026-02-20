@@ -244,14 +244,41 @@ class AppService:
         return self._validate_config_data(config_data)
 
     # 允许修改的配置节
-    ALLOWED_CONFIG_SECTIONS = {"server", "proxy", "rate_limit", "cors"}
+    ALLOWED_CONFIG_SECTIONS = {"server", "proxy", "rate_limit", "cors", "database"}
     # 禁止修改的配置节（可能导致系统不稳定或安全问题）
     PROTECTED_CONFIG_SECTIONS = {"storage", "security", "app", "logging", "system"}
     # 需要重启才能生效的配置项
+    # 注意：几乎所有配置修改都需要重启，因为：
+    # 1. 服务器核心参数（host, port, workers）在启动时绑定
+    # 2. 中间件（CORS、Proxy）在启动时加载
+    # 3. 数据库连接池在启动时创建
+    # 4. 速率限制器在启动时初始化
     RESTART_REQUIRED_CONFIGS = {
-        "server": {"host", "port", "workers"},  # 服务器核心参数需要重启
-        "proxy": {"proxy"},  # 代理设置影响中间件加载
-        "cors": {"allow_origins", "allow_credentials", "allow_methods", "allow_headers", "max_age"},  # CORS 配置需要重启才能生效
+        # 服务器核心参数 - 启动时绑定到网络接口
+        "server": {"host", "port", "workers", "log_level"},
+        # 代理设置 - 影响中间件加载和请求处理链
+        "proxy": {"proxy"},
+        # CORS 配置 - 中间件在启动时加载
+        "cors": {"allow_origins", "allow_credentials", "allow_methods", "allow_headers", "max_age"},
+        # 速率限制 - 限制器在启动时初始化
+        "rate_limit": {"default_limits", "strict", "standard", "generous", "git_operations", "download"},
+        # 数据库配置 - 连接池在启动时创建
+        "database": {
+            # 连接池配置
+            "pool_size", "max_overflow", "pool_timeout", "pool_recycle", "echo",
+            # SQLite 配置
+            "sqlite_timeout", "sqlite_check_same_thread", "sqlite_isolation_level",
+            # WAL 模式配置
+            "enable_wal", "wal_synchronous", "wal_cache_size", "wal_temp_store",
+            # 压力测试配置
+            "stress_pool_size", "stress_max_overflow", "stress_pool_timeout", "stress_pool_recycle",
+            "stress_sqlite_timeout", "stress_echo",
+            # PostgreSQL 配置
+            "pg_ssl_mode", "pg_connect_timeout", "pg_application_name",
+            # MySQL 配置
+            "mysql_charset", "mysql_pool_recycle", "mysql_connect_timeout",
+            "mysql_read_timeout", "mysql_write_timeout",
+        },
     }
 
     def _validate_config_data(self, config_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
@@ -396,6 +423,105 @@ class AppService:
                     except (ValueError, TypeError):
                         errors.append("cors.max_age 必须是整数（秒）")
 
+        # 验证数据库配置
+        if "database" in config_data:
+            database = config_data["database"]
+            if not isinstance(database, dict):
+                errors.append("database 配置必须是对象")
+            else:
+                # 验证连接池配置
+                pool_int_fields = ["pool_size", "max_overflow", "pool_timeout", "pool_recycle"]
+                for field in pool_int_fields:
+                    if field in database:
+                        try:
+                            value = int(database[field])
+                            if value < 1:
+                                errors.append(f"database.{field} 必须是正整数")
+                        except (ValueError, TypeError):
+                            errors.append(f"database.{field} 必须是正整数")
+
+                # 验证布尔字段
+                bool_fields = ["echo", "sqlite_check_same_thread", "enable_wal", "stress_echo"]
+                for field in bool_fields:
+                    if field in database:
+                        if not isinstance(database[field], bool):
+                            errors.append(f"database.{field} 必须是布尔值")
+
+                # 验证 SQLite 超时时间
+                if "sqlite_timeout" in database:
+                    try:
+                        value = int(database["sqlite_timeout"])
+                        if value < 1:
+                            errors.append("database.sqlite_timeout 必须是正整数")
+                    except (ValueError, TypeError):
+                        errors.append("database.sqlite_timeout 必须是正整数")
+
+                # 验证 WAL 同步模式
+                if "wal_synchronous" in database:
+                    valid_modes = ["OFF", "NORMAL", "FULL", "EXTRA"]
+                    if database["wal_synchronous"] not in valid_modes:
+                        errors.append(f"database.wal_synchronous 必须是以下之一: {', '.join(valid_modes)}")
+
+                # 验证 WAL 缓存大小
+                if "wal_cache_size" in database:
+                    try:
+                        value = int(database["wal_cache_size"])
+                        if value < 0:
+                            errors.append("database.wal_cache_size 必须是非负整数")
+                    except (ValueError, TypeError):
+                        errors.append("database.wal_cache_size 必须是非负整数")
+
+                # 验证 WAL 临时存储
+                if "wal_temp_store" in database:
+                    valid_stores = ["DEFAULT", "FILE", "MEMORY"]
+                    if database["wal_temp_store"] not in valid_stores:
+                        errors.append(f"database.wal_temp_store 必须是以下之一: {', '.join(valid_stores)}")
+
+                # 验证压力测试配置
+                stress_int_fields = [
+                    "stress_pool_size", "stress_max_overflow", "stress_pool_timeout",
+                    "stress_pool_recycle", "stress_sqlite_timeout"
+                ]
+                for field in stress_int_fields:
+                    if field in database:
+                        try:
+                            value = int(database[field])
+                            if value < 1:
+                                errors.append(f"database.{field} 必须是正整数")
+                        except (ValueError, TypeError):
+                            errors.append(f"database.{field} 必须是正整数")
+
+                # 验证 PostgreSQL SSL 模式
+                if "pg_ssl_mode" in database:
+                    valid_ssl_modes = ["disable", "allow", "prefer", "require", "verify-ca", "verify-full"]
+                    if database["pg_ssl_mode"] not in valid_ssl_modes:
+                        errors.append(f"database.pg_ssl_mode 必须是以下之一: {', '.join(valid_ssl_modes)}")
+
+                # 验证 PostgreSQL 超时时间
+                if "pg_connect_timeout" in database:
+                    try:
+                        value = int(database["pg_connect_timeout"])
+                        if value < 1:
+                            errors.append("database.pg_connect_timeout 必须是正整数")
+                    except (ValueError, TypeError):
+                        errors.append("database.pg_connect_timeout 必须是正整数")
+
+                # 验证 MySQL 字符集
+                if "mysql_charset" in database:
+                    if not isinstance(database["mysql_charset"], str):
+                        errors.append("database.mysql_charset 必须是字符串")
+
+                # 验证 MySQL 超时时间
+                mysql_timeout_fields = ["mysql_pool_recycle", "mysql_connect_timeout", "mysql_read_timeout", "mysql_write_timeout"]
+                for field in mysql_timeout_fields:
+                    if field in database:
+                        try:
+                            value = int(database[field])
+                            if value < 1:
+                                errors.append(f"database.{field} 必须是正整数")
+                        except (ValueError, TypeError):
+                            errors.append(f"database.{field} 必须是正整数")
+
         return len(errors) == 0, errors
 
     def _merge_config(self, current: Dict[str, Any], updates: Dict[str, Any]) -> Dict[str, Any]:
@@ -488,9 +614,10 @@ class AppService:
         重启应用
 
         实现方式：
-        1. 优雅关闭当前进程
-        2. 使用子进程启动新的应用实例
-        3. 新进程启动成功后，旧进程退出
+        1. 使用子进程启动新的应用实例
+        2. 等待新进程启动
+        3. 触发 lifespan 优雅关闭流程（关闭 WebSocket 连接、释放数据库连接池）
+        4. 新进程启动成功后，旧进程退出
 
         Args:
             is_debug: 是否调试模式
@@ -508,6 +635,7 @@ class AppService:
             """执行重启流程"""
             import time
             import subprocess
+            import asyncio
 
             time.sleep(0.5)  # 让响应先返回
 
@@ -531,12 +659,29 @@ class AppService:
                         stderr=subprocess.DEVNULL
                     )
 
+                logger.info(f"新进程已启动，命令: {' '.join(cmd)}")
+
                 # 给新进程一点时间启动
                 time.sleep(1)
 
-                # 优雅关闭当前进程
-                _set_shutdown_flag()
-                time.sleep(1)
+                # 优雅关闭当前进程：触发 lifespan 关闭流程
+                try:
+                    from lifespan import get_lifecycle_manager
+
+                    manager = get_lifecycle_manager()
+
+                    # 创建新的事件循环来运行异步关闭
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    loop.run_until_complete(manager.shutdown())
+                    loop.close()
+                    logger.info("优雅关闭完成")
+
+                except Exception as e:
+                    logger.error(f"优雅关闭失败: {e}")
+                    # 即使优雅关闭失败，也继续终止进程
+
+                # 终止当前进程
                 _terminate_process()
 
             except Exception as e:

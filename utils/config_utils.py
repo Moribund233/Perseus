@@ -60,6 +60,15 @@ def generate_default_config() -> Dict[str, Any]:
         del config_dict["app"]["debug"]
         logger.debug("已从默认配置中移除 app.debug（通过环境变量注入）")
 
+    # 3. 移除 database.url 和 database.is_stress_test（数据库连接配置）
+    if "database" in config_dict:
+        if "url" in config_dict["database"]:
+            del config_dict["database"]["url"]
+            logger.debug("已从默认配置中移除 database.url（通过环境变量 DATABASE_URL 注入）")
+        if "is_stress_test" in config_dict["database"]:
+            del config_dict["database"]["is_stress_test"]
+            logger.debug("已从默认配置中移除 database.is_stress_test（通过环境变量 LANGIT_STRESS_TEST 注入）")
+
     return config_dict
 
 

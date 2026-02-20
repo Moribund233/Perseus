@@ -4,6 +4,7 @@ import Home from '../views/Home.vue'
 import Log from '../views/Log.vue'
 import Setting from '../views/Setting.vue'
 import Nginx from '../views/Nginx.vue'
+import Database from '../views/Database.vue'
 import Guide from '../views/Guide.vue'
 import { isGuideCompleted } from '../services/api'
 
@@ -55,6 +56,14 @@ const routes = [
         component: Nginx,
         meta: {
           title: 'Nginx管理'
+        }
+      },
+      {
+        path: 'database',
+        name: 'Database',
+        component: Database,
+        meta: {
+          title: '数据库配置'
         }
       }
     ]
