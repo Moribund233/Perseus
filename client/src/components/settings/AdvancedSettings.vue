@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
+import { useClientConfig } from '../../composables/useClientConfig'
 import {
-  getClientConfig,
-  saveClientConfig,
   setSecurityPassword,
   verifySecurityPassword,
-  hasSecurityPassword,
-  type ClientConfig
+  hasSecurityPassword
 } from '../../services/api'
 
 /**
@@ -24,41 +22,23 @@ const props = defineProps<{
   isDeveloperEnabled: boolean
 }>()
 
-// 加载和保存状态
-const isSaving = ref(false)
+// 定义事件
+const emit = defineEmits<{
+  (e: 'error', message: string): void
+  (e: 'success', message: string): void
+  (e: 'developer-enabled'): void
+  (e: 'developer-locked'): void
+}>()
 
-// 客户端配置
-const clientConfig = ref<ClientConfig>({
-  server: {
-    url: 'http://127.0.0.1:8000',
-    auto_connect: true,
-    auto_start: false,
-    path: {
-      exe_name: 'langit-server.exe',
-      dir_name: 'langit-server',
-      custom_path: undefined
-    }
-  },
-  appearance: {
-    theme: 'dark',
-    language: 'zh',
-    sidebar_collapsed: false
-  },
-  notification: {
-    enabled: true,
-    on_error: true,
-    on_warning: false,
-    on_start_stop: true
-  },
-  log: {
-    level: 'info',
-    retention_days: 7
-  },
-  advanced: {
-    ws_reconnect_interval: 3000,
-    connection_timeout: 30,
-    request_timeout: 30
-  }
+// 使用客户端配置组合式函数（禁用自动加载，手动控制）
+const {
+  clientConfig,
+  isSaving,
+  loadConfig,
+  saveConfig: saveClientConfigHandler
+} = useClientConfig(emit, {
+  autoLoad: false,
+  successMessage: '高级设置保存成功'
 })
 
 // 安全密码验证状态
@@ -68,14 +48,6 @@ const securityAuth = ref({
   passwordError: '',
   isLoading: false
 })
-
-// 定义事件
-const emit = defineEmits<{
-  (e: 'error', message: string): void
-  (e: 'success', message: string): void
-  (e: 'developer-enabled'): void
-  (e: 'developer-locked'): void
-}>()
 
 /**
  * 监听开发者选项状态变化
@@ -92,40 +64,9 @@ watch(() => props.isDeveloperEnabled, (newValue) => {
  * 初始化
  */
 onMounted(async () => {
-  await loadClientConfig()
+  await loadConfig()
   await checkSecurityPasswordStatus()
 })
-
-/**
- * 加载客户端配置
- */
-const loadClientConfig = async (): Promise<void> => {
-  try {
-    const config = await getClientConfig()
-    clientConfig.value = { ...clientConfig.value, ...config }
-  } catch (err) {
-    console.error('加载客户端配置失败:', err)
-  }
-}
-
-/**
- * 保存客户端配置
- */
-const saveClientConfigHandler = async (): Promise<void> => {
-  isSaving.value = true
-  emit('error', '')
-  emit('success', '')
-
-  try {
-    await saveClientConfig(clientConfig.value)
-    emit('success', '高级设置保存成功')
-  } catch (err) {
-    console.error('保存客户端配置失败:', err)
-    emit('error', '保存客户端配置失败: ' + String(err))
-  } finally {
-    isSaving.value = false
-  }
-}
 
 /**
  * 检查安全密码状态

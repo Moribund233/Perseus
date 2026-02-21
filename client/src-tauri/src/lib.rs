@@ -107,6 +107,7 @@ pub fn run() {
             commands::get_database_type,
             commands::switch_database_type,
             commands::update_database_url,
+            commands::get_database_status_from_api,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

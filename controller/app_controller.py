@@ -431,7 +431,16 @@ class DatabaseMigrateRequest(BaseModel):
     """数据库迁移请求模型"""
     source_type: str = Field(..., description="源数据库类型 (sqlite/postgresql/mysql)")
     target_type: str = Field(..., description="目标数据库类型 (sqlite/postgresql/mysql)")
+    source_url: str = Field(..., description="源数据库连接URL")
     target_url: str = Field(..., description="目标数据库连接URL")
+
+
+class DatabaseStatusResponse(BaseModel):
+    """数据库状态响应模型"""
+    current_db_type: Optional[str] = Field(None, description="服务端记录的上次实际数据库类型")
+    target_db_type: str = Field(..., description="从环境变量解析的目标数据库类型")
+    migration_required: bool = Field(..., description="是否需要数据迁移")
+    message: str = Field(..., description="状态信息")
 
 
 class DatabaseMigrateResponse(BaseModel):
@@ -442,6 +451,72 @@ class DatabaseMigrateResponse(BaseModel):
     export_file: Optional[str] = Field(None, description="导出文件路径（保留时）")
 
 
+@router.get("/api/app/database/status", response_model=DatabaseStatusResponse)
+async def get_database_status_endpoint(
+    permission: tuple = Depends(check_app_permission)
+):
+    """
+    获取数据库状态
+
+    检查数据库类型变更和迁移需求。
+    服务端会比较环境变量中的 DATABASE_URL 解析出的类型
+    和 config.toml 中记录的 current_db_type。
+
+    Returns:
+        DatabaseStatusResponse: 数据库状态信息
+    """
+    import os
+    from config import get_config
+    
+    config = get_config()
+    
+    # 从环境变量获取实际数据库类型
+    actual_url = os.environ.get("DATABASE_URL", "")
+    actual_type = _parse_db_type(actual_url)
+    
+    # 获取记录的数据库类型
+    recorded_type = config.database.current_db_type
+    
+    # 首次启动
+    if recorded_type is None:
+        return DatabaseStatusResponse(
+            current_db_type=actual_type,
+            target_db_type=actual_type,
+            migration_required=False,
+            message="首次启动，初始化数据库记录"
+        )
+    
+    # 类型一致
+    if actual_type == recorded_type:
+        return DatabaseStatusResponse(
+            current_db_type=recorded_type,
+            target_db_type=actual_type,
+            migration_required=False,
+            message="数据库类型一致"
+        )
+    
+    # 类型变更，需要迁移
+    return DatabaseStatusResponse(
+        current_db_type=recorded_type,
+        target_db_type=actual_type,
+        migration_required=True,
+        message=f"检测到数据库类型变更: {recorded_type} -> {actual_type}"
+    )
+
+
+def _parse_db_type(url: str) -> str:
+    """从数据库URL解析类型"""
+    url_lower = url.lower()
+    if url_lower.startswith("sqlite"):
+        return "sqlite"
+    elif url_lower.startswith("postgresql") or url_lower.startswith("postgres"):
+        return "postgresql"
+    elif url_lower.startswith("mysql"):
+        return "mysql"
+    else:
+        return "unknown"
+
+
 @router.post("/api/app/database/migrate", response_model=DatabaseMigrateResponse)
 async def migrate_database_endpoint(
     request: DatabaseMigrateRequest,
@@ -450,15 +525,20 @@ async def migrate_database_endpoint(
     """
     执行数据库迁移
 
-    将数据从当前数据库迁移到目标数据库。
+    将数据从源数据库迁移到目标数据库。
     迁移过程中会：
     1. 从源数据库导出所有数据到临时文件
     2. 在目标数据库创建表结构
     3. 将数据导入到目标数据库
-    4. 清理临时文件
+    4. 更新服务端记录的 current_db_type
+    5. 清理临时文件
 
     Args:
-        request: 迁移请求，包含源类型、目标类型和目标URL
+        request: 迁移请求，包含源类型、目标类型和URL
+            - source_type: 源数据库类型（从服务端状态获取）
+            - target_type: 目标数据库类型（从环境变量解析）
+            - source_url: 源数据库URL（由前端从加密配置提供）
+            - target_url: 目标数据库URL（由前端从加密配置提供）
 
     Returns:
         DatabaseMigrateResponse: 迁移结果
@@ -470,6 +550,7 @@ async def migrate_database_endpoint(
         result = app_service.migrate_database(
             source_type=request.source_type,
             target_type=request.target_type,
+            source_url=request.source_url,
             target_url=request.target_url,
             is_debug=is_debug,
             is_admin=is_admin

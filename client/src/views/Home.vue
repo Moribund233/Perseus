@@ -4,13 +4,14 @@ import { storeToRefs } from 'pinia'
 import Alert from '../components/Alert.vue'
 import Card from '../components/Card.vue'
 import StatusBadge from '../components/StatusBadge.vue'
-import { useServiceStore, type BasicSystemInfo } from '../stores'
+import { useServiceStore, useDatabaseStore, type BasicSystemInfo } from '../stores'
 import {
   startService,
   stopService,
   restartService,
   type ActionResponse
 } from '../services/api'
+import MigrationProgressModal from '../components/database/MigrationProgressModal.vue'
 
 /**
  * 服务状态类型
@@ -36,6 +37,15 @@ const {
 // 本地状态
 const isLoading = ref(false)
 const error = ref<string | null>(null)
+const successMessage = ref<string | null>(null)
+
+// 数据库 store
+const databaseStore = useDatabaseStore()
+
+// 迁移模态框状态
+const showMigrationModal = ref(false)
+const migrationSourceType = ref<'sqlite' | 'postgresql' | 'mysql'>('sqlite')
+const migrationTargetType = ref<'sqlite' | 'postgresql' | 'mysql'>('sqlite')
 
 // 计算属性：服务状态（兼容原有逻辑）
 const serviceStatus = computed<ServiceStatusType | null>(() => {
@@ -141,7 +151,8 @@ const handleStartService = async (): Promise<void> => {
         await serviceStore.refreshStatus(true)
 
         if (storeIsRunning.value) {
-          // 服务已启动
+          // 服务已启动，检查是否需要迁移
+          await checkMigrationAfterStart()
           break
         }
         attempts++
@@ -157,6 +168,42 @@ const handleStartService = async (): Promise<void> => {
     error.value = '启动服务失败: ' + String(err)
   } finally {
     isLoading.value = false
+  }
+}
+
+/**
+ * 服务启动后检查迁移状态
+ */
+const checkMigrationAfterStart = async (): Promise<void> => {
+  try {
+    const status = await databaseStore.checkMigrationStatus()
+    if (status && status.migration_required) {
+      // 需要迁移，显示迁移模态框
+      migrationSourceType.value = status.current_db_type as 'sqlite' | 'postgresql' | 'mysql'
+      migrationTargetType.value = status.target_db_type as 'sqlite' | 'postgresql' | 'mysql'
+      showMigrationModal.value = true
+    }
+  } catch (err) {
+    console.error('检查迁移状态失败:', err)
+  }
+}
+
+/**
+ * 迁移完成处理
+ */
+const handleMigrationComplete = async (success: boolean): Promise<void> => {
+  showMigrationModal.value = false
+  if (success) {
+    // 刷新数据库配置
+    await databaseStore.loadConfig()
+    // 显示成功消息
+    successMessage.value = '数据库迁移完成，服务已更新'
+    setTimeout(() => {
+      successMessage.value = null
+    }, 5000)
+  } else {
+    // 迁移失败或取消
+    console.log('数据库迁移未完成')
   }
 }
 
@@ -333,6 +380,16 @@ onUnmounted(() => {
       @close="error = null"
     >
       {{ error }}
+    </Alert>
+
+    <!-- 成功提示 -->
+    <Alert
+      v-if="successMessage"
+      type="success"
+      closable
+      @close="successMessage = null"
+    >
+      {{ successMessage }}
     </Alert>
 
     <!-- 服务控制卡片 -->
@@ -777,6 +834,14 @@ onUnmounted(() => {
       </div>
     </div>
   </div>
+
+  <!-- 数据库迁移模态框 -->
+  <MigrationProgressModal
+    v-model:visible="showMigrationModal"
+    :source-type="migrationSourceType"
+    :target-type="migrationTargetType"
+    @complete="handleMigrationComplete"
+  />
 </template>
 
 <style scoped>

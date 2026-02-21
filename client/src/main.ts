@@ -6,6 +6,7 @@ import { useThemeStore } from './stores'
 
 // 导入全局样式
 import './styles/variables.css'
+import './styles/page-common.css'
 
 const app = createApp(App)
 const pinia = createPinia()

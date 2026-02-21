@@ -939,6 +939,7 @@ class AppService:
         self,
         source_type: str,
         target_type: str,
+        source_url: str,
         target_url: str,
         is_debug: bool = False,
         is_admin: bool = False
@@ -946,12 +947,13 @@ class AppService:
         """
         执行数据库迁移
 
-        将数据从当前数据库迁移到目标数据库。
+        将数据从源数据库迁移到目标数据库。
 
         Args:
             source_type: 源数据库类型
             target_type: 目标数据库类型
-            target_url: 目标数据库URL
+            source_url: 源数据库URL（由前端从加密配置提供）
+            target_url: 目标数据库URL（由前端从加密配置提供）
             is_debug: 是否调试模式
             is_admin: 是否管理员
 
@@ -962,10 +964,9 @@ class AppService:
 
         try:
             from utils.migration import DatabaseMigration, MigrationError
-            from config import get_config
+            from config import get_config, ConfigManager
 
             config = get_config()
-            source_url = config.database.url
 
             logger.info(f"开始数据库迁移: {source_type} -> {target_type}")
             logger.info(f"源数据库: {source_url}")
@@ -978,6 +979,18 @@ class AppService:
             result = migrator.migrate(source_url, target_url)
 
             logger.info(f"数据库迁移完成: {result}")
+
+            # 迁移成功，更新 current_db_type
+            config.database.current_db_type = target_type
+            
+            # 保存配置
+            try:
+                config_manager = ConfigManager()
+                config_manager.save_config(config)
+                logger.info(f"已更新 current_db_type 为: {target_type}")
+            except Exception as save_error:
+                logger.error(f"保存配置失败: {save_error}")
+                # 配置保存失败不影响迁移结果，但应该记录日志
 
             return {
                 "success": True,

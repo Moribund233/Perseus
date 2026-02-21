@@ -207,110 +207,13 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* 容器布局 */
-.guide-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  min-height: 100vh;
-  padding: var(--spacing-xl);
-  background-color: var(--bg-primary);
-  overflow-y: auto;
-}
+/* Guide 页面特定样式 - 其他样式来自 page-common.css */
 
-/* 步骤指示器 */
-.step-indicator {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-lg);
-  margin-bottom: var(--spacing-xl);
-  max-width: 900px;
-  width: 100%;
-}
-
-.step-item {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  flex: 1;
-  position: relative;
-}
-
-.step-number {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background-color: var(--bg-tertiary);
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: var(--font-size-sm);
-  flex-shrink: 0;
-}
-
-.step-active .step-number {
-  background-color: var(--primary-color);
-  color: white;
-}
-
-.step-completed .step-number {
-  background-color: var(--success-color);
-  color: white;
-}
-
-.step-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.step-title {
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.step-desc {
-  font-size: var(--font-size-xs);
-  color: var(--text-tertiary);
-}
-
-.step-line {
-  flex: 1;
-  height: 1px;
-  background-color: var(--border-color);
-  margin: 0 var(--spacing-sm);
-  margin-top: 16px;
-}
-
-/* 卡片样式 */
-.guide-card {
-  width: 100%;
-  max-width: 600px;
-  display: flex;
-  flex-direction: column;
-  max-height: calc(100vh - 180px);
-}
-
+/* 卡片深度选择器样式 */
 .guide-card :deep(.card-body) {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
   max-height: calc(100vh - 280px);
-}
-
-/* 底部导航 */
-.guide-footer {
-  display: flex;
-  align-items: center;
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-top: 1px solid var(--border-color);
-}
-
-.spacer {
-  flex: 1;
 }
 </style>

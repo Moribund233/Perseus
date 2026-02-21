@@ -5,9 +5,9 @@ import Button from '../components/Button.vue'
 import Modal from '../components/Modal.vue'
 import Alert from '../components/Alert.vue'
 import MigrationProgressModal from '../components/database/MigrationProgressModal.vue'
-import { useDatabaseStore } from '../stores'
-import type { DatabaseType } from '../services/databaseApi'
-import { getDatabaseType, switchDatabaseType } from '../services/api'
+import { useDatabaseStore, useServiceStore } from '../stores'
+import type { DatabaseType, DatabaseConfig } from '../services/databaseApi'
+import { switchDatabaseType } from '../services/api'
 
 /**
  * 数据库配置页面
@@ -16,10 +16,7 @@ import { getDatabaseType, switchDatabaseType } from '../services/api'
  */
 
 const dbStore = useDatabaseStore()
-
-// 从加密配置读取的数据库类型
-const clientDbType = ref<DatabaseType>('sqlite')
-const isLoadingClientDbType = ref(false)
+const serviceStore = useServiceStore()
 
 // 迁移相关状态
 const showMigrationConfirm = ref(false)
@@ -47,8 +44,39 @@ const databaseTypes = computed(() =>
   }))
 )
 
-// 当前编辑的配置
-const config = computed(() => dbStore.editingConfig)
+// 默认数据库配置
+const defaultConfig: DatabaseConfig = {
+  db_type: 'sqlite',
+  pool_size: 10,
+  max_overflow: 20,
+  pool_timeout: 30,
+  pool_recycle: 3600,
+  echo: false,
+  sqlite_timeout: 30,
+  sqlite_check_same_thread: false,
+  sqlite_isolation_level: null,
+  enable_wal: true,
+  wal_synchronous: 'NORMAL',
+  wal_cache_size: 2000,
+  wal_temp_store: 'MEMORY',
+  stress_pool_size: 20,
+  stress_max_overflow: 40,
+  stress_pool_timeout: 60,
+  stress_pool_recycle: 1800,
+  stress_sqlite_timeout: 60,
+  stress_echo: false,
+  pg_ssl_mode: 'prefer',
+  pg_connect_timeout: 30,
+  pg_application_name: 'LangGit',
+  mysql_charset: 'utf8mb4',
+  mysql_pool_recycle: 3600,
+  mysql_connect_timeout: 30,
+  mysql_read_timeout: 30,
+  mysql_write_timeout: 30
+}
+
+// 当前编辑的配置 - 服务未启动时使用默认配置
+const config = computed((): DatabaseConfig => dbStore.editingConfig || defaultConfig)
 
 /**
  * 切换数据库类型
@@ -60,9 +88,14 @@ const handleDbTypeChange = async (newType: DatabaseType): Promise<void> => {
   // 先更新 client.toml 中的数据库类型
   try {
     await switchDatabaseType(newType)
-    clientDbType.value = newType
   } catch (err) {
     console.error('切换数据库类型失败:', err)
+    return
+  }
+
+  // 服务未启动时，只更新本地配置，不显示迁移确认
+  if (!serviceStore.isRunning) {
+    dbStore.switchDbType(newType)
     return
   }
 
@@ -102,29 +135,12 @@ const onMigrationComplete = async (success: boolean): Promise<void> => {
   pendingDbType.value = null
 }
 
-/**
- * 从客户端加密配置加载数据库类型
- */
-const loadClientDbType = async (): Promise<void> => {
-  isLoadingClientDbType.value = true
-  try {
-    const dbType = await getDatabaseType()
-    clientDbType.value = dbType as DatabaseType
-  } catch (err) {
-    console.error('加载客户端数据库类型失败:', err)
-    // 保持默认 sqlite
-  } finally {
-    isLoadingClientDbType.value = false
-  }
-}
-
 // 页面加载
 onMounted(() => {
-  if (!dbStore.isConfigLoaded) {
+  // 服务启动时才加载配置
+  if (serviceStore.isRunning && !dbStore.isConfigLoaded) {
     dbStore.loadConfig()
   }
-  // 从加密配置加载数据库类型
-  loadClientDbType()
 })
 </script>
 
@@ -141,8 +157,13 @@ onMounted(() => {
       </p>
     </div>
 
-    <!-- 消息提示 -->
-    <Alert v-if="dbStore.error" type="error" closable @close="dbStore.clearMessages()" class="mb-lg">
+    <!-- 服务未启动提示 -->
+    <Alert v-if="!serviceStore.isRunning" type="info" class="mb-lg">
+      服务未启动，请前往控制台启动服务以加载数据库配置
+    </Alert>
+
+    <!-- 消息提示 - 服务启动时才显示错误 -->
+    <Alert v-if="dbStore.error && serviceStore.isRunning" type="error" closable @close="dbStore.clearMessages()" class="mb-lg">
       {{ dbStore.error }}
     </Alert>
     <Alert v-if="dbStore.successMessage" type="success" closable @close="dbStore.clearMessages()" class="mb-lg">
@@ -150,38 +171,12 @@ onMounted(() => {
     </Alert>
 
     <!-- 加载中 -->
-    <div v-if="dbStore.isLoading && !config" class="loading-state">
+    <div v-if="dbStore.isLoading && !dbStore.isConfigLoaded" class="loading-state">
       <img :src="icons.refresh" class="spinner-icon" alt="loading" />
       <span>加载配置中...</span>
     </div>
 
-    <!-- 未加载配置时显示提示 -->
-    <div v-else-if="!config" class="empty-state">
-      <img :src="icons.database" class="empty-icon" alt="database" />
-      <h3>数据库配置未加载</h3>
-      <p>请启动服务端以加载数据库配置信息</p>
-      <Button type="primary" :icon="icons.refresh" @click="dbStore.loadConfig(true)" :disabled="dbStore.isLoading">
-        重新加载
-      </Button>
-    </div>
-
-    <template v-else>
-      <!-- 客户端加密配置中的数据库类型显示 -->
-      <Card v-if="!isLoadingClientDbType" title="客户端数据库配置" class="mb-lg client-db-info">
-        <div class="client-db-type-display">
-          <div class="db-type-badge" :class="clientDbType">
-            <img :src="icons[clientDbType]" class="badge-icon" :alt="clientDbType" />
-            <span class="badge-text">
-              {{ clientDbType === 'sqlite' ? 'SQLite' :
-                 clientDbType === 'postgresql' ? 'PostgreSQL' : 'MySQL' }}
-            </span>
-          </div>
-          <div class="client-db-info-text">
-            <p>当前客户端配置的数据库类型</p>
-            <p class="hint">修改数据库类型请在「高级设置」-「敏感配置」-「数据库配置」中进行</p>
-          </div>
-        </div>
-      </Card>
+    <template v-if="dbStore.isConfigLoaded || !serviceStore.isRunning">
       <!-- 数据库类型选择 -->
       <Card title="数据库类型" class="mb-lg">
         <div class="db-type-grid">
@@ -203,47 +198,47 @@ onMounted(() => {
       </Card>
 
       <!-- 连接池配置 -->
-      <Card title="连接池配置" class="mb-lg">
+      <Card title="连接池配置" class="mb-lg" :class="{ 'card-disabled': !serviceStore.isRunning }">
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">连接池大小</label>
-            <input v-model.number="config.pool_size" type="number" class="form-input" min="1" />
+            <input v-model.number="config.pool_size" type="number" class="form-input" min="1" :disabled="!serviceStore.isRunning" />
             <span class="form-hint">默认连接池中的连接数</span>
           </div>
           <div class="form-group">
             <label class="form-label">最大溢出连接数</label>
-            <input v-model.number="config.max_overflow" type="number" class="form-input" min="0" />
+            <input v-model.number="config.max_overflow" type="number" class="form-input" min="0" :disabled="!serviceStore.isRunning" />
             <span class="form-hint">超过连接池大小时允许创建的额外连接</span>
           </div>
           <div class="form-group">
             <label class="form-label">连接超时时间（秒）</label>
-            <input v-model.number="config.pool_timeout" type="number" class="form-input" min="1" />
+            <input v-model.number="config.pool_timeout" type="number" class="form-input" min="1" :disabled="!serviceStore.isRunning" />
             <span class="form-hint">获取连接的最大等待时间</span>
           </div>
           <div class="form-group">
             <label class="form-label">连接回收时间（秒）</label>
-            <input v-model.number="config.pool_recycle" type="number" class="form-input" min="0" />
+            <input v-model.number="config.pool_recycle" type="number" class="form-input" min="0" :disabled="!serviceStore.isRunning" />
             <span class="form-hint">连接自动回收的时间，0表示不回收</span>
           </div>
         </div>
         <div class="form-group mt-md">
           <label class="form-checkbox">
-            <input v-model="config.echo" type="checkbox" />
+            <input v-model="config.echo" type="checkbox" :disabled="!serviceStore.isRunning" />
             <span>打印 SQL 语句（调试用）</span>
           </label>
         </div>
       </Card>
 
       <!-- SQLite 配置 -->
-      <Card v-if="config.db_type === 'sqlite'" title="SQLite 配置" class="mb-lg">
+      <Card v-if="config.db_type === 'sqlite'" title="SQLite 配置" class="mb-lg" :class="{ 'card-disabled': !serviceStore.isRunning }">
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">内部超时时间（秒）</label>
-            <input v-model.number="config.sqlite_timeout" type="number" class="form-input" min="1" />
+            <input v-model.number="config.sqlite_timeout" type="number" class="form-input" min="1" :disabled="!serviceStore.isRunning" />
           </div>
           <div class="form-group">
             <label class="form-label">WAL 同步模式</label>
-            <select v-model="config.wal_synchronous" class="form-select">
+            <select v-model="config.wal_synchronous" class="form-select" :disabled="!serviceStore.isRunning">
               <option value="OFF">OFF</option>
               <option value="NORMAL">NORMAL</option>
               <option value="FULL">FULL</option>
@@ -252,11 +247,11 @@ onMounted(() => {
           </div>
           <div class="form-group">
             <label class="form-label">WAL 缓存大小</label>
-            <input v-model.number="config.wal_cache_size" type="number" class="form-input" min="0" />
+            <input v-model.number="config.wal_cache_size" type="number" class="form-input" min="0" :disabled="!serviceStore.isRunning" />
           </div>
           <div class="form-group">
             <label class="form-label">临时表存储</label>
-            <select v-model="config.wal_temp_store" class="form-select">
+            <select v-model="config.wal_temp_store" class="form-select" :disabled="!serviceStore.isRunning">
               <option value="DEFAULT">DEFAULT</option>
               <option value="FILE">FILE</option>
               <option value="MEMORY">MEMORY</option>
@@ -265,19 +260,19 @@ onMounted(() => {
         </div>
         <div class="form-group mt-md">
           <label class="form-checkbox">
-            <input v-model="config.enable_wal" type="checkbox" />
+            <input v-model="config.enable_wal" type="checkbox" :disabled="!serviceStore.isRunning" />
             <span>启用 WAL 模式（提高并发性能）</span>
           </label>
         </div>
         <div class="form-group mt-sm">
           <label class="form-checkbox">
-            <input v-model="config.sqlite_check_same_thread" type="checkbox" />
+            <input v-model="config.sqlite_check_same_thread" type="checkbox" :disabled="!serviceStore.isRunning" />
             <span>检查同线程（仅调试使用）</span>
           </label>
         </div>
         <div class="form-group mt-sm">
           <label class="form-label">隔离级别</label>
-          <select v-model="config.sqlite_isolation_level" class="form-select">
+          <select v-model="config.sqlite_isolation_level" class="form-select" :disabled="!serviceStore.isRunning">
             <option :value="null">自动提交模式</option>
             <option value="READ UNCOMMITTED">READ UNCOMMITTED</option>
             <option value="READ COMMITTED">READ COMMITTED</option>
@@ -288,11 +283,11 @@ onMounted(() => {
       </Card>
 
       <!-- PostgreSQL 配置 -->
-      <Card v-if="config.db_type === 'postgresql'" title="PostgreSQL 配置" class="mb-lg">
+      <Card v-if="config.db_type === 'postgresql'" title="PostgreSQL 配置" class="mb-lg" :class="{ 'card-disabled': !serviceStore.isRunning }">
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">SSL 模式</label>
-            <select v-model="config.pg_ssl_mode" class="form-select">
+            <select v-model="config.pg_ssl_mode" class="form-select" :disabled="!serviceStore.isRunning">
               <option value="disable">disable</option>
               <option value="allow">allow</option>
               <option value="prefer">prefer</option>
@@ -303,33 +298,33 @@ onMounted(() => {
           </div>
           <div class="form-group">
             <label class="form-label">连接超时时间（秒）</label>
-            <input v-model.number="config.pg_connect_timeout" type="number" class="form-input" min="1" />
+            <input v-model.number="config.pg_connect_timeout" type="number" class="form-input" min="1" :disabled="!serviceStore.isRunning" />
           </div>
           <div class="form-group">
             <label class="form-label">应用名称</label>
-            <input v-model="config.pg_application_name" type="text" class="form-input" />
+            <input v-model="config.pg_application_name" type="text" class="form-input" :disabled="!serviceStore.isRunning" />
           </div>
         </div>
       </Card>
 
       <!-- MySQL 配置 -->
-      <Card v-if="config.db_type === 'mysql'" title="MySQL 配置" class="mb-lg">
+      <Card v-if="config.db_type === 'mysql'" title="MySQL 配置" class="mb-lg" :class="{ 'card-disabled': !serviceStore.isRunning }">
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">字符集</label>
-            <input v-model="config.mysql_charset" type="text" class="form-input" />
+            <input v-model="config.mysql_charset" type="text" class="form-input" :disabled="!serviceStore.isRunning" />
           </div>
           <div class="form-group">
             <label class="form-label">连接超时时间（秒）</label>
-            <input v-model.number="config.mysql_connect_timeout" type="number" class="form-input" min="1" />
+            <input v-model.number="config.mysql_connect_timeout" type="number" class="form-input" min="1" :disabled="!serviceStore.isRunning" />
           </div>
           <div class="form-group">
             <label class="form-label">读取超时时间（秒）</label>
-            <input v-model.number="config.mysql_read_timeout" type="number" class="form-input" min="1" />
+            <input v-model.number="config.mysql_read_timeout" type="number" class="form-input" min="1" :disabled="!serviceStore.isRunning" />
           </div>
           <div class="form-group">
             <label class="form-label">写入超时时间（秒）</label>
-            <input v-model.number="config.mysql_write_timeout" type="number" class="form-input" min="1" />
+            <input v-model.number="config.mysql_write_timeout" type="number" class="form-input" min="1" :disabled="!serviceStore.isRunning" />
           </div>
         </div>
       </Card>
@@ -337,23 +332,22 @@ onMounted(() => {
       <!-- 操作按钮 -->
       <div class="action-bar">
         <div class="action-left">
-          <Button type="secondary" :icon="icons.refresh" @click="dbStore.loadConfig(true)" :disabled="dbStore.isLoading">
+          <Button type="secondary" :icon="icons.refresh" @click="dbStore.loadConfig(true)" :disabled="!serviceStore.isRunning || dbStore.isLoading">
             刷新
           </Button>
-          <Button type="info" :loading="dbStore.isTesting" @click="dbStore.testConnection()">
+          <Button type="info" :loading="dbStore.isTesting" @click="dbStore.testConnection()" :disabled="!serviceStore.isRunning">
             测试连接
           </Button>
         </div>
         <div class="action-right">
-          <Button type="secondary" @click="dbStore.resetConfig()" :disabled="!dbStore.hasChanges || dbStore.isSaving">
+          <Button type="secondary" @click="dbStore.resetConfig()" :disabled="!serviceStore.isRunning || !dbStore.hasChanges || dbStore.isSaving">
             重置
           </Button>
-          <Button type="primary" :loading="dbStore.isSaving" :disabled="!dbStore.hasChanges" @click="dbStore.saveConfig()">
+          <Button type="primary" :loading="dbStore.isSaving" :disabled="!serviceStore.isRunning || !dbStore.hasChanges" @click="dbStore.saveConfig()">
             保存配置
           </Button>
         </div>
       </div>
-    </template>
 
     <!-- 迁移确认弹窗 -->
     <Modal v-model:visible="showMigrationConfirm" title="数据库迁移确认" width="500px" :closable="false" :mask-closable="false">
@@ -380,6 +374,7 @@ onMounted(() => {
         <Button type="primary" :icon="icons.migrate" @click="confirmMigration">开始迁移</Button>
       </template>
     </Modal>
+    </template>
 
     <!-- 迁移进度弹窗 -->
     <MigrationProgressModal
@@ -392,198 +387,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.database-page {
-  padding: var(--spacing-lg);
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.page-header {
-  margin-bottom: var(--spacing-xl);
-}
-
-.header-title {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-sm);
-}
-
-.header-icon {
-  width: 32px;
-  height: 32px;
-}
-
-.header-title h1 {
-  font-size: var(--font-size-2xl);
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.header-description {
-  color: var(--text-secondary);
-  font-size: var(--font-size-md);
-  margin: 0;
-}
-
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--spacing-xl);
-  gap: var(--spacing-md);
-  color: var(--text-secondary);
-}
-
-.spinner-icon {
-  width: 32px;
-  height: 32px;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.db-type-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: var(--spacing-md);
-}
-
-.db-type-card {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-lg);
-  border: 2px solid var(--border-color);
-  border-radius: var(--border-radius-md);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.db-type-card:hover {
-  border-color: var(--primary-color);
-  background-color: var(--bg-tertiary);
-}
-
-.db-type-card.active {
-  border-color: var(--primary-color);
-  background-color: var(--primary-color-alpha);
-}
-
-.db-type-icon {
-  width: 40px;
-  height: 40px;
-}
-
-.db-type-info {
-  flex: 1;
-}
-
-.db-type-label {
-  font-size: var(--font-size-lg);
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 var(--spacing-xs);
-}
-
-.db-type-description {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.db-type-check {
-  width: 24px;
-  height: 24px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: var(--spacing-lg);
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.form-label {
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.form-input,
-.form-select {
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: var(--font-size-md);
-}
-
-.form-input:focus,
-.form-select:focus {
-  outline: none;
-  border-color: var(--primary-color);
-}
-
-.form-hint {
-  font-size: var(--font-size-xs);
-  color: var(--text-tertiary);
-}
-
-.form-checkbox {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  cursor: pointer;
-  font-size: var(--font-size-sm);
-  color: var(--text-primary);
-}
-
-.form-checkbox input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-}
-
-.action-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--spacing-lg);
-  background-color: var(--bg-secondary);
-  border-radius: var(--border-radius-md);
-  border: 1px solid var(--border-color);
-}
-
-.action-left,
-.action-right {
-  display: flex;
-  gap: var(--spacing-md);
-}
-
-.migration-confirm-content {
-  text-align: center;
-  padding: var(--spacing-lg);
-}
-
-.warning-icon {
-  width: 64px;
-  height: 64px;
-  color: var(--warning-color);
-  margin-bottom: var(--spacing-md);
-}
-
+/* 迁移确认内容标题和段落 - 补充样式 */
 .migration-confirm-content h3 {
   font-size: var(--font-size-xl);
   color: var(--text-primary);
@@ -595,135 +399,14 @@ onMounted(() => {
   margin-bottom: var(--spacing-lg);
 }
 
-.migration-flow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--spacing-md);
-  margin: var(--spacing-lg) 0;
-  flex-wrap: wrap;
+/* 禁用状态样式 */
+.card-disabled :deep(.card-body) {
+  opacity: 0.7;
 }
 
-.flow-item {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  background-color: var(--bg-tertiary);
-  border-radius: var(--border-radius-sm);
+.card-disabled .form-input,
+.card-disabled .form-select,
+.card-disabled .form-checkbox input[type="checkbox"] {
+  cursor: not-allowed;
 }
-
-.flow-step {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  background-color: var(--primary-color);
-  color: white;
-  border-radius: 50%;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-}
-
-.flow-arrow {
-  width: 20px;
-  height: 20px;
-  color: var(--text-tertiary);
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--spacing-2xl);
-  gap: var(--spacing-md);
-  text-align: center;
-  background-color: var(--bg-secondary);
-  border-radius: var(--border-radius-lg);
-  border: 1px solid var(--border-color);
-}
-
-.empty-icon {
-  width: 64px;
-  height: 64px;
-  opacity: 0.5;
-}
-
-.empty-state h3 {
-  font-size: var(--font-size-xl);
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.empty-state p {
-  color: var(--text-secondary);
-  margin: 0 0 var(--spacing-md);
-}
-
-/* 客户端数据库配置显示 */
-.client-db-info {
-  background-color: var(--bg-secondary);
-}
-
-.client-db-type-display {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-lg);
-  padding: var(--spacing-md);
-}
-
-.db-type-badge {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--border-radius-md);
-  font-weight: 600;
-  font-size: var(--font-size-lg);
-}
-
-.db-type-badge.sqlite {
-  background-color: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.3);
-}
-
-.db-type-badge.postgresql {
-  background-color: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.3);
-}
-
-.db-type-badge.mysql {
-  background-color: rgba(234, 179, 8, 0.15);
-  color: #eab308;
-  border: 1px solid rgba(234, 179, 8, 0.3);
-}
-
-.badge-icon {
-  width: 24px;
-  height: 24px;
-}
-
-.client-db-info-text {
-  flex: 1;
-}
-
-.client-db-info-text p {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: var(--font-size-md);
-}
-
-.client-db-info-text .hint {
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-  margin-top: var(--spacing-xs);
-}
-
-.mb-lg { margin-bottom: var(--spacing-lg); }
-.mt-md { margin-top: var(--spacing-md); }
-.mt-sm { margin-top: var(--spacing-sm); }
 </style>

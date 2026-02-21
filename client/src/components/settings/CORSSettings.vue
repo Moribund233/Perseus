@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useConfigSaver } from '../../composables/useConfigSaver'
 import { useServiceStore } from '../../stores'
 
 /**
@@ -17,9 +18,6 @@ const serviceStore = useServiceStore()
 
 // 从 store 获取代理状态
 const isServerProxyEnabled = computed(() => serviceStore.isServerProxyEnabled)
-
-// 加载和保存状态
-const isSaving = ref(false)
 
 /**
  * CORS 配置类型
@@ -51,53 +49,48 @@ const emit = defineEmits<{
   (e: 'success', message: string): void
 }>()
 
+// 使用配置保存组合式函数
+const { isSaving, save } = useConfigSaver<Partial<CORSConfig>>(
+  async (config) => {
+    const result = await serviceStore.updateCORSConfig(config)
+
+    if (!result.success) {
+      throw new Error(result.errors?.[0] || '保存失败')
+    }
+  },
+  emit
+)
+
 /**
  * 保存 CORS 配置
  */
 const saveCORSConfig = async (): Promise<void> => {
-  isSaving.value = true
-  emit('error', '')
-  emit('success', '')
+  // 解析输入框内容
+  const origins = corsOriginsInput.value
+    .split('\n')
+    .map(s => s.trim())
+    .filter(s => s.length > 0)
 
-  try {
-    // 解析输入框内容
-    const origins = corsOriginsInput.value
-      .split('\n')
-      .map(s => s.trim())
-      .filter(s => s.length > 0)
+  const headers = corsHeadersInput.value
+    .split('\n')
+    .map(s => s.trim())
+    .filter(s => s.length > 0)
 
-    const headers = corsHeadersInput.value
-      .split('\n')
-      .map(s => s.trim())
-      .filter(s => s.length > 0)
-
-    // 验证至少有一个 origin
-    if (origins.length === 0) {
-      emit('error', '至少需要一个允许的源地址')
-      return
-    }
-
-    const config: Partial<CORSConfig> = {
-      allow_origins: origins,
-      allow_credentials: corsConfig.value.allow_credentials,
-      allow_methods: corsConfig.value.allow_methods,
-      allow_headers: headers,
-      max_age: corsConfig.value.max_age
-    }
-
-    const result = await serviceStore.updateCORSConfig(config)
-
-    if (result.success) {
-      emit('success', 'CORS 配置保存成功（需要重启服务才能生效）')
-    } else {
-      emit('error', result.errors?.[0] || '保存失败')
-    }
-  } catch (err) {
-    console.error('保存 CORS 配置失败:', err)
-    emit('error', '保存 CORS 配置失败: ' + String(err))
-  } finally {
-    isSaving.value = false
+  // 验证至少有一个 origin
+  if (origins.length === 0) {
+    emit('error', '至少需要一个允许的源地址')
+    return
   }
+
+  const config: Partial<CORSConfig> = {
+    allow_origins: origins,
+    allow_credentials: corsConfig.value.allow_credentials,
+    allow_methods: corsConfig.value.allow_methods,
+    allow_headers: headers,
+    max_age: corsConfig.value.max_age
+  }
+
+  await save(config, 'CORS 配置保存成功（需要重启服务才能生效）')
 }
 
 /**

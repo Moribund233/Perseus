@@ -1,0 +1,589 @@
+/**
+ * 页面公共样式
+ *
+ * 包含所有页面视图共享的样式定义
+ * 适用于 Database.vue、Nginx.vue、Guide.vue 等页面组件
+ */
+
+/* ==================== 页面容器基础样式 ==================== */
+
+.page-container,
+.database-page,
+.nginx-page {
+  padding: var(--spacing-lg);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ==================== 页面标题区域 ==================== */
+
+.page-header {
+  margin-bottom: var(--spacing-xl);
+}
+
+.page-title {
+  margin: 0 0 var(--spacing-xl) 0;
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+}
+
+.header-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.header-title h1 {
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.header-description {
+  color: var(--text-secondary);
+  font-size: var(--font-size-md);
+  margin: 0;
+}
+
+/* ==================== 状态卡片样式 ==================== */
+
+.status-card,
+.config-card {
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-xl);
+  border: 1px solid var(--border-color);
+}
+
+.config-card {
+  margin-top: var(--spacing-lg);
+}
+
+.status-header,
+.config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.status-header h2,
+.config-header h2 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.config-hint {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+/* ==================== 状态详情样式 ==================== */
+
+.status-details {
+  margin-bottom: var(--spacing-xl);
+}
+
+.detail-item {
+  display: flex;
+  margin-bottom: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}
+
+.detail-label {
+  width: 100px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.detail-value {
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.detail-value.path {
+  font-family: monospace;
+  font-size: var(--font-size-xs);
+  background-color: var(--bg-tertiary);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+}
+
+/* ==================== 操作按钮区域 ==================== */
+
+.status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+}
+
+.action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-lg);
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.action-left,
+.action-right {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+/* ==================== 表单区域样式 ==================== */
+
+.config-form {
+  margin-bottom: var(--spacing-lg);
+}
+
+.form-section {
+  margin-bottom: var(--spacing-xl);
+}
+
+.form-section h3 {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 var(--spacing-md) 0;
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.form-row {
+  display: flex;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-lg);
+}
+
+.form-row .form-group {
+  flex: 1;
+  min-width: 200px;
+  margin-bottom: 0;
+}
+
+.form-row .form-group-full {
+  flex: 1 1 100%;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-lg);
+}
+
+.form-group label {
+  display: block;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.form-label {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.form-input,
+.form-select {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: var(--font-size-md);
+}
+
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.form-hint {
+  display: block;
+  margin-top: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.form-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.form-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.form-group input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* ==================== 消息提示样式 ==================== */
+
+.message {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--border-radius-md);
+  margin-bottom: var(--spacing-lg);
+  font-size: var(--font-size-sm);
+}
+
+.message.success {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: var(--success-color);
+  border: 1px solid var(--success-color);
+}
+
+.message.error {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--error-color);
+  border: 1px solid var(--error-color);
+}
+
+.message.info {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: var(--info-color);
+  border: 1px solid var(--info-color);
+}
+
+/* ==================== 加载状态样式 ==================== */
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  gap: var(--spacing-md);
+  color: var(--text-secondary);
+}
+
+.spinner-icon {
+  width: 32px;
+  height: 32px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ==================== 空状态样式 ==================== */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-2xl);
+  gap: var(--spacing-md);
+  text-align: center;
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--border-color);
+}
+
+.empty-icon {
+  width: 64px;
+  height: 64px;
+  opacity: 0.5;
+}
+
+/* ==================== 数据库类型选择网格 ==================== */
+
+.db-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.db-type-card {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  border: 2px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.db-type-card:hover {
+  border-color: var(--primary-color);
+  background-color: var(--bg-tertiary);
+}
+
+.db-type-card.active {
+  border-color: var(--primary-color);
+  background-color: var(--primary-color-alpha);
+}
+
+.db-type-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.db-type-info {
+  flex: 1;
+}
+
+.db-type-label {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 var(--spacing-xs);
+}
+
+.db-type-description {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.db-type-check {
+  width: 24px;
+  height: 24px;
+}
+
+/* ==================== 迁移确认样式 ==================== */
+
+.migration-confirm-content {
+  text-align: center;
+  padding: var(--spacing-lg);
+}
+
+.warning-icon {
+  width: 64px;
+  height: 64px;
+  color: var(--warning-color);
+  margin-bottom: var(--spacing-md);
+}
+
+.migration-confirm-content h3 {
+  font-size: var(--font-size-xl);
+  color: var(--text-primary);
+  margin: 0 0 var(--spacing-md);
+}
+
+.migration-confirm-content p {
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-lg);
+}
+
+.migration-flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  margin: var(--spacing-lg) 0;
+  flex-wrap: wrap;
+}
+
+.flow-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--bg-tertiary);
+  border-radius: var(--border-radius-sm);
+}
+
+.flow-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background-color: var(--primary-color);
+  color: white;
+  border-radius: 50%;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.flow-arrow {
+  width: 20px;
+  height: 20px;
+  color: var(--text-tertiary);
+}
+
+/* ==================== 按钮扩展样式 ==================== */
+
+.btn-danger {
+  background-color: var(--error-color);
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #dc2626;
+}
+
+.btn-info {
+  background-color: var(--info-color);
+  color: white;
+}
+
+.btn-info:hover:not(:disabled) {
+  background-color: #0891b2;
+}
+
+.config-actions {
+  justify-content: flex-end;
+}
+
+/* ==================== Guide 页面特定样式 ==================== */
+
+.guide-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 100vh;
+  padding: var(--spacing-xl);
+  background-color: var(--bg-primary);
+  overflow-y: auto;
+}
+
+/* 步骤指示器 */
+.step-indicator {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+  max-width: 900px;
+  width: 100%;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex: 1;
+  position: relative;
+}
+
+.step-number {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  flex-shrink: 0;
+}
+
+.step-active .step-number {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.step-completed .step-number {
+  background-color: var(--success-color);
+  color: white;
+}
+
+.step-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.step-title {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.step-desc {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.step-line {
+  flex: 1;
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 0 var(--spacing-sm);
+  margin-top: 16px;
+}
+
+/* 引导卡片 */
+.guide-card {
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 180px);
+}
+
+.guide-card :deep(.card-body) {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  max-height: calc(100vh - 280px);
+}
+
+/* 底部导航 */
+.guide-footer {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-top: 1px solid var(--border-color);
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* ==================== 间距工具类 ==================== */
+
+.mt-sm { margin-top: var(--spacing-sm); }
+.mt-md { margin-top: var(--spacing-md); }
+.mt-lg { margin-top: var(--spacing-lg); }
+.mt-xl { margin-top: var(--spacing-xl); }
+
+.mb-sm { margin-bottom: var(--spacing-sm); }
+.mb-md { margin-bottom: var(--spacing-md); }
+.mb-lg { margin-bottom: var(--spacing-lg); }
+.mb-xl { margin-bottom: var(--spacing-xl); }

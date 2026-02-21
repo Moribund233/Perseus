@@ -115,6 +115,27 @@ class DatabaseMigration:
     def _get_engine(self, db_url: str) -> Any:
         """Create database engine"""
         try:
+            # 处理 PostgreSQL URL，确保使用正确的驱动
+            # 优先使用 pg8000 (纯 Python 实现，无需编译)
+            if db_url.startswith('postgresql://'):
+                db_url = db_url.replace('postgresql://', 'postgresql+pg8000://', 1)
+            elif db_url.startswith('postgres://'):
+                db_url = db_url.replace('postgres://', 'postgresql+pg8000://', 1)
+            
+            # 对于 MySQL，确保使用 pymysql 驱动
+            if db_url.startswith('mysql://'):
+                db_url = db_url.replace('mysql://', 'mysql+pymysql://', 1)
+            
+            # 对于 SQLite，添加编码参数
+            if db_url.startswith('sqlite://'):
+                # 将相对路径转换为绝对路径，避免编码问题
+                if db_url.startswith('sqlite:///./'):
+                    import os
+                    db_path = db_url.replace('sqlite:///./', '')
+                    abs_path = os.path.abspath(db_path)
+                    db_url = f"sqlite:///{abs_path}"
+                return create_engine(db_url, connect_args={'check_same_thread': False})
+            
             return create_engine(db_url)
         except Exception as e:
             raise MigrationError(f"Failed to create engine for {db_url}: {e}")
@@ -192,7 +213,7 @@ class DatabaseMigration:
             output_path.parent.mkdir(parents=True, exist_ok=True)
             
             with open(output_path, 'w', encoding='utf-8') as f:
-                json.dump(export_data, f, indent=2, ensure_ascii=False)
+                json.dump(export_data, f, indent=2, ensure_ascii=True)
             
             logger.info(f"Export completed: {output_file}")
             return counts
@@ -300,27 +321,45 @@ class DatabaseMigration:
         Returns:
             Dict mapping table names to migrated row counts
         """
+        import tempfile
+        import os
+        
+        # 标记是否由本方法创建的临时文件
+        auto_created = False
+        
         if not temp_file:
+            # 使用系统临时目录，避免 Windows 路径编码问题
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            temp_file = f"./migration_{timestamp}.json"
+            temp_dir = tempfile.gettempdir()
+            temp_file = os.path.join(temp_dir, f"langit_migration_{timestamp}.json")
+            auto_created = True
         
         try:
             # Export
+            logger.info(f"Starting export from: {source_url}")
             export_counts = self.export_data(source_url, temp_file)
             logger.info(f"Exported {sum(export_counts.values())} total records")
             
             # Import
+            logger.info(f"Starting import to: {target_url}")
             import_counts = self.import_data(target_url, temp_file, clear_existing=True)
             logger.info(f"Imported {sum(import_counts.values())} total records")
-            
-            # Clean up temp file
-            Path(temp_file).unlink(missing_ok=True)
             
             return import_counts
             
         except Exception as e:
+            import traceback
             logger.error(f"Migration failed: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             raise MigrationError(f"Migration failed: {e}")
+        finally:
+            # 清理临时文件（仅在自动创建时）
+            if auto_created and temp_file and Path(temp_file).exists():
+                try:
+                    Path(temp_file).unlink()
+                    logger.info(f"临时文件已清理: {temp_file}")
+                except Exception as cleanup_error:
+                    logger.warning(f"清理临时文件失败: {cleanup_error}")
 
 
 def main():

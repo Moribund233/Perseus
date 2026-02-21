@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useConfigSaver } from '../../composables/useConfigSaver'
 import {
   updateAppConfig,
   validateAppConfig,
@@ -25,9 +26,6 @@ const serviceStore = useServiceStore()
 
 // 从 store 获取服务端配置
 const serverConfigFromStore = computed(() => serviceStore.serverConfig)
-
-// 加载和保存状态
-const isSaving = ref(false)
 
 /**
  * 服务端配置类型
@@ -58,6 +56,27 @@ const emit = defineEmits<{
   (e: 'reset-server'): void
 }>()
 
+// 使用配置保存组合式函数
+const { isSaving, save } = useConfigSaver<ServerConfig>(
+  async (config) => {
+    // 先验证配置
+    const isValid = await validateAppConfig(config)
+    if (!isValid) {
+      throw new Error('配置验证失败')
+    }
+
+    const result: ConfigResponse = await updateAppConfig(config)
+
+    if (!result.success) {
+      throw new Error(result.errors?.[0] || '保存失败')
+    }
+
+    // 保存成功后刷新 store 中的配置
+    await serviceStore.refreshServerConfig()
+  },
+  emit
+)
+
 /**
  * 从 store 同步服务端配置
  */
@@ -71,33 +90,7 @@ const syncServerConfigFromStore = (): void => {
  * 保存服务端配置
  */
 const saveServerConfig = async (): Promise<void> => {
-  isSaving.value = true
-  emit('error', '')
-  emit('success', '')
-
-  try {
-    // 先验证配置
-    const isValid = await validateAppConfig(serverConfig.value)
-    if (!isValid) {
-      emit('error', '配置验证失败')
-      return
-    }
-
-    const result: ConfigResponse = await updateAppConfig(serverConfig.value)
-
-    if (result.success) {
-      emit('success', '服务端配置保存成功')
-      // 保存成功后刷新 store 中的配置
-      await serviceStore.refreshServerConfig()
-    } else {
-      emit('error', result.errors?.[0] || '保存失败')
-    }
-  } catch (err) {
-    console.error('保存服务端配置失败:', err)
-    emit('error', '保存服务端配置失败: ' + String(err))
-  } finally {
-    isSaving.value = false
-  }
+  await save(serverConfig.value, '服务端配置保存成功')
 }
 
 /**

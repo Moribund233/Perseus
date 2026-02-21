@@ -1,11 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import {
-  getClientConfig,
-  saveClientConfig,
-  updateServerUrl,
-  type ClientConfig
-} from '../../services/api'
+import { useClientConfig } from '../../composables/useClientConfig'
+import { updateServerUrl } from '../../services/api'
 
 /**
  * 客户端配置组件
@@ -16,84 +11,21 @@ import {
 // 图标路径
 const loaderIcon = new URL('../../assets/icons/loader.svg', import.meta.url).href
 
-// 加载和保存状态
-const isSaving = ref(false)
-const isLoading = ref(false)
-
-// 客户端配置
-const clientConfig = ref<ClientConfig>({
-  server: {
-    url: 'http://127.0.0.1:8000',
-    auto_connect: true,
-    auto_start: false,
-    path: {
-      exe_name: 'langit-server.exe',
-      dir_name: 'langit-server',
-      custom_path: undefined
-    }
-  },
-  appearance: {
-    theme: 'dark',
-    language: 'zh',
-    sidebar_collapsed: false
-  },
-  notification: {
-    enabled: true,
-    on_error: true,
-    on_warning: false,
-    on_start_stop: true
-  },
-  log: {
-    level: 'info',
-    retention_days: 7
-  },
-  advanced: {
-    ws_reconnect_interval: 3000,
-    connection_timeout: 30,
-    request_timeout: 30
-  }
-})
-
 // 定义事件
 const emit = defineEmits<{
   (e: 'error', message: string): void
   (e: 'success', message: string): void
 }>()
 
-/**
- * 加载客户端配置
- */
-const loadClientConfig = async (): Promise<void> => {
-  isLoading.value = true
-  try {
-    const config = await getClientConfig()
-    clientConfig.value = { ...clientConfig.value, ...config }
-  } catch (err) {
-    console.error('加载客户端配置失败:', err)
-    emit('error', '加载客户端配置失败: ' + String(err))
-  } finally {
-    isLoading.value = false
-  }
-}
-
-/**
- * 保存客户端配置
- */
-const saveClientConfigHandler = async (): Promise<void> => {
-  isSaving.value = true
-  emit('error', '')
-  emit('success', '')
-
-  try {
-    await saveClientConfig(clientConfig.value)
-    emit('success', '客户端配置保存成功')
-  } catch (err) {
-    console.error('保存客户端配置失败:', err)
-    emit('error', '保存客户端配置失败: ' + String(err))
-  } finally {
-    isSaving.value = false
-  }
-}
+// 使用客户端配置组合式函数
+const {
+  clientConfig,
+  isLoading,
+  isSaving,
+  saveConfig: saveClientConfigHandler
+} = useClientConfig(emit, {
+  successMessage: '客户端配置保存成功'
+})
 
 /**
  * 更新服务器地址
@@ -126,8 +58,6 @@ const selectServerPath = async (): Promise<void> => {
   }
 }
 
-// 初始化加载配置
-loadClientConfig()
 </script>
 
 <template>

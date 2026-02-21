@@ -300,6 +300,7 @@ pub async fn validate_app_config(
 pub struct DatabaseMigrateRequest {
     pub source_type: String,
     pub target_type: String,
+    pub source_url: String,
     pub target_url: String,
 }
 
@@ -310,6 +311,21 @@ pub struct DatabaseMigrateResponse {
     pub message: String,
     pub tables: Option<serde_json::Value>,
     pub export_file: Option<String>,
+}
+
+/// 数据库状态响应
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct DatabaseStatusResponse {
+    pub current_db_type: Option<String>,
+    pub target_db_type: String,
+    pub migration_required: bool,
+    pub message: String,
+}
+
+/// 获取数据库状态
+pub async fn get_database_status() -> Result<DatabaseStatusResponse, String> {
+    let client = ApiClient::new()?;
+    client.get("/api/app/database/status").await
 }
 
 /// 执行数据库迁移

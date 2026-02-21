@@ -244,7 +244,7 @@ async function savePreferences(): Promise<void> {
   gap: var(--spacing-sm);
   padding: var(--spacing-md);
   border: 2px solid var(--border-color);
-  border-radius: var(--radius-lg);
+  border-radius: var(--border-radius-md);
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -261,7 +261,7 @@ async function savePreferences(): Promise<void> {
 .theme-preview {
   width: 48px;
   height: 48px;
-  border-radius: var(--radius-md);
+  border-radius: var(--border-radius-md);
   border: 1px solid var(--border-color);
 }
 
@@ -286,7 +286,7 @@ async function savePreferences(): Promise<void> {
 .db-type-option {
   padding: var(--spacing-md);
   border: 2px solid var(--border-color);
-  border-radius: var(--radius-lg);
+  border-radius: var(--border-radius-md);
   cursor: pointer;
   transition: all 0.2s ease;
 }

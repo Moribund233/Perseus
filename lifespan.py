@@ -38,12 +38,19 @@ class AppLifecycleManager:
         
         包括：
         - 记录启动日志
+        - 数据库类型变更检测和迁移检查
         - 验证数据库连接
         - 初始化WebSocket管理器
         """
         logger.info("=" * 60)
         logger.info("应用启动中...")
         logger.info("=" * 60)
+        
+        # 数据库类型变更检测
+        migration_status = await self._check_database_migration()
+        if migration_status.get("migration_required"):
+            logger.warning(f"检测到数据库类型变更: {migration_status.get('current_db_type')} -> {migration_status.get('target_db_type')}")
+            logger.warning("需要执行数据迁移，请通过前端界面确认迁移")
         
         # 验证数据库连接
         await self._verify_database_connection()
@@ -52,6 +59,116 @@ class AppLifecycleManager:
         await self._init_websocket_manager()
         
         logger.info("应用启动完成")
+    
+    async def _check_database_migration(self) -> Dict[str, Any]:
+        """
+        检查数据库类型变更和迁移需求
+        
+        Returns:
+            Dict[str, Any]: 迁移状态信息
+        """
+        try:
+            import os
+            from config import get_config
+            
+            config = get_config()
+            
+            # 从环境变量获取实际数据库类型
+            actual_url = os.environ.get("DATABASE_URL", "")
+            actual_type = self._parse_db_type(actual_url)
+            
+            # 获取记录的数据库类型
+            recorded_type = config.database.current_db_type
+            
+            # 首次启动
+            if recorded_type is None:
+                logger.info(f"首次启动，记录数据库类型: {actual_type}")
+                config.database.current_db_type = actual_type
+                # 保存配置
+                self._save_config(config)
+                return {
+                    "migration_required": False,
+                    "message": "首次启动，初始化数据库记录",
+                    "current_db_type": actual_type,
+                    "target_db_type": actual_type
+                }
+            
+            # 类型一致
+            if actual_type == recorded_type:
+                return {
+                    "migration_required": False,
+                    "message": "数据库类型一致",
+                    "current_db_type": recorded_type,
+                    "target_db_type": actual_type
+                }
+            
+            # 类型变更，需要检查是否有数据
+            logger.info(f"检测到数据库类型变更: {recorded_type} -> {actual_type}")
+            
+            # 注意：这里需要获取旧数据库的URL来检查数据
+            # 但URL是敏感信息，存储在客户端加密配置中
+            # 服务端无法直接访问，需要前端提供
+            # 这里只返回迁移需求，具体检查由迁移API处理
+            
+            return {
+                "migration_required": True,
+                "message": f"检测到数据库类型变更: {recorded_type} -> {actual_type}",
+                "current_db_type": recorded_type,
+                "target_db_type": actual_type
+            }
+            
+        except Exception as e:
+            logger.error(f"数据库迁移检查失败: {e}")
+            return {
+                "migration_required": False,
+                "message": f"检查失败: {str(e)}",
+                "current_db_type": None,
+                "target_db_type": None
+            }
+    
+    def _parse_db_type(self, url: str) -> str:
+        """从数据库URL解析类型"""
+        url_lower = url.lower()
+        if url_lower.startswith("sqlite"):
+            return "sqlite"
+        elif url_lower.startswith("postgresql") or url_lower.startswith("postgres"):
+            return "postgresql"
+        elif url_lower.startswith("mysql"):
+            return "mysql"
+        else:
+            return "unknown"
+    
+    def _save_config(self, config) -> None:
+        """保存配置到文件"""
+        try:
+            import toml
+            from config import ConfigManager
+            
+            config_manager = ConfigManager()
+            config_manager._cache = config
+            config_manager._cache_time = 0  # 强制下次重新加载
+            
+            # 保存到文件
+            config_data = {
+                "server": config.server.model_dump(),
+                "app": config.app.model_dump(),
+                "cors": config.cors.model_dump(),
+                "proxy": config.proxy.model_dump(),
+                "storage": config.storage.model_dump(),
+                "security": config.security.model_dump(),
+                "logging": config.logging.model_dump(),
+                "rate_limit": config.rate_limit.model_dump(),
+                "database": {
+                    k: v for k, v in config.database.model_dump().items()
+                    if k not in ["url", "is_stress_test"]  # 排除环境变量注入的配置
+                }
+            }
+            
+            with open(config_manager.config_path, "w", encoding="utf-8") as f:
+                toml.dump(config_data, f)
+                
+        except Exception as e:
+            logger.error(f"保存配置失败: {e}")
     
     async def shutdown(self) -> None:
         """

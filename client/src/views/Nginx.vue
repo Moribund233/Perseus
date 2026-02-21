@@ -904,103 +904,9 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.nginx-page {
-  padding: var(--spacing-lg);
-  max-width: 1200px;
-  margin: 0 auto;
-}
+/* Nginx 页面特定样式 - 其他样式来自 page-common.css */
 
-.page-title {
-  margin: 0 0 var(--spacing-xl) 0;
-}
-
-/* 消息提示 */
-.message {
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-radius: var(--border-radius-md);
-  margin-bottom: var(--spacing-lg);
-  font-size: var(--font-size-sm);
-}
-
-.message.success {
-  background-color: rgba(34, 197, 94, 0.1);
-  color: var(--success-color);
-  border: 1px solid var(--success-color);
-}
-
-.message.error {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: var(--error-color);
-  border: 1px solid var(--error-color);
-}
-
-.message.info {
-  background-color: rgba(59, 130, 246, 0.1);
-  color: var(--info-color);
-  border: 1px solid var(--info-color);
-}
-
-/* 状态卡片 */
-.status-card {
-  background-color: var(--bg-secondary);
-  border-radius: var(--border-radius-md);
-  padding: var(--spacing-xl);
-  border: 1px solid var(--border-color);
-}
-
-.status-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-lg);
-  padding-bottom: var(--spacing-lg);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.status-header h2 {
-  font-size: var(--font-size-lg);
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-/* 状态详情 */
-.status-details {
-  margin-bottom: var(--spacing-xl);
-}
-
-.detail-item {
-  display: flex;
-  margin-bottom: var(--spacing-sm);
-  font-size: var(--font-size-sm);
-}
-
-.detail-label {
-  width: 100px;
-  color: var(--text-secondary);
-  flex-shrink: 0;
-}
-
-.detail-value {
-  color: var(--text-primary);
-  word-break: break-all;
-}
-
-.detail-value.path {
-  font-family: monospace;
-  font-size: var(--font-size-xs);
-  background-color: var(--bg-tertiary);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--border-radius-sm);
-}
-
-/* 操作按钮 */
-.status-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-md);
-}
-
+/* 按钮扩展 */
 .btn-danger {
   background-color: var(--error-color);
   color: white;
@@ -1025,23 +931,12 @@ onMounted(() => {
 }
 
 /* 表单扩展 */
-.form-group {
-  margin-bottom: var(--spacing-lg);
-}
-
 .form-group label {
   display: block;
   font-size: var(--font-size-sm);
   font-weight: 500;
   color: var(--text-primary);
   margin-bottom: var(--spacing-sm);
-}
-
-.form-hint {
-  display: block;
-  margin-top: var(--spacing-xs);
-  font-size: var(--font-size-xs);
-  color: var(--text-secondary);
 }
 
 .form-info {
@@ -1066,68 +961,8 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
-/* 配置卡片 */
-.config-card {
-  background-color: var(--bg-secondary);
-  border-radius: var(--border-radius-md);
-  padding: var(--spacing-xl);
-  border: 1px solid var(--border-color);
-  margin-top: var(--spacing-lg);
-}
-
-.config-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-lg);
-  padding-bottom: var(--spacing-lg);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.config-header h2 {
-  font-size: var(--font-size-lg);
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.config-hint {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
-
 /* 配置表单 */
-.config-form {
-  margin-bottom: var(--spacing-lg);
-}
-
-.form-section {
-  margin-bottom: var(--spacing-xl);
-}
-
-.form-section h3 {
-  font-size: var(--font-size-md);
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 var(--spacing-md) 0;
-  padding-bottom: var(--spacing-sm);
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-}
-
 .form-row .form-group {
   margin-bottom: 0;
-}
-
-.form-group input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-}
-
-.config-actions {
-  justify-content: flex-end;
 }
 </style>

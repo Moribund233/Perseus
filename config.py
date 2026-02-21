@@ -108,6 +108,12 @@ class DatabaseSettings(BaseSettings):
         description="是否启用压力测试模式，必须通过环境变量 LANGIT_STRESS_TEST 注入"
     )
     
+    # 服务端记录的数据库类型（由服务端维护，用于迁移检测）
+    current_db_type: Optional[str] = Field(
+        default=None, 
+        description="服务端记录的上次实际数据库类型，用于检测类型变更和迁移"
+    )
+    
     # 可写入配置文件的配置项
     pool_size: int = Field(default=20, ge=1, description="连接池大小（增加以支持高并发）")
     max_overflow: int = Field(default=40, ge=0, description="最大溢出连接数（增加以支持高并发）")

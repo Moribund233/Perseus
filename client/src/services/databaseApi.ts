@@ -120,10 +120,28 @@ export interface MigrationResult {
  */
 export interface MigrationParams {
   /** 源数据库类型 */
-  sourceType: string
+  source_type: string
   /** 目标数据库类型 */
-  targetType: string
+  target_type: string
+  /** 源数据库 URL */
+  source_url: string
+  /** 目标数据库 URL */
+  target_url: string
   [key: string]: unknown
+}
+
+/**
+ * 数据库状态响应（从服务端 API 获取）
+ */
+export interface DatabaseStatusResponse {
+  /** 服务端记录的上次实际数据库类型 */
+  current_db_type: DatabaseType | null
+  /** 从环境变量解析的目标数据库类型 */
+  target_db_type: DatabaseType
+  /** 是否需要数据迁移 */
+  migration_required: boolean
+  /** 状态信息 */
+  message: string
 }
 
 /**
@@ -192,6 +210,14 @@ export async function testDatabaseConnection(config: DatabaseConfig): Promise<Co
     success: response.success,
     message: response.success ? '连接配置验证通过' : (response.errors.join('; ') || '连接配置验证失败')
   }
+}
+
+/**
+ * 获取数据库状态（从服务端 API）
+ */
+export async function getDatabaseStatusFromApi(): Promise<DatabaseStatusResponse> {
+  const response = await invoke<DatabaseStatusResponse>('get_database_status_from_api')
+  return response
 }
 
 /**

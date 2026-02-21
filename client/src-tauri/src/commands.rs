@@ -687,16 +687,25 @@ pub fn get_jwt_secret_key() -> Result<String, String> {
 
 // ==================== 数据库迁移命令 ====================
 
+/// 获取数据库状态（从服务端 API）
+#[tauri::command]
+pub async fn get_database_status_from_api(
+) -> Result<crate::api_client::DatabaseStatusResponse, String> {
+    crate::api_client::get_database_status().await
+}
+
 /// 执行数据库迁移
 #[tauri::command]
 pub async fn migrate_database(
     source_type: String,
     target_type: String,
+    source_url: String,
     target_url: String,
 ) -> Result<crate::api_client::DatabaseMigrateResponse, String> {
     let request = crate::api_client::DatabaseMigrateRequest {
         source_type,
         target_type,
+        source_url,
         target_url,
     };
     crate::api_client::migrate_database(request).await

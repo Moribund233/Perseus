@@ -70,6 +70,7 @@ fn merge_configs(
         result.log = app.log;
         result.advanced = app.advanced;
         result.nginx = app.nginx;
+        result.db_type = app.db_type;
     }
 
     // 如果有用户配置，使用它的值（覆盖非敏感配置）
@@ -80,6 +81,7 @@ fn merge_configs(
         result.log = user.log;
         result.advanced = user.advanced;
         result.nginx = user.nginx;
+        result.db_type = user.db_type;
     }
 
     result

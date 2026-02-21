@@ -146,6 +146,16 @@ Thumbs.db
 *.pid
 nginx/
 repositories/
+
+# Database migration files
+migration_*.json
+*.migration.json
+
+# Temporary files
+*.tmp
+.temp/
+temp/
+!temp/.gitkeep
 server/
 
 # node_modules

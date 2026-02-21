@@ -11,11 +11,16 @@ import {
   updateDatabaseConfig,
   testDatabaseConnection,
   getDatabaseStatus,
+  getDatabaseStatusFromApi,
+  migrateDatabase,
   type DatabaseConfig,
   type DatabaseType,
   type DatabaseStatus,
-  type ConnectionTestResult
+  type ConnectionTestResult,
+  type DatabaseStatusResponse,
+  type MigrationParams
 } from '../services/databaseApi'
+import { getDatabaseUrl } from '../services/api'
 
 /**
  * 数据库类型选项
@@ -260,6 +265,63 @@ export const useDatabaseStore = defineStore('database', () => {
   }
 
   /**
+   * 从服务端 API 获取数据库状态（用于迁移检测）
+   */
+  async function checkMigrationStatus(): Promise<DatabaseStatusResponse | null> {
+    try {
+      const status = await getDatabaseStatusFromApi()
+      return status
+    } catch (err) {
+      console.error('获取迁移状态失败:', err)
+      return null
+    }
+  }
+
+  /**
+   * 执行数据库迁移
+   * @param sourceType 源数据库类型
+   * @param targetType 目标数据库类型
+   */
+  async function executeMigration(sourceType: DatabaseType, targetType: DatabaseType): Promise<{ success: boolean; message: string }> {
+    try {
+      // 从加密配置获取源和目标数据库 URL
+      const [sourceUrl, targetUrl] = await Promise.all([
+        getDatabaseUrl(sourceType),
+        getDatabaseUrl(targetType)
+      ])
+
+      const params: MigrationParams = {
+        source_type: sourceType,
+        target_type: targetType,
+        source_url: sourceUrl,
+        target_url: targetUrl
+      }
+
+      const result = await migrateDatabase(params)
+      
+      if (result.success) {
+        // 迁移成功，更新本地配置
+        if (editingConfig.value) {
+          editingConfig.value.db_type = targetType
+        }
+        successMessage.value = '数据库迁移成功'
+      } else {
+        error.value = result.message || '迁移失败'
+      }
+
+      return {
+        success: result.success,
+        message: result.message
+      }
+    } catch (err: any) {
+      const message = err?.message || '迁移过程中发生错误'
+      error.value = message
+      console.error('执行迁移失败:', err)
+      return { success: false, message }
+    }
+  }
+
+  /**
    * 重置状态
    */
   function reset(): void {
@@ -306,6 +368,8 @@ export const useDatabaseStore = defineStore('database', () => {
     resetConfig,
     clearMessages,
     refreshStatus,
+    checkMigrationStatus,
+    executeMigration,
     reset
   }
 })
