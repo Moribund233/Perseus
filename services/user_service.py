@@ -4,7 +4,6 @@
 处理与用户相关的所有业务逻辑
 """
 import logging
-from sqlalchemy.orm import Session
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from models import User
@@ -84,27 +83,28 @@ def get_password_hash(password: str) -> str:
         raise
 
 
-def get_users(db: Session):
+async def get_users(db: AsyncSession):
     """
     获取所有用户
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         list[dict]: 用户列表（不包含密码）
     """
-    users = db.query(User).all()
+    result = await db.execute(select(User))
+    users = result.scalars().all()
     return [user_to_dict(user) for user in users]
 
 
-def get_user_by_id(user_id: int, db: Session):
+async def get_user_by_id(user_id: int, db: AsyncSession):
     """
     根据ID获取用户
 
     Args:
         user_id: 用户ID
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         dict: 用户信息（不包含密码）
@@ -112,33 +112,36 @@ def get_user_by_id(user_id: int, db: Session):
     Raises:
         NotFoundException: 用户不存在时抛出404异常
     """
-    user = db.query(User).filter(User.id == user_id).first()
+    result = await db.execute(select(User).filter(User.id == user_id))
+    user = result.scalar_one_or_none()
     if user is None:
         raise NotFoundException(detail="User not found")
     return user_to_dict(user)
 
 
-def create_user(user_data: dict, db: Session):
+async def create_user(user_data: dict, db: AsyncSession):
     """
     创建新用户
 
     Args:
         user_data: 用户信息
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
-        User: 创建的用户信息
+        dict: 创建的用户信息
 
     Raises:
         ConflictException: 用户名或邮箱已存在时抛出409异常
     """
     # 检查用户名是否已存在
-    existing_user = db.query(User).filter(User.username == user_data["username"]).first()
+    result = await db.execute(select(User).filter(User.username == user_data["username"]))
+    existing_user = result.scalar_one_or_none()
     if existing_user:
         raise ConflictException(detail="Username already exists")
 
     # 检查邮箱是否已存在
-    existing_email = db.query(User).filter(User.email == user_data["email"]).first()
+    result = await db.execute(select(User).filter(User.email == user_data["email"]))
+    existing_email = result.scalar_one_or_none()
     if existing_email:
         raise ConflictException(detail="Email already exists")
 
@@ -153,13 +156,13 @@ def create_user(user_data: dict, db: Session):
     )
 
     db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
+    await db.commit()
+    await db.refresh(db_user)
 
     return user_to_dict(db_user)
 
 
-def update_user(user_id: int, user_data: dict, db: Session, current_user: User = None):
+async def update_user(user_id: int, user_data: dict, db: AsyncSession, current_user: User = None):
     """
     更新用户信息
 
@@ -170,11 +173,11 @@ def update_user(user_id: int, user_data: dict, db: Session, current_user: User =
     Args:
         user_id: 用户ID
         user_data: 更新的用户信息
-        db: 数据库会话
+        db: 异步数据库会话
         current_user: 当前认证用户，用于权限检查
 
     Returns:
-        User: 更新后的用户信息
+        dict: 更新后的用户信息
 
     Raises:
         NotFoundException: 用户不存在时抛出404异常
@@ -182,7 +185,8 @@ def update_user(user_id: int, user_data: dict, db: Session, current_user: User =
     """
     from exception import AuthorizationException
 
-    db_user = db.query(User).filter(User.id == user_id).first()
+    result = await db.execute(select(User).filter(User.id == user_id))
+    db_user = result.scalar_one_or_none()
     if db_user is None:
         raise NotFoundException(detail="User not found")
 
@@ -198,19 +202,19 @@ def update_user(user_id: int, user_data: dict, db: Session, current_user: User =
         if hasattr(db_user, key):
             setattr(db_user, key, value)
 
-    db.commit()
-    db.refresh(db_user)
+    await db.commit()
+    await db.refresh(db_user)
 
     return user_to_dict(db_user)
 
 
-def delete_user(user_id: int, db: Session):
+async def delete_user(user_id: int, db: AsyncSession):
     """
     删除用户
 
     Args:
         user_id: 用户ID
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         dict: 成功消息
@@ -218,12 +222,13 @@ def delete_user(user_id: int, db: Session):
     Raises:
         NotFoundException: 用户不存在时抛出404异常
     """
-    db_user = db.query(User).filter(User.id == user_id).first()
+    result = await db.execute(select(User).filter(User.id == user_id))
+    db_user = result.scalar_one_or_none()
     if db_user is None:
         raise NotFoundException(detail="User not found")
 
-    db.delete(db_user)
-    db.commit()
+    await db.delete(db_user)
+    await db.commit()
 
     return {"message": "User deleted successfully"}
 
@@ -270,27 +275,26 @@ async def login_user(credentials: dict, db: AsyncSession):
     }
 
 
-def authenticate_user(username: str, password: str, db: Session) -> User | None:
+async def authenticate_user(username: str, password: str, db: AsyncSession) -> User | None:
     """
-    验证用户凭据
-
-    同步版本的认证函数，用于 Git HTTP 协议认证
+    验证用户凭据（异步版本）
 
     Args:
         username: 用户名
         password: 密码
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         User | None: 认证成功返回用户对象，失败返回 None
     """
-    # 查找用户
-    user = db.query(User).filter(User.username == username).first()
+    # 查找用户（异步）
+    result = await db.execute(select(User).filter(User.username == username))
+    user = result.scalar_one_or_none()
 
     if not user:
         return None
 
-    # 同步验证密码
+    # 验证密码
     try:
         # 限制密码长度，避免bcrypt错误
         if pwd_context.verify(password[:MAX_PASSWORD_LENGTH], user.password):

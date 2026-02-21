@@ -9,6 +9,9 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 import logging
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from models.user import User
 from config import get_config
 
@@ -203,7 +206,7 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
         return None
 
 
-async def refresh_access_token(refresh_token: str, db) -> Optional[Dict[str, str]]:
+async def refresh_access_token(refresh_token: str, db: AsyncSession) -> Optional[Dict[str, str]]:
     """
     使用刷新令牌获取新的访问令牌
 
@@ -214,8 +217,6 @@ async def refresh_access_token(refresh_token: str, db) -> Optional[Dict[str, str
     Returns:
         dict: 新的令牌对，验证失败返回 None
     """
-    from sqlalchemy import select
-
     token_data = verify_token(refresh_token, token_type="refresh")
     if not token_data:
         return None
@@ -245,3 +246,132 @@ def revoke_token(token: str) -> bool:
     # 这里仅作示例
     logger.info(f"Token revoked: {token[:10]}...")
     return True
+
+
+async def get_user_by_username(db: AsyncSession, username: str) -> Optional[User]:
+    """
+    根据用户名获取用户
+
+    Args:
+        db: 异步数据库会话
+        username: 用户名
+
+    Returns:
+        User: 用户对象，不存在返回 None
+    """
+    result = await db.execute(select(User).filter(User.username == username))
+    return result.scalar_one_or_none()
+
+
+async def authenticate_user(
+    db: AsyncSession,
+    username: str,
+    password: str
+) -> Optional[User]:
+    """
+    认证用户
+
+    验证用户名和密码是否匹配
+
+    Args:
+        db: 异步数据库会话
+        username: 用户名
+        password: 密码
+
+    Returns:
+        User: 认证成功的用户对象，失败返回 None
+
+    Raises:
+        AuthenticationException: 认证失败时抛出
+    """
+    from exception import AuthenticationException
+
+    user = await get_user_by_username(db, username)
+
+    if not user:
+        raise AuthenticationException(detail="Invalid username or password")
+
+    if not user.is_active:
+        raise AuthenticationException(detail="User account is disabled")
+
+    if not pwd_context.verify(password, user.password):
+        raise AuthenticationException(detail="Invalid username or password")
+
+    return user
+
+
+async def get_current_user(
+    db: AsyncSession,
+    token: str
+) -> User:
+    """
+    从令牌获取当前用户
+
+    验证令牌并返回对应的用户对象
+
+    Args:
+        db: 异步数据库会话
+        token: JWT 令牌
+
+    Returns:
+        User: 当前用户对象
+
+    Raises:
+        AuthenticationException: 令牌无效或用户不存在时抛出
+    """
+    from exception import AuthenticationException
+
+    token_data = verify_token(token, token_type="access")
+
+    if not token_data:
+        raise AuthenticationException(detail="Invalid or expired token")
+
+    result = await db.execute(select(User).filter(User.id == token_data.user_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise AuthenticationException(detail="User not found")
+
+    if not user.is_active:
+        raise AuthenticationException(detail="User account is disabled")
+
+    return user
+
+
+async def validate_token(
+    db: AsyncSession,
+    token: str
+) -> TokenData:
+    """
+    验证令牌
+
+    验证令牌的有效性并返回令牌数据
+
+    Args:
+        db: 异步数据库会话
+        token: JWT 令牌
+
+    Returns:
+        TokenData: 令牌数据
+
+    Raises:
+        AuthenticationException: 令牌无效时抛出
+    """
+    from exception import AuthenticationException
+
+    token_data = verify_token(token, token_type="access")
+
+    if not token_data:
+        raise AuthenticationException(detail="Invalid or expired token")
+
+    # 验证用户是否存在且活跃
+    result = await db.execute(select(User).filter(User.id == token_data.user_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise AuthenticationException(detail="User not found")
+
+    if not user.is_active:
+        raise AuthenticationException(detail="User account is disabled")
+
+    return token_data

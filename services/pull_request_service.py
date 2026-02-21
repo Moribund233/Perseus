@@ -5,7 +5,9 @@ Pull Request 服务层
 """
 import os
 from typing import List, Optional, Dict, Any
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
+from sqlalchemy import select
 
 from models import PullRequest, PRComment, PRReview, User
 from exception import ValidationException, NotFoundException, AuthorizationException
@@ -22,7 +24,7 @@ from utils.git_utils import GitService
 
 
 async def list_pull_requests(
-    db: Session,
+    db: AsyncSession,
     repository_id: int,
     status: Optional[str] = None,
     author_id: Optional[int] = None,
@@ -33,7 +35,7 @@ async def list_pull_requests(
     获取 PR 列表
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         status: 状态筛选（open/merged/closed）
         author_id: 作者ID筛选
@@ -43,16 +45,16 @@ async def list_pull_requests(
     Returns:
         dict: 包含 PR 列表和分页信息
     """
-    query = db.query(PullRequest).filter(PullRequest.repository_id == repository_id)
+    stmt = select(PullRequest).filter(PullRequest.repository_id == repository_id)
 
     if status:
-        query = query.filter(PullRequest.status == status)
+        stmt = stmt.filter(PullRequest.status == status)
 
     if author_id:
-        query = query.filter(PullRequest.author_id == author_id)
+        stmt = stmt.filter(PullRequest.author_id == author_id)
 
-    query = query.order_by(PullRequest.created_at.desc())
-    prs, total = paginate(db, query, page, limit)
+    stmt = stmt.order_by(PullRequest.created_at.desc())
+    prs, total = await paginate(db, stmt, page, limit)
 
     return build_pagination_response(
         items=[build_pr_response(pr) for pr in prs],
@@ -63,7 +65,7 @@ async def list_pull_requests(
 
 
 async def get_pull_request(
-    db: Session,
+    db: AsyncSession,
     repository_id: int,
     pr_number: int,
     include_details: bool = False
@@ -72,7 +74,7 @@ async def get_pull_request(
     获取 PR 详情
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         pr_number: PR 编号
         include_details: 是否包含详细信息
@@ -84,24 +86,25 @@ async def get_pull_request(
         NotFoundException: PR 不存在
     """
     # 使用 joinedload 预加载关联数据，避免 N+1 查询
-    query = db.query(PullRequest).filter(
+    stmt = select(PullRequest).filter(
         PullRequest.repository_id == repository_id,
         PullRequest.pr_number == pr_number
     )
 
     # 预加载关联数据
-    query = query.options(
+    stmt = stmt.options(
         joinedload(PullRequest.author),
         joinedload(PullRequest.merger)
     )
 
     if include_details:
-        query = query.options(
+        stmt = stmt.options(
             joinedload(PullRequest.comments).joinedload(PRComment.author),
             joinedload(PullRequest.reviews).joinedload(PRReview.reviewer)
         )
 
-    pr = query.first()
+    result = await db.execute(stmt)
+    pr = result.scalar_one_or_none()
 
     if not pr:
         raise NotFoundException(detail="Pull request not found")
@@ -110,7 +113,7 @@ async def get_pull_request(
 
 
 async def create_pull_request(
-    db: Session,
+    db: AsyncSession,
     repository_id: int,
     author_id: int,
     title: str,
@@ -122,7 +125,7 @@ async def create_pull_request(
     创建 Pull Request
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         author_id: 作者ID
         title: 标题
@@ -144,7 +147,7 @@ async def create_pull_request(
         raise ValidationException(detail="Source and target branches cannot be the same")
 
     # 生成 PR 编号
-    pr_number = get_next_sequence_number(
+    pr_number = await get_next_sequence_number(
         db, PullRequest, "pr_number", {"repository_id": repository_id}
     )
 
@@ -161,14 +164,14 @@ async def create_pull_request(
     )
 
     db.add(pr)
-    db.commit()
-    db.refresh(pr)
+    await db.commit()
+    await db.refresh(pr)
 
     return build_pr_response(pr)
 
 
 async def update_pull_request(
-    db: Session,
+    db: AsyncSession,
     repository_id: int,
     pr_number: int,
     user_id: int,
@@ -179,7 +182,7 @@ async def update_pull_request(
     更新 Pull Request
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         pr_number: PR 编号
         user_id: 当前用户ID
@@ -211,14 +214,14 @@ async def update_pull_request(
     if description is not None:
         pr.description = description
 
-    db.commit()
-    db.refresh(pr)
+    await db.commit()
+    await db.refresh(pr)
 
     return build_pr_response(pr)
 
 
 async def close_pull_request(
-    db: Session,
+    db: AsyncSession,
     repository_id: int,
     pr_number: int,
     user_id: int
@@ -227,7 +230,7 @@ async def close_pull_request(
     关闭 Pull Request
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         pr_number: PR 编号
         user_id: 当前用户ID
@@ -247,14 +250,14 @@ async def close_pull_request(
         raise ValidationException(detail=f"Pull request is already {pr.status}")
 
     pr.status = "closed"
-    db.commit()
-    db.refresh(pr)
+    await db.commit()
+    await db.refresh(pr)
 
     return build_pr_response(pr)
 
 
 async def merge_pull_request(
-    db: Session,
+    db: AsyncSession,
     repository_id: int,
     pr_number: int,
     merger_id: int,
@@ -264,7 +267,7 @@ async def merge_pull_request(
     合并 Pull Request
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         pr_number: PR 编号
         merger_id: 合并者ID
@@ -283,12 +286,13 @@ async def merge_pull_request(
         raise ValidationException(detail=f"Cannot merge {pr.status} pull request")
 
     # 获取合并者信息
-    merger = db.query(User).filter(User.id == merger_id).first()
+    result = await db.execute(select(User).filter(User.id == merger_id))
+    merger = result.scalar_one_or_none()
     if not merger:
         raise NotFoundException(detail="Merger not found")
 
     # 检查合并权限（需要仓库写权限）
-    has_permission = check_repository_permission(
+    has_permission = await check_repository_permission(
         db, repository_id, merger_id, ["owner", "admin", "developer"]
     )
     if not has_permission:
@@ -296,7 +300,7 @@ async def merge_pull_request(
 
     # 使用 GitService 进行 Git 操作
     try:
-        git_service = GitService.from_repository_id(db, repository_id)
+        git_service = await GitService.from_repository_id(db, repository_id)
     except NotFoundException:
         raise NotFoundException(detail="Repository not found on disk")
 
@@ -338,14 +342,14 @@ async def merge_pull_request(
     pr.merged_by = merger_id
     pr.merged_commit_hash = merged_commit_hash
 
-    db.commit()
-    db.refresh(pr)
+    await db.commit()
+    await db.refresh(pr)
 
     return build_pr_response(pr)
 
 
 async def create_pr_comment(
-    db: Session,
+    db: AsyncSession,
     repository_id: int,
     pr_number: int,
     author_id: int,
@@ -359,7 +363,7 @@ async def create_pr_comment(
     创建 PR 评论
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         pr_number: PR 编号
         author_id: 作者ID
@@ -380,7 +384,8 @@ async def create_pr_comment(
 
     # 验证父评论
     if parent_id:
-        parent = db.query(PRComment).filter(PRComment.id == parent_id).first()
+        result = await db.execute(select(PRComment).filter(PRComment.id == parent_id))
+        parent = result.scalar_one_or_none()
         if not parent or parent.pull_request_id != pr.id:
             raise ValidationException(detail="Invalid parent comment")
 
@@ -395,14 +400,14 @@ async def create_pr_comment(
     )
 
     db.add(comment)
-    db.commit()
-    db.refresh(comment)
+    await db.commit()
+    await db.refresh(comment)
 
     return build_pr_comment_response(comment)
 
 
 async def create_pr_review(
-    db: Session,
+    db: AsyncSession,
     repository_id: int,
     pr_number: int,
     reviewer_id: int,
@@ -413,7 +418,7 @@ async def create_pr_review(
     创建 PR 审查
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         pr_number: PR 编号
         reviewer_id: 审查者ID
@@ -430,17 +435,20 @@ async def create_pr_review(
         raise ValidationException(detail="Invalid review status")
 
     # 检查是否已存在审查记录
-    existing_review = db.query(PRReview).filter(
-        PRReview.pull_request_id == pr.id,
-        PRReview.reviewer_id == reviewer_id
-    ).first()
+    result = await db.execute(
+        select(PRReview).filter(
+            PRReview.pull_request_id == pr.id,
+            PRReview.reviewer_id == reviewer_id
+        )
+    )
+    existing_review = result.scalar_one_or_none()
 
     if existing_review:
         # 更新现有审查
         existing_review.status = status
         existing_review.comment = comment
-        db.commit()
-        db.refresh(existing_review)
+        await db.commit()
+        await db.refresh(existing_review)
         return build_pr_review_response(existing_review)
 
     # 创建新审查
@@ -452,14 +460,14 @@ async def create_pr_review(
     )
 
     db.add(review)
-    db.commit()
-    db.refresh(review)
+    await db.commit()
+    await db.refresh(review)
 
     return build_pr_review_response(review)
 
 
 async def list_pr_comments(
-    db: Session,
+    db: AsyncSession,
     repository_id: int,
     pr_number: int
 ) -> List[dict]:
@@ -467,7 +475,7 @@ async def list_pr_comments(
     获取 PR 评论列表
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         pr_number: PR 编号
 
@@ -478,10 +486,131 @@ async def list_pr_comments(
     pr = await get_pull_request_or_404(db, repository_id, pr_number)
 
     # 使用 joinedload 预加载作者信息，避免 N+1 查询
-    comments = db.query(PRComment).filter(
-        PRComment.pull_request_id == pr.id
-    ).options(
-        joinedload(PRComment.author)
-    ).order_by(PRComment.created_at.asc()).all()
+    result = await db.execute(
+        select(PRComment)
+        .filter(PRComment.pull_request_id == pr.id)
+        .options(joinedload(PRComment.author))
+        .order_by(PRComment.created_at.asc())
+    )
+    comments = result.scalars().all()
 
     return [build_pr_comment_response(c) for c in comments]
+
+
+# =============================================================================
+# PR Diff 相关功能
+# =============================================================================
+
+async def get_pr_diff(
+    db: AsyncSession,
+    repository_id: int,
+    pr_number: int
+) -> dict:
+    """
+    获取 PR 的 diff 内容
+
+    Args:
+        db: 异步数据库会话
+        repository_id: 仓库ID
+        pr_number: PR 编号
+
+    Returns:
+        dict: 包含 diff 内容、文件列表、统计信息
+
+    Raises:
+        NotFoundException: PR 不存在
+        ValidationException: 获取 diff 失败
+    """
+    from utils.git_utils import get_pr_diff as _get_pr_diff
+    from utils.git_utils import get_pr_files, get_pr_stats
+
+    # 获取 PR
+    pr = await get_pull_request_or_404(db, repository_id, pr_number)
+
+    # 获取仓库路径
+    from utils.git_utils import get_repository_path
+    repo_path = await get_repository_path(db, repository_id)
+
+    try:
+        # 获取 diff 内容
+        diff_content = _get_pr_diff(
+            repo_path,
+            pr.base_commit,
+            pr.head_commit
+        )
+
+        # 获取文件列表
+        files = get_pr_files(
+            repo_path,
+            pr.base_commit,
+            pr.head_commit
+        )
+
+        # 获取统计信息
+        stats = get_pr_stats(
+            repo_path,
+            pr.base_commit,
+            pr.head_commit
+        )
+
+        return {
+            "diff": diff_content,
+            "files": files,
+            "stats": stats,
+            "base_commit": pr.base_commit,
+            "head_commit": pr.head_commit
+        }
+
+    except Exception as e:
+        raise ValidationException(detail=f"Failed to get PR diff: {str(e)}")
+
+
+async def get_pr_file_diff(
+    db: AsyncSession,
+    repository_id: int,
+    pr_number: int,
+    file_path: str
+) -> dict:
+    """
+    获取 PR 中单个文件的 diff 内容
+
+    Args:
+        db: 异步数据库会话
+        repository_id: 仓库ID
+        pr_number: PR 编号
+        file_path: 文件路径
+
+    Returns:
+        dict: 包含文件 diff 内容
+
+    Raises:
+        NotFoundException: PR 不存在
+        ValidationException: 获取 diff 失败
+    """
+    from utils.git_utils import get_file_diff
+
+    # 获取 PR
+    pr = await get_pull_request_or_404(db, repository_id, pr_number)
+
+    # 获取仓库路径
+    from utils.git_utils import get_repository_path
+    repo_path = await get_repository_path(db, repository_id)
+
+    try:
+        # 获取文件 diff
+        diff_content = get_file_diff(
+            repo_path,
+            pr.base_commit,
+            pr.head_commit,
+            file_path
+        )
+
+        return {
+            "file_path": file_path,
+            "diff": diff_content,
+            "base_commit": pr.base_commit,
+            "head_commit": pr.head_commit
+        }
+
+    except Exception as e:
+        raise ValidationException(detail=f"Failed to get file diff: {str(e)}")

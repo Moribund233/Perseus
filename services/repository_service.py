@@ -6,7 +6,8 @@
 import os
 import shutil
 import logging
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import Repository
 from models.branch import Branch
@@ -45,30 +46,31 @@ def _check_physical_repo_exists(repo: Repository) -> bool:
         return False
 
 
-def get_repositories(db: Session):
+async def get_repositories(db: AsyncSession):
     """
     获取所有仓库
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         list[dict]: 仓库列表（包含物理仓库信息）
     """
-    repos = db.query(Repository).all()
+    result = await db.execute(select(Repository))
+    repos = result.scalars().all()
     return [
         build_repo_response(repo, _check_physical_repo_exists(repo))
         for repo in repos
     ]
 
 
-def get_repository_by_id(repo_id: int, db: Session):
+async def get_repository_by_id(repo_id: int, db: AsyncSession):
     """
     根据ID获取仓库
 
     Args:
         repo_id: 仓库ID
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         dict: 仓库信息（包含物理仓库信息）
@@ -76,33 +78,38 @@ def get_repository_by_id(repo_id: int, db: Session):
     Raises:
         NotFoundException: 仓库不存在时抛出404异常
     """
-    repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).filter(Repository.id == repo_id))
+    repo = result.scalar_one_or_none()
     if repo is None:
         raise NotFoundException(detail="Repository not found")
     return build_repo_response(repo, _check_physical_repo_exists(repo))
 
 
-def get_repositories_by_user(user_id: int, db: Session):
+async def get_repositories_by_user(user_id: int, db: AsyncSession):
     """
     根据用户ID获取仓库列表
 
     Args:
         user_id: 用户ID
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         list[dict]: 仓库列表（包含物理仓库信息）
     """
     # 查询用户拥有的仓库
-    owned_repos = db.query(Repository).filter(Repository.owner_id == user_id).all()
+    result = await db.execute(select(Repository).filter(Repository.owner_id == user_id))
+    owned_repos = result.scalars().all()
 
     # 查询用户参与的仓库（通过repository_members表）
-    member_repos = db.query(Repository).join(RepositoryMember).filter(
-        RepositoryMember.user_id == user_id
-    ).all()
+    result = await db.execute(
+        select(Repository)
+        .join(RepositoryMember)
+        .filter(RepositoryMember.user_id == user_id)
+    )
+    member_repos = result.scalars().all()
 
     # 合并结果，去重
-    all_repos = list(set(owned_repos + member_repos))
+    all_repos = list(set(list(owned_repos) + list(member_repos)))
 
     return [
         build_repo_response(repo, _check_physical_repo_exists(repo))
@@ -110,13 +117,13 @@ def get_repositories_by_user(user_id: int, db: Session):
     ]
 
 
-def create_repository(repo_data: dict, db: Session):
+async def create_repository(repo_data: dict, db: AsyncSession):
     """
     创建新仓库
 
     Args:
         repo_data: 仓库信息
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         dict: 创建的仓库信息
@@ -130,7 +137,7 @@ def create_repository(repo_data: dict, db: Session):
         raise ValidationException(detail="Name, path and owner_id are required")
 
     # 检查路径是否已存在
-    if exists(db, Repository, {"path": repo_data["path"]}):
+    if await exists(db, Repository, {"path": repo_data["path"]}):
         raise ConflictException(detail="Repository path already exists")
 
     # 创建新仓库
@@ -144,8 +151,8 @@ def create_repository(repo_data: dict, db: Session):
     )
 
     db.add(db_repo)
-    db.commit()
-    db.refresh(db_repo)
+    await db.commit()
+    await db.refresh(db_repo)
 
     # 为仓库创建默认分支
     default_branch = Branch(
@@ -155,7 +162,7 @@ def create_repository(repo_data: dict, db: Session):
         is_default=True
     )
     db.add(default_branch)
-    db.commit()
+    await db.commit()
 
     # 添加仓库所有者为成员
     owner_member = RepositoryMember(
@@ -164,7 +171,7 @@ def create_repository(repo_data: dict, db: Session):
         role="owner"
     )
     db.add(owner_member)
-    db.commit()
+    await db.commit()
 
     # 创建物理 Git 仓库（空仓库，无初始提交）
     try:
@@ -180,14 +187,14 @@ def create_repository(repo_data: dict, db: Session):
     return build_repo_response(db_repo, _check_physical_repo_exists(db_repo))
 
 
-def update_repository(repo_id: int, repo_data: dict, db: Session):
+async def update_repository(repo_id: int, repo_data: dict, db: AsyncSession):
     """
     更新仓库信息
 
     Args:
         repo_id: 仓库ID
         repo_data: 更新的仓库信息
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         dict: 更新后的仓库信息（包含物理仓库信息）
@@ -196,13 +203,14 @@ def update_repository(repo_id: int, repo_data: dict, db: Session):
         NotFoundException: 仓库不存在时抛出404异常
         ConflictException: 仓库路径已存在时抛出409异常
     """
-    db_repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).filter(Repository.id == repo_id))
+    db_repo = result.scalar_one_or_none()
     if db_repo is None:
         raise NotFoundException(detail="Repository not found")
 
     # 检查路径是否已存在（如果更新了路径）
     if "path" in repo_data and repo_data["path"] != db_repo.path:
-        if exists(db, Repository, {"path": repo_data["path"]}):
+        if await exists(db, Repository, {"path": repo_data["path"]}):
             raise ConflictException(detail="Repository path already exists")
 
     # 更新仓库信息
@@ -210,19 +218,19 @@ def update_repository(repo_id: int, repo_data: dict, db: Session):
         if hasattr(db_repo, key):
             setattr(db_repo, key, value)
 
-    db.commit()
-    db.refresh(db_repo)
+    await db.commit()
+    await db.refresh(db_repo)
 
     return build_repo_response(db_repo, _check_physical_repo_exists(db_repo))
 
 
-def delete_repository(repo_id: int, db: Session):
+async def delete_repository(repo_id: int, db: AsyncSession):
     """
     删除仓库
 
     Args:
         repo_id: 仓库ID
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         dict: 成功消息
@@ -230,7 +238,8 @@ def delete_repository(repo_id: int, db: Session):
     Raises:
         NotFoundException: 仓库不存在时抛出404异常
     """
-    db_repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).filter(Repository.id == repo_id))
+    db_repo = result.scalar_one_or_none()
     if db_repo is None:
         raise NotFoundException(detail="Repository not found")
 
@@ -244,37 +253,38 @@ def delete_repository(repo_id: int, db: Session):
         # 物理仓库删除失败，记录错误但不阻止数据库删除
         logger.warning(f"Failed to delete physical repository at {physical_path}: {e}")
 
-    db.delete(db_repo)
-    db.commit()
+    await db.delete(db_repo)
+    await db.commit()
 
     return {"message": "Repository deleted successfully"}
 
 
-def get_public_repositories(db: Session):
+async def get_public_repositories(db: AsyncSession):
     """
     获取所有公开仓库
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         list[dict]: 公开仓库列表（包含物理仓库信息）
     """
-    repos = db.query(Repository).filter(Repository.is_public == True).all()
+    result = await db.execute(select(Repository).filter(Repository.is_public == True))
+    repos = result.scalars().all()
     return [
         build_repo_response(repo, _check_physical_repo_exists(repo))
         for repo in repos
     ]
 
 
-def check_repository_access(repo_id: int, user_id: int, db: Session, required_role: str = None):
+async def check_repository_access(repo_id: int, user_id: int, db: AsyncSession, required_role: str = None):
     """
     检查用户对仓库的访问权限
 
     Args:
         repo_id: 仓库ID
         user_id: 用户ID
-        db: 数据库会话
+        db: 异步数据库会话
         required_role: 所需的最低权限角色（可选）
 
     Returns:
@@ -283,7 +293,7 @@ def check_repository_access(repo_id: int, user_id: int, db: Session, required_ro
     Raises:
         NotFoundException: 仓库不存在时抛出404异常
     """
-    repo = get_repository_by_id(repo_id, db)
+    repo = await get_repository_by_id(repo_id, db)
 
     # 检查仓库是否公开
     if repo["is_public"] and required_role is None:
@@ -294,11 +304,15 @@ def check_repository_access(repo_id: int, user_id: int, db: Session, required_ro
         return True
 
     # 检查用户是否是仓库成员
-    member = db.query(RepositoryMember).filter(
-        RepositoryMember.repository_id == repo_id,
-        RepositoryMember.user_id == user_id,
-        RepositoryMember.is_active == True
-    ).first()
+    result = await db.execute(
+        select(RepositoryMember)
+        .filter(
+            RepositoryMember.repository_id == repo_id,
+            RepositoryMember.user_id == user_id,
+            RepositoryMember.is_active == True
+        )
+    )
+    member = result.scalar_one_or_none()
 
     if not member:
         return False

@@ -15,15 +15,11 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     AsyncEngine
 )
-from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import NullPool
 
 from config import get_config
 
 logger = logging.getLogger(__name__)
-
-# 异步基础模型
-AsyncBase = declarative_base()
 
 # 全局异步引擎和会话工厂
 _async_engine: Optional[AsyncEngine] = None

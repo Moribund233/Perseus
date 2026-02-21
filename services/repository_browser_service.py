@@ -102,7 +102,7 @@ def _get_tree(repo: pygit2.Repository, commit: pygit2.Commit, path: str = "") ->
         raise PathNotFoundException(f"Path not found: {path}")
 
 
-def get_tree_entries(
+async def get_tree_entries(
     repo_path: str,
     ref: str = "HEAD",
     path: str = ""
@@ -173,7 +173,7 @@ def get_tree_entries(
     }
 
 
-def get_blob_content(
+async def get_blob_content(
     repo_path: str,
     ref: str = "HEAD",
     path: str = None
@@ -233,7 +233,7 @@ def get_blob_content(
     }
 
 
-def get_commits(
+async def get_commits(
     repo_path: str,
     ref: str = "HEAD",
     path: str = None,
@@ -313,7 +313,7 @@ def get_commits(
     }
 
 
-def get_diff(
+async def get_diff(
     repo_path: str,
     base: str = None,
     head: str = None,

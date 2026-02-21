@@ -12,7 +12,8 @@ from typing import Optional, Tuple, Dict, Any
 from pathlib import Path
 
 from fastapi import Request
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from exception import NotFoundException, AuthorizationException
 from models import Repository, User
@@ -65,7 +66,7 @@ def check_repository_exists(repo_path: str) -> bool:
     return repo_exists(physical_path)
 
 
-def get_repository_by_path(repo_path: str, db: Session) -> Optional[Repository]:
+async def get_repository_by_path(repo_path: str, db: AsyncSession) -> Optional[Repository]:
     """
     根据路径获取仓库
 
@@ -73,7 +74,7 @@ def get_repository_by_path(repo_path: str, db: Session) -> Optional[Repository]:
 
     Args:
         repo_path: 仓库路径（如 username/repo-name）
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         Repository: 仓库对象，不存在则返回 None
@@ -85,7 +86,8 @@ def get_repository_by_path(repo_path: str, db: Session) -> Optional[Repository]:
     normalized_path = repo_path.strip('/')
 
     # 尝试直接匹配路径
-    repo = db.query(Repository).filter(Repository.path == normalized_path).first()
+    result = await db.execute(select(Repository).filter(Repository.path == normalized_path))
+    repo = result.scalar_one_or_none()
     if repo:
         return repo
 
@@ -94,19 +96,23 @@ def get_repository_by_path(repo_path: str, db: Session) -> Optional[Repository]:
     if len(parts) >= 2:
         username = parts[0]  # 第一部分作为用户名
         repo_name = parts[1]  # 第二部分作为仓库名
-        user = db.query(User).filter(User.username == username).first()
+        result = await db.execute(select(User).filter(User.username == username))
+        user = result.scalar_one_or_none()
         if user:
-            repo = db.query(Repository).filter(
-                Repository.owner_id == user.id,
-                Repository.name == repo_name
-            ).first()
+            result = await db.execute(
+                select(Repository).filter(
+                    Repository.owner_id == user.id,
+                    Repository.name == repo_name
+                )
+            )
+            repo = result.scalar_one_or_none()
             if repo:
                 return repo
 
     return None
 
 
-def check_git_permission(repo_path: str, user: Optional[User], action: str, db: Session) -> bool:
+async def check_git_permission(repo_path: str, user: Optional[User], action: str, db: AsyncSession) -> bool:
     """
     检查用户是否有 Git 操作权限
     
@@ -119,12 +125,12 @@ def check_git_permission(repo_path: str, user: Optional[User], action: str, db: 
         repo_path: 仓库路径
         user: 用户对象，None 表示匿名用户
         action: 操作类型，"read" 或 "write"
-        db: 数据库会话
+        db: 异步数据库会话
         
     Returns:
         bool: 是否有权限
     """
-    repo = get_repository_by_path(repo_path, db)
+    repo = await get_repository_by_path(repo_path, db)
     if not repo:
         return False
 
@@ -141,10 +147,13 @@ def check_git_permission(repo_path: str, user: Optional[User], action: str, db: 
         return True
 
     # 检查成员权限
-    member = db.query(RepositoryMember).filter(
-        RepositoryMember.repository_id == repo.id,
-        RepositoryMember.user_id == user.id
-    ).first()
+    result = await db.execute(
+        select(RepositoryMember).filter(
+            RepositoryMember.repository_id == repo.id,
+            RepositoryMember.user_id == user.id
+        )
+    )
+    member = result.scalar_one_or_none()
 
     if not member or not member.is_active:
         return False

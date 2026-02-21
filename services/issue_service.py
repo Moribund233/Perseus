@@ -4,8 +4,9 @@ Issue 服务层
 处理 Issue 相关的所有业务逻辑
 """
 from typing import List, Optional, Dict, Any
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+from sqlalchemy import select, func
 
 from models import Issue, Label, IssueComment
 from exception import ValidationException, NotFoundException
@@ -20,8 +21,8 @@ from utils.response_builder import (
 from utils.db_utils import paginate, get_next_sequence_number
 
 
-def list_issues(
-    db: Session,
+async def list_issues(
+    db: AsyncSession,
     repository_id: int,
     status: Optional[str] = None,
     label: Optional[str] = None,
@@ -34,7 +35,7 @@ def list_issues(
     获取 Issue 列表
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         status: 状态筛选
         label: 标签名称筛选
@@ -46,22 +47,22 @@ def list_issues(
     Returns:
         dict: 包含 Issue 列表和分页信息
     """
-    query = db.query(Issue).filter(Issue.repository_id == repository_id)
+    stmt = select(Issue).filter(Issue.repository_id == repository_id)
 
     if status:
-        query = query.filter(Issue.status == status)
+        stmt = stmt.filter(Issue.status == status)
 
     if assignee_id:
-        query = query.filter(Issue.assignee_id == assignee_id)
+        stmt = stmt.filter(Issue.assignee_id == assignee_id)
 
     if author_id:
-        query = query.filter(Issue.author_id == author_id)
+        stmt = stmt.filter(Issue.author_id == author_id)
 
     if label:
-        query = query.join(Issue.labels).filter(Label.name == label)
+        stmt = stmt.join(Issue.labels).filter(Label.name == label)
 
-    query = query.order_by(Issue.created_at.desc())
-    issues, total = paginate(db, query, page, limit)
+    stmt = stmt.order_by(Issue.created_at.desc())
+    issues, total = await paginate(db, stmt, page, limit)
 
     return build_pagination_response(
         items=[build_issue_response(issue) for issue in issues],
@@ -71,8 +72,8 @@ def list_issues(
     )
 
 
-def get_issue(
-    db: Session,
+async def get_issue(
+    db: AsyncSession,
     repository_id: int,
     issue_number: int,
     include_details: bool = False
@@ -81,7 +82,7 @@ def get_issue(
     获取 Issue 详情
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         issue_number: Issue 编号
         include_details: 是否包含详细信息
@@ -89,26 +90,28 @@ def get_issue(
     Returns:
         dict: Issue 详情
     """
-    # 使用 joinedload 预加载关联数据，避免 N+1 查询
-    query = db.query(Issue).filter(
+    # 使用 selectinload 预加载关联数据，避免 N+1 查询
+    # selectinload 在异步会话中比 joinedload 更可靠
+    stmt = select(Issue).filter(
         Issue.repository_id == repository_id,
         Issue.issue_number == issue_number
     )
 
     # 预加载关联数据
-    query = query.options(
-        joinedload(Issue.author),
-        joinedload(Issue.assignee),
-        joinedload(Issue.labels),
-        joinedload(Issue.closer)
+    stmt = stmt.options(
+        selectinload(Issue.author),
+        selectinload(Issue.assignee),
+        selectinload(Issue.labels),
+        selectinload(Issue.closer)
     )
 
     if include_details:
-        query = query.options(
-            joinedload(Issue.comments).joinedload(IssueComment.author)
+        stmt = stmt.options(
+            selectinload(Issue.comments).selectinload(IssueComment.author)
         )
 
-    issue = query.first()
+    result = await db.execute(stmt)
+    issue = result.scalar_one_or_none()
 
     if not issue:
         raise NotFoundException(detail="Issue not found")
@@ -116,8 +119,8 @@ def get_issue(
     return build_issue_response(issue, include_details=include_details)
 
 
-def create_issue(
-    db: Session,
+async def create_issue(
+    db: AsyncSession,
     repository_id: int,
     author_id: int,
     title: str,
@@ -130,7 +133,7 @@ def create_issue(
     创建 Issue
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         author_id: 作者ID
         title: 标题
@@ -149,7 +152,7 @@ def create_issue(
         raise ValidationException(detail="Invalid priority")
 
     # 生成 Issue 编号
-    issue_number = get_next_sequence_number(
+    issue_number = await get_next_sequence_number(
         db, Issue, "issue_number", {"repository_id": repository_id}
     )
 
@@ -167,18 +170,32 @@ def create_issue(
 
     # 添加标签
     if label_ids:
-        labels = db.query(Label).filter(Label.id.in_(label_ids)).all()
+        result = await db.execute(select(Label).filter(Label.id.in_(label_ids)))
+        labels = result.scalars().all()
         issue.labels = labels
 
     db.add(issue)
-    db.commit()
-    db.refresh(issue)
+    await db.commit()
+    await db.refresh(issue)
+
+    # 重新查询 Issue 并预加载关联数据
+    result = await db.execute(
+        select(Issue)
+        .filter(Issue.id == issue.id)
+        .options(
+            selectinload(Issue.author),
+            selectinload(Issue.assignee),
+            selectinload(Issue.labels),
+            selectinload(Issue.closer)
+        )
+    )
+    issue = result.scalar_one()
 
     return build_issue_response(issue)
 
 
 async def update_issue(
-    db: Session,
+    db: AsyncSession,
     repository_id: int,
     issue_number: int,
     user_id: int,
@@ -192,7 +209,7 @@ async def update_issue(
     更新 Issue
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         issue_number: Issue 编号
         user_id: 当前用户ID
@@ -228,17 +245,18 @@ async def update_issue(
         issue.assignee_id = assignee_id
 
     if label_ids is not None:
-        labels = db.query(Label).filter(Label.id.in_(label_ids)).all()
+        result = await db.execute(select(Label).filter(Label.id.in_(label_ids)))
+        labels = result.scalars().all()
         issue.labels = labels
 
-    db.commit()
-    db.refresh(issue)
+    await db.commit()
+    await db.refresh(issue)
 
     return build_issue_response(issue)
 
 
 async def close_issue(
-    db: Session,
+    db: AsyncSession,
     repository_id: int,
     issue_number: int,
     user_id: int
@@ -247,7 +265,7 @@ async def close_issue(
     关闭 Issue
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         issue_number: Issue 编号
         user_id: 当前用户ID
@@ -269,14 +287,26 @@ async def close_issue(
     issue.status = "closed"
     issue.closed_by = user_id
 
-    db.commit()
-    db.refresh(issue)
+    await db.commit()
+
+    # 重新查询 Issue 并预加载关联数据
+    result = await db.execute(
+        select(Issue)
+        .filter(Issue.id == issue.id)
+        .options(
+            selectinload(Issue.author),
+            selectinload(Issue.assignee),
+            selectinload(Issue.labels),
+            selectinload(Issue.closer)
+        )
+    )
+    issue = result.scalar_one()
 
     return build_issue_response(issue)
 
 
 async def reopen_issue(
-    db: Session,
+    db: AsyncSession,
     repository_id: int,
     issue_number: int,
     user_id: int
@@ -285,7 +315,7 @@ async def reopen_issue(
     重新打开 Issue
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         issue_number: Issue 编号
         user_id: 当前用户ID
@@ -307,14 +337,26 @@ async def reopen_issue(
     issue.status = "open"
     issue.closed_by = None
 
-    db.commit()
-    db.refresh(issue)
+    await db.commit()
+
+    # 重新查询 Issue 并预加载关联数据
+    result = await db.execute(
+        select(Issue)
+        .filter(Issue.id == issue.id)
+        .options(
+            selectinload(Issue.author),
+            selectinload(Issue.assignee),
+            selectinload(Issue.labels),
+            selectinload(Issue.closer)
+        )
+    )
+    issue = result.scalar_one()
 
     return build_issue_response(issue)
 
 
 async def create_issue_comment(
-    db: Session,
+    db: AsyncSession,
     repository_id: int,
     issue_number: int,
     author_id: int,
@@ -324,7 +366,7 @@ async def create_issue_comment(
     创建 Issue 评论
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         issue_number: Issue 编号
         author_id: 作者ID
@@ -346,14 +388,14 @@ async def create_issue_comment(
     )
 
     db.add(comment)
-    db.commit()
-    db.refresh(comment)
+    await db.commit()
+    await db.refresh(comment)
 
     return build_issue_comment_response(comment)
 
 
 async def list_issue_comments(
-    db: Session,
+    db: AsyncSession,
     repository_id: int,
     issue_number: int
 ) -> List[dict]:
@@ -361,7 +403,7 @@ async def list_issue_comments(
     获取 Issue 评论列表
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         issue_number: Issue 编号
 
@@ -371,38 +413,41 @@ async def list_issue_comments(
     # 使用工具函数获取 Issue，不存在则抛出 404
     issue = await get_issue_or_404(db, repository_id, issue_number)
 
-    # 使用 joinedload 预加载作者信息，避免 N+1 查询
-    comments = db.query(IssueComment).filter(
-        IssueComment.issue_id == issue.id
-    ).options(
-        joinedload(IssueComment.author)
-    ).order_by(IssueComment.created_at.asc()).all()
+    # 使用 selectinload 预加载作者信息，避免 N+1 查询
+    result = await db.execute(
+        select(IssueComment)
+        .filter(IssueComment.issue_id == issue.id)
+        .options(selectinload(IssueComment.author))
+        .order_by(IssueComment.created_at.asc())
+    )
+    comments = result.scalars().all()
 
     return [build_issue_comment_response(c) for c in comments]
 
 
 # ==================== Label 管理 ====================
 
-def list_labels(
-    db: Session,
+async def list_labels(
+    db: AsyncSession,
     repository_id: int
 ) -> List[dict]:
     """
     获取仓库标签列表
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
 
     Returns:
         list: 标签列表
     """
-    labels = db.query(Label).filter(Label.repository_id == repository_id).all()
+    result = await db.execute(select(Label).filter(Label.repository_id == repository_id))
+    labels = result.scalars().all()
     return [build_label_response(label) for label in labels]
 
 
-def create_label(
-    db: Session,
+async def create_label(
+    db: AsyncSession,
     repository_id: int,
     name: str,
     color: str,
@@ -412,7 +457,7 @@ def create_label(
     创建标签
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         name: 标签名称
         color: 标签颜色（十六进制）
@@ -428,10 +473,13 @@ def create_label(
         raise ValidationException(detail="Invalid color format")
 
     # 检查是否已存在
-    existing = db.query(Label).filter(
-        Label.repository_id == repository_id,
-        Label.name == name.strip()
-    ).first()
+    result = await db.execute(
+        select(Label).filter(
+            Label.repository_id == repository_id,
+            Label.name == name.strip()
+        )
+    )
+    existing = result.scalar_one_or_none()
 
     if existing:
         raise ValidationException(detail="Label already exists")
@@ -444,14 +492,14 @@ def create_label(
     )
 
     db.add(label)
-    db.commit()
-    db.refresh(label)
+    await db.commit()
+    await db.refresh(label)
 
     return build_label_response(label)
 
 
-def update_label(
-    db: Session,
+async def update_label(
+    db: AsyncSession,
     repository_id: int,
     label_id: int,
     name: Optional[str] = None,
@@ -462,7 +510,7 @@ def update_label(
     更新标签
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         label_id: 标签ID
         name: 新名称
@@ -472,10 +520,13 @@ def update_label(
     Returns:
         dict: 更新后的标签数据
     """
-    label = db.query(Label).filter(
-        Label.id == label_id,
-        Label.repository_id == repository_id
-    ).first()
+    result = await db.execute(
+        select(Label).filter(
+            Label.id == label_id,
+            Label.repository_id == repository_id
+        )
+    )
+    label = result.scalar_one_or_none()
 
     if not label:
         raise NotFoundException(detail="Label not found")
@@ -489,14 +540,14 @@ def update_label(
     if description is not None:
         label.description = description
 
-    db.commit()
-    db.refresh(label)
+    await db.commit()
+    await db.refresh(label)
 
     return build_label_response(label)
 
 
-def delete_label(
-    db: Session,
+async def delete_label(
+    db: AsyncSession,
     repository_id: int,
     label_id: int
 ) -> None:
@@ -504,17 +555,164 @@ def delete_label(
     删除标签
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
         label_id: 标签ID
     """
-    label = db.query(Label).filter(
-        Label.id == label_id,
-        Label.repository_id == repository_id
-    ).first()
+    result = await db.execute(
+        select(Label).filter(
+            Label.id == label_id,
+            Label.repository_id == repository_id
+        )
+    )
+    label = result.scalar_one_or_none()
 
     if not label:
         raise NotFoundException(detail="Label not found")
 
-    db.delete(label)
-    db.commit()
+    await db.delete(label)
+    await db.commit()
+
+
+async def add_label_to_issue(
+    db: AsyncSession,
+    repository_id: int,
+    issue_number: int,
+    label_id: int,
+    user_id: int
+) -> dict:
+    """
+    为 Issue 添加标签
+
+    Args:
+        db: 异步数据库会话
+        repository_id: 仓库ID
+        issue_number: Issue 编号
+        label_id: 标签ID
+        user_id: 当前用户ID
+
+    Returns:
+        dict: 更新后的 Issue 数据
+
+    Raises:
+        NotFoundException: Issue 或标签不存在时抛出
+        ValidationException: 标签已存在时抛出
+    """
+    from utils.permission_utils import check_resource_author_or_admin
+    from utils.query_utils import get_issue_or_404
+    from sqlalchemy.orm import selectinload
+
+    # 获取 Issue
+    issue = await get_issue_or_404(db, repository_id, issue_number)
+
+    # 检查权限
+    await check_resource_author_or_admin(
+        db, issue.author_id, user_id, repository_id, "modify this issue"
+    )
+
+    # 获取标签
+    result = await db.execute(
+        select(Label).filter(
+            Label.id == label_id,
+            Label.repository_id == repository_id
+        )
+    )
+    label = result.scalar_one_or_none()
+
+    if not label:
+        raise NotFoundException(detail="Label not found")
+
+    # 检查标签是否已存在
+    if label in issue.labels:
+        raise ValidationException(detail="Label already added to this issue")
+
+    # 添加标签
+    issue.labels.append(label)
+    await db.commit()
+
+    # 重新查询 Issue 并预加载关联数据
+    result = await db.execute(
+        select(Issue)
+        .filter(Issue.id == issue.id)
+        .options(
+            selectinload(Issue.author),
+            selectinload(Issue.assignee),
+            selectinload(Issue.labels),
+            selectinload(Issue.closer)
+        )
+    )
+    issue = result.scalar_one()
+
+    return build_issue_response(issue)
+
+
+async def remove_label_from_issue(
+    db: AsyncSession,
+    repository_id: int,
+    issue_number: int,
+    label_id: int,
+    user_id: int
+) -> dict:
+    """
+    从 Issue 移除标签
+
+    Args:
+        db: 异步数据库会话
+        repository_id: 仓库ID
+        issue_number: Issue 编号
+        label_id: 标签ID
+        user_id: 当前用户ID
+
+    Returns:
+        dict: 更新后的 Issue 数据
+
+    Raises:
+        NotFoundException: Issue 或标签不存在时抛出
+        ValidationException: 标签不存在于 Issue 时抛出
+    """
+    from utils.permission_utils import check_resource_author_or_admin
+    from utils.query_utils import get_issue_or_404
+    from sqlalchemy.orm import selectinload
+
+    # 获取 Issue
+    issue = await get_issue_or_404(db, repository_id, issue_number)
+
+    # 检查权限
+    await check_resource_author_or_admin(
+        db, issue.author_id, user_id, repository_id, "modify this issue"
+    )
+
+    # 获取标签
+    result = await db.execute(
+        select(Label).filter(
+            Label.id == label_id,
+            Label.repository_id == repository_id
+        )
+    )
+    label = result.scalar_one_or_none()
+
+    if not label:
+        raise NotFoundException(detail="Label not found")
+
+    # 检查标签是否存在于 Issue
+    if label not in issue.labels:
+        raise ValidationException(detail="Label not found in this issue")
+
+    # 移除标签
+    issue.labels.remove(label)
+    await db.commit()
+
+    # 重新查询 Issue 并预加载关联数据
+    result = await db.execute(
+        select(Issue)
+        .filter(Issue.id == issue.id)
+        .options(
+            selectinload(Issue.author),
+            selectinload(Issue.assignee),
+            selectinload(Issue.labels),
+            selectinload(Issue.closer)
+        )
+    )
+    issue = result.scalar_one()
+
+    return build_issue_response(issue)

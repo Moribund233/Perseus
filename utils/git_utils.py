@@ -6,7 +6,8 @@ Git 操作工具模块
 import os
 from typing import Any, Dict, Optional, Tuple
 import pygit2
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from exception import NotFoundException, ValidationException
 from models import Repository
@@ -44,12 +45,12 @@ class GitService:
             raise ValidationException(detail=f"Invalid git repository: {str(e)}")
 
     @classmethod
-    def from_repository_id(cls, db: Session, repository_id: int) -> "GitService":
+    async def from_repository_id(cls, db: AsyncSession, repository_id: int) -> "GitService":
         """
         从仓库 ID 创建 Git 服务实例
 
         Args:
-            db: 数据库会话
+            db: 异步数据库会话
             repository_id: 仓库ID
 
         Returns:
@@ -58,7 +59,10 @@ class GitService:
         Raises:
             NotFoundException: 仓库不存在
         """
-        repo = db.query(Repository).filter(Repository.id == repository_id).first()
+        result = await db.execute(
+            select(Repository).filter(Repository.id == repository_id)
+        )
+        repo = result.scalar_one_or_none()
         if not repo:
             raise NotFoundException(detail="Repository not found")
 
@@ -209,12 +213,12 @@ class GitService:
         return pygit2.Signature(name, email)
 
 
-def get_repository_path(db: Session, repository_id: int) -> str:
+async def get_repository_path(db: AsyncSession, repository_id: int) -> str:
     """
     获取仓库的物理路径
 
     Args:
-        db: 数据库会话
+        db: 异步数据库会话
         repository_id: 仓库ID
 
     Returns:
@@ -223,7 +227,10 @@ def get_repository_path(db: Session, repository_id: int) -> str:
     Raises:
         NotFoundException: 仓库不存在
     """
-    repo = db.query(Repository).filter(Repository.id == repository_id).first()
+    result = await db.execute(
+        select(Repository).filter(Repository.id == repository_id)
+    )
+    repo = result.scalar_one_or_none()
     if not repo:
         raise NotFoundException(detail="Repository not found")
 
@@ -413,3 +420,232 @@ def ensure_repository_root(repo_root: Optional[str] = None) -> str:
     os.makedirs(repo_root, exist_ok=True)
 
     return repo_root
+
+
+# =============================================================================
+# PR Diff 相关功能
+# =============================================================================
+
+class DiffFileStatus:
+    """文件变更状态"""
+    ADDED = "added"
+    MODIFIED = "modified"
+    DELETED = "deleted"
+    RENAMED = "renamed"
+
+
+def get_pr_diff(repo_path: str, base_commit: str, head_commit: str) -> str:
+    """
+    获取 PR 的 diff 内容
+
+    使用 git diff 命令获取两个提交之间的变更
+
+    Args:
+        repo_path: 仓库物理路径
+        base_commit: 基础提交（目标分支）
+        head_commit: 头部提交（源分支）
+
+    Returns:
+        str: diff 内容
+
+    Raises:
+        GitError: 获取 diff 失败
+    """
+    import subprocess
+
+    try:
+        # 使用 git diff 获取变更
+        # 格式: git diff base_commit..head_commit
+        result = subprocess.run(
+            ["git", "diff", f"{base_commit}..{head_commit}"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            encoding="utf-8"
+        )
+
+        if result.returncode != 0:
+            raise GitError(f"Failed to get diff: {result.stderr}")
+
+        return result.stdout
+
+    except subprocess.SubprocessError as e:
+        raise GitError(f"Failed to execute git diff: {e}")
+
+
+def get_pr_files(repo_path: str, base_commit: str, head_commit: str) -> list:
+    """
+    获取 PR 变更的文件列表
+
+    Args:
+        repo_path: 仓库物理路径
+        base_commit: 基础提交（目标分支）
+        head_commit: 头部提交（源分支）
+
+    Returns:
+        list: 文件列表，每个文件包含状态、路径、增删行数等信息
+
+    Raises:
+        GitError: 获取文件列表失败
+    """
+    import subprocess
+
+    try:
+        # 使用 git diff --name-status 获取文件状态
+        result = subprocess.run(
+            ["git", "diff", "--name-status", f"{base_commit}..{head_commit}"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            encoding="utf-8"
+        )
+
+        if result.returncode != 0:
+            raise GitError(f"Failed to get file list: {result.stderr}")
+
+        files = []
+        for line in result.stdout.strip().split("\n"):
+            if not line:
+                continue
+
+            parts = line.split("\t")
+            status_code = parts[0]
+
+            if status_code.startswith("A"):
+                status = DiffFileStatus.ADDED
+                file_path = parts[1]
+                old_path = None
+            elif status_code.startswith("M"):
+                status = DiffFileStatus.MODIFIED
+                file_path = parts[1]
+                old_path = None
+            elif status_code.startswith("D"):
+                status = DiffFileStatus.DELETED
+                file_path = parts[1]
+                old_path = None
+            elif status_code.startswith("R"):
+                status = DiffFileStatus.RENAMED
+                old_path = parts[1]
+                file_path = parts[2]
+            else:
+                status = "unknown"
+                file_path = parts[1]
+                old_path = None
+
+            files.append({
+                "status": status,
+                "path": file_path,
+                "old_path": old_path,
+                "status_code": status_code
+            })
+
+        return files
+
+    except subprocess.SubprocessError as e:
+        raise GitError(f"Failed to execute git diff: {e}")
+
+
+def get_pr_stats(repo_path: str, base_commit: str, head_commit: str) -> dict:
+    """
+    获取 PR 的统计信息
+
+    Args:
+        repo_path: 仓库物理路径
+        base_commit: 基础提交（目标分支）
+        head_commit: 头部提交（源分支）
+
+    Returns:
+        dict: 统计信息，包含文件数、新增行数、删除行数等
+
+    Raises:
+        GitError: 获取统计信息失败
+    """
+    import subprocess
+
+    try:
+        # 使用 git diff --stat 获取统计信息
+        result = subprocess.run(
+            ["git", "diff", "--stat", f"{base_commit}..{head_commit}"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            encoding="utf-8"
+        )
+
+        if result.returncode != 0:
+            raise GitError(f"Failed to get stats: {result.stderr}")
+
+        # 解析统计信息
+        lines = result.stdout.strip().split("\n")
+        if not lines:
+            return {
+                "files_changed": 0,
+                "additions": 0,
+                "deletions": 0,
+                "total_changes": 0
+            }
+
+        # 最后一行包含总计信息
+        # 格式: " X files changed, Y insertions(+), Z deletions(-)"
+        last_line = lines[-1]
+
+        files_changed = 0
+        additions = 0
+        deletions = 0
+
+        # 解析文件数
+        if "file changed" in last_line or "files changed" in last_line:
+            parts = last_line.split(",")
+            for part in parts:
+                if "file" in part:
+                    files_changed = int(part.strip().split()[0])
+                elif "insertion" in part or "insertions" in part:
+                    additions = int(part.strip().split()[0])
+                elif "deletion" in part or "deletions" in part:
+                    deletions = int(part.strip().split()[0])
+
+        return {
+            "files_changed": files_changed,
+            "additions": additions,
+            "deletions": deletions,
+            "total_changes": additions + deletions
+        }
+
+    except subprocess.SubprocessError as e:
+        raise GitError(f"Failed to execute git diff: {e}")
+
+
+def get_file_diff(repo_path: str, base_commit: str, head_commit: str, file_path: str) -> str:
+    """
+    获取单个文件的 diff 内容
+
+    Args:
+        repo_path: 仓库物理路径
+        base_commit: 基础提交（目标分支）
+        head_commit: 头部提交（源分支）
+        file_path: 文件路径
+
+    Returns:
+        str: 文件的 diff 内容
+
+    Raises:
+        GitError: 获取 diff 失败
+    """
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "diff", f"{base_commit}..{head_commit}", "--", file_path],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            encoding="utf-8"
+        )
+
+        if result.returncode != 0:
+            raise GitError(f"Failed to get file diff: {result.stderr}")
+
+        return result.stdout
+
+    except subprocess.SubprocessError as e:
+        raise GitError(f"Failed to execute git diff: {e}")

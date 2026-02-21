@@ -3,7 +3,8 @@
 
 处理与仓库成员相关的所有业务逻辑
 """
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from models.repository_member import RepositoryMember
 from exception import ValidationException, NotFoundException, ConflictException, AuthorizationException
 
@@ -17,28 +18,31 @@ ROLE_PRIORITY = {
 }
 
 
-def get_repository_members(repo_id: int, db: Session):
+async def get_repository_members(repo_id: int, db: AsyncSession):
     """
     获取仓库的所有成员
 
     Args:
         repo_id: 仓库ID
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         list[RepositoryMember]: 仓库成员列表
     """
-    return db.query(RepositoryMember).filter(RepositoryMember.repository_id == repo_id).all()
+    result = await db.execute(
+        select(RepositoryMember).filter(RepositoryMember.repository_id == repo_id)
+    )
+    return result.scalars().all()
 
 
-def get_repository_member(repo_id: int, user_id: int, db: Session):
+async def get_repository_member(repo_id: int, user_id: int, db: AsyncSession):
     """
     获取仓库的特定成员
 
     Args:
         repo_id: 仓库ID
         user_id: 用户ID
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         RepositoryMember: 仓库成员信息
@@ -46,10 +50,13 @@ def get_repository_member(repo_id: int, user_id: int, db: Session):
     Raises:
         NotFoundException: 成员不存在时抛出404异常
     """
-    member = db.query(RepositoryMember).filter(
-        RepositoryMember.repository_id == repo_id,
-        RepositoryMember.user_id == user_id
-    ).first()
+    result = await db.execute(
+        select(RepositoryMember).filter(
+            RepositoryMember.repository_id == repo_id,
+            RepositoryMember.user_id == user_id
+        )
+    )
+    member = result.scalar_one_or_none()
 
     if member is None:
         raise NotFoundException(detail="Member not found in this repository")
@@ -57,14 +64,14 @@ def get_repository_member(repo_id: int, user_id: int, db: Session):
     return member
 
 
-def add_repository_member(repo_id: int, member_data: dict, db: Session):
+async def add_repository_member(repo_id: int, member_data: dict, db: AsyncSession):
     """
     添加仓库成员
 
     Args:
         repo_id: 仓库ID
         member_data: 成员信息
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         RepositoryMember: 添加的成员信息
@@ -80,15 +87,19 @@ def add_repository_member(repo_id: int, member_data: dict, db: Session):
 
     # 检查用户是否存在
     from models.user import User
-    user = db.query(User).filter(User.id == member_data["user_id"]).first()
+    result = await db.execute(select(User).filter(User.id == member_data["user_id"]))
+    user = result.scalar_one_or_none()
     if not user:
         raise NotFoundException(detail="User not found")
 
     # 检查成员是否已存在
-    existing_member = db.query(RepositoryMember).filter(
-        RepositoryMember.repository_id == repo_id,
-        RepositoryMember.user_id == member_data["user_id"]
-    ).first()
+    result = await db.execute(
+        select(RepositoryMember).filter(
+            RepositoryMember.repository_id == repo_id,
+            RepositoryMember.user_id == member_data["user_id"]
+        )
+    )
+    existing_member = result.scalar_one_or_none()
 
     if existing_member:
         raise ConflictException(detail="User is already a member of this repository")
@@ -102,13 +113,13 @@ def add_repository_member(repo_id: int, member_data: dict, db: Session):
     )
 
     db.add(db_member)
-    db.commit()
-    db.refresh(db_member)
+    await db.commit()
+    await db.refresh(db_member)
 
     return db_member
 
 
-def update_repository_member(repo_id: int, user_id: int, member_data: dict, db: Session):
+async def update_repository_member(repo_id: int, user_id: int, member_data: dict, db: AsyncSession):
     """
     更新仓库成员信息
 
@@ -116,7 +127,7 @@ def update_repository_member(repo_id: int, user_id: int, member_data: dict, db: 
         repo_id: 仓库ID
         user_id: 用户ID
         member_data: 更新的成员信息
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         RepositoryMember: 更新后的成员信息
@@ -124,27 +135,27 @@ def update_repository_member(repo_id: int, user_id: int, member_data: dict, db: 
     Raises:
         NotFoundException: 成员不存在时抛出404异常
     """
-    db_member = get_repository_member(repo_id, user_id, db)
+    db_member = await get_repository_member(repo_id, user_id, db)
 
     # 更新成员信息
     for key, value in member_data.items():
         if hasattr(db_member, key):
             setattr(db_member, key, value)
 
-    db.commit()
-    db.refresh(db_member)
+    await db.commit()
+    await db.refresh(db_member)
 
     return db_member
 
 
-def remove_repository_member(repo_id: int, user_id: int, db: Session):
+async def remove_repository_member(repo_id: int, user_id: int, db: AsyncSession):
     """
     删除仓库成员
 
     Args:
         repo_id: 仓库ID
         user_id: 用户ID
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         dict: 成功消息
@@ -153,19 +164,19 @@ def remove_repository_member(repo_id: int, user_id: int, db: Session):
         NotFoundException: 成员不存在时抛出404异常
         AuthorizationException: 无法删除仓库所有者时抛出403异常
     """
-    db_member = get_repository_member(repo_id, user_id, db)
+    db_member = await get_repository_member(repo_id, user_id, db)
 
     # 检查是否是仓库所有者
     if db_member.role == "owner":
         raise AuthorizationException(detail="Cannot remove repository owner")
 
-    db.delete(db_member)
-    db.commit()
+    await db.delete(db_member)
+    await db.commit()
 
     return {"message": "Member removed successfully"}
 
 
-def update_member_role(repo_id: int, user_id: int, role: str, db: Session):
+async def update_member_role(repo_id: int, user_id: int, role: str, db: AsyncSession):
     """
     更新成员角色
 
@@ -173,7 +184,7 @@ def update_member_role(repo_id: int, user_id: int, role: str, db: Session):
         repo_id: 仓库ID
         user_id: 用户ID
         role: 新角色
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         RepositoryMember: 更新后的成员信息
@@ -186,28 +197,33 @@ def update_member_role(repo_id: int, user_id: int, role: str, db: Session):
     if role not in VALID_ROLES:
         raise ValidationException(detail=f"Invalid role. Valid roles are: {', '.join(VALID_ROLES)}")
 
-    return update_repository_member(repo_id, user_id, {"role": role}, db)
+    return await update_repository_member(repo_id, user_id, {"role": role}, db)
 
 
-def get_user_repositories(user_id: int, db: Session):
+async def get_user_repositories(user_id: int, db: AsyncSession):
     """
     获取用户参与的所有仓库
 
     Args:
         user_id: 用户ID
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         list[Repository]: 用户参与的仓库列表
     """
     from models.repository import Repository
-    return db.query(Repository).join(RepositoryMember).filter(
-        RepositoryMember.user_id == user_id,
-        RepositoryMember.is_active == True
-    ).all()
+    result = await db.execute(
+        select(Repository)
+        .join(RepositoryMember)
+        .filter(
+            RepositoryMember.user_id == user_id,
+            RepositoryMember.is_active == True
+        )
+    )
+    return result.scalars().all()
 
 
-def check_member_permission(repo_id: int, user_id: int, required_role: str, db: Session):
+async def check_member_permission(repo_id: int, user_id: int, required_role: str, db: AsyncSession):
     """
     检查用户在仓库中的权限
 
@@ -215,7 +231,7 @@ def check_member_permission(repo_id: int, user_id: int, required_role: str, db: 
         repo_id: 仓库ID
         user_id: 用户ID
         required_role: 所需的最低权限角色
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         bool: 是否有足够的权限
@@ -225,7 +241,8 @@ def check_member_permission(repo_id: int, user_id: int, required_role: str, db: 
     """
     # 检查仓库是否存在
     from models.repository import Repository
-    repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).filter(Repository.id == repo_id))
+    repo = result.scalar_one_or_none()
     if not repo:
         raise NotFoundException(detail="Repository not found")
 
@@ -234,11 +251,14 @@ def check_member_permission(repo_id: int, user_id: int, required_role: str, db: 
         return True
 
     # 检查用户是否是仓库成员
-    member = db.query(RepositoryMember).filter(
-        RepositoryMember.repository_id == repo_id,
-        RepositoryMember.user_id == user_id,
-        RepositoryMember.is_active == True
-    ).first()
+    result = await db.execute(
+        select(RepositoryMember).filter(
+            RepositoryMember.repository_id == repo_id,
+            RepositoryMember.user_id == user_id,
+            RepositoryMember.is_active == True
+        )
+    )
+    member = result.scalar_one_or_none()
 
     if not member:
         return False
@@ -250,14 +270,14 @@ def check_member_permission(repo_id: int, user_id: int, required_role: str, db: 
     return user_role_priority >= required_role_priority
 
 
-def activate_repository_member(repo_id: int, user_id: int, db: Session):
+async def activate_repository_member(repo_id: int, user_id: int, db: AsyncSession):
     """
     激活仓库成员
 
     Args:
         repo_id: 仓库ID
         user_id: 用户ID
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         RepositoryMember: 更新后的成员信息
@@ -265,17 +285,17 @@ def activate_repository_member(repo_id: int, user_id: int, db: Session):
     Raises:
         NotFoundException: 成员不存在时抛出404异常
     """
-    return update_repository_member(repo_id, user_id, {"is_active": True}, db)
+    return await update_repository_member(repo_id, user_id, {"is_active": True}, db)
 
 
-def deactivate_repository_member(repo_id: int, user_id: int, db: Session):
+async def deactivate_repository_member(repo_id: int, user_id: int, db: AsyncSession):
     """
     停用仓库成员
 
     Args:
         repo_id: 仓库ID
         user_id: 用户ID
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         RepositoryMember: 更新后的成员信息
@@ -284,10 +304,10 @@ def deactivate_repository_member(repo_id: int, user_id: int, db: Session):
         NotFoundException: 成员不存在时抛出404异常
         AuthorizationException: 无法停用仓库所有者时抛出403异常
     """
-    db_member = get_repository_member(repo_id, user_id, db)
+    db_member = await get_repository_member(repo_id, user_id, db)
 
     # 检查是否是仓库所有者
     if db_member.role == "owner":
         raise AuthorizationException(detail="Cannot deactivate repository owner")
 
-    return update_repository_member(repo_id, user_id, {"is_active": False}, db)
+    return await update_repository_member(repo_id, user_id, {"is_active": False}, db)

@@ -259,11 +259,15 @@ from models.branch import Branch
 from models.commit import Commit
 from models.pull_request import PullRequest, PRComment, PRReview
 from models.issue import Issue, Label, IssueComment
+from models.release import Release, ReleaseAsset
+from models.webhook import WebHook, WebHookDelivery
 
 __all__ = [
     "Base", "SessionLocal", "engine", "BaseModel",
     "User", "Repository", "RepositoryMember", "Branch", "Commit",
     "PullRequest", "PRComment", "PRReview", "Issue", "Label", "IssueComment",
+    "Release", "ReleaseAsset",
+    "WebHook", "WebHookDelivery",
     # 导出配置相关
     "get_db_config"
 ]
