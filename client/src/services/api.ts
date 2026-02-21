@@ -280,6 +280,8 @@ export interface ClientConfig {
   log: LogConfig
   advanced: AdvancedConfig
   auth_token?: string
+  /** 数据库类型（sqlite/postgresql/mysql） */
+  db_type?: string
 }
 
 /**

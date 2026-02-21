@@ -13,6 +13,5 @@ export {
 } from './theme'
 export {
   useDatabaseStore,
-  type DatabaseTypeOption,
-  type DatabaseConfigState
+  type DatabaseTypeOption
 } from './database'

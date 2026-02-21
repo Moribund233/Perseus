@@ -1,0 +1,286 @@
+/**
+ * Guide步骤组件公共样式
+ * 
+ * 包含所有Guide步骤组件共享的样式定义
+ */
+
+/* ==================== 步骤内容基础样式 ==================== */
+
+.step-content {
+  padding: var(--spacing-lg);
+}
+
+.step-heading {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  margin-bottom: var(--spacing-sm);
+  color: var(--text-primary);
+}
+
+.step-text {
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-lg);
+}
+
+/* ==================== 状态框样式 ==================== */
+
+.status-box {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  background-color: var(--bg-tertiary);
+  margin-bottom: var(--spacing-lg);
+}
+
+.status-box.success {
+  background-color: rgba(16, 185, 129, 0.1);
+  border: 1px solid var(--success-color);
+}
+
+.status-box.warning {
+  background-color: rgba(245, 158, 11, 0.1);
+  border: 1px solid var(--warning-color);
+}
+
+.status-box.error {
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--error-color);
+}
+
+.status-box.info {
+  background-color: rgba(6, 182, 212, 0.1);
+  border: 1px solid var(--info-color);
+}
+
+.status-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.loading-text {
+  color: var(--text-secondary);
+}
+
+/* ==================== 操作行样式 ==================== */
+
+.action-row {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+/* ==================== 选项组样式 ==================== */
+
+.option-group {
+  padding: var(--spacing-md);
+  background-color: var(--bg-tertiary);
+  border-radius: var(--border-radius-md);
+}
+
+.option-group h3 {
+  font-size: var(--font-size-md);
+  margin-bottom: var(--spacing-xs);
+}
+
+.option-desc {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-md);
+}
+
+.option-divider {
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+}
+
+/* ==================== URL输入框样式 ==================== */
+
+.url-input {
+  width: 100%;
+  padding: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.url-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+/* ==================== 安装帮助样式 ==================== */
+
+.install-help {
+  margin-top: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+}
+
+.install-help a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.install-help a:hover {
+  text-decoration: underline;
+}
+
+/* ==================== 偏好设置区域样式 ==================== */
+
+.preference-section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.preference-section h3 {
+  font-size: var(--font-size-md);
+  margin-bottom: var(--spacing-md);
+  color: var(--text-primary);
+}
+
+/* ==================== 主题网格样式 ==================== */
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacing-md);
+}
+
+.theme-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color var(--transition-fast);
+}
+
+.theme-option:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.theme-selected {
+  border-color: var(--primary-color);
+  background-color: var(--bg-tertiary);
+}
+
+.theme-preview {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.theme-name {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+/* ==================== 布局选项样式 ==================== */
+
+.layout-options {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+/* ==================== 安全设置区域样式 ==================== */
+
+.security-section {
+  background-color: var(--bg-tertiary);
+  padding: var(--spacing-lg);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--warning-color);
+}
+
+.security-section h3 {
+  color: var(--warning-color);
+  margin-bottom: var(--spacing-sm);
+}
+
+.section-desc {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+/* ==================== 表单样式 ==================== */
+
+.security-form {
+  max-width: 400px;
+}
+
+.form-group {
+  margin-bottom: var(--spacing-md);
+}
+
+.form-label {
+  display: block;
+  margin-bottom: var(--spacing-xs);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.form-input {
+  width: 100%;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.form-input.input-error {
+  border-color: var(--error-color);
+}
+
+.form-input.input-error:focus {
+  border-color: var(--error-color);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+
+/* ==================== 必填标记样式 ==================== */
+
+.required {
+  color: var(--error-color);
+}
+
+.required-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background-color: var(--error-color);
+  color: white;
+  font-size: var(--font-size-xs);
+  border-radius: var(--border-radius-sm);
+  margin-left: var(--spacing-sm);
+  font-weight: normal;
+}
+
+/* ==================== 错误文本样式 ==================== */
+
+.error-text {
+  color: var(--error-color);
+  font-size: var(--font-size-xs);
+  margin-top: var(--spacing-xs);
+}
+
+/* ==================== Nginx选项区域样式 ==================== */
+
+.nginx-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}

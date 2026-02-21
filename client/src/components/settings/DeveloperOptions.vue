@@ -14,6 +14,7 @@ import {
   resetClientConfig
 } from '../../services/api'
 import { useRouter } from 'vue-router'
+import ConfirmDialog from '../ConfirmDialog.vue'
 
 /**
  * 数据库类型
@@ -561,36 +562,20 @@ const handleResetClientConfig = (): void => {
     </div>
 
     <!-- 危险操作验证对话框 -->
-    <div v-if="dangerDialog.show" class="danger-dialog-overlay" @click.self="closeDangerDialog">
-      <div class="danger-dialog">
-        <div class="danger-dialog-header">
-          <h3 class="danger-dialog-title">{{ dangerDialog.title }}</h3>
-        </div>
-        <div class="danger-dialog-body">
-          <p class="danger-dialog-message">{{ dangerDialog.message }}</p>
-          <div class="form-group">
-            <label class="form-label">请输入 "{{ dangerDialog.expectedInput }}" 确认</label>
-            <input
-              v-model="dangerInput"
-              type="text"
-              class="input danger-input"
-              :placeholder="dangerDialog.expectedInput"
-              @keyup.enter="confirmDangerAction"
-            />
-          </div>
-        </div>
-        <div class="danger-dialog-footer">
-          <button class="btn btn-secondary" @click="closeDangerDialog">取消</button>
-          <button
-            class="btn btn-error"
-            :disabled="dangerInput !== dangerDialog.expectedInput || isSaving"
-            @click="confirmDangerAction"
-          >
-            {{ dangerDialog.confirmText }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <ConfirmDialog
+      v-model:visible="dangerDialog.show"
+      :title="dangerDialog.title"
+      type="danger"
+      :message="dangerDialog.message"
+      :hint="'请输入 \'' + dangerDialog.expectedInput + '\' 确认'"
+      :confirm-text="dangerDialog.confirmText"
+      :require-input="true"
+      :expected-input="dangerDialog.expectedInput"
+      :loading="isSaving"
+      @update:input="dangerInput = $event"
+      @confirm="confirmDangerAction"
+      @cancel="closeDangerDialog"
+    />
   </div>
 </template>
 
@@ -819,66 +804,5 @@ const handleResetClientConfig = (): void => {
   margin: 0;
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
-}
-
-/* 危险操作对话框样式 */
-.danger-dialog-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.danger-dialog {
-  background-color: var(--bg-primary);
-  border-radius: var(--border-radius-lg);
-  border: 1px solid var(--error-color);
-  width: 90%;
-  max-width: 500px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
-.danger-dialog-header {
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.danger-dialog-title {
-  margin: 0;
-  color: var(--error-color);
-  font-size: var(--font-size-lg);
-}
-
-.danger-dialog-body {
-  padding: var(--spacing-lg);
-}
-
-.danger-dialog-message {
-  margin: 0 0 var(--spacing-md) 0;
-  color: var(--text-secondary);
-  line-height: 1.5;
-}
-
-.danger-dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-top: 1px solid var(--border-color);
-}
-
-.danger-input {
-  border-color: var(--error-color);
-}
-
-.danger-input:focus {
-  border-color: var(--error-color);
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
 }
 </style>
