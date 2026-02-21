@@ -6,8 +6,8 @@ Pull Request 控制器层
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
-from models.db import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from models.async_db import get_async_db
 from models.user import User
 from api.dependencies import get_current_user
 from services.pull_request_service import (
@@ -67,7 +67,7 @@ async def list_pull_requests(
     author: Optional[int] = Query(None, description="作者ID筛选"),
     page: int = Query(1, ge=1, description="页码"),
     limit: int = Query(20, ge=1, le=100, description="每页数量"),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     获取 PR 列表
@@ -97,7 +97,7 @@ async def list_pull_requests(
 async def create_pull_request(
     repo_id: int,
     data: PRCreateRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -127,7 +127,7 @@ async def create_pull_request(
 async def get_pull_request(
     repo_id: int,
     pr_number: int,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     获取 PR 详情
@@ -153,7 +153,7 @@ async def update_pull_request(
     repo_id: int,
     pr_number: int,
     data: PRUpdateRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -183,7 +183,7 @@ async def update_pull_request(
 async def close_pull_request(
     repo_id: int,
     pr_number: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -211,7 +211,7 @@ async def merge_pull_request(
     repo_id: int,
     pr_number: int,
     data: PRMergeRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -242,7 +242,7 @@ async def merge_pull_request(
 async def list_pr_comments(
     repo_id: int,
     pr_number: int,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     获取 PR 评论列表
@@ -267,7 +267,7 @@ async def create_pr_comment(
     repo_id: int,
     pr_number: int,
     data: PRCommentCreateRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -303,7 +303,7 @@ async def create_pr_review(
     repo_id: int,
     pr_number: int,
     data: PRReviewRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """

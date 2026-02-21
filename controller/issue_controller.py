@@ -6,8 +6,8 @@ Issue 控制器层
 from typing import Optional, List
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
-from models.db import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from models.async_db import get_async_db
 from models.user import User
 from api.dependencies import get_current_user
 from services.issue_service import (
@@ -67,7 +67,7 @@ class LabelUpdateRequest(BaseModel):
 
 
 @router.get("/{repo_id}/issues")
-def list_issues(
+async def list_issues(
     repo_id: int,
     status: Optional[str] = Query(None, description="状态筛选：open/closed"),
     label: Optional[str] = Query(None, description="标签名称筛选"),
@@ -75,7 +75,7 @@ def list_issues(
     author: Optional[int] = Query(None, description="作者ID筛选"),
     page: int = Query(1, ge=1, description="页码"),
     limit: int = Query(20, ge=1, le=100, description="每页数量"),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     获取 Issue 列表
@@ -93,7 +93,7 @@ def list_issues(
     Returns:
         dict: Issue 列表和分页信息
     """
-    return service_list_issues(
+    return await service_list_issues(
         db=db,
         repository_id=repo_id,
         status=status,
@@ -106,10 +106,10 @@ def list_issues(
 
 
 @router.post("/{repo_id}/issues")
-def create_issue(
+async def create_issue(
     repo_id: int,
     data: IssueCreateRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -124,7 +124,7 @@ def create_issue(
     Returns:
         dict: 创建的 Issue 数据
     """
-    return service_create_issue(
+    return await service_create_issue(
         db=db,
         repository_id=repo_id,
         author_id=current_user.id,
@@ -137,10 +137,10 @@ def create_issue(
 
 
 @router.get("/{repo_id}/issues/{issue_number}")
-def get_issue(
+async def get_issue(
     repo_id: int,
     issue_number: int,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     获取 Issue 详情
@@ -153,7 +153,7 @@ def get_issue(
     Returns:
         dict: Issue 详情（包含评论）
     """
-    return service_get_issue(
+    return await service_get_issue(
         db=db,
         repository_id=repo_id,
         issue_number=issue_number,
@@ -166,7 +166,7 @@ async def update_issue(
     repo_id: int,
     issue_number: int,
     data: IssueUpdateRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -199,7 +199,7 @@ async def update_issue(
 async def close_issue(
     repo_id: int,
     issue_number: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -226,7 +226,7 @@ async def close_issue(
 async def reopen_issue(
     repo_id: int,
     issue_number: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -255,7 +255,7 @@ async def reopen_issue(
 async def list_issue_comments(
     repo_id: int,
     issue_number: int,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     获取 Issue 评论列表
@@ -280,7 +280,7 @@ async def create_issue_comment(
     repo_id: int,
     issue_number: int,
     data: IssueCommentCreateRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -308,9 +308,9 @@ async def create_issue_comment(
 # ==================== Label 管理 ====================
 
 @router.get("/{repo_id}/labels")
-def list_labels(
+async def list_labels(
     repo_id: int,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     获取仓库标签列表
@@ -322,17 +322,17 @@ def list_labels(
     Returns:
         list: 标签列表
     """
-    return service_list_labels(
+    return await service_list_labels(
         db=db,
         repository_id=repo_id
     )
 
 
 @router.post("/{repo_id}/labels")
-def create_label(
+async def create_label(
     repo_id: int,
     data: LabelCreateRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     创建标签
@@ -345,7 +345,7 @@ def create_label(
     Returns:
         dict: 创建的标签数据
     """
-    return service_create_label(
+    return await service_create_label(
         db=db,
         repository_id=repo_id,
         name=data.name,
@@ -355,11 +355,11 @@ def create_label(
 
 
 @router.patch("/{repo_id}/labels/{label_id}")
-def update_label(
+async def update_label(
     repo_id: int,
     label_id: int,
     data: LabelUpdateRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     更新标签
@@ -373,7 +373,7 @@ def update_label(
     Returns:
         dict: 更新后的标签数据
     """
-    return service_update_label(
+    return await service_update_label(
         db=db,
         repository_id=repo_id,
         label_id=label_id,
@@ -384,10 +384,10 @@ def update_label(
 
 
 @router.delete("/{repo_id}/labels/{label_id}")
-def delete_label(
+async def delete_label(
     repo_id: int,
     label_id: int,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     删除标签
@@ -400,7 +400,7 @@ def delete_label(
     Returns:
         dict: 操作结果
     """
-    service_delete_label(
+    await service_delete_label(
         db=db,
         repository_id=repo_id,
         label_id=label_id

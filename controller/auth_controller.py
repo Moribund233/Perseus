@@ -5,9 +5,9 @@
 """
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.db import get_db
+from models.async_db import get_async_db
 from services.user_service import login_user as service_login_user
 from utils.rate_limiter import limiter, RateLimitConfig
 
@@ -23,10 +23,10 @@ class LoginRequest(BaseModel):
 
 @router.post("/login")
 @limiter.limit(RateLimitConfig.STRICT)
-def login(
+async def login(
     request: Request,
     credentials: LoginRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     用户登录
@@ -51,4 +51,4 @@ def login(
         }
         ```
     """
-    return service_login_user(credentials.model_dump(), db)
+    return await service_login_user(credentials.model_dump(), db)

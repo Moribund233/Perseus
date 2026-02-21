@@ -4,8 +4,8 @@
 处理与仓库成员相关的HTTP请求，调用服务层方法并返回响应
 """
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from models.db import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from models.async_db import get_async_db
 from services.member_service import (
     get_repository_members as service_get_repository_members,
     get_repository_member as service_get_repository_member,
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/v1/repositories", tags=["repository_members"])
 
 
 @router.get("/{repo_id}/members")
-def get_repository_members(repo_id: int, db: Session = Depends(get_db)):
+async def get_repository_members(repo_id: int, db: AsyncSession = Depends(get_async_db)):
     """
     获取仓库的所有成员
     
@@ -34,11 +34,11 @@ def get_repository_members(repo_id: int, db: Session = Depends(get_db)):
     Returns:
         list[RepositoryMember]: 仓库成员列表
     """
-    return service_get_repository_members(repo_id, db)
+    return await service_get_repository_members(repo_id, db)
 
 
 @router.get("/{repo_id}/members/{user_id}")
-def get_repository_member(repo_id: int, user_id: int, db: Session = Depends(get_db)):
+async def get_repository_member(repo_id: int, user_id: int, db: AsyncSession = Depends(get_async_db)):
     """
     获取仓库的特定成员
     
@@ -53,11 +53,11 @@ def get_repository_member(repo_id: int, user_id: int, db: Session = Depends(get_
     Raises:
         NotFoundException: 成员不存在时抛出404异常
     """
-    return service_get_repository_member(repo_id, user_id, db)
+    return await service_get_repository_member(repo_id, user_id, db)
 
 
 @router.post("/{repo_id}/members")
-def add_repository_member(repo_id: int, member_data: dict, db: Session = Depends(get_db)):
+async def add_repository_member(repo_id: int, member_data: dict, db: AsyncSession = Depends(get_async_db)):
     """
     添加仓库成员
     
@@ -74,11 +74,11 @@ def add_repository_member(repo_id: int, member_data: dict, db: Session = Depends
         ConflictException: 成员已存在时抛出409异常
         NotFoundException: 用户不存在时抛出404异常
     """
-    return service_add_repository_member(repo_id, member_data, db)
+    return await service_add_repository_member(repo_id, member_data, db)
 
 
 @router.put("/{repo_id}/members/{user_id}")
-def update_repository_member(repo_id: int, user_id: int, member_data: dict, db: Session = Depends(get_db)):
+async def update_repository_member(repo_id: int, user_id: int, member_data: dict, db: AsyncSession = Depends(get_async_db)):
     """
     更新仓库成员信息
     
@@ -94,11 +94,11 @@ def update_repository_member(repo_id: int, user_id: int, member_data: dict, db: 
     Raises:
         NotFoundException: 成员不存在时抛出404异常
     """
-    return service_update_repository_member(repo_id, user_id, member_data, db)
+    return await service_update_repository_member(repo_id, user_id, member_data, db)
 
 
 @router.delete("/{repo_id}/members/{user_id}")
-def remove_repository_member(repo_id: int, user_id: int, db: Session = Depends(get_db)):
+async def remove_repository_member(repo_id: int, user_id: int, db: AsyncSession = Depends(get_async_db)):
     """
     移除仓库成员
     
@@ -113,11 +113,11 @@ def remove_repository_member(repo_id: int, user_id: int, db: Session = Depends(g
     Raises:
         NotFoundException: 成员不存在时抛出404异常
     """
-    return service_remove_repository_member(repo_id, user_id, db)
+    return await service_remove_repository_member(repo_id, user_id, db)
 
 
 @router.put("/{repo_id}/members/{user_id}/role")
-def update_member_role(repo_id: int, user_id: int, role_data: dict, db: Session = Depends(get_db)):
+async def update_member_role(repo_id: int, user_id: int, role_data: dict, db: AsyncSession = Depends(get_async_db)):
     """
     更新成员角色
 
@@ -135,11 +135,11 @@ def update_member_role(repo_id: int, user_id: int, role_data: dict, db: Session 
         ValidationException: 角色无效时抛出422异常
     """
     role = role_data.get("role")
-    return service_update_member_role(repo_id, user_id, role, db)
+    return await service_update_member_role(repo_id, user_id, role, db)
 
 
 @router.put("/{repo_id}/members/{user_id}/activate")
-def activate_repository_member(repo_id: int, user_id: int, db: Session = Depends(get_db)):
+async def activate_repository_member(repo_id: int, user_id: int, db: AsyncSession = Depends(get_async_db)):
     """
     激活仓库成员
     
@@ -154,11 +154,11 @@ def activate_repository_member(repo_id: int, user_id: int, db: Session = Depends
     Raises:
         NotFoundException: 成员不存在时抛出404异常
     """
-    return service_activate_repository_member(repo_id, user_id, db)
+    return await service_activate_repository_member(repo_id, user_id, db)
 
 
 @router.put("/{repo_id}/members/{user_id}/deactivate")
-def deactivate_repository_member(repo_id: int, user_id: int, db: Session = Depends(get_db)):
+async def deactivate_repository_member(repo_id: int, user_id: int, db: AsyncSession = Depends(get_async_db)):
     """
     停用仓库成员
     
@@ -173,11 +173,11 @@ def deactivate_repository_member(repo_id: int, user_id: int, db: Session = Depen
     Raises:
         NotFoundException: 成员不存在时抛出404异常
     """
-    return service_deactivate_repository_member(repo_id, user_id, db)
+    return await service_deactivate_repository_member(repo_id, user_id, db)
 
 
 @router.get("/{repo_id}/members/{user_id}/permission")
-def check_member_permission(repo_id: int, user_id: int, permission: str, db: Session = Depends(get_db)):
+async def check_member_permission(repo_id: int, user_id: int, permission: str, db: AsyncSession = Depends(get_async_db)):
     """
     检查成员权限
     
@@ -193,4 +193,4 @@ def check_member_permission(repo_id: int, user_id: int, permission: str, db: Ses
     Raises:
         NotFoundException: 成员不存在时抛出404异常
     """
-    return service_check_member_permission(repo_id, user_id, permission, db)
+    return await service_check_member_permission(repo_id, user_id, permission, db)

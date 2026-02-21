@@ -4,8 +4,8 @@
 处理与分支相关的HTTP请求，调用服务层方法并返回响应
 """
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy.orm import Session
-from models.db import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from models.async_db import get_async_db
 from models.user import User
 from api.dependencies import get_current_user
 from services.branch_service import (
@@ -27,9 +27,9 @@ router = APIRouter(prefix="/api/v1/repositories", tags=["branches"])
 
 
 @router.get("/{repo_id}/branches")
-def get_branches(
+async def get_branches(
     repo_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -43,11 +43,11 @@ def get_branches(
     Returns:
         list[Branch]: 分支列表
     """
-    return service_get_branches(repo_id, db)
+    return await service_get_branches(repo_id, db)
 
 
 @router.get("/{repo_id}/branches/default")
-def get_default_branch(repo_id: int, db: Session = Depends(get_db)):
+async def get_default_branch(repo_id: int, db: AsyncSession = Depends(get_async_db)):
     """
     获取默认分支
     
@@ -61,11 +61,11 @@ def get_default_branch(repo_id: int, db: Session = Depends(get_db)):
     Raises:
         NotFoundException: 没有默认分支时抛出404异常
     """
-    return service_get_default_branch(repo_id, db)
+    return await service_get_default_branch(repo_id, db)
 
 
 @router.get("/{repo_id}/branches/{branch_name}")
-def get_branch(repo_id: int, branch_name: str, db: Session = Depends(get_db)):
+async def get_branch(repo_id: int, branch_name: str, db: AsyncSession = Depends(get_async_db)):
     """
     获取仓库的特定分支
     
@@ -80,16 +80,16 @@ def get_branch(repo_id: int, branch_name: str, db: Session = Depends(get_db)):
     Raises:
         NotFoundException: 分支不存在时抛出404异常
     """
-    return service_get_branch(repo_id, branch_name, db)
+    return await service_get_branch(repo_id, branch_name, db)
 
 
 @router.post("/{repo_id}/branches")
 @limiter.limit(RateLimitConfig.STANDARD)
-def create_branch(
+async def create_branch(
     request: Request,
     repo_id: int,
     branch_data: dict,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -109,17 +109,17 @@ def create_branch(
         ValidationException: 请求参数不完整时抛出422异常
         ConflictException: 分支名称已存在时抛出409异常
     """
-    return service_create_branch(repo_id, branch_data, db)
+    return await service_create_branch(repo_id, branch_data, db)
 
 
 @router.put("/{repo_id}/branches/{branch_name}")
 @limiter.limit(RateLimitConfig.STANDARD)
-def update_branch(
+async def update_branch(
     request: Request,
     repo_id: int,
     branch_name: str,
     branch_data: dict,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -139,16 +139,16 @@ def update_branch(
     Raises:
         NotFoundException: 分支不存在时抛出404异常
     """
-    return service_update_branch(repo_id, branch_name, branch_data, db)
+    return await service_update_branch(repo_id, branch_name, branch_data, db)
 
 
 @router.delete("/{repo_id}/branches/{branch_name}")
 @limiter.limit(RateLimitConfig.STANDARD)
-def delete_branch(
+async def delete_branch(
     request: Request,
     repo_id: int,
     branch_name: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -168,16 +168,16 @@ def delete_branch(
         NotFoundException: 分支不存在时抛出404异常
         ConflictException: 尝试删除默认分支时抛出409异常
     """
-    return service_delete_branch(repo_id, branch_name, db)
+    return await service_delete_branch(repo_id, branch_name, db)
 
 
 @router.put("/{repo_id}/branches/{branch_name}/default")
 @limiter.limit(RateLimitConfig.STANDARD)
-def set_default_branch(
+async def set_default_branch(
     request: Request,
     repo_id: int,
     branch_name: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -196,17 +196,17 @@ def set_default_branch(
     Raises:
         NotFoundException: 分支不存在时抛出404异常
     """
-    return service_set_default_branch(repo_id, branch_name, db)
+    return await service_set_default_branch(repo_id, branch_name, db)
 
 
 @router.put("/{repo_id}/branches/{branch_name}/protect")
 @limiter.limit(RateLimitConfig.STANDARD)
-def protect_branch(
+async def protect_branch(
     request: Request,
     repo_id: int,
     branch_name: str,
     protection_settings: dict = None,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -228,16 +228,16 @@ def protect_branch(
     """
     if protection_settings is None:
         protection_settings = {}
-    return service_protect_branch(repo_id, branch_name, protection_settings, db)
+    return await service_protect_branch(repo_id, branch_name, protection_settings, db)
 
 
 @router.put("/{repo_id}/branches/{branch_name}/unprotect")
 @limiter.limit(RateLimitConfig.STANDARD)
-def unprotect_branch(
+async def unprotect_branch(
     request: Request,
     repo_id: int,
     branch_name: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -256,14 +256,14 @@ def unprotect_branch(
     Raises:
         NotFoundException: 分支不存在时抛出404异常
     """
-    return service_unprotect_branch(repo_id, branch_name, db)
+    return await service_unprotect_branch(repo_id, branch_name, db)
 
 
 @router.get("/{repo_id}/branches/{branch_name}/protection")
-def check_branch_protection(
+async def check_branch_protection(
     repo_id: int,
     branch_name: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -281,4 +281,4 @@ def check_branch_protection(
     Raises:
         NotFoundException: 分支不存在时抛出404异常
     """
-    return service_check_branch_protection(repo_id, branch_name, db)
+    return await service_check_branch_protection(repo_id, branch_name, db)

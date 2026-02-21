@@ -5,14 +5,14 @@
 """
 from fastapi import APIRouter, Depends, Request, status, HTTPException
 from fastapi.security import HTTPBearer
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.db import get_db
+from models.async_db import get_async_db
 from models.user import User
 from api.dependencies import get_current_user, get_current_admin_user
 from utils.permission_utils import (
-    require_repository_permission_sync,
-    require_repository_owner_or_admin_sync
+    require_repository_permission,
+    require_repository_owner_or_admin
 )
 from utils.rate_limiter import limiter, RateLimitConfig
 from exception import AuthorizationException
@@ -36,8 +36,8 @@ security = HTTPBearer(auto_error=False)
 
 
 @router.get("/")
-def get_repositories(
-    db: Session = Depends(get_db),
+async def get_repositories(
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -50,11 +50,11 @@ def get_repositories(
     Returns:
         list[Repository]: 仓库列表
     """
-    return service_get_repositories(db)
+    return await service_get_repositories(db)
 
 
 @router.get("/public")
-def get_public_repositories(db: Session = Depends(get_db)):
+async def get_public_repositories(db: AsyncSession = Depends(get_async_db)):
     """
     获取所有公开仓库
 
@@ -64,13 +64,13 @@ def get_public_repositories(db: Session = Depends(get_db)):
     Returns:
         list[Repository]: 公开仓库列表
     """
-    return service_get_public_repositories(db)
+    return await service_get_public_repositories(db)
 
 
 @router.get("/user/{user_id}")
-def get_repositories_by_user(
+async def get_repositories_by_user(
     user_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -84,13 +84,13 @@ def get_repositories_by_user(
     Returns:
         list[Repository]: 用户的仓库列表
     """
-    return service_get_repositories_by_user(user_id, db)
+    return await service_get_repositories_by_user(user_id, db)
 
 
 @router.get("/{repo_id}")
-def get_repository(
+async def get_repository(
     repo_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -107,15 +107,15 @@ def get_repository(
     Raises:
         NotFoundException: 仓库不存在时抛出404异常
     """
-    return service_get_repository_by_id(repo_id, db)
+    return await service_get_repository_by_id(repo_id, db)
 
 
 @router.post("/")
 @limiter.limit(RateLimitConfig.STANDARD)
-def create_repository(
+async def create_repository(
     request: Request,
     repo: dict,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -151,16 +151,16 @@ def create_repository(
     # 这是 Git HTTP 标准 URL 格式，如: admin/test-repo
     repo["path"] = f"{current_user.username}/{repo['name']}"
 
-    return service_create_repository(repo, db)
+    return await service_create_repository(repo, db)
 
 
 @router.put("/{repo_id}")
 @limiter.limit(RateLimitConfig.STANDARD)
-def update_repository(
+async def update_repository(
     request: Request,
     repo_id: int,
     repo: dict,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -181,18 +181,18 @@ def update_repository(
         AuthorizationException: 无权限时抛出403异常
     """
     # 使用工具函数检查权限（需要所有者或管理员权限）
-    require_repository_owner_or_admin_sync(
+    await require_repository_owner_or_admin(
         db, repo_id, current_user.id, "update this repository"
     )
-    return service_update_repository(repo_id, repo, db)
+    return await service_update_repository(repo_id, repo, db)
 
 
 @router.delete("/{repo_id}")
 @limiter.limit(RateLimitConfig.STANDARD)
-def delete_repository(
+async def delete_repository(
     request: Request,
     repo_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -212,17 +212,17 @@ def delete_repository(
         AuthorizationException: 无权限时抛出403异常
     """
     # 使用工具函数检查权限（只有所有者可以删除）
-    require_repository_permission_sync(
+    await require_repository_permission(
         db, repo_id, current_user.id, ["owner"], "delete this repository"
     )
-    return service_delete_repository(repo_id, db)
+    return await service_delete_repository(repo_id, db)
 
 
 @router.get("/{repo_id}/access")
-def check_repository_access(
+async def check_repository_access(
     repo_id: int,
     user_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -240,5 +240,5 @@ def check_repository_access(
     Raises:
         NotFoundException: 仓库不存在时抛出404异常
     """
-    has_access = service_check_repository_access(repo_id, user_id, db)
+    has_access = await service_check_repository_access(repo_id, user_id, db)
     return {"has_access": has_access}

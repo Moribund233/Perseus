@@ -45,12 +45,16 @@ psutil = "^7.0.0"
 psycopg2-binary = { version = "^2.9.9", optional = true }  # PostgreSQL driver (C extension)
 pg8000 = { version = "^1.31.0", optional = true }  # PostgreSQL driver (pure Python)
 pymysql = { version = "^1.1.0", optional = true }  # MySQL driver
+aiosqlite = "^0.20.0"  # Async SQLite driver
+asyncpg = { version = "^0.30.0", optional = true }  # Async PostgreSQL driver
+aiomysql = { version = "^0.2.0", optional = true }  # Async MySQL driver
+greenlet = "^3.1.0"  # Required for SQLAlchemy async operations
 cryptography = { version = "^42.0.0", optional = true }  # Required for MySQL SSL
 
 [tool.poetry.extras]
-postgresql = ["psycopg2-binary", "pg8000"]
-mysql = ["pymysql", "cryptography"]
-all = ["psycopg2-binary", "pg8000", "pymysql", "cryptography"]
+postgresql = ["psycopg2-binary", "pg8000", "asyncpg"]
+mysql = ["pymysql", "cryptography", "aiomysql"]
+all = ["psycopg2-binary", "pg8000", "pymysql", "cryptography", "asyncpg", "aiomysql"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"

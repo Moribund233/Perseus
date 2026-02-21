@@ -5,10 +5,10 @@
 """
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field, EmailStr
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
-from models.db import get_db
+from models.async_db import get_async_db
 from models.user import User
 from api.dependencies import get_current_user, get_current_admin_user
 from services.user_service import (
@@ -43,8 +43,8 @@ class UserUpdateRequest(BaseModel):
 
 
 @router.get("/")
-def get_users(
-    db: Session = Depends(get_db),
+async def get_users(
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -57,13 +57,13 @@ def get_users(
     Returns:
         list[User]: 用户列表
     """
-    return service_get_users(db)
+    return await service_get_users(db)
 
 
 @router.get("/{user_id}")
-def get_user(
+async def get_user(
     user_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -80,13 +80,13 @@ def get_user(
     Raises:
         NotFoundException: 用户不存在时抛出404异常
     """
-    return service_get_user_by_id(user_id, db)
+    return await service_get_user_by_id(user_id, db)
 
 
 @router.post("/")
-def create_user(
+async def create_user(
     user_data: UserCreateRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     创建新用户
@@ -102,16 +102,16 @@ def create_user(
         ConflictException: 用户名或邮箱已存在时抛出409异常
         ValidationException: 请求参数无效时抛出422异常
     """
-    return service_create_user(user_data.model_dump(), db)
+    return await service_create_user(user_data.model_dump(), db)
 
 
 @router.put("/{user_id}")
 @limiter.limit(RateLimitConfig.STANDARD)
-def update_user(
+async def update_user(
     request: Request,
     user_id: int,
     user_data: UserUpdateRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -135,15 +135,15 @@ def update_user(
         NotFoundException: 用户不存在时抛出404异常
         AuthorizationException: 无权限时抛出403异常
     """
-    return service_update_user(user_id, user_data.model_dump(exclude_unset=True), db, current_user)
+    return await service_update_user(user_id, user_data.model_dump(exclude_unset=True), db, current_user)
 
 
 @router.delete("/{user_id}")
 @limiter.limit(RateLimitConfig.STANDARD)
-def delete_user(
+async def delete_user(
     request: Request,
     user_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_admin_user)
 ):
     """
@@ -162,4 +162,4 @@ def delete_user(
         NotFoundException: 用户不存在时抛出404异常
         AuthorizationException: 非管理员时抛出403异常
     """
-    return service_delete_user(user_id, db)
+    return await service_delete_user(user_id, db)

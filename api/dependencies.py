@@ -5,10 +5,11 @@ API 依赖模块
 """
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import Optional, Union
 
-from models.db import get_db
+from models.async_db import get_async_db
 from models.user import User
 from services.token_service import verify_token
 from api.local_auth import get_local_auth_user, LocalUser
@@ -22,7 +23,7 @@ security_strict = HTTPBearer(auto_error=True)
 async def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ) -> Union[User, LocalUser]:
     """
     获取当前认证用户（支持本地认证和JWT认证）
@@ -63,7 +64,8 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user = db.query(User).filter(User.id == token_data.user_id).first()
+    result = await db.execute(select(User).filter(User.id == token_data.user_id))
+    user = result.scalar_one_or_none()
 
     if user is None:
         raise HTTPException(
@@ -123,7 +125,7 @@ async def get_current_admin_user(
 # ==================== 仓库权限检查工具函数 ====================
 
 async def check_repository_permission(
-    db: Session,
+    db: AsyncSession,
     repository_id: int,
     user_id: int,
     required_roles: list = None
@@ -147,21 +149,26 @@ async def check_repository_permission(
         required_roles = ["owner", "admin", "developer"]
 
     # 检查是否是系统管理员
-    user = db.query(User).filter(User.id == user_id).first()
+    result = await db.execute(select(User).filter(User.id == user_id))
+    user = result.scalar_one_or_none()
     if user and user.is_admin:
         return True
 
     # 检查是否是仓库所有者
-    repo = db.query(Repository).filter(Repository.id == repository_id).first()
+    result = await db.execute(select(Repository).filter(Repository.id == repository_id))
+    repo = result.scalar_one_or_none()
     if repo and repo.owner_id == user_id:
         return True
 
     # 检查仓库成员角色
-    member = db.query(RepositoryMember).filter(
-        RepositoryMember.repository_id == repository_id,
-        RepositoryMember.user_id == user_id,
-        RepositoryMember.is_active == True
-    ).first()
+    result = await db.execute(
+        select(RepositoryMember).filter(
+            RepositoryMember.repository_id == repository_id,
+            RepositoryMember.user_id == user_id,
+            RepositoryMember.is_active == True
+        )
+    )
+    member = result.scalar_one_or_none()
 
     if member and member.role in required_roles:
         return True
@@ -172,7 +179,7 @@ async def check_repository_permission(
 async def require_repository_permission(
     repository_id: int,
     user_id: int,
-    db: Session,
+    db: AsyncSession,
     required_roles: list = None
 ):
     """
@@ -196,101 +203,3 @@ async def require_repository_permission(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have permission to perform this action on this repository"
         )
-
-
-async def check_repository_owner_or_admin(
-    db: Session,
-    repository_id: int,
-    user_id: int
-) -> bool:
-    """
-    检查用户是否是仓库所有者或管理员
-
-    Args:
-        db: 数据库会话
-        repository_id: 仓库ID
-        user_id: 用户ID
-
-    Returns:
-        bool: 是否是所有者或管理员
-    """
-    from models.repository import Repository
-    from models.repository_member import RepositoryMember
-
-    # 检查是否是系统管理员
-    user = db.query(User).filter(User.id == user_id).first()
-    if user and user.is_admin:
-        return True
-
-    # 检查是否是仓库所有者
-    repo = db.query(Repository).filter(Repository.id == repository_id).first()
-    if repo and repo.owner_id == user_id:
-        return True
-
-    # 检查是否是仓库管理员
-    member = db.query(RepositoryMember).filter(
-        RepositoryMember.repository_id == repository_id,
-        RepositoryMember.user_id == user_id,
-        RepositoryMember.role.in_(["owner", "admin"]),
-        RepositoryMember.is_active == True
-    ).first()
-
-    return member is not None
-
-
-# ==================== FastAPI 依赖注入函数 ====================
-
-def require_repository_permission_dependency(
-    required_roles: list = None,
-    action_description: str = "perform this action"
-):
-    """
-    创建仓库权限检查依赖
-
-    用于 FastAPI 路由中检查用户是否有仓库操作权限
-
-    Args:
-        required_roles: 所需角色列表
-        action_description: 操作描述
-
-    Returns:
-        依赖函数
-    """
-    async def check_permission(
-        repo_id: int,
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
-    ) -> User:
-        from utils.permission_utils import require_repository_permission_sync
-        require_repository_permission_sync(
-            db, repo_id, current_user.id, required_roles, action_description
-        )
-        return current_user
-    return check_permission
-
-
-def require_repository_owner_dependency(
-    action_description: str = "perform this action"
-):
-    """
-    创建仓库所有者权限检查依赖
-
-    用于 FastAPI 路由中检查用户是否是仓库所有者或管理员
-
-    Args:
-        action_description: 操作描述
-
-    Returns:
-        依赖函数
-    """
-    async def check_owner(
-        repo_id: int,
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
-    ) -> User:
-        from utils.permission_utils import require_repository_owner_or_admin_sync
-        require_repository_owner_or_admin_sync(
-            db, repo_id, current_user.id, action_description
-        )
-        return current_user
-    return check_owner

@@ -8,10 +8,11 @@
 - 代码对比
 """
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import Optional
 
-from models.db import get_db
+from models.async_db import get_async_db
 from models import Repository
 from services.repository_browser_service import (
     get_tree_entries,
@@ -26,7 +27,7 @@ from exception import NotFoundException
 router = APIRouter(prefix="/api/v1/repositories", tags=["repository-browser"])
 
 
-def _get_repo_path(repo_id: int, db: Session) -> str:
+async def _get_repo_path(repo_id: int, db: AsyncSession) -> str:
     """
     获取仓库物理路径
 
@@ -40,7 +41,8 @@ def _get_repo_path(repo_id: int, db: Session) -> str:
     Raises:
         NotFoundException: 仓库不存在
     """
-    repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).filter(Repository.id == repo_id))
+    repo = result.scalar_one_or_none()
     if not repo:
         raise NotFoundException(detail="Repository not found")
 
@@ -48,11 +50,11 @@ def _get_repo_path(repo_id: int, db: Session) -> str:
 
 
 @router.get("/{repo_id}/tree")
-def get_repository_tree(
+async def get_repository_tree(
     repo_id: int,
     ref: str = Query("HEAD", description="分支名或提交SHA"),
     path: str = Query("", description="子目录路径"),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     获取仓库文件树
@@ -69,16 +71,16 @@ def get_repository_tree(
     Raises:
         HTTPException: 仓库或路径不存在
     """
-    repo_path = _get_repo_path(repo_id, db)
+    repo_path = await _get_repo_path(repo_id, db)
     return get_tree_entries(repo_path, ref=ref, path=path)
 
 
 @router.get("/{repo_id}/blob")
-def get_repository_blob(
+async def get_repository_blob(
     repo_id: int,
     path: str = Query(..., description="文件路径"),
     ref: str = Query("HEAD", description="分支名或提交SHA"),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     获取文件内容
@@ -95,18 +97,18 @@ def get_repository_blob(
     Raises:
         HTTPException: 文件不存在或是目录
     """
-    repo_path = _get_repo_path(repo_id, db)
+    repo_path = await _get_repo_path(repo_id, db)
     return get_blob_content(repo_path, ref=ref, path=path)
 
 
 @router.get("/{repo_id}/commits")
-def get_repository_commits(
+async def get_repository_commits(
     repo_id: int,
     ref: str = Query("HEAD", description="分支名"),
     path: Optional[str] = Query(None, description="特定文件路径"),
     page: int = Query(1, ge=1, description="页码"),
     per_page: int = Query(30, ge=1, le=100, description="每页数量"),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     获取提交历史
@@ -125,17 +127,17 @@ def get_repository_commits(
     Raises:
         HTTPException: 仓库不存在
     """
-    repo_path = _get_repo_path(repo_id, db)
+    repo_path = await _get_repo_path(repo_id, db)
     return get_commits(repo_path, ref=ref, path=path, page=page, per_page=per_page)
 
 
 @router.get("/{repo_id}/diff")
-def get_repository_diff(
+async def get_repository_diff(
     repo_id: int,
     head: str = Query(..., description="对比提交SHA"),
     base: Optional[str] = Query(None, description="基准提交SHA"),
     path: Optional[str] = Query(None, description="特定文件路径"),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     获取代码差异
@@ -153,5 +155,5 @@ def get_repository_diff(
     Raises:
         HTTPException: 提交不存在
     """
-    repo_path = _get_repo_path(repo_id, db)
+    repo_path = await _get_repo_path(repo_id, db)
     return get_diff(repo_path, base=base, head=head, path=path)

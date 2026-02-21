@@ -8,10 +8,11 @@ WebSocket认证模块
 """
 from typing import Optional, Dict, Any
 from fastapi import WebSocket, HTTPException, status
+from sqlalchemy import select
 import logging
 
 from services.token_service import verify_token as jwt_verify_token
-from models.db import get_db
+from models.async_db import get_async_db_context
 from models.user import User
 
 logger = logging.getLogger(__name__)
@@ -88,25 +89,24 @@ async def verify_token(token: str) -> Optional[Dict[str, Any]]:
 
     # 从数据库获取完整的用户信息
     try:
-        db = next(get_db())
-        user = db.query(User).filter(User.id == token_data.user_id).first()
+        async with get_async_db_context() as db:
+            result = await db.execute(select(User).filter(User.id == token_data.user_id))
+            user = result.scalar_one_or_none()
 
-        if not user:
-            logger.warning(f"WebSocket token valid but user not found: user_id={token_data.user_id}")
-            return None
+            if not user:
+                logger.warning(f"WebSocket token valid but user not found: user_id={token_data.user_id}")
+                return None
 
-        return {
-            "user_id": user.id,
-            "username": user.username,
-            "is_active": user.is_active,
-            "is_admin": user.is_admin,
-            "is_local": False
-        }
+            return {
+                "user_id": user.id,
+                "username": user.username,
+                "is_active": user.is_active,
+                "is_admin": user.is_admin,
+                "is_local": False
+            }
     except Exception as e:
         logger.error(f"WebSocket token verification error: {e}")
         return None
-    finally:
-        db.close()
 
 
 async def authenticate_websocket(websocket: WebSocket) -> Optional[Dict[str, Any]]:
@@ -197,15 +197,3 @@ def check_permission(user_info: Dict[str, Any], permission: str) -> bool:
 #        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 #        user_id = payload.get("sub")
 #        # 查询用户信息...
-#        return user_info
-#    except jwt.JWTError:
-#        return None
-#
-# 2. 如果你使用session认证，可以通过cookie获取：
-#    session_id = websocket.cookies.get("session_id")
-#    # 查询session获取用户信息...
-#
-# 3. 建议复用现有的用户服务：
-#    from services.user_service import UserService
-#    user_service = UserService()
-#    return await user_service.get_current_user_by_token(token)

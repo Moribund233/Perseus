@@ -7,11 +7,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy.orm import Session
 import logging
 
 from models.user import User
-from models.db import get_db
 from config import get_config
 
 # 获取配置
@@ -205,30 +203,30 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
         return None
 
 
-def refresh_access_token(refresh_token: str) -> Optional[Dict[str, str]]:
+async def refresh_access_token(refresh_token: str, db) -> Optional[Dict[str, str]]:
     """
     使用刷新令牌获取新的访问令牌
 
     Args:
         refresh_token: 刷新令牌
+        db: 异步数据库会话
 
     Returns:
         dict: 新的令牌对，验证失败返回 None
     """
+    from sqlalchemy import select
+
     token_data = verify_token(refresh_token, token_type="refresh")
     if not token_data:
         return None
 
     # 获取用户信息
-    db = next(get_db())
-    try:
-        user = db.query(User).filter(User.id == token_data.user_id).first()
-        if not user or not user.is_active:
-            return None
+    result = await db.execute(select(User).filter(User.id == token_data.user_id))
+    user = result.scalar_one_or_none()
+    if not user or not user.is_active:
+        return None
 
-        return create_token_pair(user)
-    finally:
-        db.close()
+    return create_token_pair(user)
 
 
 def revoke_token(token: str) -> bool:

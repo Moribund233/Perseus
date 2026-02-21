@@ -20,9 +20,10 @@ URL 格式（遵循 Gitee/GitHub 标准，根路径，不包含 API 版本）：
 """
 import base64
 from fastapi import APIRouter, Request, Response, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-from models.db import get_db
+from models.async_db import get_async_db
 from models.user import User
 from services.git_http_service import (
     check_git_permission,
@@ -42,7 +43,7 @@ from utils.rate_limiter import limiter, RateLimitConfig, get_git_operation_key
 router = APIRouter(tags=["git-http"])
 
 
-def extract_auth_user(request: Request, db: Session) -> User | None:
+async def extract_auth_user(request: Request, db: AsyncSession) -> User | None:
     """
     从请求中提取认证用户
 
@@ -72,7 +73,7 @@ def extract_auth_user(request: Request, db: Session) -> User | None:
 
         # 验证用户
         from services.user_service import authenticate_user
-        return authenticate_user(username, password, db)
+        return await authenticate_user(username, password, db)
 
     # 解析 Token Auth
     elif auth_header.startswith("Bearer "):
@@ -83,7 +84,7 @@ def extract_auth_user(request: Request, db: Session) -> User | None:
     return None
 
 
-def check_read_permission(repo_path: str, user: User | None, db: Session) -> None:
+async def check_read_permission(repo_path: str, user: User | None, db: AsyncSession) -> None:
     """
     检查读取权限
 
@@ -95,7 +96,7 @@ def check_read_permission(repo_path: str, user: User | None, db: Session) -> Non
     Raises:
         HTTPException: 无权限时抛出 403 或 401
     """
-    if not check_git_permission(repo_path, user, "read", db):
+    if not await check_git_permission(repo_path, user, "read", db):
         if user is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -108,7 +109,7 @@ def check_read_permission(repo_path: str, user: User | None, db: Session) -> Non
         )
 
 
-def check_write_permission(repo_path: str, user: User | None, db: Session) -> None:
+async def check_write_permission(repo_path: str, user: User | None, db: AsyncSession) -> None:
     """
     检查写入权限
 
@@ -120,7 +121,7 @@ def check_write_permission(repo_path: str, user: User | None, db: Session) -> No
     Raises:
         HTTPException: 无权限时抛出 403 或 401
     """
-    if not check_git_permission(repo_path, user, "write", db):
+    if not await check_git_permission(repo_path, user, "write", db):
         if user is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -133,7 +134,7 @@ def check_write_permission(repo_path: str, user: User | None, db: Session) -> No
         )
 
 
-def resolve_repository(repo_path: str, db: Session):
+async def resolve_repository(repo_path: str, db: AsyncSession):
     """
     解析仓库路径并验证仓库是否存在
 
@@ -149,7 +150,7 @@ def resolve_repository(repo_path: str, db: Session):
     """
     from models.repository import Repository
 
-    repo = get_repository_by_path(repo_path, db)
+    repo = await get_repository_by_path(repo_path, db)
     if not repo:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -173,7 +174,7 @@ async def git_refs(
     repo_name: str,
     service: str | None = None,
     request: Request = None,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     Git 引用发现端点
@@ -198,7 +199,7 @@ async def git_refs(
     repo_path = f"{username}/{repo_name}"
 
     # 获取认证用户（先认证，不管仓库是否存在）
-    user = extract_auth_user(request, db)
+    user = await extract_auth_user(request, db)
 
     # 解析服务名称（如果有）
     service_name = None
@@ -212,7 +213,7 @@ async def git_refs(
             )
 
     # 确保仓库存在于数据库中（用于权限检查）
-    repo = get_repository_by_path(repo_path, db)
+    repo = await get_repository_by_path(repo_path, db)
     if not repo:
         # 仓库不存在，但先检查是否需要认证
         # 如果不存在且未认证，返回 401（让客户端有机会用认证重试）
@@ -231,10 +232,10 @@ async def git_refs(
     # 根据服务类型检查不同的权限
     if service_name == "receive-pack":
         # git-receive-pack 需要写权限
-        check_write_permission(repo_path, user, db)
+        await check_write_permission(repo_path, user, db)
     else:
         # 默认或 git-upload-pack 需要读权限
-        check_read_permission(repo_path, user, db)
+        await check_read_permission(repo_path, user, db)
 
     # 检查物理仓库是否存在
     if not check_repository_exists(repo.path):
@@ -297,7 +298,7 @@ async def git_upload_pack(
     username: str,
     repo_name: str,
     request: Request,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     Git upload-pack 端点
@@ -321,13 +322,13 @@ async def git_upload_pack(
     repo_path = f"{username}/{repo_name}"
 
     # 解析仓库并验证存在性
-    repo = resolve_repository(repo_path, db)
+    repo = await resolve_repository(repo_path, db)
 
     # 获取认证用户
-    user = extract_auth_user(request, db)
+    user = await extract_auth_user(request, db)
 
     # 检查读取权限
-    check_read_permission(repo_path, user, db)
+    await check_read_permission(repo_path, user, db)
 
     # 读取请求体
     body = await request.body()
@@ -380,7 +381,7 @@ async def git_receive_pack(
     username: str,
     repo_name: str,
     request: Request,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     Git receive-pack 端点
@@ -404,13 +405,13 @@ async def git_receive_pack(
     repo_path = f"{username}/{repo_name}"
 
     # 解析仓库并验证存在性
-    repo = resolve_repository(repo_path, db)
+    repo = await resolve_repository(repo_path, db)
 
     # 获取认证用户
-    user = extract_auth_user(request, db)
+    user = await extract_auth_user(request, db)
 
     # 检查写入权限
-    check_write_permission(repo_path, user, db)
+    await check_write_permission(repo_path, user, db)
 
     # 读取请求体
     body = await request.body()
@@ -467,7 +468,7 @@ async def git_head(
     username: str,
     repo_name: str,
     request: Request = None,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     获取 HEAD 引用
@@ -488,13 +489,13 @@ async def git_head(
     repo_path = f"{username}/{repo_name}"
 
     # 解析仓库并验证存在性
-    repo = resolve_repository(repo_path, db)
+    repo = await resolve_repository(repo_path, db)
 
     # 获取认证用户
-    user = extract_auth_user(request, db) if request else None
+    user = await extract_auth_user(request, db) if request else None
 
     # 检查读取权限
-    check_read_permission(repo_path, user, db)
+    await check_read_permission(repo_path, user, db)
 
     try:
         # 调用 git http-backend 处理请求
@@ -530,7 +531,7 @@ async def git_objects(
     repo_name: str,
     oid: str,
     request: Request = None,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     获取 Git 对象
@@ -552,13 +553,13 @@ async def git_objects(
     repo_path = f"{username}/{repo_name}"
 
     # 解析仓库并验证存在性
-    repo = resolve_repository(repo_path, db)
+    repo = await resolve_repository(repo_path, db)
 
     # 获取认证用户
-    user = extract_auth_user(request, db) if request else None
+    user = await extract_auth_user(request, db) if request else None
 
     # 检查读取权限
-    check_read_permission(repo_path, user, db)
+    await check_read_permission(repo_path, user, db)
 
     try:
         # 调用 git http-backend 处理请求
