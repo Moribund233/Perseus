@@ -72,7 +72,7 @@ def check_and_terminate_running_service(
     pids = get_port_processes(port)
 
     if not pids:
-        logger.info(f"端口 {port} 空闲")
+        logger.debug(f"端口 {port} 空闲")
         return True
 
     logger.info(f"端口 {port} 被 {len(pids)} 个进程占用")

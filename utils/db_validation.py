@@ -101,6 +101,25 @@ def validate_database_url(url: str) -> Tuple[bool, Optional[str]]:
         return False, f"Invalid database URL format: {str(e)}"
 
 
+def _get_url_with_driver(url: str, db_type: str) -> str:
+    """
+    将数据库 URL 转换为带驱动的格式
+    
+    Args:
+        url: 原始数据库 URL
+        db_type: 数据库类型
+        
+    Returns:
+        str: 带驱动的 URL
+    """
+    url_lower = url.lower()
+    if db_type == "mysql" and url_lower.startswith("mysql://"):
+        return url.replace("mysql://", "mysql+pymysql://", 1)
+    elif db_type == "postgresql" and url_lower.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    return url
+
+
 def test_database_connection(url: str, db_type: str, timeout: int = 10) -> Tuple[bool, Optional[str]]:
     """
     Test database connection
@@ -114,15 +133,18 @@ def test_database_connection(url: str, db_type: str, timeout: int = 10) -> Tuple
         Tuple[bool, Optional[str]]: (is_connected, error_message)
     """
     try:
+        # 转换 URL 为带驱动的格式
+        test_url = _get_url_with_driver(url, db_type)
+        
         # Create engine with short timeout for testing
         if db_type == "sqlite":
-            engine = create_engine(url, connect_args={"timeout": timeout})
+            engine = create_engine(test_url, connect_args={"timeout": timeout})
         elif db_type == "postgresql":
-            engine = create_engine(url, connect_args={"connect_timeout": timeout})
+            engine = create_engine(test_url, connect_args={"connect_timeout": timeout})
         elif db_type == "mysql":
-            engine = create_engine(url, connect_args={"connect_timeout": timeout * 1000})  # MySQL uses milliseconds
+            engine = create_engine(test_url, connect_args={"connect_timeout": timeout * 1000})  # MySQL uses milliseconds
         else:
-            engine = create_engine(url)
+            engine = create_engine(test_url)
         
         # Test connection
         with engine.connect() as conn:

@@ -72,8 +72,13 @@ class DatabaseInitializer:
         session = SessionLocal() if self._SessionLocal is None else self._SessionLocal()
 
         try:
-            self._create_test_users(session)
-            self._create_test_repositories(session)
+            user_count = self._create_test_users(session)
+            repo_count, branch_count, commit_count = self._create_test_repositories(session)
+
+            # 合并输出一条日志
+            if user_count > 0 or repo_count > 0:
+                logger.info(f"测试数据创建完成: {user_count}用户, {repo_count}仓库, {branch_count}分支, {commit_count}提交")
+
             return True
         except Exception as e:
             session.rollback()
@@ -82,18 +87,21 @@ class DatabaseInitializer:
         finally:
             session.close()
 
-    def _create_test_users(self, session) -> None:
+    def _create_test_users(self, session) -> int:
         """
         创建测试用户数据
 
         Args:
             session: 数据库会话
+
+        Returns:
+            int: 创建的用户数量
         """
         from models.user import User
 
         user_count = session.query(User).count()
         if user_count > 0:
-            return
+            return 0
 
         # 创建管理员用户
         admin_user = User(
@@ -118,14 +126,17 @@ class DatabaseInitializer:
         session.add(test_user)
 
         session.commit()
-        logger.info("测试用户数据创建成功")
+        return 2
 
-    def _create_test_repositories(self, session) -> None:
+    def _create_test_repositories(self, session) -> tuple[int, int, int]:
         """
         创建测试仓库、分支和提交数据
 
         Args:
             session: 数据库会话
+
+        Returns:
+            tuple[int, int, int]: (仓库数量, 分支数量, 提交数量)
         """
         from models.user import User
         from models.repository import Repository
@@ -134,12 +145,12 @@ class DatabaseInitializer:
 
         repo_count = session.query(Repository).count()
         if repo_count > 0:
-            return
+            return 0, 0, 0
 
         # 获取管理员用户
         admin_user = session.query(User).filter(User.username == "admin").first()
         if not admin_user:
-            return
+            return 0, 0, 0
 
         # 创建测试仓库
         # 使用新的 URL 格式: /{username}/{repo_name}
@@ -166,18 +177,18 @@ class DatabaseInitializer:
             session.add(repo)
 
         session.commit()
-        logger.info("测试仓库数据创建成功")
 
-        # 创建物理 Git 仓库（空仓库）
+        # 创建物理 Git 仓库（空仓库）- 使用 debug 级别日志
         for repo in test_repos:
             try:
                 physical_path = get_repository_storage_path(repo.path)
                 init_bare_repo(physical_path)
-                logger.info(f"物理仓库创建成功: {physical_path}")
+                logger.debug(f"物理仓库创建成功: {physical_path}")
             except Exception as e:
                 logger.warning(f"物理仓库创建失败 {repo.path}: {e}")
 
         # 创建分支数据
+        branch_count = 0
         for repo in test_repos:
             # 创建主分支
             main_branch = Branch(
@@ -187,6 +198,7 @@ class DatabaseInitializer:
                 is_default=True,
             )
             session.add(main_branch)
+            branch_count += 1
 
             # 创建开发分支
             dev_branch = Branch(
@@ -196,12 +208,13 @@ class DatabaseInitializer:
                 is_default=False,
             )
             session.add(dev_branch)
+            branch_count += 1
 
         session.commit()
-        logger.info("测试分支数据创建成功")
 
         # 创建提交数据
         branches = session.query(Branch).all()
+        commit_count = 0
         for i, branch in enumerate(branches):
             unique_hash = hashlib.sha1(
                 f"initial-commit-{branch.repository_id}-{branch.id}-{i}".encode()
@@ -218,9 +231,10 @@ class DatabaseInitializer:
                 parent_hashes="",
             )
             session.add(initial_commit)
+            commit_count += 1
 
         session.commit()
-        logger.info("测试提交数据创建成功")
+        return len(test_repos), branch_count, commit_count
 
 
 def init_database(

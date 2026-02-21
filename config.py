@@ -139,9 +139,11 @@ class DatabaseSettings(BaseSettings):
     wal_temp_store: str = Field(default="MEMORY", description="临时表存储位置")
     
     # 压力测试模式专用配置（仅在 is_stress_test=true 时生效）
-    stress_pool_size: int = Field(default=5, ge=1, description="压力测试模式：连接池大小")
-    stress_max_overflow: int = Field(default=10, ge=0, description="压力测试模式：最大溢出连接数")
-    stress_pool_timeout: int = Field(default=5, ge=1, description="压力测试模式：获取连接超时时间（秒）")
+    # 注意：对于高并发测试（100+并发），建议增加连接池大小
+    # PostgreSQL 优化：增加连接池以支持更高并发
+    stress_pool_size: int = Field(default=30, ge=1, description="压力测试模式：连接池大小")
+    stress_max_overflow: int = Field(default=60, ge=0, description="压力测试模式：最大溢出连接数")
+    stress_pool_timeout: int = Field(default=15, ge=1, description="压力测试模式：获取连接超时时间（秒）")
     stress_pool_recycle: int = Field(default=300, ge=0, description="压力测试模式：连接回收时间（秒）")
     stress_sqlite_timeout: int = Field(default=5, ge=1, description="压力测试模式：SQLite内部超时时间（秒）")
     stress_echo: bool = Field(default=False, description="压力测试模式：是否打印SQL语句")
@@ -309,8 +311,15 @@ class DatabaseSettings(BaseSettings):
             from sqlalchemy import create_engine, text
             from sqlalchemy.exc import SQLAlchemyError
             
+            # 转换 URL 为带驱动的格式（同步验证）
+            test_url = url
+            if url_lower.startswith("mysql://"):
+                test_url = url.replace("mysql://", "mysql+pymysql://", 1)
+            elif url_lower.startswith("postgresql://"):
+                test_url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+            
             # 创建引擎并测试连接
-            engine = create_engine(url, connect_args={"connect_timeout": 5})
+            engine = create_engine(test_url, connect_args={"connect_timeout": 5})
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
             engine.dispose()

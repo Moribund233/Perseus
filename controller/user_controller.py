@@ -42,7 +42,7 @@ class UserUpdateRequest(BaseModel):
     is_active: Optional[bool] = Field(None, description="是否激活")
 
 
-@router.get("/")
+@router.get("", summary="获取所有用户")
 async def get_users(
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -60,7 +60,23 @@ async def get_users(
     return await service_get_users(db)
 
 
-@router.get("/{user_id}")
+@router.get("/me", summary="获取当前用户信息")
+async def get_current_user_info(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取当前登录用户信息
+
+    Args:
+        current_user: 当前认证用户
+
+    Returns:
+        User: 当前用户信息
+    """
+    return current_user
+
+
+@router.get("/{user_id}", summary="根据ID获取用户")
 async def get_user(
     user_id: int,
     db: AsyncSession = Depends(get_async_db),
@@ -83,7 +99,7 @@ async def get_user(
     return await service_get_user_by_id(user_id, db)
 
 
-@router.post("/")
+@router.post("", summary="创建新用户")
 async def create_user(
     user_data: UserCreateRequest,
     db: AsyncSession = Depends(get_async_db)

@@ -35,7 +35,7 @@ router = APIRouter(prefix="/api/v1/repositories", tags=["repositories"])
 security = HTTPBearer(auto_error=False)
 
 
-@router.get("/")
+@router.get("", summary="获取所有仓库")
 async def get_repositories(
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -110,7 +110,7 @@ async def get_repository(
     return await service_get_repository_by_id(repo_id, db)
 
 
-@router.post("/")
+@router.post("", summary="创建新仓库")
 @limiter.limit(RateLimitConfig.STANDARD)
 async def create_repository(
     request: Request,

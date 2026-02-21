@@ -172,12 +172,30 @@ def _create_postgresql_engine():
         )
 
 
+def _get_mysql_url_with_driver(url: str) -> str:
+    """
+    将 MySQL URL 转换为带驱动的格式
+
+    Args:
+        url: 原始 MySQL URL (mysql://...)
+
+    Returns:
+        str: 带驱动的 URL (mysql+pymysql://...)
+    """
+    if url.lower().startswith("mysql://"):
+        return url.replace("mysql://", "mysql+pymysql://", 1)
+    return url
+
+
 def _create_mysql_engine():
     """创建 MySQL 引擎"""
+    # 转换 URL 为带驱动的格式
+    mysql_url = _get_mysql_url_with_driver(db_config.url)
+
     if db_config.is_stress_test:
         logger.info("启用 MySQL 压力测试模式配置")
         return create_engine(
-            db_config.url,
+            mysql_url,
             connect_args=_get_mysql_connect_args(),
             poolclass=QueuePool,
             pool_size=db_config.stress_pool_size,
@@ -190,7 +208,7 @@ def _create_mysql_engine():
     elif _config.app.debug:
         logger.info("启用 MySQL 开发模式配置")
         return create_engine(
-            db_config.url,
+            mysql_url,
             connect_args=_get_mysql_connect_args(),
             poolclass=QueuePool,
             pool_size=db_config.pool_size,
@@ -203,7 +221,7 @@ def _create_mysql_engine():
     else:
         logger.info("启用 MySQL 生产模式配置")
         return create_engine(
-            db_config.url,
+            mysql_url,
             connect_args=_get_mysql_connect_args(),
             poolclass=QueuePool,
             pool_size=db_config.pool_size,

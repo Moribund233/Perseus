@@ -4,6 +4,8 @@ Git 操作工具模块
 提供统一的 Git 操作封装，避免在多个服务中重复实现
 """
 import os
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional, Tuple
 import pygit2
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +13,9 @@ from sqlalchemy import select
 
 from exception import NotFoundException, ValidationException
 from models import Repository
+
+# 创建线程池用于执行同步IO操作
+_git_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="git_utils")
 
 
 class GitError(Exception):
@@ -323,7 +328,7 @@ def init_bare_repo(repo_path: str) -> bool:
 
 def repo_exists(repo_path: str) -> bool:
     """
-    检查路径是否是有效的 Git 仓库
+    检查路径是否是有效的 Git 仓库（同步版本）
 
     Args:
         repo_path: 仓库路径
@@ -336,6 +341,22 @@ def repo_exists(repo_path: str) -> bool:
         return True
     except Exception:
         return False
+
+
+async def repo_exists_async(repo_path: str) -> bool:
+    """
+    检查路径是否是有效的 Git 仓库（异步版本）
+
+    使用线程池将同步IO操作转为异步，避免阻塞事件循环
+
+    Args:
+        repo_path: 仓库路径
+
+    Returns:
+        bool: 是否是有效仓库
+    """
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(_git_executor, repo_exists, repo_path)
 
 
 def get_repo_info(repo_path: str) -> Dict[str, Any]:

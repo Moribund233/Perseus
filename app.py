@@ -52,7 +52,6 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
         max_concurrent=max_concurrent,
         max_wait_time=max_wait_time
     )
-    logger.info(f"并发限制: max_concurrent={max_concurrent}, max_wait_time={max_wait_time}s")
 
     # 添加请求超时中间件（防止请求无限期挂起）
     from middleware.timeout import TimeoutMiddleware
@@ -62,7 +61,9 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     else:
         timeout_seconds = 30.0  # PostgreSQL/MySQL 正常超时
     app.add_middleware(TimeoutMiddleware, timeout_seconds=timeout_seconds)
-    logger.info(f"请求超时: {timeout_seconds}s")
+
+    # 合并输出服务配置信息
+    logger.info(f"服务配置: 并发限制={max_concurrent}, 请求超时={timeout_seconds}s")
 
     # 添加安全响应头中间件（确保所有响应都包含安全头）
     from middleware.security_headers import SecurityHeadersMiddleware
@@ -218,11 +219,10 @@ def start_server():
     # 记录主进程PID（覆盖写模式，新启动自动覆盖旧内容）
     pid_manager = get_pid_manager()
     pid_file = pid_manager.write_pid()
-    logger.info(f"PID file created: {pid_file} (PID: {pid_manager.read_pid()})")
-    
-    logger.info(f"Starting {config.app.title} v{config.app.version}")
-    logger.info(f"Environment: {'Development' if debug else 'Production'}")
-    logger.info(f"Server: http://{config.server.host}:{config.server.port}")
+
+    # 合并启动信息输出
+    env_name = "开发环境" if debug else "生产环境"
+    logger.info(f"服务已启动: http://{config.server.host}:{config.server.port} (PID: {pid_manager.read_pid()}, {env_name})")
 
     if debug:
         # 开发环境：Uvicorn

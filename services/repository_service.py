@@ -5,7 +5,10 @@
 """
 import os
 import shutil
+import asyncio
 import logging
+from typing import Dict, Tuple
+from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,7 +16,7 @@ from models import Repository
 from models.branch import Branch
 from models.repository_member import RepositoryMember
 from exception import ValidationException, NotFoundException, ConflictException
-from utils.git_utils import init_bare_repo, get_repository_storage_path, repo_exists, GitError
+from utils.git_utils import init_bare_repo, get_repository_storage_path, repo_exists_async, GitError
 from utils.response_builder import build_repo_response
 from utils.db_utils import exists
 
@@ -28,10 +31,48 @@ ROLE_PRIORITY = {
     "readonly": 1
 }
 
+# 物理仓库存在状态缓存（仓库ID -> (存在状态, 缓存时间)）
+# 缓存有效期30秒，减少频繁的磁盘IO检查
+_repo_exists_cache: Dict[int, Tuple[bool, datetime]] = {}
+_REPO_EXISTS_CACHE_TTL_SECONDS = 30
 
-def _check_physical_repo_exists(repo: Repository) -> bool:
+
+def _get_cached_repo_exists(repo_id: int) -> Tuple[bool, bool]:
     """
-    检查物理仓库是否存在
+    获取缓存的仓库存在状态
+
+    Args:
+        repo_id: 仓库ID
+
+    Returns:
+        Tuple[bool, bool]: (是否存在, 是否命中缓存)
+    """
+    if repo_id in _repo_exists_cache:
+        exists, cached_time = _repo_exists_cache[repo_id]
+        if datetime.now() - cached_time < timedelta(seconds=_REPO_EXISTS_CACHE_TTL_SECONDS):
+            return exists, True
+        # 缓存过期，删除
+        del _repo_exists_cache[repo_id]
+    return False, False
+
+
+def _set_cached_repo_exists(repo_id: int, exists: bool) -> None:
+    """
+    设置仓库存在状态缓存
+
+    Args:
+        repo_id: 仓库ID
+        exists: 是否存在
+    """
+    _repo_exists_cache[repo_id] = (exists, datetime.now())
+
+
+async def _check_physical_repo_exists_async(repo: Repository) -> bool:
+    """
+    检查物理仓库是否存在（异步版本，带缓存）
+
+    优先从缓存获取，缓存未命中时执行异步IO检查
+    缓存有效期30秒，减少频繁的磁盘IO操作
 
     Args:
         repo: Repository 模型对象
@@ -39,28 +80,49 @@ def _check_physical_repo_exists(repo: Repository) -> bool:
     Returns:
         bool: 物理仓库是否存在
     """
+    # 先检查缓存
+    cached_exists, cache_hit = _get_cached_repo_exists(repo.id)
+    if cache_hit:
+        return cached_exists
+
+    # 缓存未命中，执行异步检查
     try:
         physical_path = get_repository_storage_path(repo.path)
-        return repo_exists(physical_path)
+        exists = await repo_exists_async(physical_path)
+        # 更新缓存
+        _set_cached_repo_exists(repo.id, exists)
+        return exists
     except Exception:
         return False
 
 
-async def get_repositories(db: AsyncSession):
+async def get_repositories(db: AsyncSession, limit: int = 100):
     """
     获取所有仓库
 
     Args:
         db: 异步数据库会话
+        limit: 最大返回数量，默认100
 
     Returns:
         list[dict]: 仓库列表（包含物理仓库信息）
     """
-    result = await db.execute(select(Repository))
+    result = await db.execute(
+        select(Repository)
+        .order_by(Repository.updated_at.desc())
+        .limit(limit)
+    )
     repos = result.scalars().all()
+
+    # 并行检查所有仓库的物理存在状态（异步IO优化）
+    physical_checks = await asyncio.gather(
+        *[_check_physical_repo_exists_async(repo) for repo in repos],
+        return_exceptions=True
+    )
+
     return [
-        build_repo_response(repo, _check_physical_repo_exists(repo))
-        for repo in repos
+        build_repo_response(repo, check if not isinstance(check, Exception) else False)
+        for repo, check in zip(repos, physical_checks)
     ]
 
 
@@ -82,7 +144,8 @@ async def get_repository_by_id(repo_id: int, db: AsyncSession):
     repo = result.scalar_one_or_none()
     if repo is None:
         raise NotFoundException(detail="Repository not found")
-    return build_repo_response(repo, _check_physical_repo_exists(repo))
+    physical_exists = await _check_physical_repo_exists_async(repo)
+    return build_repo_response(repo, physical_exists)
 
 
 async def get_repositories_by_user(user_id: int, db: AsyncSession):
@@ -111,9 +174,15 @@ async def get_repositories_by_user(user_id: int, db: AsyncSession):
     # 合并结果，去重
     all_repos = list(set(list(owned_repos) + list(member_repos)))
 
+    # 并行检查所有仓库的物理存在状态（异步IO优化）
+    physical_checks = await asyncio.gather(
+        *[_check_physical_repo_exists_async(repo) for repo in all_repos],
+        return_exceptions=True
+    )
+
     return [
-        build_repo_response(repo, _check_physical_repo_exists(repo))
-        for repo in all_repos
+        build_repo_response(repo, check if not isinstance(check, Exception) else False)
+        for repo, check in zip(all_repos, physical_checks)
     ]
 
 
@@ -184,7 +253,8 @@ async def create_repository(repo_data: dict, db: AsyncSession):
         # 其他错误，记录但不阻止
         logger.warning(f"Unexpected error creating git repository: {e}")
 
-    return build_repo_response(db_repo, _check_physical_repo_exists(db_repo))
+    physical_exists = await _check_physical_repo_exists_async(db_repo)
+    return build_repo_response(db_repo, physical_exists)
 
 
 async def update_repository(repo_id: int, repo_data: dict, db: AsyncSession):
@@ -221,7 +291,8 @@ async def update_repository(repo_id: int, repo_data: dict, db: AsyncSession):
     await db.commit()
     await db.refresh(db_repo)
 
-    return build_repo_response(db_repo, _check_physical_repo_exists(db_repo))
+    physical_exists = await _check_physical_repo_exists_async(db_repo)
+    return build_repo_response(db_repo, physical_exists)
 
 
 async def delete_repository(repo_id: int, db: AsyncSession):
@@ -271,9 +342,16 @@ async def get_public_repositories(db: AsyncSession):
     """
     result = await db.execute(select(Repository).filter(Repository.is_public == True))
     repos = result.scalars().all()
+
+    # 并行检查所有仓库的物理存在状态（异步IO优化）
+    physical_checks = await asyncio.gather(
+        *[_check_physical_repo_exists_async(repo) for repo in repos],
+        return_exceptions=True
+    )
+
     return [
-        build_repo_response(repo, _check_physical_repo_exists(repo))
-        for repo in repos
+        build_repo_response(repo, check if not isinstance(check, Exception) else False)
+        for repo, check in zip(repos, physical_checks)
     ]
 
 
