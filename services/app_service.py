@@ -107,14 +107,14 @@ class AppService:
 
         Args:
             is_debug: 是否调试模式
-            is_admin: 是否管理员
+            is_admin: 是否管理员（本地认证始终为 True）
 
         Raises:
             AuthorizationException: 权限不足
         """
         if not is_debug and not is_admin:
             raise AuthorizationException(
-                detail="该操作仅在调试模式或管理员权限下可用"
+                detail="该操作需要本地认证或调试模式"
             )
 
     def get_config(self, section: Optional[str] = None) -> Dict[str, Any]:

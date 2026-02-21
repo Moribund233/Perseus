@@ -106,32 +106,39 @@ def _create_async_engine_with_config() -> AsyncEngine:
     return engine
 
 
-def get_async_engine() -> AsyncEngine:
+def get_async_engine() -> Optional[AsyncEngine]:
     """
     获取异步数据库引擎（单例模式）
     
     Returns:
-        AsyncEngine: 异步数据库引擎实例
+        AsyncEngine: 异步数据库引擎实例，创建失败返回 None
     """
     global _async_engine
     
     if _async_engine is None:
-        _async_engine = _create_async_engine_with_config()
+        try:
+            _async_engine = _create_async_engine_with_config()
+        except Exception as e:
+            logger.error(f"创建异步数据库引擎失败: {e}")
+            # 返回 None，让调用者处理
+            return None
     
     return _async_engine
 
 
-def get_async_session_maker() -> async_sessionmaker:
+def get_async_session_maker() -> Optional[async_sessionmaker]:
     """
     获取异步会话工厂（单例模式）
     
     Returns:
-        async_sessionmaker: 异步会话工厂
+        async_sessionmaker: 异步会话工厂，创建失败返回 None
     """
     global _async_session_maker
     
     if _async_session_maker is None:
         engine = get_async_engine()
+        if engine is None:
+            return None
         _async_session_maker = async_sessionmaker(
             engine,
             class_=AsyncSession,
@@ -150,6 +157,9 @@ async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
     Yields:
         AsyncSession: 异步数据库会话实例
         
+    Raises:
+        RuntimeError: 数据库引擎未初始化时抛出
+        
     Example:
         @app.get("/items")
         async def get_items(db: AsyncSession = Depends(get_async_db)):
@@ -157,6 +167,9 @@ async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
             return result.scalars().all()
     """
     session_maker = get_async_session_maker()
+    if session_maker is None:
+        raise RuntimeError("数据库连接失败，请检查数据库配置和驱动是否安装")
+    
     async with session_maker() as session:
         try:
             yield session
@@ -176,12 +189,18 @@ async def get_async_db_context() -> AsyncGenerator[AsyncSession, None]:
     
     用于非 FastAPI 依赖注入场景
     
+    Raises:
+        RuntimeError: 数据库引擎未初始化时抛出
+        
     Example:
         async with get_async_db_context() as db:
             result = await db.execute(select(User))
             users = result.scalars().all()
     """
     session_maker = get_async_session_maker()
+    if session_maker is None:
+        raise RuntimeError("数据库连接失败，请检查数据库配置和驱动是否安装")
+    
     async with session_maker() as session:
         try:
             yield session
@@ -216,6 +235,9 @@ async def init_async_db():
     创建所有表（如果不存在）
     """
     engine = get_async_engine()
+    if engine is None:
+        logger.error("异步数据库初始化失败：数据库引擎未创建")
+        return
     
     # 导入所有模型以确保表被创建
     from models import Base

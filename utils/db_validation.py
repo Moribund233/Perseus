@@ -145,7 +145,7 @@ def test_database_connection(url: str, db_type: str, timeout: int = 10) -> Tuple
         return False, f"Unexpected error: {str(e)}"
 
 
-def validate_database_config(url: str, db_type: str) -> None:
+def validate_database_config(url: str, db_type: str) -> bool:
     """
     Validate database configuration comprehensively
     
@@ -153,27 +153,31 @@ def validate_database_config(url: str, db_type: str) -> None:
         url: Database connection URL
         db_type: Database type
         
-    Raises:
-        DatabaseValidationError: When validation fails
+    Returns:
+        bool: 验证是否通过，失败时记录警告但不抛出异常
     """
     logger.info(f"Validating database configuration: {db_type}")
     
     # 1. Validate URL format
     is_valid, error = validate_database_url(url)
     if not is_valid:
-        raise DatabaseValidationError(f"Invalid database URL: {error}")
+        logger.warning(f"Database URL validation failed: {error}")
+        return False
     
     # 2. Check driver installation
     is_installed, error = check_driver_installed(db_type)
     if not is_installed:
-        raise DatabaseDriverNotFoundError(f"Driver not found: {error}")
+        logger.warning(f"Database driver not found: {error}")
+        return False
     
-    # 3. Test connection
+    # 3. Test connection (optional, don't fail startup if connection fails)
     is_connected, error = test_database_connection(url, db_type)
     if not is_connected:
-        raise DatabaseConnectionError(f"Connection failed: {error}")
+        logger.warning(f"Database connection test failed: {error}")
+        # 连接测试失败不阻止启动，让应用尝试运行时连接
     
     logger.info(f"Database validation passed: {db_type}")
+    return True
 
 
 def check_sqlite_stress_test_warning(is_sqlite: bool, is_stress_test: bool) -> Optional[str]:

@@ -645,38 +645,10 @@ pub fn update_debug_mode(debug: bool) -> Result<(), String> {
     crate::secure_config::update_debug_mode(debug)
 }
 
-/// 重置所有安全令牌（需要管理员权限）
+/// 重置所有安全令牌
 #[tauri::command]
 pub fn reset_all_tokens() -> Result<(), String> {
     crate::secure_config::reset_all_tokens()
-}
-
-/// 检查是否以提升的权限运行
-#[tauri::command]
-pub fn is_elevated() -> Result<bool, String> {
-    #[cfg(target_os = "windows")]
-    {
-        use std::process::Command;
-        match Command::new("net").args(["session"]).output() {
-            Ok(output) => Ok(output.status.success()),
-            Err(_) => Ok(false),
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        Ok(unsafe { libc::getuid() == 0 })
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        Ok(unsafe { libc::getuid() == 0 })
-    }
-
-    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
-    {
-        Ok(false)
-    }
 }
 
 /// 获取 JWT 密钥

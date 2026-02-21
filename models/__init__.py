@@ -20,8 +20,10 @@ from utils.db_validation import (
 _config = get_config()
 db_config = _config.database
 
-# 验证数据库配置
-validate_database_config(db_config.url, db_config.db_type)
+# 验证数据库配置（验证失败不阻止启动，已回退到 SQLite）
+validation_passed = validate_database_config(db_config.url, db_config.db_type)
+if not validation_passed:
+    logger.warning("数据库配置验证未通过，但应用仍将继续启动")
 
 # 检查 SQLite + 压力测试警告
 warning = check_sqlite_stress_test_warning(db_config.is_sqlite, db_config.is_stress_test)

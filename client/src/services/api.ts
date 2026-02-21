@@ -508,13 +508,6 @@ export async function resetAllTokens(): Promise<void> {
 }
 
 /**
- * 检查是否以提升的权限运行
- */
-export async function isElevated(): Promise<boolean> {
-  return invoke('is_elevated')
-}
-
-/**
  * 获取 JWT 密钥
  */
 export async function getJwtSecretKey(): Promise<string> {

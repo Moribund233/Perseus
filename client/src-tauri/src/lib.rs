@@ -94,7 +94,6 @@ pub fn run() {
             commands::get_debug_mode,
             commands::update_debug_mode,
             commands::reset_all_tokens,
-            commands::is_elevated,
             commands::get_jwt_secret_key,
             // 数据库迁移
             commands::migrate_database,

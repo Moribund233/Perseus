@@ -5,6 +5,8 @@
 """
 import logging
 from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from models import User
 from exception import ValidationException, NotFoundException, ConflictException, AuthenticationException
 from passlib.context import CryptContext
@@ -226,13 +228,13 @@ def delete_user(user_id: int, db: Session):
     return {"message": "User deleted successfully"}
 
 
-def login_user(credentials: dict, db: Session):
+async def login_user(credentials: dict, db: AsyncSession):
     """
-    用户登录
+    用户登录（异步版本）
 
     Args:
         credentials: 登录凭证，包含用户名和密码
-        db: 数据库会话
+        db: 异步数据库会话
 
     Returns:
         dict: 登录成功后的用户信息
@@ -245,8 +247,9 @@ def login_user(credentials: dict, db: Session):
     if "username" not in credentials or "password" not in credentials:
         raise ValidationException(detail="Username and password are required")
 
-    # 查找用户
-    user = db.query(User).filter(User.username == credentials["username"]).first()
+    # 查找用户（异步）
+    result = await db.execute(select(User).filter(User.username == credentials["username"]))
+    user = result.scalar_one_or_none()
 
     # 验证用户是否存在以及密码是否正确
     if not user or not verify_password(credentials["password"], user.password):

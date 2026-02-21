@@ -144,10 +144,10 @@ def check_app_permission(
             # 尝试从对象属性获取
             is_admin = getattr(current_user, "is_admin", False)
 
-    # 调试模式或管理员可以访问
+    # 调试模式或本地认证/管理员可以访问
     if not is_debug and not is_admin:
         raise AuthorizationException(
-            detail="该操作仅在调试模式或管理员权限下可用"
+            detail="该操作需要本地认证或调试模式"
         )
 
     return is_debug, is_admin

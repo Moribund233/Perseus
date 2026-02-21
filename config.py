@@ -92,6 +92,12 @@ class RateLimitSettings(BaseSettings):
     download: list = Field(default=["20 per minute", "200 per hour"], description="下载限制")
 
 
+# 全局标志：记录是否已进行数据库URL验证（避免重复输出日志）
+_db_url_validated = False
+_original_db_url = None
+_validation_result = None
+
+
 class DatabaseSettings(BaseSettings):
     """
     数据库配置类
@@ -194,32 +200,142 @@ class DatabaseSettings(BaseSettings):
         """
         初始化时从环境变量读取必需配置
         
-        Raises:
-            ValueError: 当必需的配置项未在环境变量中设置时抛出
+        如果环境变量未设置或配置无效，自动回退到 SQLite 默认值
         """
-        # 从环境变量读取 DATABASE_URL（必需）
+        import logging
+        logger = logging.getLogger(__name__)
+        global _db_url_validated, _original_db_url, _validation_result
+        
+        # 从环境变量读取 DATABASE_URL
         env_url = os.environ.get("DATABASE_URL")
-        if not env_url:
-            raise ValueError(
-                "缺少必需的环境变量: DATABASE_URL\n"
-                "请设置数据库连接URL，例如:\n"
-                "  export DATABASE_URL=\"sqlite:///./langit.db\"\n"
-                "  export DATABASE_URL=\"postgresql://user:pass@localhost/dbname\""
-            )
+        original_url = env_url  # 保存原始 URL 用于日志
+        
+        # 检查是否已经验证过相同的 URL（避免重复输出日志）
+        if _db_url_validated and _original_db_url == original_url:
+            # 使用缓存的验证结果
+            env_url = _validation_result
+        else:
+            # 首次验证或 URL 发生变化
+            _original_db_url = original_url
+            
+            if not env_url:
+                # 未设置环境变量，使用默认 SQLite
+                logger.warning("未设置 DATABASE_URL 环境变量，使用默认 SQLite 配置")
+                env_url = "sqlite:///./langit.db"
+            else:
+                # 验证数据库 URL 是否有效，无效则回退到 SQLite
+                is_valid, error_msg = self._validate_db_url_with_error(env_url)
+                if not is_valid:
+                    logger.warning(f"数据库连接失败: {error_msg}")
+                    logger.warning(f"从 {self._mask_url(original_url)} 回退到 SQLite")
+                    env_url = "sqlite:///./langit.db"
+                else:
+                    logger.info(f"数据库连接成功: {self._mask_url(env_url)}")
+            
+            # 缓存验证结果
+            _validation_result = env_url
+            _db_url_validated = True
+        
         kwargs["url"] = env_url
         
-        # 从环境变量读取 LANGIT_STRESS_TEST（必需）
+        # 从环境变量读取 LANGIT_STRESS_TEST
         stress_test = os.environ.get("LANGIT_STRESS_TEST")
         if stress_test is None:
-            raise ValueError(
-                "缺少必需的环境变量: LANGIT_STRESS_TEST\n"
-                "请设置压力测试模式标志，例如:\n"
-                "  export LANGIT_STRESS_TEST=\"false\"  # 正常模式\n"
-                "  export LANGIT_STRESS_TEST=\"true\"   # 压力测试模式"
-            )
+            logger.debug("未设置 LANGIT_STRESS_TEST 环境变量，使用默认值 false")
+            stress_test = "false"
         kwargs["is_stress_test"] = stress_test.lower() in ("true", "1", "yes")
         
         super().__init__(**kwargs)
+    
+    @staticmethod
+    def _mask_url(url: str) -> str:
+        """
+        掩码数据库 URL，隐藏敏感信息
+        
+        Args:
+            url: 原始数据库 URL
+            
+        Returns:
+            str: 掩码后的 URL（如: postgresql://***@localhost:5432/dbname）
+        """
+        if not url or not isinstance(url, str):
+            return "invalid_url"
+        
+        try:
+            # 解析 URL 并掩码密码部分
+            from urllib.parse import urlparse, urlunparse
+            parsed = urlparse(url)
+            
+            if parsed.password:
+                # 有密码，需要掩码
+                netloc = f"{parsed.username}:****@{parsed.hostname}"
+                if parsed.port:
+                    netloc += f":{parsed.port}"
+                parsed = parsed._replace(netloc=netloc)
+            
+            return urlunparse(parsed)
+        except Exception:
+            # 解析失败，返回简化版本
+            if "://" in url:
+                scheme = url.split("://")[0]
+                return f"{scheme}://****"
+            return "masked_url"
+
+    @staticmethod
+    def _validate_db_url_with_error(url: str) -> tuple[bool, str]:
+        """
+        验证数据库 URL 是否有效，返回详细错误信息
+        
+        Args:
+            url: 数据库连接 URL
+            
+        Returns:
+            tuple[bool, str]: (是否有效, 错误信息)
+        """
+        if not url or not isinstance(url, str):
+            return False, "URL 为空或格式错误"
+        
+        url_lower = url.lower()
+        valid_prefixes = ("sqlite://", "postgresql://", "postgres://", "mysql://", "mysql+pymysql://")
+        if not any(url_lower.startswith(prefix) for prefix in valid_prefixes):
+            return False, f"不支持的协议类型"
+        
+        # SQLite 不需要测试连接（本地文件）
+        if url_lower.startswith("sqlite://"):
+            return True, ""
+        
+        # 对于 PostgreSQL 和 MySQL，尝试测试连接
+        try:
+            from sqlalchemy import create_engine, text
+            from sqlalchemy.exc import SQLAlchemyError
+            
+            # 创建引擎并测试连接
+            engine = create_engine(url, connect_args={"connect_timeout": 5})
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            engine.dispose()
+            
+            return True, ""
+            
+        except SQLAlchemyError as e:
+            error_msg = str(e).split('\n')[0]  # 只取第一行错误信息
+            return False, error_msg
+        except Exception as e:
+            return False, str(e)
+
+    @staticmethod
+    def _validate_db_url(url: str) -> bool:
+        """
+        验证数据库 URL 是否有效（简化版本，无日志输出）
+        
+        Args:
+            url: 数据库连接 URL
+            
+        Returns:
+            bool: 是否有效
+        """
+        is_valid, _ = DatabaseSettings._validate_db_url_with_error(url)
+        return is_valid
 
 
 class Config(BaseSettings):

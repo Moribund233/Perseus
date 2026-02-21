@@ -7,7 +7,6 @@ import {
   updateStressTest,
   getDatabaseUrls,
   updateDatabaseUrl,
-  isElevated as checkIsElevated,
   getJwtSecretKey,
   getLocalToken,
   resetAllTokens,
@@ -46,9 +45,6 @@ const debugSettings = ref({
   stressTest: false
 })
 
-// 管理员权限状态
-const isElevated = ref(false)
-
 // 安全令牌
 const tokenConfig = ref({
   jwtKey: '',
@@ -73,7 +69,7 @@ const dangerDialog = ref<{
   message: string
   confirmText: string
   expectedInput: string
-  action: 'resetClient' | 'resetTokens' | null
+  action: 'resetClient' | 'resetTokens' | 'showTokens' | 'editDatabase' | null
 }>({
   show: false,
   title: '',
@@ -97,16 +93,14 @@ onMounted(async () => {
  */
 const loadAllConfigs = async (): Promise<void> => {
   try {
-    const [debugMode, stressTest, elevated, databaseUrls] = await Promise.all([
+    const [debugMode, stressTest, databaseUrls] = await Promise.all([
       getDebugMode(),
       getStressTest(),
-      checkIsElevated(),
       getDatabaseUrls()
     ])
 
     debugSettings.value.debugMode = debugMode
     debugSettings.value.stressTest = stressTest
-    isElevated.value = elevated
     databaseConfig.value.urls = databaseUrls
 
     // 加载 Token
@@ -277,7 +271,7 @@ const maskDatabaseUrl = (url: string): string => {
  * 打开危险操作验证对话框
  */
 const openDangerDialog = (
-  action: 'resetClient' | 'resetTokens',
+  action: 'resetClient' | 'resetTokens' | 'showTokens' | 'editDatabase',
   title: string,
   message: string,
   confirmText: string,
@@ -327,6 +321,11 @@ const confirmDangerAction = async (): Promise<void> => {
       emit('success', '安全令牌已重置')
       // 重新加载 Token
       await loadTokens()
+    } else if (dangerDialog.value.action === 'showTokens') {
+      tokenConfig.value.showTokens = true
+      emit('success', '安全令牌已显示')
+    } else if (dangerDialog.value.action === 'editDatabase') {
+      startEditDatabaseUrl()
     }
   } catch (err) {
     console.error('危险操作失败:', err)
@@ -338,16 +337,35 @@ const confirmDangerAction = async (): Promise<void> => {
 }
 
 /**
+ * 处理显示令牌
+ */
+const handleShowTokens = (): void => {
+  openDangerDialog(
+    'showTokens',
+    '显示安全令牌',
+    '安全令牌包含敏感信息，泄露可能导致安全风险。请输入 "SHOW TOKENS" 确认操作。',
+    '确认显示',
+    'SHOW TOKENS'
+  )
+}
+
+/**
+ * 处理编辑数据库配置
+ */
+const handleEditDatabase = (): void => {
+  openDangerDialog(
+    'editDatabase',
+    '修改数据库配置',
+    '修改数据库配置将影响服务端连接，错误的配置可能导致服务无法启动。请输入 "EDIT DATABASE" 确认操作。',
+    '确认修改',
+    'EDIT DATABASE'
+  )
+}
+
+/**
  * 打开重置令牌对话框
  */
-const handleResetTokens = async (): Promise<void> => {
-  // 检查是否已提升权限
-  const elevated = await checkIsElevated()
-  if (!elevated) {
-    emit('error', '需要以管理员权限运行才能执行此操作')
-    return
-  }
-
+const handleResetTokens = (): void => {
   openDangerDialog(
     'resetTokens',
     '重置安全令牌',
@@ -406,17 +424,13 @@ const handleResetClientConfig = (): void => {
       </div>
     </div>
 
-    <!-- 安全令牌与数据库配置（管理员权限控制） -->
-    <div class="card admin-required-section" :class="{ disabled: !isElevated }">
+    <!-- 安全令牌与数据库配置 -->
+    <div class="card">
       <div class="card-header">
         <h2 class="card-title">安全令牌与数据库配置</h2>
       </div>
 
-      <p v-if="!isElevated" class="elevate-warning">
-        ⚠️ 需要以管理员权限运行才能查看和修改以下配置
-      </p>
-
-      <div class="admin-required-content" :class="{ disabled: !isElevated }">
+      <div class="admin-required-content">
         <!-- 查看 Token -->
         <div class="subsection">
           <div class="subsection-header">
@@ -424,8 +438,7 @@ const handleResetClientConfig = (): void => {
             <button
               class="btn btn-sm"
               :class="tokenConfig.showTokens ? 'btn-secondary' : 'btn-primary'"
-              @click="tokenConfig.showTokens = !tokenConfig.showTokens"
-              :disabled="!isElevated"
+              @click="tokenConfig.showTokens ? tokenConfig.showTokens = false : handleShowTokens()"
             >
               {{ tokenConfig.showTokens ? '隐藏' : '显示' }}
             </button>
@@ -453,7 +466,7 @@ const handleResetClientConfig = (): void => {
             <button
               class="btn btn-error"
               @click="handleResetTokens"
-              :disabled="!isElevated || isSaving"
+              :disabled="isSaving"
             >
               重置令牌
             </button>
@@ -481,7 +494,7 @@ const handleResetClientConfig = (): void => {
                     type="text"
                     class="input"
                     :class="{ 'input-error': databaseConfig.urlValidationError }"
-                    :placeholder="`例如: ${databaseConfig.selectedDbType === 'sqlite' ? 'sqlite:///./langit.db' : databaseConfig.selectedDbType === 'postgresql' ? 'postgresql://user:pass@localhost/dbname' : 'mysql://user:pass@localhost/dbname'}`"
+                    :placeholder="`${databaseConfig.selectedDbType === 'sqlite' ? 'sqlite:///path/to/database.db' : databaseConfig.selectedDbType === 'postgresql' ? 'postgresql://用户名:密码@主机:端口/数据库名' : 'mysql://用户名:密码@主机:端口/数据库名'}`"
                   />
                   <span v-if="databaseConfig.urlValidationError" class="input-error-text">
                     {{ databaseConfig.urlValidationError }}
@@ -495,7 +508,7 @@ const handleResetClientConfig = (): void => {
                 <select
                   v-model="databaseConfig.selectedDbType"
                   class="input"
-                  :disabled="databaseConfig.isEditingDatabaseUrl || !isElevated"
+                  :disabled="databaseConfig.isEditingDatabaseUrl"
                 >
                   <option value="sqlite">SQLite</option>
                   <option value="postgresql">PostgreSQL</option>
@@ -510,14 +523,12 @@ const handleResetClientConfig = (): void => {
                 <button
                   class="btn btn-sm btn-secondary"
                   @click="databaseConfig.showDatabaseUrl = !databaseConfig.showDatabaseUrl"
-                  :disabled="!isElevated"
                 >
                   {{ databaseConfig.showDatabaseUrl ? '隐藏' : '显示' }}
                 </button>
                 <button
                   class="btn btn-sm btn-primary"
-                  @click="startEditDatabaseUrl"
-                  :disabled="!isElevated"
+                  @click="handleEditDatabase"
                 >
                   修改
                 </button>
@@ -585,34 +596,6 @@ const handleResetClientConfig = (): void => {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
-}
-
-/* 管理员权限控制区域样式 */
-.admin-required-section {
-  border: 1px solid var(--border-color);
-}
-
-.admin-required-section.disabled {
-  opacity: 0.7;
-  border-color: var(--border-color);
-}
-
-.admin-required-content {
-  margin-top: var(--spacing-md);
-}
-
-.admin-required-content.disabled {
-  pointer-events: none;
-  opacity: 0.6;
-}
-
-.admin-required-section .elevate-warning {
-  color: var(--warning-color);
-  font-size: var(--font-size-sm);
-  margin: var(--spacing-sm) 0 var(--spacing-md);
-  padding: var(--spacing-sm);
-  background-color: rgba(234, 179, 8, 0.1);
-  border-radius: var(--border-radius-sm);
 }
 
 /* 子区域样式 */

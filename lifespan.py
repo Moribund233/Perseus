@@ -46,17 +46,29 @@ class AppLifecycleManager:
         logger.info("应用启动中...")
         logger.info("=" * 60)
         
-        # 数据库类型变更检测
-        migration_status = await self._check_database_migration()
-        if migration_status.get("migration_required"):
-            logger.warning(f"检测到数据库类型变更: {migration_status.get('current_db_type')} -> {migration_status.get('target_db_type')}")
-            logger.warning("需要执行数据迁移，请通过前端界面确认迁移")
+        try:
+            # 数据库类型变更检测
+            migration_status = await self._check_database_migration()
+            if migration_status.get("migration_required"):
+                logger.warning(f"检测到数据库类型变更: {migration_status.get('current_db_type')} -> {migration_status.get('target_db_type')}")
+                logger.warning("需要执行数据迁移，请通过前端界面确认迁移")
+        except Exception as e:
+            logger.error(f"数据库迁移检查失败: {e}")
+            # 不阻止应用启动，让其他端点（如/shutdown）仍然可用
         
-        # 验证数据库连接
-        await self._verify_database_connection()
+        try:
+            # 验证数据库连接
+            await self._verify_database_connection()
+        except Exception as e:
+            logger.error(f"数据库连接验证失败: {e}")
+            # 不阻止应用启动
         
-        # 初始化WebSocket管理器（启动心跳检测任务）
-        await self._init_websocket_manager()
+        try:
+            # 初始化WebSocket管理器（启动心跳检测任务）
+            await self._init_websocket_manager()
+        except Exception as e:
+            logger.error(f"WebSocket管理器初始化失败: {e}")
+            # 不阻止应用启动
         
         logger.info("应用启动完成")
     
@@ -73,9 +85,14 @@ class AppLifecycleManager:
             
             config = get_config()
             
-            # 从环境变量获取实际数据库类型
+            # 从环境变量获取实际数据库类型，优先使用环境变量
             actual_url = os.environ.get("DATABASE_URL", "")
-            actual_type = self._parse_db_type(actual_url)
+            if actual_url:
+                actual_type = self._parse_db_type(actual_url)
+            else:
+                # 环境变量未设置，使用配置中的 URL（此时已回退到 SQLite）
+                actual_type = config.database.db_type
+                logger.debug(f"环境变量未设置，使用配置数据库类型: {actual_type}")
             
             # 获取记录的数据库类型
             recorded_type = config.database.current_db_type
@@ -210,7 +227,8 @@ class AppLifecycleManager:
             logger.info("数据库连接验证成功")
         except Exception as e:
             logger.error(f"数据库连接验证失败: {e}")
-            raise
+            # 不抛出异常，允许应用继续启动
+            # 这样其他端点（如/shutdown）仍然可以访问
     
     async def _init_websocket_manager(self) -> None:
         """初始化WebSocket管理器"""

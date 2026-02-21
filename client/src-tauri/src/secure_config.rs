@@ -93,14 +93,14 @@ pub struct SecureConfig {
 
 pub fn default_database_urls() -> std::collections::HashMap<String, String> {
     let mut urls = std::collections::HashMap::new();
-    urls.insert("sqlite".to_string(), "sqlite:///./langit.db".to_string());
+    urls.insert("sqlite".to_string(), "".to_string());
     urls.insert(
         "postgresql".to_string(),
-        "postgresql://user:password@localhost:5432/langit".to_string(),
+        "".to_string(),
     );
     urls.insert(
         "mysql".to_string(),
-        "mysql://user:password@localhost:3306/langit".to_string(),
+        "".to_string(),
     );
     urls
 }
