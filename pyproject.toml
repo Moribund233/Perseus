@@ -43,7 +43,6 @@ psutil = "^7.0.0"
 
 # Database drivers (all required for full database support)
 psycopg2-binary = "^2.9.9"  # PostgreSQL driver (C extension)
-pg8000 = "^1.31.0"  # PostgreSQL driver (pure Python)
 pymysql = "^1.1.0"  # MySQL driver
 aiosqlite = "^0.20.0"  # Async SQLite driver
 asyncpg = "^0.30.0"  # Async PostgreSQL driver
