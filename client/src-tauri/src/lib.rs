@@ -104,6 +104,8 @@ pub fn run() {
             commands::clear_pending_migration,
             commands::record_migration_failed,
             commands::clear_migration_failed,
+            // 数据库安装检测
+            commands::check_installed_databases,
             // 数据库连接测试（客户端本地）
             commands::check_sqlite_file,
             commands::test_tcp_connection,

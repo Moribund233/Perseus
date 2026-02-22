@@ -282,6 +282,8 @@ export interface ClientConfig {
   auth_token?: string
   /** 数据库类型（sqlite/postgresql/mysql） */
   db_type?: string
+  /** 已安装的数据库类型列表 */
+  installed_databases?: string[]
 }
 
 /**
@@ -844,4 +846,18 @@ export async function switchDatabaseType(dbType: string): Promise<void> {
  */
 export async function updateDatabaseUrl(dbType: string, url: string): Promise<void> {
   return invoke('update_database_url', { dbType, url })
+}
+
+/**
+ * 检测系统中已安装的数据库
+ * 
+ * 检查 Python 环境中可用的数据库驱动：
+ * - SQLite: 总是可用（内置于 Python）
+ * - PostgreSQL: 需要 pg8000 驱动
+ * - MySQL: 需要 pymysql 驱动
+ * 
+ * @returns 已安装的数据库类型列表，如 ['sqlite', 'postgresql']
+ */
+export async function checkInstalledDatabases(): Promise<string[]> {
+  return invoke('check_installed_databases')
 }

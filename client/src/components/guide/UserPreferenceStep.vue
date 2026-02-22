@@ -5,7 +5,8 @@ import {
   getClientConfig,
   saveClientConfig,
   markGuideCompleted,
-  getDatabaseUrls
+  getDatabaseUrls,
+  checkInstalledDatabases
 } from '../../services/api'
 import { useGuideEventBus, type DatabaseType } from '../../composables/useGuideEvents'
 import { useRouter } from 'vue-router'
@@ -41,6 +42,26 @@ const isDatabaseUrlConfigured = (dbType: DatabaseType): boolean => {
 }
 
 /**
+ * 检查数据库是否已安装
+ */
+const isDatabaseInstalled = (dbType: DatabaseType): boolean => {
+  return state.installedDatabases.includes(dbType)
+}
+
+/**
+ * 获取数据库选项的禁用原因
+ */
+const getDatabaseDisabledReason = (dbType: DatabaseType): string => {
+  if (!isDatabaseInstalled(dbType)) {
+    return '系统未检测到该数据库驱动，请先安装对应的数据库'
+  }
+  if (!isDatabaseUrlConfigured(dbType)) {
+    return '请在开发者选项中配置数据库连接 URL'
+  }
+  return ''
+}
+
+/**
  * 数据库类型选项（带启用状态）
  */
 const dbTypeOptions = computed(() => [
@@ -48,19 +69,25 @@ const dbTypeOptions = computed(() => [
     value: 'sqlite' as DatabaseType,
     label: 'SQLite',
     description: '轻量级本地数据库，适合开发和测试',
-    enabled: isDatabaseUrlConfigured('sqlite')
+    enabled: isDatabaseInstalled('sqlite') && isDatabaseUrlConfigured('sqlite'),
+    installed: isDatabaseInstalled('sqlite'),
+    configured: isDatabaseUrlConfigured('sqlite')
   },
   {
     value: 'postgresql' as DatabaseType,
     label: 'PostgreSQL',
     description: '强大的开源关系型数据库，适合生产环境',
-    enabled: isDatabaseUrlConfigured('postgresql')
+    enabled: isDatabaseInstalled('postgresql') && isDatabaseUrlConfigured('postgresql'),
+    installed: isDatabaseInstalled('postgresql'),
+    configured: isDatabaseUrlConfigured('postgresql')
   },
   {
     value: 'mysql' as DatabaseType,
     label: 'MySQL',
     description: '流行的开源数据库，广泛使用于Web应用',
-    enabled: isDatabaseUrlConfigured('mysql')
+    enabled: isDatabaseInstalled('mysql') && isDatabaseUrlConfigured('mysql'),
+    installed: isDatabaseInstalled('mysql'),
+    configured: isDatabaseUrlConfigured('mysql')
   }
 ])
 
@@ -80,9 +107,32 @@ async function loadDatabaseUrls(): Promise<void> {
   }
 }
 
-// 页面加载时获取数据库 URL
+/**
+ * 检测已安装的数据库
+ */
+async function checkDatabasesInstallation(): Promise<void> {
+  eventBus.updateUserPreference({ isCheckingDatabases: true })
+  try {
+    const installed = await checkInstalledDatabases()
+    // 将字符串数组转换为 DatabaseType 数组
+    const validDatabases = installed.filter((db): db is DatabaseType =>
+      ['sqlite', 'postgresql', 'mysql'].includes(db)
+    )
+    eventBus.updateUserPreference({ installedDatabases: validDatabases })
+    console.log('已安装的数据库:', validDatabases)
+  } catch (err) {
+    console.error('检测数据库安装状态失败:', err)
+    // 检测失败时，默认只保留 SQLite
+    eventBus.updateUserPreference({ installedDatabases: ['sqlite'] })
+  } finally {
+    eventBus.updateUserPreference({ isCheckingDatabases: false })
+  }
+}
+
+// 页面加载时获取数据库 URL 和检测已安装的数据库
 onMounted(() => {
   loadDatabaseUrls()
+  checkDatabasesInstallation()
 })
 
 /**
@@ -108,6 +158,10 @@ function selectLayout(layoutId: string): void {
  * @param dbType - 数据库类型
  */
 function selectDbType(dbType: DatabaseType): void {
+  // 检查数据库是否已安装
+  if (!isDatabaseInstalled(dbType)) {
+    return
+  }
   // 检查数据库 URL 是否已配置
   if (!isDatabaseUrlConfigured(dbType)) {
     return
@@ -160,7 +214,8 @@ async function savePreferences(): Promise<void> {
         connection_timeout: clientConfig?.advanced?.connection_timeout ?? 30,
         request_timeout: clientConfig?.advanced?.request_timeout ?? 30
       },
-      db_type: state.dbType
+      db_type: state.dbType,
+      installed_databases: state.installedDatabases
     }
 
     // 保存配置
@@ -227,8 +282,8 @@ async function savePreferences(): Promise<void> {
     <!-- 数据库类型选择 -->
     <div class="preference-section">
       <h3>数据库类型</h3>
-      <div v-if="isLoadingUrls" class="db-type-loading">
-        加载数据库配置中...
+      <div v-if="isLoadingUrls || state.isCheckingDatabases" class="db-type-loading">
+        {{ state.isCheckingDatabases ? '检测数据库安装状态...' : '加载数据库配置中...' }}
       </div>
       <div v-else class="db-type-options">
         <div
@@ -237,24 +292,35 @@ async function savePreferences(): Promise<void> {
           class="db-type-option"
           :class="{
             'db-type-selected': state.dbType === dbType.value,
-            'db-type-disabled': !dbType.enabled
+            'db-type-disabled': !dbType.enabled,
+            'db-type-not-installed': !dbType.installed
           }"
           @click="selectDbType(dbType.value)"
+          :title="getDatabaseDisabledReason(dbType.value)"
         >
           <div class="db-type-header">
             <div class="db-type-radio">
               <div v-if="state.dbType === dbType.value" class="db-type-radio-inner" />
             </div>
             <div class="db-type-label">{{ dbType.label }}</div>
-            <span v-if="!dbType.enabled" class="db-type-badge">未配置</span>
+            <span v-if="!dbType.installed" class="db-type-badge db-type-badge-not-installed">未安装</span>
+            <span v-else-if="!dbType.configured" class="db-type-badge">未配置</span>
           </div>
           <div class="db-type-description">
-            {{ dbType.enabled ? dbType.description : '请在开发者选项中配置数据库连接 URL' }}
+            <template v-if="!dbType.installed">
+              系统未检测到该数据库驱动，请先安装对应的数据库
+            </template>
+            <template v-else-if="!dbType.configured">
+              请在开发者选项中配置数据库连接 URL
+            </template>
+            <template v-else>
+              {{ dbType.description }}
+            </template>
           </div>
         </div>
       </div>
-      <p v-if="!isLoadingUrls" class="db-type-hint">
-        只有已配置连接 URL 的数据库类型可以选择，未配置的类型需要先在开发者选项中设置
+      <p v-if="!isLoadingUrls && !state.isCheckingDatabases" class="db-type-hint">
+        只有已安装且已配置连接 URL 的数据库类型可以选择
       </p>
     </div>
 
@@ -408,6 +474,15 @@ async function savePreferences(): Promise<void> {
   background-color: var(--bg-secondary);
 }
 
+/* 未安装状态样式 */
+.db-type-option.db-type-not-installed {
+  border-color: var(--error-color-alpha, rgba(239, 68, 68, 0.3));
+}
+
+.db-type-option.db-type-not-installed .db-type-label {
+  color: var(--text-secondary);
+}
+
 .db-type-badge {
   margin-left: auto;
   padding: 2px 8px;
@@ -415,6 +490,10 @@ async function savePreferences(): Promise<void> {
   color: white;
   font-size: var(--font-size-xs);
   border-radius: var(--border-radius-sm);
+}
+
+.db-type-badge.db-type-badge-not-installed {
+  background-color: var(--error-color, #ef4444);
 }
 
 .db-type-hint {

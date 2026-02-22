@@ -772,6 +772,51 @@ pub fn update_database_url(db_type: String, url: String) -> Result<(), String> {
     crate::secure_config::update_database_url(db_type, url)
 }
 
+// ==================== 数据库安装检测命令 ====================
+
+/// 检测系统中已安装的数据库
+///
+/// 返回已安装的数据库类型列表：["sqlite", "postgresql", "mysql"]
+/// - SQLite: 总是可用（内置于 Python）
+/// - PostgreSQL: 检查 pg8000 驱动是否可用
+/// - MySQL: 检查 pymysql 驱动是否可用
+#[tauri::command]
+pub async fn check_installed_databases() -> Result<Vec<String>, String> {
+    let mut installed = vec!["sqlite".to_string()];
+
+    // 检查 PostgreSQL 驱动 (pg8000)
+    match check_python_module("pg8000").await {
+        Ok(true) => installed.push("postgresql".to_string()),
+        Ok(false) => log::info!("PostgreSQL 驱动 (pg8000) 未安装"),
+        Err(e) => log::warn!("检查 PostgreSQL 驱动失败: {}", e),
+    }
+
+    // 检查 MySQL 驱动 (pymysql)
+    match check_python_module("pymysql").await {
+        Ok(true) => installed.push("mysql".to_string()),
+        Ok(false) => log::info!("MySQL 驱动 (pymysql) 未安装"),
+        Err(e) => log::warn!("检查 MySQL 驱动失败: {}", e),
+    }
+
+    log::info!("已安装的数据库: {:?}", installed);
+    Ok(installed)
+}
+
+/// 检查 Python 模块是否可用
+///
+/// 通过执行 Python 解释器检查指定模块是否可以导入
+async fn check_python_module(module_name: &str) -> Result<bool, String> {
+    use tokio::process::Command;
+
+    let output = Command::new("python")
+        .args(["-c", &format!("import {}", module_name)])
+        .output()
+        .await
+        .map_err(|e| format!("执行 Python 命令失败: {}", e))?;
+
+    Ok(output.status.success())
+}
+
 // ==================== 数据库连接测试命令 ====================
 
 /// 检查 SQLite 数据库文件是否存在

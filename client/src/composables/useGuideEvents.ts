@@ -84,6 +84,10 @@ export interface UserPreferenceState {
   selectedLayout: string
   /** 数据库类型 */
   dbType: DatabaseType
+  /** 已安装的数据库类型列表 */
+  installedDatabases: DatabaseType[]
+  /** 是否正在检测数据库安装状态 */
+  isCheckingDatabases: boolean
 }
 
 /**
@@ -194,7 +198,9 @@ export function createGuideEventBus(initialConfig: ClientConfig | null): GuideEv
     userPreference: {
       selectedTheme: initialConfig?.appearance?.theme || 'dark',
       selectedLayout: initialConfig?.appearance?.layout_density || 'default',
-      dbType: (initialConfig?.db_type as DatabaseType) || 'sqlite'
+      dbType: (initialConfig?.db_type as DatabaseType) || 'sqlite',
+      installedDatabases: ['sqlite'], // 默认只有 SQLite
+      isCheckingDatabases: false
     }
   })
 
