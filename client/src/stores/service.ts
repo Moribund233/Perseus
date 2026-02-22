@@ -24,6 +24,7 @@ import {
   type ConfigResponse,
   type HealthStatus
 } from '../services/api'
+import { useLogStore } from './logs'
 
 // 基础系统信息类型
 export interface BasicSystemInfo {
@@ -190,6 +191,14 @@ export const useServiceStore = defineStore('service', () => {
             isConfigLoaded.value = true
           }
         }
+
+        // 服务运行时自动连接日志 WebSocket
+        const logStore = useLogStore()
+        if (logStore.autoConnectEnabled && !logStore.isConnected) {
+          logStore.connect(true).catch(err => {
+            console.warn('自动连接日志失败:', err)
+          })
+        }
       } else {
         // 服务停止时清空服务端信息
         serviceStatus.value = null
@@ -197,6 +206,12 @@ export const useServiceStore = defineStore('service', () => {
         processInfo.value = null
         serverConfig.value = null
         isConfigLoaded.value = false
+
+        // 服务停止时断开日志连接
+        const logStore = useLogStore()
+        if (logStore.isConnected) {
+          logStore.disconnect()
+        }
       }
 
       isInitialized.value = true

@@ -133,6 +133,31 @@ impl ApiClient {
         self.handle_response(response).await
     }
 
+    /// 发送带超时的 POST 请求
+    pub async fn post_with_timeout<B: Serialize>(
+        &self,
+        path: &str,
+        body: &B,
+        timeout_secs: u64,
+    ) -> Result<reqwest::Response, String> {
+        let headers = self.build_headers()?;
+        let url = self.get_url(path);
+
+        // 创建短超时客户端
+        let timeout_client = Client::builder()
+            .timeout(std::time::Duration::from_secs(timeout_secs))
+            .build()
+            .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
+
+        timeout_client
+            .post(&url)
+            .headers(headers)
+            .json(body)
+            .send()
+            .await
+            .map_err(|e| format!("请求失败: {}", e))
+    }
+
     /// 处理响应
     async fn handle_response<T: DeserializeOwned>(
         &self,
@@ -176,17 +201,13 @@ pub async fn start_service() -> Result<ActionResponse, String> {
 
 /// 停止服务（带超时）
 pub async fn stop_service_with_timeout(timeout_secs: u64) -> Result<ActionResponse, String> {
-    let base_url = get_server_url()?;
+    // 使用 ApiClient 发送请求，会自动添加本地认证头
+    let client = ApiClient::new()?;
 
-    // 创建短超时客户端
-    let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(timeout_secs))
-        .build()
-        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
-
-    let url = format!("{}/api/app/shutdown", base_url);
-
-    match client.post(&url).send().await {
+    match client
+        .post_with_timeout("/api/app/shutdown", &serde_json::json!({}), timeout_secs)
+        .await
+    {
         Ok(response) => {
             let status = response.status();
             if status.is_success() {

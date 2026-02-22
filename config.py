@@ -506,24 +506,40 @@ class ConfigManager:
     def update_config(self, new_config: Dict[str, Any]) -> Config:
         """
         更新配置文件和缓存
-        
+
         Args:
             new_config: 新的配置数据
-            
+
         Returns:
             Config: 更新后的配置对象
         """
         # 读取当前配置
         current_config = self.get_config()
-        
+
         # 合并新配置
         config_data = current_config.model_dump()
         self._deep_merge(config_data, new_config)
-        
+
+        # 移除敏感配置项（这些通过环境变量注入，不写入配置文件）
+        # 1. 移除 security.secret_key（JWT Secret Key）
+        if "security" in config_data and "secret_key" in config_data["security"]:
+            del config_data["security"]["secret_key"]
+
+        # 2. 移除 app.debug（调试模式）
+        if "app" in config_data and "debug" in config_data["app"]:
+            del config_data["app"]["debug"]
+
+        # 3. 移除 database.url 和 database.is_stress_test（数据库连接配置）
+        if "database" in config_data:
+            if "url" in config_data["database"]:
+                del config_data["database"]["url"]
+            if "is_stress_test" in config_data["database"]:
+                del config_data["database"]["is_stress_test"]
+
         # 写入配置文件
         with open(self.config_path, "w", encoding="utf-8") as f:
             toml.dump(config_data, f)
-        
+
         # 重新加载配置
         return self._load_config()
     

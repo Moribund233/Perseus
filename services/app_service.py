@@ -981,16 +981,19 @@ class AppService:
             logger.info(f"数据库迁移完成: {result}")
 
             # 迁移成功，更新 current_db_type 和清除 pending 状态
-            config.database.current_db_type = target_type
-            config.database.pending_db_type = None
-            config.database.last_migration_failed = False
-            config.database.failed_target_type = None
-            config.database.failed_at = None
-
-            # 保存配置
+            # 使用 update_config 方法保存配置
+            from config import update_config
+            
             try:
-                config_manager = ConfigManager()
-                config_manager.save_config(config)
+                update_config({
+                    "database": {
+                        "current_db_type": target_type,
+                        "pending_db_type": None,
+                        "last_migration_failed": False,
+                        "failed_target_type": None,
+                        "failed_at": None
+                    }
+                })
                 logger.info(f"已更新 current_db_type 为: {target_type}，并清除 pending 状态")
             except Exception as save_error:
                 logger.error(f"保存配置失败: {save_error}")

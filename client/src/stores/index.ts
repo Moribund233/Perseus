@@ -15,3 +15,7 @@ export {
   useDatabaseStore,
   type DatabaseTypeOption
 } from './database'
+export {
+  useLogStore,
+  type LogNotification
+} from './logs'
