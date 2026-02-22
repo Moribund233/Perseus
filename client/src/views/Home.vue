@@ -9,6 +9,7 @@ import {
   startService,
   stopService,
   restartService,
+  getDatabaseUrl,
   type ActionResponse
 } from '../services/api'
 import MigrationProgressModal from '../components/database/MigrationProgressModal.vue'
@@ -46,6 +47,8 @@ const databaseStore = useDatabaseStore()
 const showMigrationModal = ref(false)
 const migrationSourceType = ref<'sqlite' | 'postgresql' | 'mysql'>('sqlite')
 const migrationTargetType = ref<'sqlite' | 'postgresql' | 'mysql'>('sqlite')
+const migrationSourceUrl = ref('')
+const migrationTargetUrl = ref('')
 
 // 计算属性：服务状态（兼容原有逻辑）
 const serviceStatus = computed<ServiceStatusType | null>(() => {
@@ -178,10 +181,23 @@ const checkMigrationAfterStart = async (): Promise<void> => {
   try {
     const status = await databaseStore.checkMigrationStatus()
     if (status && status.migration_required) {
-      // 需要迁移，显示迁移模态框
-      migrationSourceType.value = status.current_db_type as 'sqlite' | 'postgresql' | 'mysql'
-      migrationTargetType.value = status.target_db_type as 'sqlite' | 'postgresql' | 'mysql'
-      showMigrationModal.value = true
+      // 需要迁移，获取 URL 并显示迁移模态框
+      const sourceType = status.current_db_type as 'sqlite' | 'postgresql' | 'mysql'
+      const targetType = status.target_db_type as 'sqlite' | 'postgresql' | 'mysql'
+
+      try {
+        const [sourceUrl, targetUrl] = await Promise.all([
+          getDatabaseUrl(sourceType),
+          getDatabaseUrl(targetType)
+        ])
+        migrationSourceType.value = sourceType
+        migrationTargetType.value = targetType
+        migrationSourceUrl.value = sourceUrl
+        migrationTargetUrl.value = targetUrl
+        showMigrationModal.value = true
+      } catch (err) {
+        console.error('获取数据库 URL 失败:', err)
+      }
     }
   } catch (err) {
     console.error('检查迁移状态失败:', err)
@@ -840,6 +856,8 @@ onUnmounted(() => {
     v-model:visible="showMigrationModal"
     :source-type="migrationSourceType"
     :target-type="migrationTargetType"
+    :source-url="migrationSourceUrl"
+    :target-url="migrationTargetUrl"
     @complete="handleMigrationComplete"
   />
 </template>

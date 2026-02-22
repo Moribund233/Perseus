@@ -11,6 +11,9 @@
   --primary-hover: #2563eb;
   --primary-light: rgba(59, 130, 246, 0.15);
 
+  /* SVG 图标滤镜 - 深色主题下反转颜色 */
+  --icon-filter: invert(1) brightness(1.2);
+
   /* 背景色 - 经典海军蓝系 */
   --bg-primary: #0c1626;
   --bg-secondary: #17253a;

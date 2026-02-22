@@ -4,10 +4,9 @@ import Card from '../components/Card.vue'
 import Button from '../components/Button.vue'
 import Modal from '../components/Modal.vue'
 import Alert from '../components/Alert.vue'
-import MigrationProgressModal from '../components/database/MigrationProgressModal.vue'
 import { useDatabaseStore, useServiceStore } from '../stores'
 import type { DatabaseType, DatabaseConfig } from '../services/databaseApi'
-import { switchDatabaseType } from '../services/api'
+import { switchDatabaseType, getDatabaseType } from '../services/api'
 
 /**
  * 数据库配置页面
@@ -20,8 +19,14 @@ const serviceStore = useServiceStore()
 
 // 迁移相关状态
 const showMigrationConfirm = ref(false)
-const showMigrationProgress = ref(false)
 const pendingDbType = ref<DatabaseType | null>(null)
+// 切换成功提示
+const showRestartAlert = ref(false)
+
+// 从客户端配置读取的数据库类型
+const clientDbType = ref<DatabaseType>('sqlite')
+// 是否正在加载客户端配置
+const isLoadingClientConfig = ref(true)
 
 // 图标路径
 const icons = {
@@ -75,69 +80,70 @@ const defaultConfig: DatabaseConfig = {
   mysql_write_timeout: 30
 }
 
-// 当前编辑的配置 - 服务未启动时使用默认配置
-const config = computed((): DatabaseConfig => dbStore.editingConfig || defaultConfig)
+// 当前编辑的配置 - 服务未启动时使用默认配置，但使用客户端配置中的 db_type
+const config = computed((): DatabaseConfig => {
+  if (dbStore.editingConfig) {
+    return dbStore.editingConfig
+  }
+  // 服务未启动时，使用客户端配置中的 db_type
+  return { ...defaultConfig, db_type: clientDbType.value }
+})
 
 /**
  * 切换数据库类型
- * 同时更新 client.toml 中的 db_type
+ * 纯客户端配置，直接更新 client.toml
  */
 const handleDbTypeChange = async (newType: DatabaseType): Promise<void> => {
-  if (!config.value?.db_type || newType === config.value.db_type) return
+  if (newType === clientDbType.value) return
 
-  // 先更新 client.toml 中的数据库类型
+  // 更新 client.toml 中的数据库类型
   try {
     await switchDatabaseType(newType)
+    // 更新本地状态，UI立即响应
+    clientDbType.value = newType
   } catch (err) {
     console.error('切换数据库类型失败:', err)
-    return
-  }
-
-  // 服务未启动时，只更新本地配置，不显示迁移确认
-  if (!serviceStore.isRunning) {
-    dbStore.switchDbType(newType)
-    return
-  }
-
-  // 如果类型变更，显示迁移确认
-  if (dbStore.serverConfig?.db_type && dbStore.serverConfig.db_type !== newType) {
-    pendingDbType.value = newType
-    showMigrationConfirm.value = true
-  } else {
-    dbStore.switchDbType(newType)
   }
 }
 
 /**
- * 确认迁移
+ * 确认切换数据库类型
+ * 仅更新客户端配置，实际迁移在应用重启后由 Home 页处理
  */
-const confirmMigration = (): void => {
+const confirmSwitch = async (): Promise<void> => {
   if (pendingDbType.value) {
-    dbStore.switchDbType(pendingDbType.value)
-    showMigrationConfirm.value = false
-    showMigrationProgress.value = true
-  }
-}
-
-/**
- * 迁移完成回调
- */
-const onMigrationComplete = async (success: boolean): Promise<void> => {
-  showMigrationProgress.value = false
-  if (success) {
-    await dbStore.loadConfig(true)
-  } else {
-    // 恢复原类型
-    if (dbStore.serverConfig?.db_type) {
-      dbStore.switchDbType(dbStore.serverConfig.db_type)
+    try {
+      // 更新客户端配置中的数据库类型
+      await switchDatabaseType(pendingDbType.value)
+      // 更新本地状态
+      clientDbType.value = pendingDbType.value
+      // 关闭确认弹窗
+      showMigrationConfirm.value = false
+      // 显示重启提示
+      showRestartAlert.value = true
+      // 清除待处理类型
+      pendingDbType.value = null
+    } catch (err) {
+      console.error('切换数据库类型失败:', err)
     }
   }
-  pendingDbType.value = null
 }
 
 // 页面加载
-onMounted(() => {
-  // 服务启动时才加载配置
+onMounted(async () => {
+  // 无论服务是否启动，都先读取客户端配置中的数据库类型
+  try {
+    const dbType = await getDatabaseType()
+    if (dbType && ['sqlite', 'postgresql', 'mysql'].includes(dbType)) {
+      clientDbType.value = dbType as DatabaseType
+    }
+  } catch (err) {
+    console.error('获取客户端数据库类型失败:', err)
+  } finally {
+    isLoadingClientConfig.value = false
+  }
+
+  // 服务启动时才加载服务端配置
   if (serviceStore.isRunning && !dbStore.isConfigLoaded) {
     dbStore.loadConfig()
   }
@@ -169,14 +175,18 @@ onMounted(() => {
     <Alert v-if="dbStore.successMessage" type="success" closable @close="dbStore.clearMessages()" class="mb-lg">
       {{ dbStore.successMessage }}
     </Alert>
+    <!-- 重启提示 - 数据库类型切换成功后显示 -->
+    <Alert v-if="showRestartAlert" type="warning" closable @close="showRestartAlert = false" class="mb-lg">
+      数据库类型已切换，请前往控制台重启应用以完成数据迁移
+    </Alert>
 
     <!-- 加载中 -->
-    <div v-if="dbStore.isLoading && !dbStore.isConfigLoaded" class="loading-state">
+    <div v-if="isLoadingClientConfig || (dbStore.isLoading && !dbStore.isConfigLoaded)" class="loading-state">
       <img :src="icons.refresh" class="spinner-icon" alt="loading" />
       <span>加载配置中...</span>
     </div>
 
-    <template v-if="dbStore.isConfigLoaded || !serviceStore.isRunning">
+    <template v-if="!isLoadingClientConfig && (dbStore.isConfigLoaded || !serviceStore.isRunning)">
       <!-- 数据库类型选择 -->
       <Card title="数据库类型" class="mb-lg">
         <div class="db-type-grid">
@@ -184,7 +194,7 @@ onMounted(() => {
             v-for="type in databaseTypes"
             :key="type.value"
             class="db-type-card"
-            :class="{ active: config.db_type === type.value }"
+            :class="{ active: clientDbType === type.value }"
             @click="handleDbTypeChange(type.value)"
           >
             <img :src="type.icon" class="db-type-icon" :alt="type.label" />
@@ -192,7 +202,7 @@ onMounted(() => {
               <h3 class="db-type-label">{{ type.label }}</h3>
               <p class="db-type-description">{{ type.description }}</p>
             </div>
-            <img v-if="config.db_type === type.value" :src="icons.checkCircle" class="db-type-check" alt="selected" />
+            <img v-if="clientDbType === type.value" :src="icons.checkCircle" class="db-type-check" alt="selected" />
           </div>
         </div>
       </Card>
@@ -230,7 +240,7 @@ onMounted(() => {
       </Card>
 
       <!-- SQLite 配置 -->
-      <Card v-if="config.db_type === 'sqlite'" title="SQLite 配置" class="mb-lg" :class="{ 'card-disabled': !serviceStore.isRunning }">
+      <Card v-if="clientDbType === 'sqlite'" title="SQLite 配置" class="mb-lg" :class="{ 'card-disabled': !serviceStore.isRunning }">
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">内部超时时间（秒）</label>
@@ -283,7 +293,7 @@ onMounted(() => {
       </Card>
 
       <!-- PostgreSQL 配置 -->
-      <Card v-if="config.db_type === 'postgresql'" title="PostgreSQL 配置" class="mb-lg" :class="{ 'card-disabled': !serviceStore.isRunning }">
+      <Card v-if="clientDbType === 'postgresql'" title="PostgreSQL 配置" class="mb-lg" :class="{ 'card-disabled': !serviceStore.isRunning }">
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">SSL 模式</label>
@@ -308,7 +318,7 @@ onMounted(() => {
       </Card>
 
       <!-- MySQL 配置 -->
-      <Card v-if="config.db_type === 'mysql'" title="MySQL 配置" class="mb-lg" :class="{ 'card-disabled': !serviceStore.isRunning }">
+      <Card v-if="clientDbType === 'mysql'" title="MySQL 配置" class="mb-lg" :class="{ 'card-disabled': !serviceStore.isRunning }">
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">字符集</label>
@@ -349,40 +359,25 @@ onMounted(() => {
         </div>
       </div>
 
-    <!-- 迁移确认弹窗 -->
-    <Modal v-model:visible="showMigrationConfirm" title="数据库迁移确认" width="500px" :closable="false" :mask-closable="false">
+    <!-- 切换确认弹窗 -->
+    <Modal v-model:visible="showMigrationConfirm" title="切换数据库类型" width="500px" :closable="false" :mask-closable="false">
       <div class="migration-confirm-content">
         <img :src="icons.alertTriangle" class="warning-icon" alt="warning" />
-        <h3>切换数据库类型需要迁移数据</h3>
+        <h3>确认切换数据库类型？</h3>
         <p>
           您正在从 <strong>{{ dbStore.currentDbTypeLabel }}</strong> 切换到
           <strong>{{ databaseTypes.find(t => t.value === pendingDbType)?.label }}</strong>
         </p>
-        <div class="migration-flow">
-          <div class="flow-item"><span class="flow-step">1</span><span>导出当前数据库数据</span></div>
-          <img :src="icons.arrowRight" class="flow-arrow" alt="arrow" />
-          <div class="flow-item"><span class="flow-step">2</span><span>切换数据库类型</span></div>
-          <img :src="icons.arrowRight" class="flow-arrow" alt="arrow" />
-          <div class="flow-item"><span class="flow-step">3</span><span>导入数据到新数据库</span></div>
-        </div>
-        <Alert type="warning" class="mt-md">
-          迁移过程中服务将暂时不可用，请确保没有正在进行的操作
+        <Alert type="info" class="mt-md">
+          切换后需要重启应用才能生效，重启时将自动进行数据迁移
         </Alert>
       </div>
       <template #footer>
         <Button type="secondary" @click="showMigrationConfirm = false; pendingDbType = null">取消</Button>
-        <Button type="primary" :icon="icons.migrate" @click="confirmMigration">开始迁移</Button>
+        <Button type="primary" @click="confirmSwitch">确认切换</Button>
       </template>
     </Modal>
     </template>
-
-    <!-- 迁移进度弹窗 -->
-    <MigrationProgressModal
-      v-model:visible="showMigrationProgress"
-      :source-type="dbStore.serverConfig?.db_type || 'sqlite'"
-      :target-type="pendingDbType || 'sqlite'"
-      @complete="onMigrationComplete"
-    />
   </div>
 </template>
 

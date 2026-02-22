@@ -2,8 +2,20 @@
 import { computed, onMounted, ref } from 'vue'
 import Button from '../Button.vue'
 import ConfirmDialog from '../ConfirmDialog.vue'
-import { setSecurityPassword, verifySecurityPassword, hasSecurityPassword } from '../../services/api'
+import {
+  setSecurityPassword,
+  verifySecurityPassword,
+  hasSecurityPassword,
+  getDatabaseUrls,
+  updateDatabaseUrl,
+  getDatabaseType
+} from '../../services/api'
 import { useGuideEventBus } from '../../composables/useGuideEvents'
+
+/**
+ * 数据库类型
+ */
+type DatabaseType = 'sqlite' | 'postgresql' | 'mysql'
 
 /**
  * 安全密码设置/验证步骤组件
@@ -32,13 +44,28 @@ const MAX_VERIFY_ATTEMPTS = 5
 const showResetDialog = ref(false)
 const resetDialogStep = ref<1 | 2>(1)
 
+// 数据库配置状态
+const databaseConfig = ref({
+  urls: {} as Record<string, string>,
+  selectedDbType: 'sqlite' as DatabaseType,
+  tempUrl: '',
+  isEditing: false,
+  urlError: ''
+})
+
 /**
- * 初始化时检查是否已存在安全密码
+ * 初始化时检查是否已存在安全密码并加载数据库配置
  */
 onMounted(async () => {
   try {
-    const hasPassword = await hasSecurityPassword()
+    const [hasPassword, databaseUrls, dbType] = await Promise.all([
+      hasSecurityPassword(),
+      getDatabaseUrls(),
+      getDatabaseType()
+    ])
     hasExistingPassword.value = hasPassword
+    databaseConfig.value.urls = databaseUrls
+    databaseConfig.value.selectedDbType = (dbType as DatabaseType) || 'sqlite'
 
     // 如果已存在密码且已验证过，自动标记为完成
     if (hasPassword && state.isSaved) {
@@ -84,13 +111,47 @@ const verifyPasswordError = computed(() => {
 })
 
 /**
+ * 获取当前选中的数据库 URL
+ */
+const getCurrentDatabaseUrl = (): string => {
+  return databaseConfig.value.urls[databaseConfig.value.selectedDbType] || ''
+}
+
+/**
+ * 验证数据库 URL 格式
+ */
+const validateDatabaseUrl = (url: string, dbType: string): boolean => {
+  const urlLower = url.toLowerCase().trim()
+
+  switch (dbType) {
+    case 'sqlite':
+      return urlLower.startsWith('sqlite://')
+    case 'postgresql':
+      return urlLower.startsWith('postgresql://') || urlLower.startsWith('postgres://')
+    case 'mysql':
+      return urlLower.startsWith('mysql://')
+    default:
+      return false
+  }
+}
+
+/**
+ * 检查数据库 URL 是否已配置
+ */
+const isDatabaseUrlConfigured = computed(() => {
+  const url = getCurrentDatabaseUrl()
+  return url && url.trim().length > 0 && validateDatabaseUrl(url, databaseConfig.value.selectedDbType)
+})
+
+/**
  * 设置模式下是否可以继续
+ * 需要同时满足：密码有效、确认密码一致、数据库 URL 已配置
  */
 const canProceedSet = computed(() => {
-  return state.isSaved || (
-    state.securityPassword.length >= 6 &&
+  const passwordValid = state.securityPassword.length >= 6 &&
     state.securityPassword === state.confirmPassword
-  )
+  const dbUrlValid = isDatabaseUrlConfigured.value
+  return state.isSaved || (passwordValid && dbUrlValid)
 })
 
 /**
@@ -113,6 +174,64 @@ function validatePassword(): boolean {
     return false
   }
   return true
+}
+
+/**
+ * 开始编辑数据库 URL
+ */
+function startEditDatabaseUrl(): void {
+  databaseConfig.value.tempUrl = getCurrentDatabaseUrl()
+  databaseConfig.value.isEditing = true
+  databaseConfig.value.urlError = ''
+}
+
+/**
+ * 取消编辑数据库 URL
+ */
+function cancelEditDatabaseUrl(): void {
+  databaseConfig.value.isEditing = false
+  databaseConfig.value.tempUrl = ''
+  databaseConfig.value.urlError = ''
+}
+
+/**
+ * 保存数据库 URL
+ */
+async function saveDatabaseUrl(): Promise<void> {
+  const url = databaseConfig.value.tempUrl.trim()
+  const dbType = databaseConfig.value.selectedDbType
+
+  if (!url) {
+    databaseConfig.value.urlError = '数据库 URL 不能为空'
+    return
+  }
+
+  // 验证 URL 格式
+  if (!validateDatabaseUrl(url, dbType)) {
+    const prefixMap: Record<string, string> = {
+      sqlite: 'sqlite://',
+      postgresql: 'postgresql://',
+      mysql: 'mysql://'
+    }
+    databaseConfig.value.urlError = `URL 格式不正确，${dbType} 类型必须以 ${prefixMap[dbType]} 开头`
+    return
+  }
+
+  eventBus.setSaving(true)
+  eventBus.clearError()
+
+  try {
+    await updateDatabaseUrl(dbType, url)
+    databaseConfig.value.urls[dbType] = url
+    databaseConfig.value.isEditing = false
+    databaseConfig.value.tempUrl = ''
+    databaseConfig.value.urlError = ''
+  } catch (e) {
+    eventBus.setError('保存数据库 URL 失败: ' + String(e))
+    console.error('保存数据库 URL 失败:', e)
+  } finally {
+    eventBus.setSaving(false)
+  }
 }
 
 /**
@@ -337,23 +456,91 @@ const resetDialogConfirmText = computed(() => {
             type="password"
             class="form-input"
             :class="{ 'input-error': confirmPasswordError }"
-            placeholder="再次输入安全密码"
+            placeholder="再次输入安全密码（至少6位）"
             :disabled="state.isSaved"
           />
           <p v-if="confirmPasswordError" class="error-text">{{ confirmPasswordError }}</p>
         </div>
+      </div>
 
-        <!-- 密码提示 -->
-        <div class="password-tips">
-          <h4>密码要求：</h4>
-          <ul>
-            <li :class="{ 'tip-met': state.securityPassword.length >= 6 }">
-              至少6位字符
-            </li>
-            <li :class="{ 'tip-met': state.securityPassword === state.confirmPassword && state.confirmPassword.length > 0 }">
-              两次输入一致
-            </li>
-          </ul>
+      <!-- 数据库配置 -->
+      <div class="database-config-section">
+        <h3 class="subsection-heading">数据库配置 <span class="required">*</span></h3>
+        <p class="subsection-text">
+          请配置数据库连接信息，用于存储应用数据。
+        </p>
+
+        <div class="database-config-row">
+          <!-- 左侧：URL 输入框 -->
+          <div class="url-input-section">
+            <label class="form-label">数据库连接 URL</label>
+            <div v-if="!databaseConfig.isEditing" class="database-url-display">
+              <div class="url-value-wrapper">
+                <span class="url-value" :class="{ 'url-empty': !getCurrentDatabaseUrl() }">
+                  {{ getCurrentDatabaseUrl() || '未配置' }}
+                </span>
+              </div>
+            </div>
+            <div v-else class="database-url-edit">
+              <input
+                v-model="databaseConfig.tempUrl"
+                type="text"
+                class="form-input url-input"
+                :class="{ 'input-error': databaseConfig.urlError }"
+                :placeholder="databaseConfig.selectedDbType === 'sqlite'
+                  ? 'sqlite:///path/to/database.db'
+                  : databaseConfig.selectedDbType === 'postgresql'
+                    ? 'postgresql://用户名:密码@主机:端口/数据库名'
+                    : 'mysql://用户名:密码@主机:端口/数据库名'"
+              />
+              <p v-if="databaseConfig.urlError" class="error-text">{{ databaseConfig.urlError }}</p>
+            </div>
+          </div>
+
+          <!-- 右侧：数据库类型下拉框 -->
+          <div class="db-type-select-section">
+            <label class="form-label">数据库类型</label>
+            <select
+              v-model="databaseConfig.selectedDbType"
+              class="form-input"
+              :disabled="databaseConfig.isEditing"
+            >
+              <option value="sqlite">SQLite</option>
+              <option value="postgresql">PostgreSQL</option>
+              <option value="mysql">MySQL</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="url-actions-row">
+          <div v-if="!databaseConfig.isEditing" class="url-actions">
+            <Button
+              type="primary"
+              size="sm"
+              :disabled="state.isSaved"
+              @click="startEditDatabaseUrl"
+            >
+              {{ getCurrentDatabaseUrl() ? '修改' : '配置' }}
+            </Button>
+          </div>
+          <div v-else class="url-edit-actions">
+            <Button
+              type="secondary"
+              size="sm"
+              @click="cancelEditDatabaseUrl"
+            >
+              取消
+            </Button>
+            <Button
+              type="primary"
+              size="sm"
+              :loading="guideState.isSaving"
+              @click="saveDatabaseUrl"
+            >
+              保存
+            </Button>
+          </div>
         </div>
       </div>
 

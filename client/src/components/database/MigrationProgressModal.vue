@@ -15,6 +15,10 @@ interface Props {
   sourceType: string
   /** 目标数据库类型 */
   targetType: string
+  /** 源数据库 URL */
+  sourceUrl: string
+  /** 目标数据库 URL */
+  targetUrl: string
 }
 
 interface Emits {
@@ -107,8 +111,10 @@ const startMigration = async (): Promise<void> => {
 
     // 调用迁移 API
     const result: MigrationResult = await migrateDatabase({
-      sourceType: props.sourceType,
-      targetType: props.targetType
+      source_type: props.sourceType,
+      target_type: props.targetType,
+      source_url: props.sourceUrl,
+      target_url: props.targetUrl
     })
 
     // 清除进度模拟

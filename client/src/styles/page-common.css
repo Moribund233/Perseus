@@ -358,6 +358,8 @@
 .db-type-icon {
   width: 40px;
   height: 40px;
+  /* 使用主题定义的图标滤镜 */
+  filter: var(--icon-filter, none);
 }
 
 .db-type-info {

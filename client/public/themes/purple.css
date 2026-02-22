@@ -10,6 +10,9 @@
   --primary-light: rgba(167, 139, 250, 0.15);
   --primary-glow: rgba(167, 139, 250, 0.4);
 
+  /* SVG 图标滤镜 - 深色主题下反转颜色 */
+  --icon-filter: invert(1) brightness(1.2);
+
   /* --- 背景层级系统 --- */
   --bg-primary: #020617;              /* Slate-950 - 近乎黑色的深空 */
   --bg-secondary: #0f172a;            /* Slate-900 - 卡片/侧边栏背景 */

@@ -11,6 +11,9 @@
   --primary-hover: #2563eb;
   --primary-light: rgba(59, 130, 246, 0.1);
 
+  /* SVG 图标滤镜 - 浅色主题下不反转 */
+  --icon-filter: none;
+
   /* 背景色 - 纯净白色系 */
   --bg-primary: #ffffff;
   --bg-secondary: #f8fafc;

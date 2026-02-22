@@ -9,6 +9,9 @@
   --primary-hover: #2563eb;
   --primary-light: rgba(59, 130, 246, 0.1);
 
+  /* SVG 图标滤镜 - 深色主题下反转颜色 */
+  --icon-filter: invert(1) brightness(1.2);
+
   /* 背景色 */
   --bg-primary: #0f172a;
   --bg-secondary: #1e293b;

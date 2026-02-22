@@ -24,6 +24,9 @@
   /* 边框 */
   --border-color: #334155;
 
+  /* SVG 图标滤镜 - 深色主题下反转颜色 */
+  --icon-filter: invert(1) brightness(1.2);
+
   /* 默认尺寸变量（会被布局密度主题覆盖） */
   /* 圆角 */
   --border-radius-sm: 4px;
