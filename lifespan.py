@@ -81,6 +81,7 @@ class AppLifecycleManager:
         """
         try:
             import os
+            import hashlib
             from config import get_config
             
             config = get_config()
@@ -89,18 +90,24 @@ class AppLifecycleManager:
             actual_url = os.environ.get("DATABASE_URL", "")
             if actual_url:
                 actual_type = self._parse_db_type(actual_url)
+                # 计算 URL 的哈希值（用于检测同一类型不同 URL）
+                actual_url_hash = hashlib.md5(actual_url.encode()).hexdigest()[:8]
             else:
                 # 环境变量未设置，使用配置中的 URL（此时已回退到 SQLite）
                 actual_type = config.database.db_type
+                actual_url_hash = None
                 logger.debug(f"环境变量未设置，使用配置数据库类型: {actual_type}")
             
-            # 获取记录的数据库类型
+            # 获取记录的数据库类型和 URL 哈希
             recorded_type = config.database.current_db_type
+            recorded_url_hash = getattr(config.database, 'current_db_url_hash', None)
             
             # 首次启动
             if recorded_type is None:
                 logger.info(f"首次启动，记录数据库类型: {actual_type}")
                 config.database.current_db_type = actual_type
+                if actual_url_hash:
+                    config.database.current_db_url_hash = actual_url_hash
                 # 保存配置
                 self._save_config(config)
                 return {
@@ -110,8 +117,19 @@ class AppLifecycleManager:
                     "target_db_type": actual_type
                 }
             
-            # 类型一致
+            # 类型一致，检查 URL 是否变更
             if actual_type == recorded_type:
+                # 如果是同一类型，检查 URL 哈希是否一致
+                if actual_url_hash and recorded_url_hash and actual_url_hash != recorded_url_hash:
+                    logger.info(f"检测到同一类型不同数据库: {actual_type} (URL hash: {recorded_url_hash} -> {actual_url_hash})")
+                    return {
+                        "migration_required": True,
+                        "message": f"检测到同一类型不同数据库: {actual_type}",
+                        "current_db_type": recorded_type,
+                        "target_db_type": actual_type,
+                        "url_changed": True
+                    }
+                
                 return {
                     "migration_required": False,
                     "message": "数据库类型一致",
@@ -131,7 +149,8 @@ class AppLifecycleManager:
                 "migration_required": True,
                 "message": f"检测到数据库类型变更: {recorded_type} -> {actual_type}",
                 "current_db_type": recorded_type,
-                "target_db_type": actual_type
+                "target_db_type": actual_type,
+                "url_changed": False
             }
             
         except Exception as e:

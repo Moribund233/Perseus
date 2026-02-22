@@ -662,12 +662,13 @@ async def set_pending_migration_endpoint(
     from config import get_config, ConfigManager
 
     try:
-        config = get_config()
-        config.database.pending_db_type = target_type
-
-        # 保存配置
+        # 使用 update_config 更新配置
         config_manager = ConfigManager()
-        config_manager.save_config(config)
+        config_manager.update_config({
+            "database": {
+                "pending_db_type": target_type
+            }
+        })
 
         return ConfigResponse(
             success=True,
@@ -695,12 +696,13 @@ async def clear_pending_migration_endpoint(
     from config import get_config, ConfigManager
 
     try:
-        config = get_config()
-        config.database.pending_db_type = None
-
-        # 保存配置
+        # 使用 update_config 更新配置
         config_manager = ConfigManager()
-        config_manager.save_config(config)
+        config_manager.update_config({
+            "database": {
+                "pending_db_type": None
+            }
+        })
 
         return ConfigResponse(
             success=True,
@@ -733,17 +735,16 @@ async def record_migration_failed_endpoint(
     from datetime import datetime
 
     try:
-        config = get_config()
-        config.database.last_migration_failed = True
-        config.database.failed_target_type = target_type
-        config.database.failed_at = datetime.now().isoformat()
-
-        # 清除 pending 状态
-        config.database.pending_db_type = None
-
-        # 保存配置
+        # 使用 update_config 更新配置
         config_manager = ConfigManager()
-        config_manager.save_config(config)
+        config_manager.update_config({
+            "database": {
+                "last_migration_failed": True,
+                "failed_target_type": target_type,
+                "failed_at": datetime.now().isoformat(),
+                "pending_db_type": None
+            }
+        })
 
         return ConfigResponse(
             success=True,
@@ -771,14 +772,15 @@ async def clear_migration_failed_endpoint(
     from config import get_config, ConfigManager
 
     try:
-        config = get_config()
-        config.database.last_migration_failed = False
-        config.database.failed_target_type = None
-        config.database.failed_at = None
-
-        # 保存配置
+        # 使用 update_config 更新配置
         config_manager = ConfigManager()
-        config_manager.save_config(config)
+        config_manager.update_config({
+            "database": {
+                "last_migration_failed": False,
+                "failed_target_type": None,
+                "failed_at": None
+            }
+        })
 
         return ConfigResponse(
             success=True,

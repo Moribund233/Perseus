@@ -41,7 +41,7 @@ def check_driver_installed(db_type: str) -> Tuple[bool, Optional[str]]:
     """
     driver_modules = {
         "sqlite": ("sqlite3", "SQLite support is built into Python"),
-        "postgresql": ("psycopg2", "Please install: pip install psycopg2-binary"),
+        "postgresql": ("pg8000", "Please install: pip install pg8000"),
         "mysql": ("pymysql", "Please install: pip install pymysql cryptography"),
     }
     
@@ -116,7 +116,9 @@ def _get_url_with_driver(url: str, db_type: str) -> str:
     if db_type == "mysql" and url_lower.startswith("mysql://"):
         return url.replace("mysql://", "mysql+pymysql://", 1)
     elif db_type == "postgresql" and url_lower.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
+        return url.replace("postgresql://", "postgresql+pg8000://", 1)
+    elif db_type == "postgresql" and url_lower.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+pg8000://", 1)
     return url
 
 
@@ -137,10 +139,11 @@ def test_database_connection(url: str, db_type: str, timeout: int = 10) -> Tuple
         test_url = _get_url_with_driver(url, db_type)
         
         # Create engine with short timeout for testing
+        # 注意：pg8000 (PostgreSQL) 不支持 connect_timeout 参数
         if db_type == "sqlite":
             engine = create_engine(test_url, connect_args={"timeout": timeout})
         elif db_type == "postgresql":
-            engine = create_engine(test_url, connect_args={"connect_timeout": timeout})
+            engine = create_engine(test_url, pool_pre_ping=True)  # pg8000 不支持 connect_timeout
         elif db_type == "mysql":
             engine = create_engine(test_url, connect_args={"connect_timeout": timeout * 1000})  # MySQL uses milliseconds
         else:

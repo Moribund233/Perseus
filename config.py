@@ -120,6 +120,12 @@ class DatabaseSettings(BaseSettings):
         description="服务端记录的上次实际数据库类型，用于检测类型变更和迁移"
     )
 
+    # 服务端记录的数据库 URL 哈希（用于检测同一类型不同数据库）
+    current_db_url_hash: Optional[str] = Field(
+        default=None,
+        description="服务端记录的数据库 URL 哈希值，用于检测同一类型不同数据库"
+    )
+
     # 待迁移的目标类型（客户端已确认但未执行）
     pending_db_type: Optional[str] = Field(
         default=None,
@@ -227,11 +233,24 @@ class DatabaseSettings(BaseSettings):
         如果环境变量未设置或配置无效，自动回退到 SQLite 默认值
         """
         import logging
+        import sys
         logger = logging.getLogger(__name__)
         global _db_url_validated, _original_db_url, _validation_result
         
         # 从环境变量读取 DATABASE_URL
         env_url = os.environ.get("DATABASE_URL")
+        
+        # 处理 Windows 环境变量编码问题
+        if env_url and sys.platform == "win32":
+            try:
+                # 在 Windows 上，环境变量可能是系统默认编码（如 GBK）
+                # 尝试将其转换为 UTF-8
+                if isinstance(env_url, str):
+                    # 先编码为字节，再解码为 UTF-8
+                    env_url = env_url.encode('utf-8', errors='ignore').decode('utf-8')
+            except Exception as e:
+                logger.warning(f"处理环境变量编码时出错: {e}")
+        
         original_url = env_url  # 保存原始 URL 用于日志
         
         # 检查是否已经验证过相同的 URL（避免重复输出日志）
@@ -286,6 +305,10 @@ class DatabaseSettings(BaseSettings):
             return "invalid_url"
         
         try:
+            # 确保 URL 是有效的 UTF-8 字符串
+            if isinstance(url, bytes):
+                url = url.decode('utf-8', errors='replace')
+            
             # 解析 URL 并掩码密码部分
             from urllib.parse import urlparse, urlunparse
             parsed = urlparse(url)
@@ -300,9 +323,12 @@ class DatabaseSettings(BaseSettings):
             return urlunparse(parsed)
         except Exception:
             # 解析失败，返回简化版本
-            if "://" in url:
-                scheme = url.split("://")[0]
-                return f"{scheme}://****"
+            try:
+                if "://" in url:
+                    scheme = url.split("://")[0]
+                    return f"{scheme}://****"
+            except Exception:
+                pass
             return "masked_url"
 
     @staticmethod
@@ -318,6 +344,15 @@ class DatabaseSettings(BaseSettings):
         """
         if not url or not isinstance(url, str):
             return False, "URL 为空或格式错误"
+        
+        # 确保 URL 是有效的 UTF-8 字符串
+        try:
+            if isinstance(url, bytes):
+                url = url.decode('utf-8', errors='replace')
+            # 验证字符串是否可以被正确编码
+            url.encode('utf-8')
+        except (UnicodeDecodeError, UnicodeEncodeError) as e:
+            return False, f"URL 编码错误: {str(e)}"
         
         url_lower = url.lower()
         valid_prefixes = ("sqlite://", "postgresql://", "postgres://", "mysql://", "mysql+pymysql://")
@@ -338,10 +373,16 @@ class DatabaseSettings(BaseSettings):
             if url_lower.startswith("mysql://"):
                 test_url = url.replace("mysql://", "mysql+pymysql://", 1)
             elif url_lower.startswith("postgresql://"):
-                test_url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+                test_url = url.replace("postgresql://", "postgresql+pg8000://", 1)
             
             # 创建引擎并测试连接
-            engine = create_engine(test_url, connect_args={"connect_timeout": 5})
+            # pg8000 不支持 connect_timeout 参数，使用 SQLAlchemy 的 pool_pre_ping 代替
+            connect_args = {}
+            if url_lower.startswith("mysql://"):
+                connect_args = {"connect_timeout": 5}
+            # PostgreSQL (pg8000) 不使用 connect_timeout
+            
+            engine = create_engine(test_url, connect_args=connect_args, pool_pre_ping=True)
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
             engine.dispose()

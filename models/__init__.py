@@ -48,12 +48,18 @@ def _get_sqlite_connect_args():
 
 
 def _get_postgresql_connect_args():
-    """获取 PostgreSQL 连接参数"""
-    return {
-        "sslmode": db_config.pg_ssl_mode,
-        "connect_timeout": db_config.pg_connect_timeout,
-        "application_name": db_config.pg_application_name,
-    }
+    """获取 PostgreSQL 连接参数 (pg8000 驱动)"""
+    # pg8000 使用纯 Python 实现，参数与 psycopg2 不同
+    connect_args = {}
+    
+    # SSL 模式
+    if db_config.pg_ssl_mode and db_config.pg_ssl_mode != "prefer":
+        connect_args["sslmode"] = db_config.pg_ssl_mode
+    
+    # 注意：pg8000 不直接支持 connect_timeout 和 application_name
+    # 这些参数通过 SQLAlchemy 引擎配置处理
+    
+    return connect_args
 
 
 def _get_mysql_connect_args():
@@ -129,12 +135,33 @@ def _create_sqlite_engine():
         )
 
 
+def _get_postgresql_url_with_driver(url: str) -> str:
+    """
+    将 PostgreSQL URL 转换为带 pg8000 驱动的格式
+    
+    Args:
+        url: 原始 PostgreSQL URL (如 postgresql://user:pass@host:port/dbname)
+        
+    Returns:
+        str: 带驱动的 URL (如 postgresql+pg8000://user:pass@host:port/dbname)
+    """
+    if url.lower().startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+pg8000://", 1)
+    elif url.lower().startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+pg8000://", 1)
+    return url
+
+
 def _create_postgresql_engine():
     """创建 PostgreSQL 引擎"""
+    # 转换 URL 为带驱动的格式
+    url_with_driver = _get_postgresql_url_with_driver(db_config.url)
+    logger.info(f"PostgreSQL URL: {db_config.url.replace(db_config.url.split('@')[0].split(':')[-1] if '@' in db_config.url else '', '****')}")
+    
     if db_config.is_stress_test:
         logger.info("启用 PostgreSQL 压力测试模式配置")
         return create_engine(
-            db_config.url,
+            url_with_driver,
             connect_args=_get_postgresql_connect_args(),
             poolclass=QueuePool,
             pool_size=db_config.stress_pool_size,
@@ -147,7 +174,7 @@ def _create_postgresql_engine():
     elif _config.app.debug:
         logger.info("启用 PostgreSQL 开发模式配置")
         return create_engine(
-            db_config.url,
+            url_with_driver,
             connect_args=_get_postgresql_connect_args(),
             poolclass=QueuePool,
             pool_size=db_config.pool_size,
@@ -160,7 +187,7 @@ def _create_postgresql_engine():
     else:
         logger.info("启用 PostgreSQL 生产模式配置")
         return create_engine(
-            db_config.url,
+            url_with_driver,
             connect_args=_get_postgresql_connect_args(),
             poolclass=QueuePool,
             pool_size=db_config.pool_size,
