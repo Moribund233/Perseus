@@ -2,38 +2,34 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Modal from '../Modal.vue'
 import Button from '../Button.vue'
-import { migrateDatabase, type MigrationResult } from '../../services/databaseApi'
+import { migrateDatabase, recordMigrationFailed, type MigrationResult } from '../../services/databaseApi'
+import { useHomeEventBus } from '../../composables/useHomeEvents'
 
 /**
  * 迁移进度弹窗组件
+ *
+ * 功能：显示数据库迁移进度
+ * 独立负责迁移相关功能，通过事件总线与 Home 通信
  */
 
-interface Props {
-  /** 是否显示 */
-  visible: boolean
-  /** 源数据库类型 */
-  sourceType: string
-  /** 目标数据库类型 */
-  targetType: string
-  /** 源数据库 URL */
-  sourceUrl: string
-  /** 目标数据库 URL */
-  targetUrl: string
-}
-
-interface Emits {
-  (e: 'update:visible', value: boolean): void
-  (e: 'complete', success: boolean): void
-}
-
-const props = defineProps<Props>()
-const emit = defineEmits<Emits>()
+const eventBus = useHomeEventBus()
 
 // 图标路径
 const migrateIcon = new URL('../../assets/icons/migrate.svg', import.meta.url).href
 const checkCircleIcon = new URL('../../assets/icons/check-circle.svg', import.meta.url).href
 const errorIcon = new URL('../../assets/icons/error.svg', import.meta.url).href
 const databaseIcon = new URL('../../assets/icons/database.svg', import.meta.url).href
+
+// 是否显示弹窗
+const visible = ref(false)
+// 源数据库类型
+const sourceType = ref<'sqlite' | 'postgresql' | 'mysql'>('sqlite')
+// 目标数据库类型
+const targetType = ref<'sqlite' | 'postgresql' | 'mysql'>('sqlite')
+// 源数据库 URL
+const sourceUrl = ref('')
+// 目标数据库 URL
+const targetUrl = ref('')
 
 // 迁移状态
 const isMigrating = ref(false)
@@ -67,7 +63,7 @@ const sourceLabel = computed(() => {
     postgresql: 'PostgreSQL',
     mysql: 'MySQL'
   }
-  return labels[props.sourceType] || props.sourceType
+  return labels[sourceType.value] || sourceType.value
 })
 
 const targetLabel = computed(() => {
@@ -76,7 +72,7 @@ const targetLabel = computed(() => {
     postgresql: 'PostgreSQL',
     mysql: 'MySQL'
   }
-  return labels[props.targetType] || props.targetType
+  return labels[targetType.value] || targetType.value
 })
 
 const totalRecords = computed(() => {
@@ -90,7 +86,32 @@ const migratedRecords = computed(() => {
 // 模拟进度更新（实际应通过 WebSocket 或轮询获取）
 let progressInterval: ReturnType<typeof setInterval> | null = null
 
+/**
+ * 显示迁移弹窗
+ */
+const showMigration = (payload: { sourceType: 'sqlite' | 'postgresql' | 'mysql'; targetType: 'sqlite' | 'postgresql' | 'mysql'; sourceUrl: string; targetUrl: string }): void => {
+  sourceType.value = payload.sourceType
+  targetType.value = payload.targetType
+  sourceUrl.value = payload.sourceUrl
+  targetUrl.value = payload.targetUrl
+  visible.value = true
+  resetState()
+  startMigration()
+}
 
+/**
+ * 重置状态
+ */
+const resetState = (): void => {
+  isMigrating.value = false
+  isCompleted.value = false
+  isSuccess.value = false
+  error.value = null
+  currentStep.value = 0
+  progressPercent.value = 0
+  statusMessage.value = '准备迁移...'
+  tableProgress.value = {}
+}
 
 /**
  * 开始迁移
@@ -111,10 +132,10 @@ const startMigration = async (): Promise<void> => {
 
     // 调用迁移 API
     const result: MigrationResult = await migrateDatabase({
-      source_type: props.sourceType,
-      target_type: props.targetType,
-      source_url: props.sourceUrl,
-      target_url: props.targetUrl
+      source_type: sourceType.value,
+      target_type: targetType.value,
+      source_url: sourceUrl.value,
+      target_url: targetUrl.value
     })
 
     // 清除进度模拟
@@ -130,6 +151,8 @@ const startMigration = async (): Promise<void> => {
       progressPercent.value = 100
       statusMessage.value = '迁移完成'
       tableProgress.value = result.tables || {}
+      // 通知 Home 迁移完成
+      eventBus.emit('migration:complete', { success: true })
     } else {
       throw new Error(result.message || '迁移失败')
     }
@@ -144,6 +167,16 @@ const startMigration = async (): Promise<void> => {
     isCompleted.value = true
     error.value = err instanceof Error ? err.message : '迁移过程中发生错误'
     statusMessage.value = '迁移失败'
+
+    // 记录迁移失败
+    try {
+      await recordMigrationFailed(targetType.value)
+    } catch (recordErr) {
+      console.error('记录迁移失败失败:', recordErr)
+    }
+
+    // 通知 Home 迁移失败
+    eventBus.emit('migration:complete', { success: false })
   } finally {
     isMigrating.value = false
   }
@@ -201,8 +234,8 @@ const simulateProgress = (): void => {
  */
 const close = (): void => {
   if (!canClose.value) return
-  emit('update:visible', false)
-  emit('complete', isSuccess.value)
+  visible.value = false
+  eventBus.emit('migration:close')
 }
 
 /**
@@ -221,15 +254,14 @@ const retryMigration = (): void => {
   startMigration()
 }
 
-// 组件挂载时开始迁移
+// 注册事件监听
 onMounted(() => {
-  if (props.visible) {
-    startMigration()
-  }
+  eventBus.on('migration:show', showMigration)
 })
 
 // 组件卸载时清理
 onUnmounted(() => {
+  eventBus.off('migration:show', showMigration)
   if (progressInterval) {
     clearInterval(progressInterval)
   }

@@ -251,10 +251,16 @@
   box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
 }
 
-/* ==================== 必填标记样式 ==================== */
+/* ==================== 必填/可选标记样式 ==================== */
 
 .required {
   color: var(--error-color);
+}
+
+.optional {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  font-weight: normal;
 }
 
 .required-badge {
@@ -287,27 +293,6 @@
 
 /* ==================== 数据库配置区域样式 ==================== */
 
-.database-config-section {
-  margin-top: var(--spacing-lg);
-  padding: var(--spacing-lg);
-  background-color: var(--bg-tertiary);
-  border-radius: var(--border-radius-md);
-  border: 1px solid var(--border-color);
-}
-
-.subsection-heading {
-  font-size: var(--font-size-md);
-  font-weight: 600;
-  margin-bottom: var(--spacing-xs);
-  color: var(--text-primary);
-}
-
-.subsection-text {
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-  margin-bottom: var(--spacing-md);
-}
-
 .database-config-row {
   display: flex;
   gap: var(--spacing-md);
@@ -324,10 +309,6 @@
   flex-shrink: 0;
 }
 
-.db-type-select-section select {
-  width: 100%;
-}
-
 .database-url-display {
   display: flex;
   flex-direction: column;
@@ -335,10 +316,11 @@
 }
 
 .url-value-wrapper {
-  background-color: var(--bg-secondary);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--border-radius-sm);
+  width: 100%;
+  padding: var(--spacing-sm);
   border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  background-color: var(--bg-secondary);
   overflow: hidden;
 }
 
@@ -351,7 +333,27 @@
 
 .url-value.url-empty {
   color: var(--text-tertiary);
-  font-style: italic;
+}
+
+/* 数据库类型下拉框样式统一 */
+.db-type-select-section select {
+  width: 100%;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.db-type-select-section select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.db-type-select-section select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .url-actions-row {
@@ -368,6 +370,17 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
+}
+
+.url-input-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.url-input-row .url-input {
+  flex: 1;
+  min-width: 0;
 }
 
 .url-input {

@@ -1,0 +1,449 @@
+/**
+ * Home页面组件公共样式
+ *
+ * 包含所有 Home 功能组件共享的样式定义
+ */
+
+/* ==================== 服务控制卡片样式 ==================== */
+
+.service-card :deep(.card-body) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.service-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.service-controls {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.service-controls .btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-lg);
+}
+
+.loading-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.btn-icon.spinning {
+  animation: spin 1s linear infinite;
+}
+
+/* ==================== 性能监控网格样式 ==================== */
+
+.performance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-lg);
+}
+
+.metric-card {
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-lg);
+  border: 1px solid var(--border-color);
+}
+
+.metric-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.metric-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--border-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.metric-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.metric-icon.cpu {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: var(--primary-color);
+}
+
+.metric-icon.memory {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: var(--success-color);
+}
+
+.metric-icon.network {
+  background-color: rgba(6, 182, 212, 0.2);
+  color: var(--info-color);
+}
+
+.metric-icon.uptime {
+  background-color: rgba(139, 92, 246, 0.2);
+  color: #8b5cf6;
+}
+
+.metric-icon.version {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: var(--warning-color);
+}
+
+.metric-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  flex: 1;
+}
+
+.metric-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.metric-value {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* ==================== 网络图例样式 ==================== */
+
+.network-legend {
+  display: flex;
+  gap: var(--spacing-md);
+  font-size: var(--font-size-xs);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  color: var(--text-secondary);
+}
+
+.legend-item .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-item.received .dot {
+  background-color: var(--success-color);
+}
+
+.legend-item.sent .dot {
+  background-color: var(--info-color);
+}
+
+/* ==================== Sparkline 图表样式 ==================== */
+
+.sparkline {
+  height: 40px;
+  margin-top: var(--spacing-sm);
+}
+
+.sparkline svg {
+  width: 100%;
+  height: 100%;
+}
+
+.network-sparkline {
+  position: relative;
+}
+
+/* ==================== 信息卡片样式 ==================== */
+
+.info-section {
+  margin-top: var(--spacing-lg);
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.info-card {
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-lg);
+  border: 1px solid var(--border-color);
+}
+
+.info-card :deep(.card-title) {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  margin-bottom: var(--spacing-md);
+  color: var(--text-primary);
+}
+
+/* ==================== 信息网格样式 ==================== */
+
+.info-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  background-color: var(--bg-tertiary);
+  border-radius: var(--border-radius-md);
+}
+
+.info-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.info-value {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ==================== 请求统计样式 ==================== */
+
+.requests-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.request-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--spacing-md);
+  background-color: var(--bg-tertiary);
+  border-radius: var(--border-radius-md);
+}
+
+.request-value {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.request-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+/* ==================== Git 状态样式 ==================== */
+
+.git-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.git-metric {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background-color: var(--bg-tertiary);
+  border-radius: var(--border-radius-md);
+}
+
+.git-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--border-radius-md);
+  background-color: rgba(139, 92, 246, 0.2);
+  color: #8b5cf6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.git-icon.push {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: var(--success-color);
+}
+
+.git-icon.queue {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: var(--warning-color);
+}
+
+.git-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.git-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.git-value {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.git-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+/* ==================== 健康状态样式 ==================== */
+
+.health-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.health-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  background-color: var(--bg-tertiary);
+  border-radius: var(--border-radius-md);
+}
+
+.health-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.health-value {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ==================== 状态徽章样式 ==================== */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.status-badge.running {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: var(--success-color);
+}
+
+.status-badge.stopped {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: var(--error-color);
+}
+
+.status-badge.starting,
+.status-badge.stopping {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: var(--warning-color);
+}
+
+.status-badge.default {
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.status-badge.running .status-dot {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ==================== 数据库连接状态徽章 ==================== */
+
+.db-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.db-status-idle {
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.db-status-checking {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: var(--info-color);
+}
+
+.db-status-connected {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: var(--success-color);
+}
+
+.db-status-disconnected {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: var(--error-color);
+}
+
+.db-status-error {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: var(--warning-color);
+}

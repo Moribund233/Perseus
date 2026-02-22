@@ -201,6 +201,29 @@ const cancelEditDatabaseUrl = (): void => {
 }
 
 /**
+ * 选择 SQLite 数据库文件
+ */
+const selectSQLiteFile = async (): Promise<void> => {
+  try {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const selected = await open({
+      multiple: false,
+      filters: [
+        { name: 'SQLite Database', extensions: ['db', 'sqlite', 'sqlite3'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    })
+    if (selected && typeof selected === 'string') {
+      // 将文件路径转换为 sqlite:// URL 格式
+      databaseConfig.value.tempDatabaseUrl = `sqlite:///${selected.replace(/\\/g, '/')}`
+    }
+  } catch (err) {
+    console.error('选择文件失败:', err)
+    emit('error', '选择文件失败: ' + String(err))
+  }
+}
+
+/**
  * 保存数据库 URL
  */
 const saveDatabaseUrl = async (): Promise<void> => {
@@ -489,13 +512,22 @@ const handleResetClientConfig = (): void => {
                   </div>
                 </div>
                 <div v-else class="database-url-edit">
-                  <input
-                    v-model="databaseConfig.tempDatabaseUrl"
-                    type="text"
-                    class="input"
-                    :class="{ 'input-error': databaseConfig.urlValidationError }"
-                    :placeholder="`${databaseConfig.selectedDbType === 'sqlite' ? 'sqlite:///path/to/database.db' : databaseConfig.selectedDbType === 'postgresql' ? 'postgresql://用户名:密码@主机:端口/数据库名' : 'mysql://用户名:密码@主机:端口/数据库名'}`"
-                  />
+                  <div class="url-input-row">
+                    <input
+                      v-model="databaseConfig.tempDatabaseUrl"
+                      type="text"
+                      class="input url-input"
+                      :class="{ 'input-error': databaseConfig.urlValidationError }"
+                      :placeholder="`${databaseConfig.selectedDbType === 'sqlite' ? 'sqlite:///path/to/database.db' : databaseConfig.selectedDbType === 'postgresql' ? 'postgresql://用户名:密码@主机:端口/数据库名' : 'mysql://用户名:密码@主机:端口/数据库名'}`"
+                    />
+                    <button
+                      v-if="databaseConfig.selectedDbType === 'sqlite'"
+                      class="btn btn-sm btn-secondary"
+                      @click="selectSQLiteFile"
+                    >
+                      选择文件
+                    </button>
+                  </div>
                   <span v-if="databaseConfig.urlValidationError" class="input-error-text">
                     {{ databaseConfig.urlValidationError }}
                   </span>
@@ -748,6 +780,17 @@ const handleResetClientConfig = (): void => {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
+}
+
+.url-input-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.url-input-row .url-input {
+  flex: 1;
+  min-width: 0;
 }
 
 .database-url-edit .input {

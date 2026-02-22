@@ -2,11 +2,12 @@
 import { ref, computed, onMounted } from 'vue'
 import Card from '../components/Card.vue'
 import Button from '../components/Button.vue'
-import Modal from '../components/Modal.vue'
 import Alert from '../components/Alert.vue'
+import Modal from '../components/Modal.vue'
 import { useDatabaseStore, useServiceStore } from '../stores'
 import type { DatabaseType, DatabaseConfig } from '../services/databaseApi'
-import { switchDatabaseType, getDatabaseType } from '../services/api'
+import { setPendingMigration, clearMigrationFailed } from '../services/databaseApi'
+import { switchDatabaseType, getDatabaseType, getDatabaseUrls } from '../services/api'
 
 /**
  * 数据库配置页面
@@ -17,11 +18,17 @@ import { switchDatabaseType, getDatabaseType } from '../services/api'
 const dbStore = useDatabaseStore()
 const serviceStore = useServiceStore()
 
-// 迁移相关状态
-const showMigrationConfirm = ref(false)
+// 确认弹窗状态
+const showConfirmModal = ref(false)
 const pendingDbType = ref<DatabaseType | null>(null)
 // 切换成功提示
 const showRestartAlert = ref(false)
+// URL 未配置提示
+const showUrlNotConfiguredAlert = ref(false)
+const urlNotConfiguredDbType = ref<DatabaseType | null>(null)
+
+// 数据库 URL 缓存
+const databaseUrls = ref<Record<string, string>>({})
 
 // 从客户端配置读取的数据库类型
 const clientDbType = ref<DatabaseType>('sqlite')
@@ -31,11 +38,8 @@ const isLoadingClientConfig = ref(true)
 // 图标路径
 const icons = {
   database: new URL('../assets/icons/database.svg', import.meta.url).href,
-  migrate: new URL('../assets/icons/migrate.svg', import.meta.url).href,
-  arrowRight: new URL('../assets/icons/arrow-right.svg', import.meta.url).href,
-  checkCircle: new URL('../assets/icons/check-circle.svg', import.meta.url).href,
-  alertTriangle: new URL('../assets/icons/alert-triangle.svg', import.meta.url).href,
   refresh: new URL('../assets/icons/refresh.svg', import.meta.url).href,
+  checkCircle: new URL('../assets/icons/check-circle.svg', import.meta.url).href,
   sqlite: new URL('../assets/icons/sqlite.svg', import.meta.url).href,
   postgresql: new URL('../assets/icons/postgresql.svg', import.meta.url).href,
   mysql: new URL('../assets/icons/mysql.svg', import.meta.url).href
@@ -72,7 +76,7 @@ const defaultConfig: DatabaseConfig = {
   stress_echo: false,
   pg_ssl_mode: 'prefer',
   pg_connect_timeout: 30,
-  pg_application_name: 'LangGit',
+  pg_application_name: 'LanGit',
   mysql_charset: 'utf8mb4',
   mysql_pool_recycle: 3600,
   mysql_connect_timeout: 30,
@@ -89,6 +93,27 @@ const config = computed((): DatabaseConfig => {
   return { ...defaultConfig, db_type: clientDbType.value }
 })
 
+// 当前数据库类型标签
+const currentDbTypeLabel = computed(() => {
+  const type = databaseTypes.value.find(t => t.value === clientDbType.value)
+  return type?.label || clientDbType.value
+})
+
+// 待切换的数据库类型标签
+const pendingDbTypeLabel = computed(() => {
+  if (!pendingDbType.value) return ''
+  const type = databaseTypes.value.find(t => t.value === pendingDbType.value)
+  return type?.label || pendingDbType.value
+})
+
+/**
+ * 检查数据库 URL 是否已配置
+ */
+const isDatabaseUrlConfigured = (dbType: DatabaseType): boolean => {
+  const url = databaseUrls.value[dbType]
+  return !!url && url.trim().length > 0
+}
+
 /**
  * 切换数据库类型
  * 纯客户端配置，直接更新 client.toml
@@ -96,29 +121,55 @@ const config = computed((): DatabaseConfig => {
 const handleDbTypeChange = async (newType: DatabaseType): Promise<void> => {
   if (newType === clientDbType.value) return
 
-  // 更新 client.toml 中的数据库类型
-  try {
-    await switchDatabaseType(newType)
-    // 更新本地状态，UI立即响应
-    clientDbType.value = newType
-  } catch (err) {
-    console.error('切换数据库类型失败:', err)
+  // 检查目标数据库类型的 URL 是否已配置
+  if (!isDatabaseUrlConfigured(newType)) {
+    urlNotConfiguredDbType.value = newType
+    showUrlNotConfiguredAlert.value = true
+    return
   }
+
+  // 设置待处理类型并显示确认弹窗
+  pendingDbType.value = newType
+  showConfirmModal.value = true
+}
+
+/**
+ * 关闭 URL 未配置提示
+ */
+const closeUrlNotConfiguredAlert = (): void => {
+  showUrlNotConfiguredAlert.value = false
+  urlNotConfiguredDbType.value = null
 }
 
 /**
  * 确认切换数据库类型
- * 仅更新客户端配置，实际迁移在应用重启后由 Home 页处理
+ * 1. 更新客户端配置
+ * 2. 通知服务端设置 pending_db_type
+ * 3. 清除之前的迁移失败记录（如果有）
+ * 实际迁移在应用重启后由 Home 页处理
  */
 const confirmSwitch = async (): Promise<void> => {
   if (pendingDbType.value) {
     try {
-      // 更新客户端配置中的数据库类型
+      // 1. 更新客户端配置中的数据库类型
       await switchDatabaseType(pendingDbType.value)
+
+      // 2. 通知服务端设置 pending_db_type（如果服务正在运行）
+      if (serviceStore.isRunning) {
+        try {
+          await setPendingMigration(pendingDbType.value)
+          // 清除之前的迁移失败记录
+          await clearMigrationFailed()
+        } catch (err) {
+          console.error('通知服务端设置 pending 状态失败:', err)
+          // 不影响主流程，继续执行
+        }
+      }
+
       // 更新本地状态
       clientDbType.value = pendingDbType.value
       // 关闭确认弹窗
-      showMigrationConfirm.value = false
+      showConfirmModal.value = false
       // 显示重启提示
       showRestartAlert.value = true
       // 清除待处理类型
@@ -129,16 +180,30 @@ const confirmSwitch = async (): Promise<void> => {
   }
 }
 
+/**
+ * 取消切换
+ */
+const cancelSwitch = (): void => {
+  showConfirmModal.value = false
+  pendingDbType.value = null
+}
+
 // 页面加载
 onMounted(async () => {
-  // 无论服务是否启动，都先读取客户端配置中的数据库类型
+  // 无论服务是否启动，都先读取客户端配置中的数据库类型和 URL
   try {
-    const dbType = await getDatabaseType()
+    const [dbType, urls] = await Promise.all([
+      getDatabaseType(),
+      getDatabaseUrls()
+    ])
     if (dbType && ['sqlite', 'postgresql', 'mysql'].includes(dbType)) {
       clientDbType.value = dbType as DatabaseType
     }
+    if (urls) {
+      databaseUrls.value = urls
+    }
   } catch (err) {
-    console.error('获取客户端数据库类型失败:', err)
+    console.error('获取客户端配置失败:', err)
   } finally {
     isLoadingClientConfig.value = false
   }
@@ -178,6 +243,16 @@ onMounted(async () => {
     <!-- 重启提示 - 数据库类型切换成功后显示 -->
     <Alert v-if="showRestartAlert" type="warning" closable @close="showRestartAlert = false" class="mb-lg">
       数据库类型已切换，请前往控制台重启应用以完成数据迁移
+    </Alert>
+
+    <!-- URL 未配置提示 -->
+    <Alert v-if="showUrlNotConfiguredAlert" type="error" closable @close="closeUrlNotConfiguredAlert" class="mb-lg">
+      <div>
+        <p>无法切换到 {{ urlNotConfiguredDbType?.toUpperCase() }}：数据库连接 URL 未配置</p>
+        <p style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">
+          请前往「设置 → 开发者选项」中配置 {{ urlNotConfiguredDbType?.toUpperCase() }} 的数据库连接 URL
+        </p>
+      </div>
     </Alert>
 
     <!-- 加载中 -->
@@ -358,41 +433,26 @@ onMounted(async () => {
           </Button>
         </div>
       </div>
+    </template>
 
-    <!-- 切换确认弹窗 -->
-    <Modal v-model:visible="showMigrationConfirm" title="切换数据库类型" width="500px" :closable="false" :mask-closable="false">
-      <div class="migration-confirm-content">
-        <img :src="icons.alertTriangle" class="warning-icon" alt="warning" />
-        <h3>确认切换数据库类型？</h3>
-        <p>
-          您正在从 <strong>{{ dbStore.currentDbTypeLabel }}</strong> 切换到
-          <strong>{{ databaseTypes.find(t => t.value === pendingDbType)?.label }}</strong>
-        </p>
-        <Alert type="info" class="mt-md">
-          切换后需要重启应用才能生效，重启时将自动进行数据迁移
-        </Alert>
-      </div>
+    <!-- 切换确认弹窗 - 使用基础 Modal 组件 -->
+    <Modal v-model:visible="showConfirmModal" title="切换数据库类型" width="400px">
+      <p style="margin: 0; color: var(--text-primary);">
+        您正在从 <strong>{{ currentDbTypeLabel }}</strong> 切换到 <strong>{{ pendingDbTypeLabel }}</strong>
+      </p>
+      <p style="margin: var(--spacing-sm) 0 0; font-size: var(--font-size-sm); color: var(--text-secondary);">
+        切换后需要重启应用才能生效，重启时将自动进行数据迁移。
+      </p>
       <template #footer>
-        <Button type="secondary" @click="showMigrationConfirm = false; pendingDbType = null">取消</Button>
+        <Button type="secondary" @click="cancelSwitch">取消</Button>
         <Button type="primary" @click="confirmSwitch">确认切换</Button>
       </template>
     </Modal>
-    </template>
   </div>
 </template>
 
 <style scoped>
-/* 迁移确认内容标题和段落 - 补充样式 */
-.migration-confirm-content h3 {
-  font-size: var(--font-size-xl);
-  color: var(--text-primary);
-  margin: 0 0 var(--spacing-md);
-}
-
-.migration-confirm-content p {
-  color: var(--text-secondary);
-  margin-bottom: var(--spacing-lg);
-}
+/* 仅保留 Database.vue 特有的样式 */
 
 /* 禁用状态样式 */
 .card-disabled :deep(.card-body) {
@@ -403,5 +463,18 @@ onMounted(async () => {
 .card-disabled .form-select,
 .card-disabled .form-checkbox input[type="checkbox"] {
   cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .action-bar {
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .action-left,
+  .action-right {
+    width: 100%;
+    justify-content: stretch;
+  }
 }
 </style>

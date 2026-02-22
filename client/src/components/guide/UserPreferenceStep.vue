@@ -4,10 +4,12 @@ import { useThemeStore, presetColorThemes, layoutDensityPresets } from '../../st
 import {
   getClientConfig,
   saveClientConfig,
-  markGuideCompleted
+  markGuideCompleted,
+  getDatabaseUrls
 } from '../../services/api'
 import { useGuideEventBus, type DatabaseType } from '../../composables/useGuideEvents'
 import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
 
 /**
  * 用户偏好设置步骤组件
@@ -26,26 +28,62 @@ const state = eventBus.state.value.userPreference
 const guideState = eventBus.state.value.guide
 const serverState = eventBus.state.value.serverCheck
 
+// 数据库 URL 配置状态
+const databaseUrls = ref<Record<string, string>>({})
+const isLoadingUrls = ref(true)
+
 /**
- * 数据库类型选项
+ * 检查数据库 URL 是否已配置
  */
-const dbTypeOptions = [
+const isDatabaseUrlConfigured = (dbType: DatabaseType): boolean => {
+  const url = databaseUrls.value[dbType]
+  return !!url && url.trim().length > 0
+}
+
+/**
+ * 数据库类型选项（带启用状态）
+ */
+const dbTypeOptions = computed(() => [
   {
     value: 'sqlite' as DatabaseType,
     label: 'SQLite',
-    description: '轻量级本地数据库，适合开发和测试'
+    description: '轻量级本地数据库，适合开发和测试',
+    enabled: isDatabaseUrlConfigured('sqlite')
   },
   {
     value: 'postgresql' as DatabaseType,
     label: 'PostgreSQL',
-    description: '强大的开源关系型数据库，适合生产环境'
+    description: '强大的开源关系型数据库，适合生产环境',
+    enabled: isDatabaseUrlConfigured('postgresql')
   },
   {
     value: 'mysql' as DatabaseType,
     label: 'MySQL',
-    description: '流行的开源数据库，广泛使用于Web应用'
+    description: '流行的开源数据库，广泛使用于Web应用',
+    enabled: isDatabaseUrlConfigured('mysql')
   }
-]
+])
+
+/**
+ * 加载数据库 URL 配置
+ */
+async function loadDatabaseUrls(): Promise<void> {
+  try {
+    const urls = await getDatabaseUrls()
+    if (urls) {
+      databaseUrls.value = urls
+    }
+  } catch (err) {
+    console.error('加载数据库 URL 失败:', err)
+  } finally {
+    isLoadingUrls.value = false
+  }
+}
+
+// 页面加载时获取数据库 URL
+onMounted(() => {
+  loadDatabaseUrls()
+})
 
 /**
  * 选择主题并实时预览
@@ -70,6 +108,10 @@ function selectLayout(layoutId: string): void {
  * @param dbType - 数据库类型
  */
 function selectDbType(dbType: DatabaseType): void {
+  // 检查数据库 URL 是否已配置
+  if (!isDatabaseUrlConfigured(dbType)) {
+    return
+  }
   eventBus.updateUserPreference({ dbType })
 }
 
@@ -185,12 +227,18 @@ async function savePreferences(): Promise<void> {
     <!-- 数据库类型选择 -->
     <div class="preference-section">
       <h3>数据库类型</h3>
-      <div class="db-type-options">
+      <div v-if="isLoadingUrls" class="db-type-loading">
+        加载数据库配置中...
+      </div>
+      <div v-else class="db-type-options">
         <div
           v-for="dbType in dbTypeOptions"
           :key="dbType.value"
           class="db-type-option"
-          :class="{ 'db-type-selected': state.dbType === dbType.value }"
+          :class="{
+            'db-type-selected': state.dbType === dbType.value,
+            'db-type-disabled': !dbType.enabled
+          }"
           @click="selectDbType(dbType.value)"
         >
           <div class="db-type-header">
@@ -198,10 +246,16 @@ async function savePreferences(): Promise<void> {
               <div v-if="state.dbType === dbType.value" class="db-type-radio-inner" />
             </div>
             <div class="db-type-label">{{ dbType.label }}</div>
+            <span v-if="!dbType.enabled" class="db-type-badge">未配置</span>
           </div>
-          <div class="db-type-description">{{ dbType.description }}</div>
+          <div class="db-type-description">
+            {{ dbType.enabled ? dbType.description : '请在开发者选项中配置数据库连接 URL' }}
+          </div>
         </div>
       </div>
+      <p v-if="!isLoadingUrls" class="db-type-hint">
+        只有已配置连接 URL 的数据库类型可以选择，未配置的类型需要先在开发者选项中设置
+      </p>
     </div>
 
     <!-- 保存按钮 -->
@@ -339,5 +393,40 @@ async function savePreferences(): Promise<void> {
   font-size: var(--font-size-sm);
   color: var(--text-tertiary);
   padding-left: calc(18px + var(--spacing-sm));
+}
+
+/* 禁用状态样式 */
+.db-type-option.db-type-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  border-color: var(--border-color);
+  background-color: var(--bg-secondary);
+}
+
+.db-type-option.db-type-disabled:hover {
+  border-color: var(--border-color);
+  background-color: var(--bg-secondary);
+}
+
+.db-type-badge {
+  margin-left: auto;
+  padding: 2px 8px;
+  background-color: var(--warning-color);
+  color: white;
+  font-size: var(--font-size-xs);
+  border-radius: var(--border-radius-sm);
+}
+
+.db-type-hint {
+  margin: var(--spacing-sm) 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.db-type-loading {
+  padding: var(--spacing-md);
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
 }
 </style>

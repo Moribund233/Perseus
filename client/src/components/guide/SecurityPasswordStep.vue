@@ -136,22 +136,14 @@ const validateDatabaseUrl = (url: string, dbType: string): boolean => {
 }
 
 /**
- * 检查数据库 URL 是否已配置
- */
-const isDatabaseUrlConfigured = computed(() => {
-  const url = getCurrentDatabaseUrl()
-  return url && url.trim().length > 0 && validateDatabaseUrl(url, databaseConfig.value.selectedDbType)
-})
-
-/**
  * 设置模式下是否可以继续
- * 需要同时满足：密码有效、确认密码一致、数据库 URL 已配置
+ * 只需要满足：密码有效、确认密码一致
+ * 数据库配置为可选项，可在后续开发者选项中配置
  */
 const canProceedSet = computed(() => {
   const passwordValid = state.securityPassword.length >= 6 &&
     state.securityPassword === state.confirmPassword
-  const dbUrlValid = isDatabaseUrlConfigured.value
-  return state.isSaved || (passwordValid && dbUrlValid)
+  return state.isSaved || passwordValid
 })
 
 /**
@@ -183,6 +175,29 @@ function startEditDatabaseUrl(): void {
   databaseConfig.value.tempUrl = getCurrentDatabaseUrl()
   databaseConfig.value.isEditing = true
   databaseConfig.value.urlError = ''
+}
+
+/**
+ * 选择 SQLite 数据库文件
+ */
+async function selectSQLiteFile(): Promise<void> {
+  try {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const selected = await open({
+      multiple: false,
+      filters: [
+        { name: 'SQLite Database', extensions: ['db', 'sqlite', 'sqlite3'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    })
+    if (selected && typeof selected === 'string') {
+      // 将文件路径转换为 sqlite:// URL 格式
+      databaseConfig.value.tempUrl = `sqlite:///${selected.replace(/\\/g, '/')}`
+    }
+  } catch (err) {
+    console.error('选择文件失败:', err)
+    eventBus.setError('选择文件失败: ' + String(err))
+  }
 }
 
 /**
@@ -464,11 +479,10 @@ const resetDialogConfirmText = computed(() => {
       </div>
 
       <!-- 数据库配置 -->
-      <div class="database-config-section">
-        <h3 class="subsection-heading">数据库配置 <span class="required">*</span></h3>
-        <p class="subsection-text">
-          请配置数据库连接信息，用于存储应用数据。
-        </p>
+      <div class="form-group">
+        <label class="form-label">
+          数据库配置 <span class="optional">（可选）</span>
+        </label>
 
         <div class="database-config-row">
           <!-- 左侧：URL 输入框 -->
@@ -482,17 +496,27 @@ const resetDialogConfirmText = computed(() => {
               </div>
             </div>
             <div v-else class="database-url-edit">
-              <input
-                v-model="databaseConfig.tempUrl"
-                type="text"
-                class="form-input url-input"
-                :class="{ 'input-error': databaseConfig.urlError }"
-                :placeholder="databaseConfig.selectedDbType === 'sqlite'
-                  ? 'sqlite:///path/to/database.db'
-                  : databaseConfig.selectedDbType === 'postgresql'
-                    ? 'postgresql://用户名:密码@主机:端口/数据库名'
-                    : 'mysql://用户名:密码@主机:端口/数据库名'"
-              />
+              <div class="url-input-row">
+                <input
+                  v-model="databaseConfig.tempUrl"
+                  type="text"
+                  class="form-input url-input"
+                  :class="{ 'input-error': databaseConfig.urlError }"
+                  :placeholder="databaseConfig.selectedDbType === 'sqlite'
+                    ? 'sqlite:///path/to/database.db'
+                    : databaseConfig.selectedDbType === 'postgresql'
+                      ? 'postgresql://用户名:密码@主机:端口/数据库名'
+                      : 'mysql://用户名:密码@主机:端口/数据库名'"
+                />
+                <Button
+                  v-if="databaseConfig.selectedDbType === 'sqlite'"
+                  type="secondary"
+                  size="sm"
+                  @click="selectSQLiteFile"
+                >
+                  选择文件
+                </Button>
+              </div>
               <p v-if="databaseConfig.urlError" class="error-text">{{ databaseConfig.urlError }}</p>
             </div>
           </div>

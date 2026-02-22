@@ -140,6 +140,16 @@ export interface DatabaseStatusResponse {
   target_db_type: DatabaseType
   /** 是否需要数据迁移 */
   migration_required: boolean
+  /** 是否需要回退到 current_db_type */
+  rollback_required?: boolean
+  /** 需要回退到的数据库类型 */
+  rollback_to_type?: DatabaseType | null
+  /** 待迁移的目标类型（客户端已确认） */
+  pending_db_type?: DatabaseType | null
+  /** 上次迁移是否失败 */
+  last_migration_failed?: boolean
+  /** 上次迁移失败的目标类型 */
+  failed_target_type?: DatabaseType | null
   /** 状态信息 */
   message: string
 }
@@ -199,10 +209,25 @@ export async function updateDatabaseConfig(config: DatabaseConfig): Promise<void
 }
 
 /**
- * 测试数据库连接
- * 使用通用的配置验证接口
+ * 检查数据库内容和状态
+ * 服务端负责检查数据库内容、表结构、数据量等
+ * 用于智能迁移判断
+ */
+export async function checkDatabase(dbUrl: string): Promise<{ success: boolean; data?: any; errors: string[]; hints: string[] }> {
+  const response = await invoke<{ success: boolean; data?: any; errors: string[]; hints: string[] }>(
+    'check_database',
+    { dbUrl }
+  )
+  return response
+}
+
+/**
+ * 测试数据库连接（已弃用，保留用于兼容性）
+ * 注意：连接测试现在由客户端本地负责
+ * @deprecated 使用客户端的 useDatabaseConnection 替代
  */
 export async function testDatabaseConnection(config: DatabaseConfig): Promise<ConnectionTestResult> {
+  console.warn('testDatabaseConnection 已弃用，请使用客户端的 useDatabaseConnection')
   const response = await invoke<{ success: boolean; errors: string[] }>('validate_app_config', {
     config: { database: config }
   })
@@ -260,4 +285,64 @@ export async function exportDatabaseData(): Promise<{ success: boolean; file_pat
  */
 export async function importDatabaseData(filePath: string): Promise<{ success: boolean; imported_count: number }> {
   return invoke('import_database_data', { filePath })
+}
+
+// ==================== 迁移管理 API ====================
+
+/**
+ * 设置待处理的迁移目标类型
+ * 客户端确认切换数据库类型后调用
+ */
+export async function setPendingMigration(targetType: DatabaseType): Promise<{ success: boolean; message?: string }> {
+  const response = await invoke<{ success: boolean; hints?: string[]; errors?: string[] }>(
+    'set_pending_migration',
+    { targetType }
+  )
+  return {
+    success: response.success,
+    message: response.hints?.[0] || response.errors?.[0]
+  }
+}
+
+/**
+ * 清除待处理的迁移目标类型
+ * 迁移完成或取消后调用
+ */
+export async function clearPendingMigration(): Promise<{ success: boolean; message?: string }> {
+  const response = await invoke<{ success: boolean; hints?: string[]; errors?: string[] }>(
+    'clear_pending_migration'
+  )
+  return {
+    success: response.success,
+    message: response.hints?.[0] || response.errors?.[0]
+  }
+}
+
+/**
+ * 记录迁移失败
+ * 迁移失败后调用，避免重复尝试
+ */
+export async function recordMigrationFailed(targetType: DatabaseType): Promise<{ success: boolean; message?: string }> {
+  const response = await invoke<{ success: boolean; hints?: string[]; errors?: string[] }>(
+    'record_migration_failed',
+    { targetType }
+  )
+  return {
+    success: response.success,
+    message: response.hints?.[0] || response.errors?.[0]
+  }
+}
+
+/**
+ * 清除迁移失败记录
+ * 用户解决问题后调用，允许再次尝试迁移
+ */
+export async function clearMigrationFailed(): Promise<{ success: boolean; message?: string }> {
+  const response = await invoke<{ success: boolean; hints?: string[]; errors?: string[] }>(
+    'clear_migration_failed'
+  )
+  return {
+    success: response.success,
+    message: response.hints?.[0] || response.errors?.[0]
+  }
 }

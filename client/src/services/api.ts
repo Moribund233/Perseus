@@ -524,6 +524,15 @@ export async function getLocalToken(): Promise<string> {
 // ==================== 健康检查 API ====================
 
 /**
+ * 健康检查响应
+ */
+export interface HealthStatus {
+  status: string
+  timestamp: string
+  service: string
+}
+
+/**
  * 检查连接
  */
 export async function checkConnection(): Promise<boolean> {
@@ -533,7 +542,7 @@ export async function checkConnection(): Promise<boolean> {
 /**
  * 获取健康状态
  */
-export async function getHealthStatus(): Promise<any> {
+export async function getHealthStatus(): Promise<HealthStatus> {
   return invoke('get_health_status')
 }
 

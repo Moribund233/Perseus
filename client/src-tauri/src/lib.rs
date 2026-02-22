@@ -98,6 +98,15 @@ pub fn run() {
             // 数据库迁移
             commands::migrate_database,
             commands::test_database_connection,
+            commands::check_database,
+            // 迁移管理
+            commands::set_pending_migration,
+            commands::clear_pending_migration,
+            commands::record_migration_failed,
+            commands::clear_migration_failed,
+            // 数据库连接测试（客户端本地）
+            commands::check_sqlite_file,
+            commands::test_tcp_connection,
             // 压力测试和数据库配置
             commands::get_stress_test,
             commands::update_stress_test,

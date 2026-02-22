@@ -116,10 +116,32 @@ class DatabaseSettings(BaseSettings):
     
     # 服务端记录的数据库类型（由服务端维护，用于迁移检测）
     current_db_type: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="服务端记录的上次实际数据库类型，用于检测类型变更和迁移"
     )
-    
+
+    # 待迁移的目标类型（客户端已确认但未执行）
+    pending_db_type: Optional[str] = Field(
+        default=None,
+        description="待迁移的目标数据库类型，客户端已确认但未执行迁移"
+    )
+
+    # 迁移失败记录
+    last_migration_failed: bool = Field(
+        default=False,
+        description="上次迁移是否失败"
+    )
+
+    failed_target_type: Optional[str] = Field(
+        default=None,
+        description="上次迁移失败的目标类型"
+    )
+
+    failed_at: Optional[str] = Field(
+        default=None,
+        description="上次迁移失败的时间戳"
+    )
+
     # 可写入配置文件的配置项
     pool_size: int = Field(default=20, ge=1, description="连接池大小（增加以支持高并发）")
     max_overflow: int = Field(default=40, ge=0, description="最大溢出连接数（增加以支持高并发）")

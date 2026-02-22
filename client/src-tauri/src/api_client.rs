@@ -336,11 +336,46 @@ pub async fn migrate_database(
     client.post("/api/app/database/migrate", &request).await
 }
 
-/// 测试数据库连接
+/// 测试数据库连接（已弃用，保留用于兼容性）
 pub async fn test_database_connection(db_url: String) -> Result<ConfigResponse, String> {
     let client = ApiClient::new()?;
     let body = serde_json::json!({ "db_url": db_url });
     client
         .post("/api/app/database/test-connection", &body)
         .await
+}
+
+/// 检查数据库内容和状态
+pub async fn check_database(db_url: String) -> Result<ConfigResponse, String> {
+    let client = ApiClient::new()?;
+    let body = serde_json::json!({ "db_url": db_url });
+    client.post("/api/app/database/check", &body).await
+}
+
+/// 设置待处理的迁移目标类型
+pub async fn set_pending_migration(target_type: String) -> Result<ConfigResponse, String> {
+    let client = ApiClient::new()?;
+    let body = serde_json::json!({ "target_type": target_type });
+    client.post("/api/app/database/pending", &body).await
+}
+
+/// 清除待处理的迁移目标类型
+pub async fn clear_pending_migration() -> Result<ConfigResponse, String> {
+    let client = ApiClient::new()?;
+    client.post("/api/app/database/clear-pending", &()).await
+}
+
+/// 记录迁移失败
+pub async fn record_migration_failed(target_type: String) -> Result<ConfigResponse, String> {
+    let client = ApiClient::new()?;
+    let body = serde_json::json!({ "target_type": target_type });
+    client
+        .post("/api/app/database/migration-failed", &body)
+        .await
+}
+
+/// 清除迁移失败记录
+pub async fn clear_migration_failed() -> Result<ConfigResponse, String> {
+    let client = ApiClient::new()?;
+    client.post("/api/app/database/clear-failed", &()).await
 }

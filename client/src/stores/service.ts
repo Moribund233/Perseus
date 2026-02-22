@@ -14,13 +14,15 @@ import {
   getLocalSystemInfo,
   getAppConfig,
   updateAppConfig,
+  getHealthStatus,
   type ServiceStatus,
   type SystemResources,
   type ProcessInfo,
   type SystemInfo,
   type ServerAppConfig,
   type CORSConfig,
-  type ConfigResponse
+  type ConfigResponse,
+  type HealthStatus
 } from '../services/api'
 
 // 基础系统信息类型
@@ -58,6 +60,8 @@ export const useServiceStore = defineStore('service', () => {
   const lastRefreshTime = ref<number>(0)
   // 是否已加载配置（仅启动时加载一次）
   const isConfigLoaded = ref<boolean>(false)
+  // 健康状态
+  const healthStatus = ref<HealthStatus | null>(null)
 
   // ============ Getters ============
   // 服务状态文本
@@ -340,6 +344,19 @@ export const useServiceStore = defineStore('service', () => {
   }
 
   /**
+   * 刷新健康状态
+   */
+  async function refreshHealthStatus(): Promise<void> {
+    try {
+      const health = await getHealthStatus()
+      healthStatus.value = health
+    } catch (err) {
+      console.error('刷新健康状态失败:', err)
+      healthStatus.value = null
+    }
+  }
+
+  /**
    * 重置状态（用于测试或重新初始化）
    */
   function reset(): void {
@@ -351,6 +368,7 @@ export const useServiceStore = defineStore('service', () => {
     localSystemInfo.value = null
     basicSystemInfo.value = null
     serverConfig.value = null
+    healthStatus.value = null
     isRefreshing.value = false
     isInitialized.value = false
     error.value = null
@@ -384,6 +402,7 @@ export const useServiceStore = defineStore('service', () => {
     isInitialized,
     error,
     lastRefreshTime,
+    healthStatus,
     // Getters
     statusText,
     statusClass,
@@ -400,6 +419,7 @@ export const useServiceStore = defineStore('service', () => {
     refreshLocalSystemInfo,
     startLocalSystemInfoRefresh,
     stopLocalSystemInfoRefresh,
+    refreshHealthStatus,
     reset
   }
 })

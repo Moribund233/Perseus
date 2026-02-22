@@ -683,12 +683,46 @@ pub async fn migrate_database(
     crate::api_client::migrate_database(request).await
 }
 
-/// 测试数据库连接
+/// 测试数据库连接（已弃用，保留用于兼容性）
 #[tauri::command]
 pub async fn test_database_connection(
     db_url: String,
 ) -> Result<crate::models::ConfigResponse, String> {
     crate::api_client::test_database_connection(db_url).await
+}
+
+/// 检查数据库内容和状态
+#[tauri::command]
+pub async fn check_database(db_url: String) -> Result<crate::models::ConfigResponse, String> {
+    crate::api_client::check_database(db_url).await
+}
+
+/// 设置待处理的迁移目标类型
+#[tauri::command]
+pub async fn set_pending_migration(
+    target_type: String,
+) -> Result<crate::models::ConfigResponse, String> {
+    crate::api_client::set_pending_migration(target_type).await
+}
+
+/// 清除待处理的迁移目标类型
+#[tauri::command]
+pub async fn clear_pending_migration() -> Result<crate::models::ConfigResponse, String> {
+    crate::api_client::clear_pending_migration().await
+}
+
+/// 记录迁移失败
+#[tauri::command]
+pub async fn record_migration_failed(
+    target_type: String,
+) -> Result<crate::models::ConfigResponse, String> {
+    crate::api_client::record_migration_failed(target_type).await
+}
+
+/// 清除迁移失败记录
+#[tauri::command]
+pub async fn clear_migration_failed() -> Result<crate::models::ConfigResponse, String> {
+    crate::api_client::clear_migration_failed().await
 }
 
 // ==================== 压力测试和数据库配置命令 ====================
@@ -736,4 +770,45 @@ pub fn switch_database_type(db_type: String) -> Result<(), String> {
 #[tauri::command]
 pub fn update_database_url(db_type: String, url: String) -> Result<(), String> {
     crate::secure_config::update_database_url(db_type, url)
+}
+
+// ==================== 数据库连接测试命令 ====================
+
+/// 检查 SQLite 数据库文件是否存在
+#[tauri::command]
+pub fn check_sqlite_file(file_path: String) -> Result<bool, String> {
+    use std::path::Path;
+
+    let path = Path::new(&file_path);
+    Ok(path.exists() && path.is_file())
+}
+
+/// 测试 TCP 连接（用于 PostgreSQL/MySQL）
+#[tauri::command]
+pub async fn test_tcp_connection(
+    host: String,
+    port: u16,
+) -> Result<crate::models::TcpTestResult, String> {
+    use tokio::net::TcpStream;
+    use tokio::time::{timeout, Duration};
+
+    let addr = format!("{}:{}", host, port);
+
+    // 5秒超时
+    let result = timeout(Duration::from_secs(5), TcpStream::connect(&addr)).await;
+
+    match result {
+        Ok(Ok(_)) => Ok(crate::models::TcpTestResult {
+            success: true,
+            error: None,
+        }),
+        Ok(Err(e)) => Ok(crate::models::TcpTestResult {
+            success: false,
+            error: Some(format!("连接失败: {}", e)),
+        }),
+        Err(_) => Ok(crate::models::TcpTestResult {
+            success: false,
+            error: Some("连接超时".to_string()),
+        }),
+    }
 }

@@ -980,14 +980,18 @@ class AppService:
 
             logger.info(f"数据库迁移完成: {result}")
 
-            # 迁移成功，更新 current_db_type
+            # 迁移成功，更新 current_db_type 和清除 pending 状态
             config.database.current_db_type = target_type
-            
+            config.database.pending_db_type = None
+            config.database.last_migration_failed = False
+            config.database.failed_target_type = None
+            config.database.failed_at = None
+
             # 保存配置
             try:
                 config_manager = ConfigManager()
                 config_manager.save_config(config)
-                logger.info(f"已更新 current_db_type 为: {target_type}")
+                logger.info(f"已更新 current_db_type 为: {target_type}，并清除 pending 状态")
             except Exception as save_error:
                 logger.error(f"保存配置失败: {save_error}")
                 # 配置保存失败不影响迁移结果，但应该记录日志
@@ -1019,6 +1023,9 @@ class AppService:
     def test_database_connection(self, db_url: str) -> Tuple[bool, List[str]]:
         """
         测试数据库连接
+
+        注意：此方法保留用于兼容性，实际连接测试已由客户端负责。
+        服务端现在主要负责数据库内容检查。
 
         Args:
             db_url: 数据库连接URL
@@ -1057,6 +1064,142 @@ class AppService:
         except Exception as e:
             errors.append(f"连接测试失败: {str(e)}")
             return False, errors
+
+    def check_database(self, db_url: str, is_debug: bool = False, is_admin: bool = False) -> Dict[str, Any]:
+        """
+        检查数据库内容和状态
+
+        服务端负责检查数据库内容、表结构、数据量等，用于智能迁移判断。
+        客户端已负责连接测试。
+
+        Args:
+            db_url: 数据库连接URL
+            is_debug: 是否调试模式
+            is_admin: 是否管理员
+
+        Returns:
+            Dict[str, Any]: 检查结果，包含数据库信息和内容统计
+        """
+        self._check_permission(is_debug, is_admin)
+
+        result = {
+            "success": False,
+            "data": None,
+            "errors": [],
+            "hints": []
+        }
+
+        try:
+            from sqlalchemy import create_engine, text, inspect
+
+            # 检测数据库类型
+            url_lower = db_url.lower()
+            if url_lower.startswith("sqlite"):
+                db_type = "sqlite"
+            elif url_lower.startswith("postgresql") or url_lower.startswith("postgres"):
+                db_type = "postgresql"
+            elif url_lower.startswith("mysql"):
+                db_type = "mysql"
+            else:
+                result["errors"].append("无法识别的数据库类型")
+                return result
+
+            # 连接数据库
+            engine = create_engine(db_url)
+
+            # 获取数据库信息
+            db_info = {
+                "type": db_type,
+                "url_masked": self._mask_database_url(db_url),
+                "tables": [],
+                "total_tables": 0,
+                "total_records": 0,
+                "database_size": None
+            }
+
+            with engine.connect() as conn:
+                # 获取所有表
+                inspector = inspect(engine)
+                table_names = inspector.get_table_names()
+                db_info["total_tables"] = len(table_names)
+
+                # 获取每个表的记录数
+                for table_name in table_names:
+                    try:
+                        count_result = conn.execute(text(f"SELECT COUNT(*) FROM \"{table_name}\""))
+                        record_count = count_result.scalar()
+
+                        # 获取表结构信息
+                        columns = inspector.get_columns(table_name)
+
+                        table_info = {
+                            "name": table_name,
+                            "records": record_count,
+                            "columns": len(columns)
+                        }
+                        db_info["tables"].append(table_info)
+                        db_info["total_records"] += record_count
+                    except Exception as e:
+                        logger.warning(f"获取表 {table_name} 信息失败: {e}")
+                        db_info["tables"].append({
+                            "name": table_name,
+                            "records": -1,
+                            "columns": 0,
+                            "error": str(e)
+                        })
+
+                # 获取数据库大小（仅 SQLite）
+                if db_type == "sqlite":
+                    try:
+                        import os
+                        # 从 URL 提取文件路径
+                        file_path = db_url.replace("sqlite:///", "").replace("sqlite://", "")
+                        if os.path.exists(file_path):
+                            size_bytes = os.path.getsize(file_path)
+                            db_info["database_size"] = self._format_file_size(size_bytes)
+                    except Exception as e:
+                        logger.warning(f"获取 SQLite 文件大小失败: {e}")
+
+            engine.dispose()
+
+            result["success"] = True
+            result["data"] = db_info
+            result["hints"].append(f"数据库检查完成，共 {db_info['total_tables']} 张表，{db_info['total_records']} 条记录")
+
+        except Exception as e:
+            result["errors"].append(f"检查数据库失败: {str(e)}")
+            logger.error(f"检查数据库失败: {e}")
+
+        return result
+
+    def _mask_database_url(self, url: str) -> str:
+        """
+        掩码显示数据库 URL，隐藏敏感信息
+
+        Args:
+            url: 数据库 URL
+
+        Returns:
+            str: 掩码后的 URL
+        """
+        if not url:
+            return ""
+
+        try:
+            if url.startswith("sqlite://"):
+                # SQLite URL 通常不包含密码
+                parts = url.split("/")
+                file_name = parts[-1] if parts else "database.db"
+                return f"sqlite://***{file_name[-10:]}"
+            else:
+                # PostgreSQL 或 MySQL URL，隐藏用户名密码部分
+                import re
+                match = re.match(r"^(postgresql|postgres|mysql)://([^@]+)@(.+)$", url)
+                if match:
+                    return f"{match.group(1)}://***@***"
+                return url.replace("://", "://***@")
+        except Exception:
+            return "***"
 
     def _format_file_size(self, size_bytes: int) -> str:
         """

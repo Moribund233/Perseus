@@ -440,6 +440,11 @@ class DatabaseStatusResponse(BaseModel):
     current_db_type: Optional[str] = Field(None, description="服务端记录的上次实际数据库类型")
     target_db_type: str = Field(..., description="从环境变量解析的目标数据库类型")
     migration_required: bool = Field(..., description="是否需要数据迁移")
+    rollback_required: bool = Field(default=False, description="是否需要回退到 current_db_type")
+    rollback_to_type: Optional[str] = Field(None, description="需要回退到的数据库类型")
+    pending_db_type: Optional[str] = Field(None, description="待迁移的目标类型（客户端已确认）")
+    last_migration_failed: bool = Field(default=False, description="上次迁移是否失败")
+    failed_target_type: Optional[str] = Field(None, description="上次迁移失败的目标类型")
     message: str = Field(..., description="状态信息")
 
 
@@ -462,46 +467,78 @@ async def get_database_status_endpoint(
     服务端会比较环境变量中的 DATABASE_URL 解析出的类型
     和 config.toml 中记录的 current_db_type。
 
+    回退逻辑：
+    - 如果类型不一致且没有 pending_db_type 确认，建议回退到 current_db_type
+    - 如果类型不一致且有 pending_db_type 确认，需要迁移
+
     Returns:
         DatabaseStatusResponse: 数据库状态信息
     """
     import os
     from config import get_config
-    
+
     config = get_config()
-    
+
     # 从环境变量获取实际数据库类型
     actual_url = os.environ.get("DATABASE_URL", "")
     actual_type = _parse_db_type(actual_url)
-    
+
     # 获取记录的数据库类型
     recorded_type = config.database.current_db_type
-    
+    pending_type = config.database.pending_db_type
+
     # 首次启动
     if recorded_type is None:
         return DatabaseStatusResponse(
             current_db_type=actual_type,
             target_db_type=actual_type,
             migration_required=False,
+            rollback_required=False,
+            pending_db_type=pending_type,
+            last_migration_failed=config.database.last_migration_failed,
+            failed_target_type=config.database.failed_target_type,
             message="首次启动，初始化数据库记录"
         )
-    
+
     # 类型一致
     if actual_type == recorded_type:
         return DatabaseStatusResponse(
             current_db_type=recorded_type,
             target_db_type=actual_type,
             migration_required=False,
+            rollback_required=False,
+            pending_db_type=pending_type,
+            last_migration_failed=config.database.last_migration_failed,
+            failed_target_type=config.database.failed_target_type,
             message="数据库类型一致"
         )
-    
-    # 类型变更，需要迁移
-    return DatabaseStatusResponse(
-        current_db_type=recorded_type,
-        target_db_type=actual_type,
-        migration_required=True,
-        message=f"检测到数据库类型变更: {recorded_type} -> {actual_type}"
-    )
+
+    # 类型不一致，检查是否有 pending 确认
+    if pending_type == actual_type:
+        # 客户端已确认，需要迁移
+        return DatabaseStatusResponse(
+            current_db_type=recorded_type,
+            target_db_type=actual_type,
+            migration_required=True,
+            rollback_required=False,
+            pending_db_type=pending_type,
+            last_migration_failed=config.database.last_migration_failed,
+            failed_target_type=config.database.failed_target_type,
+            message=f"检测到数据库类型变更: {recorded_type} -> {actual_type}，客户端已确认，等待迁移"
+        )
+    else:
+        # 客户端未确认，建议回退
+        return DatabaseStatusResponse(
+            current_db_type=recorded_type,
+            target_db_type=actual_type,
+            migration_required=False,
+            rollback_required=True,
+            rollback_to_type=recorded_type,
+            pending_db_type=pending_type,
+            last_migration_failed=config.database.last_migration_failed,
+            failed_target_type=config.database.failed_target_type,
+            message=f"检测到数据库类型变更: {recorded_type} -> {actual_type}，但客户端未确认，建议回退到 {recorded_type}"
+        )
 
 
 def _parse_db_type(url: str) -> str:
@@ -569,28 +606,186 @@ async def migrate_database_endpoint(
         )
 
 
-@router.post("/api/app/database/test-connection", response_model=ConfigResponse)
-async def test_database_connection_endpoint(
-    db_url: str = Body(..., embed=True, description="要测试的数据库URL"),
+@router.post("/api/app/database/check", response_model=ConfigResponse)
+async def check_database_endpoint(
+    db_url: str = Body(..., embed=True, description="要检查的数据库URL"),
     permission: tuple = Depends(check_app_permission)
 ):
     """
-    测试数据库连接
+    检查数据库内容和状态
 
-    验证数据库URL是否可以正常连接。
+    服务端负责检查数据库内容、表结构、数据量等，
+    用于智能迁移判断。客户端已负责连接测试。
 
     Args:
         db_url: 数据库连接URL
 
     Returns:
-        ConfigResponse: 测试结果
+        ConfigResponse: 检查结果，包含数据库信息和内容统计
     """
+    is_debug, is_admin = permission
     app_service = get_app_service()
 
-    is_valid, errors = app_service.test_database_connection(db_url)
+    try:
+        result = app_service.check_database(db_url, is_debug=is_debug, is_admin=is_admin)
 
-    return ConfigResponse(
-        success=is_valid,
-        errors=errors,
-        hints=["连接测试成功"] if is_valid else []
-    )
+        return ConfigResponse(
+            success=result.get("success", False),
+            data=result.get("data"),
+            errors=result.get("errors", []),
+            hints=result.get("hints", [])
+        )
+    except Exception as e:
+        return ConfigResponse(
+            success=False,
+            errors=[f"检查数据库失败: {str(e)}"]
+        )
+
+
+@router.post("/api/app/database/pending", response_model=ConfigResponse)
+async def set_pending_migration_endpoint(
+    target_type: str = Body(..., embed=True, description="目标数据库类型"),
+    permission: tuple = Depends(check_app_permission)
+):
+    """
+    设置待处理的迁移目标类型
+
+    客户端确认切换数据库类型后，通知服务端设置 pending_db_type。
+    服务端在启动时会检查此字段，确认是否允许迁移。
+
+    Args:
+        target_type: 目标数据库类型 (sqlite/postgresql/mysql)
+
+    Returns:
+        ConfigResponse: 操作结果
+    """
+    from config import get_config, ConfigManager
+
+    try:
+        config = get_config()
+        config.database.pending_db_type = target_type
+
+        # 保存配置
+        config_manager = ConfigManager()
+        config_manager.save_config(config)
+
+        return ConfigResponse(
+            success=True,
+            hints=[f"已设置待迁移目标类型: {target_type}"]
+        )
+    except Exception as e:
+        return ConfigResponse(
+            success=False,
+            errors=[f"设置待迁移类型失败: {str(e)}"]
+        )
+
+
+@router.post("/api/app/database/clear-pending", response_model=ConfigResponse)
+async def clear_pending_migration_endpoint(
+    permission: tuple = Depends(check_app_permission)
+):
+    """
+    清除待处理的迁移目标类型
+
+    迁移完成或取消后，清除 pending_db_type。
+
+    Returns:
+        ConfigResponse: 操作结果
+    """
+    from config import get_config, ConfigManager
+
+    try:
+        config = get_config()
+        config.database.pending_db_type = None
+
+        # 保存配置
+        config_manager = ConfigManager()
+        config_manager.save_config(config)
+
+        return ConfigResponse(
+            success=True,
+            hints=["已清除待迁移目标类型"]
+        )
+    except Exception as e:
+        return ConfigResponse(
+            success=False,
+            errors=[f"清除待迁移类型失败: {str(e)}"]
+        )
+
+
+@router.post("/api/app/database/migration-failed", response_model=ConfigResponse)
+async def record_migration_failed_endpoint(
+    target_type: str = Body(..., embed=True, description="迁移失败的目标类型"),
+    permission: tuple = Depends(check_app_permission)
+):
+    """
+    记录迁移失败
+
+    迁移失败后，记录失败信息，避免重复尝试迁移到该类型。
+
+    Args:
+        target_type: 迁移失败的目标类型
+
+    Returns:
+        ConfigResponse: 操作结果
+    """
+    from config import get_config, ConfigManager
+    from datetime import datetime
+
+    try:
+        config = get_config()
+        config.database.last_migration_failed = True
+        config.database.failed_target_type = target_type
+        config.database.failed_at = datetime.now().isoformat()
+
+        # 清除 pending 状态
+        config.database.pending_db_type = None
+
+        # 保存配置
+        config_manager = ConfigManager()
+        config_manager.save_config(config)
+
+        return ConfigResponse(
+            success=True,
+            hints=[f"已记录迁移失败: {target_type}"]
+        )
+    except Exception as e:
+        return ConfigResponse(
+            success=False,
+            errors=[f"记录迁移失败失败: {str(e)}"]
+        )
+
+
+@router.post("/api/app/database/clear-failed", response_model=ConfigResponse)
+async def clear_migration_failed_endpoint(
+    permission: tuple = Depends(check_app_permission)
+):
+    """
+    清除迁移失败记录
+
+    用户解决问题后，清除迁移失败记录，允许再次尝试迁移。
+
+    Returns:
+        ConfigResponse: 操作结果
+    """
+    from config import get_config, ConfigManager
+
+    try:
+        config = get_config()
+        config.database.last_migration_failed = False
+        config.database.failed_target_type = None
+        config.database.failed_at = None
+
+        # 保存配置
+        config_manager = ConfigManager()
+        config_manager.save_config(config)
+
+        return ConfigResponse(
+            success=True,
+            hints=["已清除迁移失败记录"]
+        )
+    except Exception as e:
+        return ConfigResponse(
+            success=False,
+            errors=[f"清除迁移失败记录失败: {str(e)}"]
+        )

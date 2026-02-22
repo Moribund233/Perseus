@@ -635,3 +635,14 @@ pub struct GitCheckResult {
     /// git-http-backend是否可用
     pub http_backend_available: bool,
 }
+
+/**
+ * TCP连接测试结果
+ */
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TcpTestResult {
+    /// 是否成功
+    pub success: bool,
+    /// 错误信息
+    pub error: Option<String>,
+}
