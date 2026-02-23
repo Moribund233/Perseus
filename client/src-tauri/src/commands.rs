@@ -789,3 +789,252 @@ pub async fn test_tcp_connection(
         }),
     }
 }
+
+// ==================== 数据库迁移命令 ====================
+
+/// 执行迁移预检查
+#[tauri::command]
+pub async fn precheck_migration(
+    target_url: String,
+) -> Result<crate::models::PrecheckResponse, String> {
+    crate::api_client::precheck_migration(&target_url).await
+}
+
+/// 执行数据库迁移
+#[tauri::command]
+pub async fn execute_migration(
+    target_url: String,
+    batch_size: Option<i32>,
+) -> Result<crate::models::MigrationResponse, String> {
+    crate::api_client::execute_migration(&target_url, batch_size).await
+}
+
+/// 切换数据库
+/// 完整的切换流程：预检查 -> 迁移（如需要）-> 更新配置
+#[tauri::command]
+pub async fn switch_database(
+    db_type: String,
+    target_url: String,
+) -> Result<crate::models::DatabaseSwitchResponse, String> {
+    log::info!("开始切换数据库: {} -> {}", db_type, target_url);
+
+    // 保存原始数据库类型用于回滚
+    let original_db_type = get_database_type()?;
+
+    // 步骤1: 执行预检查
+    log::info!("步骤1: 执行预检查...");
+    let precheck_result = match crate::api_client::precheck_migration(&target_url).await {
+        Ok(result) => result,
+        Err(e) => {
+            log::error!("预检查失败: {}", e);
+            return Ok(crate::models::DatabaseSwitchResponse {
+                success: false,
+                message: format!("预检查失败: {}", e),
+                need_migration: false,
+                migration_result: None,
+                need_restart: false,
+            });
+        }
+    };
+
+    // 检查预检查是否通过
+    if !precheck_result.passed {
+        let error_msg = precheck_result
+            .errors
+            .iter()
+            .map(|e| e.message.clone())
+            .collect::<Vec<_>>()
+            .join("; ");
+        log::error!("预检查未通过: {}", error_msg);
+        return Ok(crate::models::DatabaseSwitchResponse {
+            success: false,
+            message: format!("预检查未通过: {}", error_msg),
+            need_migration: false,
+            migration_result: None,
+            need_restart: false,
+        });
+    }
+
+    // 步骤2: 先更新客户端配置中的数据库类型
+    log::info!("步骤2: 更新客户端配置...");
+    if let Err(e) = switch_database_type(db_type.clone()) {
+        log::error!("更新数据库类型失败: {}", e);
+        return Ok(crate::models::DatabaseSwitchResponse {
+            success: false,
+            message: format!("更新配置失败: {}", e),
+            need_migration: false,
+            migration_result: None,
+            need_restart: false,
+        });
+    }
+
+    // 步骤3: 检查是否需要迁移
+    let need_migration = !precheck_result.is_synced;
+    let mut migration_result: Option<crate::models::MigrationResponse> = None;
+
+    if need_migration {
+        log::info!("步骤3: 需要数据迁移，开始执行...");
+
+        // 执行迁移
+        match crate::api_client::execute_migration(&target_url, Some(1000)).await {
+            Ok(result) => {
+                if result.success {
+                    log::info!(
+                        "迁移成功: {} 个表, {} 行数据",
+                        result.tables_migrated,
+                        result.total_rows_migrated
+                    );
+                    migration_result = Some(result);
+                } else {
+                    log::error!("迁移失败，开始回滚...");
+                    // 迁移失败，回滚数据库类型
+                    let _ = switch_database_type(original_db_type.clone());
+
+                    let error_msg = result
+                        .errors
+                        .iter()
+                        .map(|e| format!("{}: {}", e.table, e.error))
+                        .collect::<Vec<_>>()
+                        .join("; ");
+
+                    return Ok(crate::models::DatabaseSwitchResponse {
+                        success: false,
+                        message: format!("迁移失败: {}", error_msg),
+                        need_migration: true,
+                        migration_result: Some(result),
+                        need_restart: false,
+                    });
+                }
+            }
+            Err(e) => {
+                log::error!("迁移执行失败: {}，开始回滚...", e);
+                // 迁移失败，回滚数据库类型
+                let _ = switch_database_type(original_db_type.clone());
+
+                return Ok(crate::models::DatabaseSwitchResponse {
+                    success: false,
+                    message: format!("迁移执行失败: {}", e),
+                    need_migration: true,
+                    migration_result: None,
+                    need_restart: false,
+                });
+            }
+        }
+    } else {
+        log::info!("步骤3: 数据库已同步，无需迁移");
+    }
+
+    // 步骤4: 更新环境变量配置
+    log::info!("步骤4: 更新环境变量配置...");
+    if let Err(e) = update_database_url(db_type.clone(), target_url) {
+        log::error!("更新数据库URL失败: {}，开始回滚...", e);
+        // 回滚数据库类型
+        let _ = switch_database_type(original_db_type.clone());
+
+        return Ok(crate::models::DatabaseSwitchResponse {
+            success: false,
+            message: format!("更新数据库URL失败: {}", e),
+            need_migration,
+            migration_result: migration_result.clone(),
+            need_restart: false,
+        });
+    }
+
+    // 步骤5: 返回成功结果
+    let message = if need_migration {
+        format!(
+            "数据库切换成功，已迁移 {} 个表",
+            migration_result
+                .as_ref()
+                .map(|r| r.tables_migrated)
+                .unwrap_or(0)
+        )
+    } else {
+        "数据库已同步，切换成功".to_string()
+    };
+
+    log::info!("数据库切换完成: {}", message);
+
+    Ok(crate::models::DatabaseSwitchResponse {
+        success: true,
+        message,
+        need_migration,
+        migration_result,
+        need_restart: true, // 需要重启服务才能生效
+    })
+}
+
+/// 回滚数据库切换
+/// 在迁移失败时恢复原来的数据库类型
+#[tauri::command]
+pub fn rollback_database_switch(original_db_type: String) -> Result<(), String> {
+    log::info!("回滚数据库切换到: {}", original_db_type);
+    switch_database_type(original_db_type)
+}
+
+/// 获取当前数据库连接信息
+#[tauri::command]
+pub fn get_current_database_info() -> Result<serde_json::Value, String> {
+    let db_type = get_database_type()?;
+    let url = crate::secure_config::get_database_url(&db_type)?;
+
+    Ok(serde_json::json!({
+        "db_type": db_type,
+        "url": url
+    }))
+}
+
+/// 测试数据库连接
+#[tauri::command]
+pub async fn test_database_connection(url: String) -> Result<serde_json::Value, String> {
+    // 根据 URL 类型选择测试方式
+    if url.starts_with("sqlite") {
+        // SQLite: 检查文件是否存在或能否创建
+        let file_path = url.replace("sqlite:///", "");
+        let exists = std::path::Path::new(&file_path).exists();
+
+        Ok(serde_json::json!({
+            "success": true,
+            "message": if exists { "数据库文件存在" } else { "将创建新数据库文件" }
+        }))
+    } else if url.contains("postgresql") || url.contains("mysql") {
+        // PostgreSQL/MySQL: 测试 TCP 连接
+        // 解析 host 和 port
+        let host_port = url
+            .split("@")
+            .nth(1)
+            .and_then(|s| s.split("/").next())
+            .unwrap_or("localhost:5432");
+
+        let parts: Vec<&str> = host_port.split(':').collect();
+        let host = parts[0];
+        let port = parts.get(1).and_then(|p| p.parse().ok()).unwrap_or(5432u16);
+
+        // 使用 TCP 连接测试
+        use tokio::net::TcpStream;
+        use tokio::time::{timeout, Duration};
+
+        let addr = format!("{}:{}", host, port);
+        let result = timeout(Duration::from_secs(5), TcpStream::connect(&addr)).await;
+
+        match result {
+            Ok(Ok(_)) => Ok(serde_json::json!({
+                "success": true,
+                "message": "数据库连接成功"
+            })),
+            Ok(Err(e)) => Ok(serde_json::json!({
+                "success": false,
+                "message": format!("连接失败: {}", e)
+            })),
+            Err(_) => Ok(serde_json::json!({
+                "success": false,
+                "message": "连接超时"
+            })),
+        }
+    } else {
+        Ok(serde_json::json!({
+            "success": false,
+            "message": "不支持的数据库类型"
+        }))
+    }
+}

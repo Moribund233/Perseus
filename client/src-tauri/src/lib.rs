@@ -108,6 +108,13 @@ pub fn run() {
             commands::get_database_type,
             commands::switch_database_type,
             commands::update_database_url,
+            // 数据库迁移
+            commands::precheck_migration,
+            commands::execute_migration,
+            commands::switch_database,
+            commands::rollback_database_switch,
+            commands::get_current_database_info,
+            commands::test_database_connection,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

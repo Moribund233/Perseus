@@ -63,7 +63,7 @@ def verify_local_token(token: str) -> bool:
 
 class LocalUser:
     """本地用户对象（模拟管理员用户）"""
-    
+
     def __init__(self):
         self.id = 0
         self.username = "local_admin"
@@ -71,7 +71,8 @@ class LocalUser:
         self.role = "admin"
         self.is_active = True
         self.is_local = True  # 标记为本地用户
-    
+        self.is_admin = True  # 本地用户默认为管理员
+
     def dict(self):
         return {
             "id": self.id,
@@ -80,6 +81,7 @@ class LocalUser:
             "role": self.role,
             "is_active": self.is_active,
             "is_local": self.is_local,
+            "is_admin": self.is_admin,
         }
 
 

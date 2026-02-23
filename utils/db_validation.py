@@ -5,6 +5,7 @@ Provides database driver detection and connection testing functionality
 """
 import importlib.util
 import logging
+import re
 from typing import Optional, Tuple
 from urllib.parse import urlparse
 
@@ -129,22 +130,23 @@ def _get_url_with_driver(url: str, db_type: str) -> str:
     return url
 
 
-def test_database_connection(url: str, db_type: str, timeout: int = 10) -> Tuple[bool, Optional[str]]:
+def test_database_connection(url: str, db_type: str, timeout: int = 10, auto_create_db: bool = False) -> Tuple[bool, Optional[str]]:
     """
     Test database connection
-    
+
     Args:
         url: Database connection URL
         db_type: Database type
         timeout: Connection timeout in seconds
-        
+        auto_create_db: 如果数据库不存在，是否自动创建（仅对 MySQL/PostgreSQL 有效）
+
     Returns:
         Tuple[bool, Optional[str]]: (is_connected, error_message)
     """
     try:
         # 转换 URL 为带驱动的格式
         test_url = _get_url_with_driver(url, db_type)
-        
+
         # Create engine with short timeout for testing
         # 注意：pg8000 (PostgreSQL) 不支持 connect_timeout 参数
         if db_type == "sqlite":
@@ -155,16 +157,48 @@ def test_database_connection(url: str, db_type: str, timeout: int = 10) -> Tuple
             engine = create_engine(test_url, connect_args={"connect_timeout": timeout * 1000})  # MySQL uses milliseconds
         else:
             engine = create_engine(test_url)
-        
+
         # Test connection
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        
+
         engine.dispose()
         return True, None
-        
+
     except SQLAlchemyError as e:
         error_msg = str(e)
+
+        # 检查是否是数据库不存在的错误，并尝试自动创建
+        if auto_create_db and db_type in ("mysql", "postgresql"):
+            db_not_exist_keywords = [
+                "unknown database",
+                "database.*does not exist",
+                "1049",  # MySQL error code for unknown database
+            ]
+            if any(re.search(keyword, error_msg, re.IGNORECASE) for keyword in db_not_exist_keywords):
+                logger.info(f"数据库不存在，尝试自动创建: {url}")
+                from utils.db_migration_utils import create_database_if_not_exists
+                created, create_error = create_database_if_not_exists(url, db_type)
+                if created:
+                    # 重新尝试连接
+                    try:
+                        if db_type == "sqlite":
+                            engine = create_engine(test_url, connect_args={"timeout": timeout})
+                        elif db_type == "postgresql":
+                            engine = create_engine(test_url, pool_pre_ping=True)
+                        elif db_type == "mysql":
+                            engine = create_engine(test_url, connect_args={"connect_timeout": timeout * 1000})
+                        else:
+                            engine = create_engine(test_url)
+                        with engine.connect() as conn:
+                            conn.execute(text("SELECT 1"))
+                        engine.dispose()
+                        return True, None
+                    except Exception as e2:
+                        return False, f"数据库已创建但连接失败: {str(e2)}"
+                else:
+                    return False, f"数据库不存在且自动创建失败: {create_error}"
+
         if "password" in error_msg.lower() or "authentication" in error_msg.lower():
             return False, f"Authentication failed: {error_msg}"
         elif "database" in error_msg.lower() and "does not exist" in error_msg.lower():

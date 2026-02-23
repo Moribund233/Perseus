@@ -313,3 +313,28 @@ pub async fn validate_app_config(
     let client = ApiClient::new()?;
     client.post("/api/app/config/validate", &config).await
 }
+
+// ==================== 数据库迁移 API ====================
+
+/// 执行迁移预检查
+pub async fn precheck_migration(target_url: &str) -> Result<crate::models::PrecheckResponse, String> {
+    let client = ApiClient::new()?;
+    let request = crate::models::PrecheckRequest {
+        target_url: target_url.to_string(),
+    };
+    client.post("/api/v1/migration/precheck", &request).await
+}
+
+/// 执行数据库迁移
+pub async fn execute_migration(
+    target_url: &str,
+    batch_size: Option<i32>,
+) -> Result<crate::models::MigrationResponse, String> {
+    let client = ApiClient::new()?;
+    let request = crate::models::MigrationRequest {
+        target_url: target_url.to_string(),
+        batch_size,
+        tables: None,
+    };
+    client.post("/api/v1/migration/execute", &request).await
+}

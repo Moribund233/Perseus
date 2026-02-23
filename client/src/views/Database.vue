@@ -4,9 +4,12 @@ import Card from '../components/Card.vue'
 import Button from '../components/Button.vue'
 import Alert from '../components/Alert.vue'
 import Modal from '../components/Modal.vue'
+import Progress from '../components/Progress.vue'
 import { useDatabaseStore, useServiceStore } from '../stores'
 import type { DatabaseType, DatabaseConfig } from '../services/databaseApi'
 import { switchDatabaseType, getDatabaseType, getDatabaseUrls } from '../services/api'
+import { switchDatabase, precheckMigration, type PrecheckResponse, type MigrationResponse } from '../services/migrationApi'
+import { useDatabaseConnection } from '../composables/useDatabaseConnection'
 
 /**
  * 数据库配置页面
@@ -16,6 +19,7 @@ import { switchDatabaseType, getDatabaseType, getDatabaseUrls } from '../service
 
 const dbStore = useDatabaseStore()
 const serviceStore = useServiceStore()
+const { checkConnection, checking } = useDatabaseConnection()
 
 // 确认弹窗状态
 const showConfirmModal = ref(false)
@@ -25,12 +29,27 @@ const showRestartAlert = ref(false)
 // URL 未配置提示
 const showUrlNotConfiguredAlert = ref(false)
 const urlNotConfiguredDbType = ref<DatabaseType | null>(null)
+// 切换进度弹窗
+const showProgressModal = ref(false)
+const progressMessage = ref('')
+const progressPercent = ref(0)
+const isSwitching = ref(false)
+// 切换结果提示
+const showResultAlert = ref(false)
+const resultType = ref<'success' | 'error'>('success')
+const resultMessage = ref('')
+// 预检查结果
+const precheckResult = ref<PrecheckResponse | null>(null)
+// 迁移结果
+const migrationResult = ref<MigrationResponse | null>(null)
 
 // 数据库 URL 缓存
 const databaseUrls = ref<Record<string, string>>({})
 
 // 从客户端配置读取的数据库类型
 const clientDbType = ref<DatabaseType>('sqlite')
+// 原始数据库类型（用于回滚）
+const originalDbType = ref<DatabaseType>('sqlite')
 // 是否正在加载客户端配置
 const isLoadingClientConfig = ref(true)
 
@@ -115,7 +134,7 @@ const isDatabaseUrlConfigured = (dbType: DatabaseType): boolean => {
 
 /**
  * 切换数据库类型
- * 纯客户端配置，直接更新 client.toml
+ * 完整的切换流程：预检查 -> 迁移（如需要）-> 更新配置
  */
 const handleDbTypeChange = async (newType: DatabaseType): Promise<void> => {
   if (newType === clientDbType.value) return
@@ -127,7 +146,15 @@ const handleDbTypeChange = async (newType: DatabaseType): Promise<void> => {
     return
   }
 
-  // 设置待处理类型并显示确认弹窗
+  // 检查服务是否运行
+  if (!serviceStore.isRunning) {
+    // 服务未运行时，仅更新客户端配置
+    pendingDbType.value = newType
+    showConfirmModal.value = true
+    return
+  }
+
+  // 服务运行时，执行完整的切换流程
   pendingDbType.value = newType
   showConfirmModal.value = true
 }
@@ -141,26 +168,137 @@ const closeUrlNotConfiguredAlert = (): void => {
 }
 
 /**
+ * 关闭结果提示
+ */
+const closeResultAlert = (): void => {
+  showResultAlert.value = false
+}
+
+/**
  * 确认切换数据库类型
- * 更新客户端配置中的数据库类型
+ * 完整的切换流程：预检查 -> 迁移（如需要）-> 更新配置
  */
 const confirmSwitch = async (): Promise<void> => {
-  if (pendingDbType.value) {
-    try {
-      // 更新客户端配置中的数据库类型
-      await switchDatabaseType(pendingDbType.value)
+  if (!pendingDbType.value) return
 
-      // 更新本地状态
+  // 保存原始数据库类型用于回滚
+  originalDbType.value = clientDbType.value
+
+  // 服务未运行时，仅更新客户端配置
+  if (!serviceStore.isRunning) {
+    try {
+      await switchDatabaseType(pendingDbType.value)
       clientDbType.value = pendingDbType.value
-      // 关闭确认弹窗
       showConfirmModal.value = false
-      // 显示重启提示
       showRestartAlert.value = true
-      // 清除待处理类型
       pendingDbType.value = null
     } catch (err) {
       console.error('切换数据库类型失败:', err)
+      resultType.value = 'error'
+      resultMessage.value = '切换失败: ' + String(err)
+      showResultAlert.value = true
     }
+    return
+  }
+
+  // 服务运行时，执行完整的切换流程
+  showConfirmModal.value = false
+  showProgressModal.value = true
+  isSwitching.value = true
+  progressMessage.value = '正在初始化...'
+  progressPercent.value = 10
+
+  try {
+    const targetUrl = databaseUrls.value[pendingDbType.value]
+
+    // 步骤1: 执行预检查
+    progressMessage.value = '正在执行预检查...'
+    progressPercent.value = 20
+
+    const precheck = await precheckMigration(targetUrl)
+    precheckResult.value = precheck
+
+    if (!precheck.passed) {
+      // 预检查未通过
+      const errors = precheck.errors.map(e => e.message).join('; ')
+      throw new Error('预检查未通过: ' + errors)
+    }
+
+    progressPercent.value = 40
+
+    // 步骤2: 检查是否需要迁移
+    if (precheck.is_synced) {
+      // 数据库已同步，无需迁移
+      progressMessage.value = '数据库已同步，正在更新配置...'
+      progressPercent.value = 80
+
+      // 更新客户端配置
+      await switchDatabaseType(pendingDbType.value)
+      clientDbType.value = pendingDbType.value
+
+      progressPercent.value = 100
+      progressMessage.value = '切换完成'
+
+      // 显示成功结果
+      setTimeout(() => {
+        showProgressModal.value = false
+        isSwitching.value = false
+        resultType.value = 'success'
+        resultMessage.value = '数据库已同步，切换成功。请重启服务以应用新的数据库配置。'
+        showResultAlert.value = true
+        showRestartAlert.value = true
+        pendingDbType.value = null
+      }, 500)
+      return
+    }
+
+    // 步骤3: 需要迁移，执行完整切换流程
+    progressMessage.value = '需要数据迁移，正在执行...'
+    progressPercent.value = 50
+
+    const result = await switchDatabase(pendingDbType.value, targetUrl)
+
+    if (result.success) {
+      // 切换成功
+      migrationResult.value = result.migration_result || null
+      clientDbType.value = pendingDbType.value
+
+      progressPercent.value = 100
+      progressMessage.value = '切换完成'
+
+      setTimeout(() => {
+        showProgressModal.value = false
+        isSwitching.value = false
+        resultType.value = 'success'
+        if (result.need_migration) {
+          const tables = result.migration_result?.tables_migrated || 0
+          const rows = result.migration_result?.total_rows_migrated || 0
+          resultMessage.value = `切换成功！已迁移 ${tables} 个表，${rows} 行数据。请重启服务以应用新的数据库配置。`
+        } else {
+          resultMessage.value = '数据库已同步，切换成功。请重启服务以应用新的数据库配置。'
+        }
+        showResultAlert.value = true
+        showRestartAlert.value = true
+        pendingDbType.value = null
+      }, 500)
+    } else {
+      // 切换失败，自动回滚
+      throw new Error(result.message)
+    }
+  } catch (err) {
+    console.error('数据库切换失败:', err)
+
+    // 关闭进度弹窗
+    showProgressModal.value = false
+    isSwitching.value = false
+
+    // 显示错误结果
+    resultType.value = 'error'
+    resultMessage.value = '切换失败: ' + String(err)
+    showResultAlert.value = true
+
+    // 清除待处理类型
+    pendingDbType.value = null
   }
 }
 
@@ -227,6 +365,11 @@ onMounted(async () => {
     <!-- 重启提示 - 数据库类型切换成功后显示 -->
     <Alert v-if="showRestartAlert" type="warning" closable @close="showRestartAlert = false" class="mb-lg">
       数据库类型已切换，请前往控制台重启应用以应用新的数据库配置
+    </Alert>
+
+    <!-- 切换结果提示 -->
+    <Alert v-if="showResultAlert" :type="resultType" closable @close="closeResultAlert" class="mb-lg">
+      {{ resultMessage }}
     </Alert>
 
     <!-- URL 未配置提示 -->
@@ -404,7 +547,7 @@ onMounted(async () => {
           <Button type="secondary" :icon="icons.refresh" @click="dbStore.loadConfig(true)" :disabled="!serviceStore.isRunning || dbStore.isLoading">
             刷新
           </Button>
-          <Button type="info" :loading="dbStore.isTesting" @click="dbStore.testConnection()" :disabled="!serviceStore.isRunning">
+          <Button type="info" :loading="checking" @click="checkConnection()" :disabled="!serviceStore.isRunning">
             测试连接
           </Button>
         </div>
@@ -424,13 +567,24 @@ onMounted(async () => {
       <p style="margin: 0; color: var(--text-primary);">
         您正在从 <strong>{{ currentDbTypeLabel }}</strong> 切换到 <strong>{{ pendingDbTypeLabel }}</strong>
       </p>
-      <p style="margin: var(--spacing-sm) 0 0; font-size: var(--font-size-sm); color: var(--text-secondary);">
-        切换后需要重启应用才能生效。
+      <p v-if="serviceStore.isRunning" style="margin: var(--spacing-sm) 0 0; font-size: var(--font-size-sm); color: var(--text-secondary);">
+        系统将自动执行预检查和数据迁移（如需要）。切换后需要重启应用才能生效。
+      </p>
+      <p v-else style="margin: var(--spacing-sm) 0 0; font-size: var(--font-size-sm); color: var(--text-secondary);">
+        服务未运行，将仅更新客户端配置。切换后需要重启应用才能生效。
       </p>
       <template #footer>
         <Button type="secondary" @click="cancelSwitch">取消</Button>
         <Button type="primary" @click="confirmSwitch">确认切换</Button>
       </template>
+    </Modal>
+
+    <!-- 切换进度弹窗 -->
+    <Modal v-model:visible="showProgressModal" title="正在切换数据库" :closable="false" width="400px">
+      <div class="progress-content">
+        <p class="progress-message">{{ progressMessage }}</p>
+        <Progress :percent="progressPercent" :show-text="true" />
+      </div>
     </Modal>
   </div>
 </template>
@@ -447,6 +601,18 @@ onMounted(async () => {
 .card-disabled .form-select,
 .card-disabled .form-checkbox input[type="checkbox"] {
   cursor: not-allowed;
+}
+
+/* 进度弹窗样式 */
+.progress-content {
+  padding: var(--spacing-md) 0;
+}
+
+.progress-message {
+  margin: 0 0 var(--spacing-md);
+  color: var(--text-primary);
+  font-size: var(--font-size-md);
+  text-align: center;
 }
 
 @media (max-width: 768px) {

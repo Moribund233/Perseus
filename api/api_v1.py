@@ -43,6 +43,9 @@ api_v1_router.include_router(pull_request_router)
 from controller.issue_controller import router as issue_router
 api_v1_router.include_router(issue_router)
 
+from controller.migration_controller import router as migration_router
+api_v1_router.include_router(migration_router)
+
 # Debug 路由（仅在调试模式下可用）
 from controller.debug_controller import router as debug_router
 api_v1_router.include_router(debug_router)
