@@ -95,15 +95,6 @@ pub fn run() {
             commands::update_debug_mode,
             commands::reset_all_tokens,
             commands::get_jwt_secret_key,
-            // 数据库迁移
-            commands::migrate_database,
-            commands::test_database_connection,
-            commands::check_database,
-            // 迁移管理
-            commands::set_pending_migration,
-            commands::clear_pending_migration,
-            commands::record_migration_failed,
-            commands::clear_migration_failed,
             // 数据库安装检测
             commands::check_installed_databases,
             // 数据库连接测试（客户端本地）
@@ -117,7 +108,6 @@ pub fn run() {
             commands::get_database_type,
             commands::switch_database_type,
             commands::update_database_url,
-            commands::get_database_status_from_api,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

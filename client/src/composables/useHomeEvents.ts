@@ -118,14 +118,6 @@ export interface HomeEvents {
   'warning:show': string
   /** 清除警告消息 */
   'warning:clear': void
-  /** 需要数据库迁移 */
-  'migration:required': { sourceType: 'sqlite' | 'postgresql' | 'mysql'; targetType: 'sqlite' | 'postgresql' | 'mysql'; sourceUrl: string; targetUrl: string }
-  /** 数据库迁移完成 */
-  'migration:complete': { success: boolean }
-  /** 显示迁移进度弹窗 */
-  'migration:show': { sourceType: 'sqlite' | 'postgresql' | 'mysql'; targetType: 'sqlite' | 'postgresql' | 'mysql'; sourceUrl: string; targetUrl: string }
-  /** 关闭迁移进度弹窗 */
-  'migration:close': void
 }
 
 /**

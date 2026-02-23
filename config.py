@@ -113,40 +113,6 @@ class DatabaseSettings(BaseSettings):
     is_stress_test: bool = Field(
         description="是否启用压力测试模式，必须通过环境变量 LANGIT_STRESS_TEST 注入"
     )
-    
-    # 服务端记录的数据库类型（由服务端维护，用于迁移检测）
-    current_db_type: Optional[str] = Field(
-        default=None,
-        description="服务端记录的上次实际数据库类型，用于检测类型变更和迁移"
-    )
-
-    # 服务端记录的数据库 URL 哈希（用于检测同一类型不同数据库）
-    current_db_url_hash: Optional[str] = Field(
-        default=None,
-        description="服务端记录的数据库 URL 哈希值，用于检测同一类型不同数据库"
-    )
-
-    # 待迁移的目标类型（客户端已确认但未执行）
-    pending_db_type: Optional[str] = Field(
-        default=None,
-        description="待迁移的目标数据库类型，客户端已确认但未执行迁移"
-    )
-
-    # 迁移失败记录
-    last_migration_failed: bool = Field(
-        default=False,
-        description="上次迁移是否失败"
-    )
-
-    failed_target_type: Optional[str] = Field(
-        default=None,
-        description="上次迁移失败的目标类型"
-    )
-
-    failed_at: Optional[str] = Field(
-        default=None,
-        description="上次迁移失败的时间戳"
-    )
 
     # 可写入配置文件的配置项
     pool_size: int = Field(default=20, ge=1, description="连接池大小（增加以支持高并发）")

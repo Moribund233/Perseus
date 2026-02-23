@@ -2,25 +2,16 @@
  * 数据库配置管理 Store
  *
  * 使用 Pinia 管理数据库配置状态，避免频繁访问配置接口
- * 提供配置的获取、更新、测试连接等功能
+ * 提供配置的获取、更新等功能
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import {
   getDatabaseConfig,
   updateDatabaseConfig,
-  testDatabaseConnection,
-  getDatabaseStatus,
-  getDatabaseStatusFromApi,
-  migrateDatabase,
   type DatabaseConfig,
-  type DatabaseType,
-  type DatabaseStatus,
-  type ConnectionTestResult,
-  type DatabaseStatusResponse,
-  type MigrationParams
+  type DatabaseType
 } from '../services/databaseApi'
-import { getDatabaseUrl } from '../services/api'
 
 /**
  * 数据库类型选项
@@ -39,14 +30,9 @@ export const useDatabaseStore = defineStore('database', () => {
   const editingConfig = ref<DatabaseConfig | null>(null)
   const isLoading = ref(false)
   const isSaving = ref(false)
-  const isTesting = ref(false)
   const error = ref<string | null>(null)
   const successMessage = ref<string | null>(null)
-  const connectionTested = ref(false)
-  const connectionSuccess = ref(false)
-  const connectionMessage = ref('')
   const lastLoadTime = ref(0)
-  const dbStatus = ref<DatabaseStatus | null>(null)
 
   // ============ Getters ============
 
@@ -133,7 +119,6 @@ export const useDatabaseStore = defineStore('database', () => {
       serverConfig.value = JSON.parse(JSON.stringify(data))
       editingConfig.value = JSON.parse(JSON.stringify(data))
       lastLoadTime.value = Date.now()
-      connectionTested.value = false
       return true
     } catch (err: any) {
       // 检查是否是连接错误（服务端未启动）
@@ -167,7 +152,6 @@ export const useDatabaseStore = defineStore('database', () => {
       await updateDatabaseConfig(editingConfig.value)
       serverConfig.value = JSON.parse(JSON.stringify(editingConfig.value))
       successMessage.value = '配置保存成功，重启服务后生效'
-      connectionTested.value = false
       return true
     } catch (err) {
       error.value = '保存配置失败'
@@ -175,44 +159,6 @@ export const useDatabaseStore = defineStore('database', () => {
       return false
     } finally {
       isSaving.value = false
-    }
-  }
-
-  /**
-   * 测试数据库连接
-   */
-  async function testConnection(): Promise<ConnectionTestResult> {
-    if (!editingConfig.value) {
-      return { success: false, message: '配置未加载' }
-    }
-
-    isTesting.value = true
-    connectionTested.value = false
-    error.value = null
-    successMessage.value = null
-
-    try {
-      const result = await testDatabaseConnection(editingConfig.value)
-      connectionTested.value = true
-      connectionSuccess.value = result.success
-      connectionMessage.value = result.message
-
-      if (result.success) {
-        successMessage.value = '连接测试成功'
-      } else {
-        error.value = result.message
-      }
-
-      return result
-    } catch (err) {
-      connectionTested.value = true
-      connectionSuccess.value = false
-      connectionMessage.value = '连接测试失败'
-      error.value = '连接测试失败'
-      console.error('连接测试失败:', err)
-      return { success: false, message: '连接测试失败' }
-    } finally {
-      isTesting.value = false
     }
   }
 
@@ -238,7 +184,6 @@ export const useDatabaseStore = defineStore('database', () => {
     if (serverConfig.value) {
       editingConfig.value = JSON.parse(JSON.stringify(serverConfig.value))
       successMessage.value = '配置已重置'
-      connectionTested.value = false
     }
   }
 
@@ -251,77 +196,6 @@ export const useDatabaseStore = defineStore('database', () => {
   }
 
   /**
-   * 获取数据库状态
-   */
-  async function refreshStatus(): Promise<DatabaseStatus | null> {
-    try {
-      const status = await getDatabaseStatus()
-      dbStatus.value = status
-      return status
-    } catch (err) {
-      console.error('获取数据库状态失败:', err)
-      return null
-    }
-  }
-
-  /**
-   * 从服务端 API 获取数据库状态（用于迁移检测）
-   */
-  async function checkMigrationStatus(): Promise<DatabaseStatusResponse | null> {
-    try {
-      const status = await getDatabaseStatusFromApi()
-      return status
-    } catch (err) {
-      console.error('获取迁移状态失败:', err)
-      return null
-    }
-  }
-
-  /**
-   * 执行数据库迁移
-   * @param sourceType 源数据库类型
-   * @param targetType 目标数据库类型
-   */
-  async function executeMigration(sourceType: DatabaseType, targetType: DatabaseType): Promise<{ success: boolean; message: string }> {
-    try {
-      // 从加密配置获取源和目标数据库 URL
-      const [sourceUrl, targetUrl] = await Promise.all([
-        getDatabaseUrl(sourceType),
-        getDatabaseUrl(targetType)
-      ])
-
-      const params: MigrationParams = {
-        source_type: sourceType,
-        target_type: targetType,
-        source_url: sourceUrl,
-        target_url: targetUrl
-      }
-
-      const result = await migrateDatabase(params)
-      
-      if (result.success) {
-        // 迁移成功，更新本地配置
-        if (editingConfig.value) {
-          editingConfig.value.db_type = targetType
-        }
-        successMessage.value = '数据库迁移成功'
-      } else {
-        error.value = result.message || '迁移失败'
-      }
-
-      return {
-        success: result.success,
-        message: result.message
-      }
-    } catch (err: any) {
-      const message = err?.message || '迁移过程中发生错误'
-      error.value = message
-      console.error('执行迁移失败:', err)
-      return { success: false, message }
-    }
-  }
-
-  /**
    * 重置状态
    */
   function reset(): void {
@@ -329,14 +203,9 @@ export const useDatabaseStore = defineStore('database', () => {
     editingConfig.value = null
     isLoading.value = false
     isSaving.value = false
-    isTesting.value = false
     error.value = null
     successMessage.value = null
-    connectionTested.value = false
-    connectionSuccess.value = false
-    connectionMessage.value = ''
     lastLoadTime.value = 0
-    dbStatus.value = null
   }
 
   return {
@@ -345,14 +214,9 @@ export const useDatabaseStore = defineStore('database', () => {
     editingConfig,
     isLoading,
     isSaving,
-    isTesting,
     error,
     successMessage,
-    connectionTested,
-    connectionSuccess,
-    connectionMessage,
     lastLoadTime,
-    dbStatus,
     // Getters
     currentDbType,
     currentDbTypeLabel,
@@ -363,13 +227,9 @@ export const useDatabaseStore = defineStore('database', () => {
     // Actions
     loadConfig,
     saveConfig,
-    testConnection,
     switchDbType,
     resetConfig,
     clearMessages,
-    refreshStatus,
-    checkMigrationStatus,
-    executeMigration,
     reset
   }
 })

@@ -6,7 +6,6 @@ import Alert from '../components/Alert.vue'
 import Modal from '../components/Modal.vue'
 import { useDatabaseStore, useServiceStore } from '../stores'
 import type { DatabaseType, DatabaseConfig } from '../services/databaseApi'
-import { setPendingMigration, clearMigrationFailed } from '../services/databaseApi'
 import { switchDatabaseType, getDatabaseType, getDatabaseUrls } from '../services/api'
 
 /**
@@ -143,28 +142,13 @@ const closeUrlNotConfiguredAlert = (): void => {
 
 /**
  * 确认切换数据库类型
- * 1. 更新客户端配置
- * 2. 通知服务端设置 pending_db_type
- * 3. 清除之前的迁移失败记录（如果有）
- * 实际迁移在应用重启后由 Home 页处理
+ * 更新客户端配置中的数据库类型
  */
 const confirmSwitch = async (): Promise<void> => {
   if (pendingDbType.value) {
     try {
-      // 1. 更新客户端配置中的数据库类型
+      // 更新客户端配置中的数据库类型
       await switchDatabaseType(pendingDbType.value)
-
-      // 2. 通知服务端设置 pending_db_type（如果服务正在运行）
-      if (serviceStore.isRunning) {
-        try {
-          await setPendingMigration(pendingDbType.value)
-          // 清除之前的迁移失败记录
-          await clearMigrationFailed()
-        } catch (err) {
-          console.error('通知服务端设置 pending 状态失败:', err)
-          // 不影响主流程，继续执行
-        }
-      }
 
       // 更新本地状态
       clientDbType.value = pendingDbType.value
@@ -224,7 +208,7 @@ onMounted(async () => {
         <h1>数据库配置</h1>
       </div>
       <p class="header-description">
-        配置数据库连接参数，切换数据库类型时需要迁移数据
+        配置数据库连接参数，支持 SQLite、PostgreSQL、MySQL 多种数据库类型
       </p>
     </div>
 
@@ -242,7 +226,7 @@ onMounted(async () => {
     </Alert>
     <!-- 重启提示 - 数据库类型切换成功后显示 -->
     <Alert v-if="showRestartAlert" type="warning" closable @close="showRestartAlert = false" class="mb-lg">
-      数据库类型已切换，请前往控制台重启应用以完成数据迁移
+      数据库类型已切换，请前往控制台重启应用以应用新的数据库配置
     </Alert>
 
     <!-- URL 未配置提示 -->
@@ -441,7 +425,7 @@ onMounted(async () => {
         您正在从 <strong>{{ currentDbTypeLabel }}</strong> 切换到 <strong>{{ pendingDbTypeLabel }}</strong>
       </p>
       <p style="margin: var(--spacing-sm) 0 0; font-size: var(--font-size-sm); color: var(--text-secondary);">
-        切换后需要重启应用才能生效，重启时将自动进行数据迁移。
+        切换后需要重启应用才能生效。
       </p>
       <template #footer>
         <Button type="secondary" @click="cancelSwitch">取消</Button>
