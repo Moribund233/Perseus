@@ -321,7 +321,7 @@ class DatabaseSettings(BaseSettings):
             return False, f"URL 编码错误: {str(e)}"
         
         url_lower = url.lower()
-        valid_prefixes = ("sqlite://", "postgresql://", "postgres://", "mysql://", "mysql+pymysql://")
+        valid_prefixes = ("sqlite://", "postgresql://", "postgres://", "mysql://", "mysql+pymysql://", "postgresql+psycopg2://")
         if not any(url_lower.startswith(prefix) for prefix in valid_prefixes):
             return False, f"不支持的协议类型"
         
@@ -338,7 +338,8 @@ class DatabaseSettings(BaseSettings):
             test_url = url
             if url_lower.startswith("mysql://"):
                 test_url = url.replace("mysql://", "mysql+pymysql://", 1)
-            elif url_lower.startswith("postgresql://"):
+            elif url_lower.startswith("postgresql://") and not url_lower.startswith("postgresql+psycopg2://"):
+                # 如果已经是 postgresql+psycopg2:// 格式，不需要转换
                 test_url = url.replace("postgresql://", "postgresql+pg8000://", 1)
             
             # 创建引擎并测试连接

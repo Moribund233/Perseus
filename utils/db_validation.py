@@ -29,37 +29,44 @@ class DatabaseConnectionError(DatabaseValidationError):
     pass
 
 
-def check_driver_installed(db_type: str) -> Tuple[bool, Optional[str]]:
+def check_driver_installed(db_type: str, url: str = None) -> Tuple[bool, Optional[str]]:
     """
     Check if the database driver is installed
     
     Args:
         db_type: Database type (sqlite, postgresql, mysql)
+        url: Database URL (optional,用于检测具体的驱动类型)
         
     Returns:
         Tuple[bool, Optional[str]]: (is_installed, error_message)
     """
-    driver_modules = {
-        "sqlite": ("sqlite3", "SQLite support is built into Python"),
-        "postgresql": ("pg8000", "Please install: pip install pg8000"),
-        "mysql": ("pymysql", "Please install: pip install pymysql cryptography"),
-    }
-    
-    if db_type not in driver_modules:
-        return False, f"Unknown database type: {db_type}"
-    
-    module_name, install_hint = driver_modules[db_type]
-    
     # SQLite is built into Python
     if db_type == "sqlite":
         return True, None
     
-    # Check if module is available
-    spec = importlib.util.find_spec(module_name)
-    if spec is None:
-        return False, f"Driver '{module_name}' not installed. {install_hint}"
+    # PostgreSQL: 支持 pg8000 或 psycopg2
+    if db_type == "postgresql":
+        # 检查 URL 中是否指定了 psycopg2
+        if url and "psycopg2" in url.lower():
+            spec = importlib.util.find_spec("psycopg2")
+            if spec is None:
+                return False, "Driver 'psycopg2' not installed. Please install: pip install psycopg2-binary"
+            return True, None
+        else:
+            # 默认检查 pg8000
+            spec = importlib.util.find_spec("pg8000")
+            if spec is None:
+                return False, "Driver 'pg8000' not installed. Please install: pip install pg8000"
+            return True, None
     
-    return True, None
+    # MySQL: 支持 pymysql
+    if db_type == "mysql":
+        spec = importlib.util.find_spec("pymysql")
+        if spec is None:
+            return False, "Driver 'pymysql' not installed. Please install: pip install pymysql cryptography"
+        return True, None
+    
+    return False, f"Unknown database type: {db_type}"
 
 
 def validate_database_url(url: str) -> Tuple[bool, Optional[str]]:
@@ -82,7 +89,7 @@ def validate_database_url(url: str) -> Tuple[bool, Optional[str]]:
             return False, "Database URL missing scheme (e.g., sqlite://, postgresql://)"
         
         # Check supported schemes
-        supported_schemes = ["sqlite", "postgresql", "postgres", "mysql", "mysql+pymysql"]
+        supported_schemes = ["sqlite", "postgresql", "postgres", "mysql", "mysql+pymysql", "postgresql+psycopg2"]
         scheme = parsed.scheme.lower()
         
         if scheme not in supported_schemes:
@@ -190,7 +197,7 @@ def validate_database_config(url: str, db_type: str) -> bool:
         return False
     
     # 2. Check driver installation
-    is_installed, error = check_driver_installed(db_type)
+    is_installed, error = check_driver_installed(db_type, url)
     if not is_installed:
         logger.warning(f"Database driver not found: {error}")
         return False

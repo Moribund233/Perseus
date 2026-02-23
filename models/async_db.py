@@ -41,10 +41,19 @@ def _get_async_url(sync_url: str) -> str:
     if url_lower.startswith("sqlite"):
         # SQLite: sqlite:///path -> sqlite+aiosqlite:///path
         return sync_url.replace("sqlite://", "sqlite+aiosqlite://", 1)
-    elif url_lower.startswith("postgresql"):
+    elif url_lower.startswith("postgresql+psycopg2://"):
+        # PostgreSQL with psycopg2: postgresql+psycopg2:// -> postgresql+asyncpg://
+        return sync_url.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
+    elif url_lower.startswith("postgresql+pg8000://"):
+        # PostgreSQL with pg8000: postgresql+pg8000:// -> postgresql+asyncpg://
+        return sync_url.replace("postgresql+pg8000://", "postgresql+asyncpg://", 1)
+    elif url_lower.startswith("postgresql://"):
         # PostgreSQL: postgresql:// -> postgresql+asyncpg://
         return sync_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    elif url_lower.startswith("mysql"):
+    elif url_lower.startswith("mysql+pymysql://"):
+        # MySQL with pymysql: mysql+pymysql:// -> mysql+aiomysql://
+        return sync_url.replace("mysql+pymysql://", "mysql+aiomysql://", 1)
+    elif url_lower.startswith("mysql://"):
         # MySQL: mysql:// -> mysql+aiomysql://
         return sync_url.replace("mysql://", "mysql+aiomysql://", 1)
     else:

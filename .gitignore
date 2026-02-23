@@ -126,7 +126,7 @@ dmypy.json
 poetry.lock
 
 # Auto create file
-config.toml
+config.toml*
 
 # IDEs
 .vscode/
