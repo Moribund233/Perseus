@@ -447,7 +447,7 @@ pub fn get_nginx_platform_info() -> Result<crate::models::NginxPlatformInfo, Str
 
 // ==================== 引导页面命令 ====================
 
-/// 检查服务端路径
+/// 检查服务端路径是否已配置
 #[tauri::command]
 pub fn check_server_path() -> Result<crate::models::ServerCheckResult, String> {
     use crate::process_manager::get_server_exe_path;
@@ -459,7 +459,7 @@ pub fn check_server_path() -> Result<crate::models::ServerCheckResult, String> {
                 found: true,
                 path: Some(path_str),
                 version: None,
-                auto_detected: true,
+                auto_detected: false,
             })
         }
         Err(_) => Ok(crate::models::ServerCheckResult {
@@ -481,7 +481,6 @@ pub fn validate_and_save_server_path(
 
     let path_obj = Path::new(&path);
 
-    // 检查文件是否存在
     if !path_obj.exists() {
         return Ok(crate::models::ServerCheckResult {
             found: false,
@@ -491,7 +490,6 @@ pub fn validate_and_save_server_path(
         });
     }
 
-    // 检查文件名是否包含 langit-server
     let file_name = path_obj.file_name().and_then(|n| n.to_str()).unwrap_or("");
     if !file_name.contains("langit-server") {
         return Ok(crate::models::ServerCheckResult {
@@ -502,7 +500,6 @@ pub fn validate_and_save_server_path(
         });
     }
 
-    // 保存到配置
     let mut client_config = config::load_config()?;
     client_config.server.path.custom_path = Some(path.clone());
     config::save_config(&client_config)?;

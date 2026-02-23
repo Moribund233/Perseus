@@ -17,7 +17,8 @@ from fastapi import APIRouter, Depends, Query, Body
 from pydantic import BaseModel, Field
 
 from config import get_config
-from services.app_service import get_app_service, AppService
+from services.app_service import get_app_service
+from services.config_service import get_config_service
 from api.dependencies import get_current_user
 from api.local_auth import get_local_auth_user, LocalUser
 from exception import AuthorizationException
@@ -170,8 +171,8 @@ async def get_config_endpoint(
     Returns:
         ConfigResponse: 配置数据
     """
-    app_service = get_app_service()
-    config_data = app_service.get_config(section)
+    config_service = get_config_service()
+    config_data = config_service.get_config(section)
 
     return ConfigResponse(
         success=True,
@@ -195,9 +196,9 @@ async def update_config_endpoint(
         ConfigResponse: 更新结果（包含重启提示）
     """
     is_debug, is_admin = permission
-    app_service = get_app_service()
+    config_service = get_config_service()
 
-    success, errors, hints = app_service.update_config(
+    success, errors, hints = config_service.update_config(
         request.config,
         is_debug=is_debug,
         is_admin=is_admin
@@ -221,9 +222,9 @@ async def reset_config_endpoint(
         ConfigResponse: 重置结果
     """
     is_debug, is_admin = permission
-    app_service = get_app_service()
+    config_service = get_config_service()
 
-    success, errors = app_service.reset_config(
+    success, errors = config_service.reset_config(
         is_debug=is_debug,
         is_admin=is_admin
     )
@@ -248,8 +249,8 @@ async def validate_config_endpoint(
     Returns:
         ConfigResponse: 验证结果
     """
-    app_service = get_app_service()
-    is_valid, errors = app_service.validate_config(config_data)
+    config_service = get_config_service()
+    is_valid, errors = config_service.validate_config(config_data)
 
     return ConfigResponse(
         success=is_valid,

@@ -63,35 +63,43 @@ class RateLimitConfig:
     速率限制配置类
 
     提供常用的速率限制配置，从配置文件读取或使用默认值
-    支持类属性访问和实例属性访问
+    返回逗号分隔的字符串格式，兼容 slowapi
     """
 
-    # 类属性默认值
-    STRICT = ["5 per minute", "20 per hour"]
-    STANDARD = ["30 per minute", "500 per hour"]
-    GENEROUS = ["100 per minute", "2000 per hour"]
-    GIT_OPERATIONS = ["10 per minute", "100 per hour"]
-    DOWNLOAD = ["20 per minute", "200 per hour"]
+    STRICT = "5 per minute, 20 per hour"
+    STANDARD = "30 per minute, 500 per hour"
+    GENEROUS = "100 per minute, 2000 per hour"
+    GIT_OPERATIONS = "10 per minute, 100 per hour"
+    DOWNLOAD = "20 per minute, 200 per hour"
 
     def __init__(self):
         """初始化，从配置读取或使用默认值"""
         _config = get_config()
         _rate_limit_config = getattr(_config, 'rate_limit', None)
 
-        # 严格限制 - 用于敏感操作（登录、认证等）
-        self.STRICT = getattr(_rate_limit_config, 'strict', ["5 per minute", "20 per hour"]) if _rate_limit_config else ["5 per minute", "20 per hour"]
+        if _rate_limit_config:
+            self.STRICT = self._format_limit(getattr(_rate_limit_config, 'strict', ["5 per minute", "20 per hour"]))
+            self.STANDARD = self._format_limit(getattr(_rate_limit_config, 'standard', ["30 per minute", "500 per hour"]))
+            self.GENEROUS = self._format_limit(getattr(_rate_limit_config, 'generous', ["100 per minute", "2000 per hour"]))
+            self.GIT_OPERATIONS = self._format_limit(getattr(_rate_limit_config, 'git_operations', ["10 per minute", "100 per hour"]))
+            self.DOWNLOAD = self._format_limit(getattr(_rate_limit_config, 'download', ["20 per minute", "200 per hour"]))
 
-        # 标准限制 - 用于普通 API
-        self.STANDARD = getattr(_rate_limit_config, 'standard', ["30 per minute", "500 per hour"]) if _rate_limit_config else ["30 per minute", "500 per hour"]
-
-        # 宽松限制 - 用于读取操作
-        self.GENEROUS = getattr(_rate_limit_config, 'generous', ["100 per minute", "2000 per hour"]) if _rate_limit_config else ["100 per minute", "2000 per hour"]
-
-        # Git 操作限制 - 用于 Git HTTP 端点
-        self.GIT_OPERATIONS = getattr(_rate_limit_config, 'git_operations', ["10 per minute", "100 per hour"]) if _rate_limit_config else ["10 per minute", "100 per hour"]
-
-        # 下载限制 - 用于文件下载
-        self.DOWNLOAD = getattr(_rate_limit_config, 'download', ["20 per minute", "200 per hour"]) if _rate_limit_config else ["20 per minute", "200 per hour"]
+    @staticmethod
+    def _format_limit(limits) -> str:
+        """
+        将限制配置格式化为 slowapi 兼容的字符串
+        
+        Args:
+            limits: 列表或字符串
+            
+        Returns:
+            str: 逗号分隔的限制字符串
+        """
+        if isinstance(limits, str):
+            return limits
+        if isinstance(limits, list):
+            return ", ".join(limits)
+        return str(limits)
 
 
 # 创建单例实例

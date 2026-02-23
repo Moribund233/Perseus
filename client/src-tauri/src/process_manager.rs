@@ -17,11 +17,6 @@ static SERVER_PID: Lazy<Mutex<Option<u32>>> = Lazy::new(|| Mutex::new(None));
 /// 全局 System 实例，用于持续监控
 pub static SYSTEM: Lazy<Mutex<System>> = Lazy::new(|| Mutex::new(System::new_all()));
 
-/// 默认服务端可执行文件名（向后兼容）
-pub const DEFAULT_SERVER_EXE_NAME: &str = "langit-server.exe";
-/// 默认服务端目录名（向后兼容）
-pub const DEFAULT_SERVER_DIR_NAME: &str = "langit-server";
-
 /// 获取服务端路径配置
 fn get_server_path_config() -> crate::models::ServerPathConfig {
     config::load_config()
@@ -32,10 +27,8 @@ fn get_server_path_config() -> crate::models::ServerPathConfig {
 /// 获取服务端可执行文件路径
 ///
 /// 查找顺序：
-/// 1. 自定义路径（如果配置了）
-/// 2. server/<dir_name>/<exe_name>（生产环境 - PyInstaller 目录模式）
-/// 3. 当前目录/<exe_name>（开发环境备用）
-/// 4. 项目结构推断（开发模式）
+/// 1. 自定义路径（用户手动选择）
+/// 2. server/<dir_name>/<exe_name>（默认位置）
 pub fn get_server_exe_path() -> Result<std::path::PathBuf, String> {
     let path_config = get_server_path_config();
 
@@ -45,7 +38,7 @@ pub fn get_server_exe_path() -> Result<std::path::PathBuf, String> {
         if custom_path.exists() {
             return Ok(custom_path);
         }
-        log::warn!("配置的自定义服务端路径不存在: {}", custom);
+        return Err(format!("配置的服务端路径不存在: {}", custom));
     }
 
     let exe_name = &path_config.exe_name;
@@ -57,44 +50,15 @@ pub fn get_server_exe_path() -> Result<std::path::PathBuf, String> {
 
     let current_dir = current_exe.parent().ok_or("无法获取当前目录")?;
 
-    // 2. 检查 server/<dir_name>/<exe_name>（生产环境 - PyInstaller 目录模式）
+    // 2. 检查 server/<dir_name>/<exe_name>（默认位置）
     let server_path = current_dir.join("server").join(dir_name).join(exe_name);
     if server_path.exists() {
         return Ok(server_path);
     }
 
-    // 3. 检查当前目录（开发环境备用）
-    let direct_path = current_dir.join(exe_name);
-    if direct_path.exists() {
-        return Ok(direct_path);
-    }
-
-    // 4. 在开发模式下，尝试从项目结构推断路径
-    // current_exe 可能是 target/debug/xxx.exe，需要向上查找
-    let mut search_dir = Some(current_dir);
-    while let Some(dir) = search_dir {
-        // 检查 client/server/<dir_name>/<exe_name>
-        let client_server_path = dir
-            .join("client")
-            .join("server")
-            .join(dir_name)
-            .join(exe_name);
-        if client_server_path.exists() {
-            return Ok(client_server_path);
-        }
-
-        // 检查 server/<dir_name>/<exe_name>
-        let sibling_server_path = dir.join("server").join(dir_name).join(exe_name);
-        if sibling_server_path.exists() {
-            return Ok(sibling_server_path);
-        }
-
-        search_dir = dir.parent();
-    }
-
     Err(format!(
-        "找不到服务端可执行文件: {}。请确保服务端已打包并放置在 client/server/{}/ 目录下，或在配置中设置自定义路径",
-        exe_name, dir_name
+        "未配置服务端路径。请在设置中选择服务端可执行文件，或将服务端放置在 {} 目录下",
+        server_path.display()
     ))
 }
 

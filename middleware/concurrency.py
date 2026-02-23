@@ -90,11 +90,6 @@ class ConcurrencyMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.limiter = ConcurrencyLimiter(max_concurrent)
         self.max_wait_time = max_wait_time
-        logger.info(
-            f"并发限制中间件已初始化: "
-            f"max_concurrent={max_concurrent}, "
-            f"max_wait_time={max_wait_time}s"
-        )
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """

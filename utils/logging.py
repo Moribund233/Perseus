@@ -8,7 +8,7 @@
 - 多文件分离：app.log (INFO及以下), error.log (WARNING及以上), audit.log (审计日志)
 - 按日期分目录存储
 - 保留文件日志（用于持久化）
-- WebSocket 实时推送
+- WebSocket 实时推送（所有日志自动继承）
 - 内存缓冲区（用于快速查询历史日志）
 """
 import logging
@@ -18,7 +18,6 @@ from typing import Optional, Dict, List
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
 
-# WebSocket handler 延迟导入，避免循环依赖
 _websocket_handler = None
 
 
@@ -41,6 +40,8 @@ class LogManager:
     - audit.log: 审计日志（单独记录）
 
     按日期分目录存储：logs/YYYY-MM-DD/
+
+    所有日志器自动继承根日志器的处理器，确保 WebSocket 能接收所有日志
     """
 
     DEFAULT_LOG_DIR = "logs"
@@ -59,27 +60,13 @@ class LogManager:
         log_dir: str = DEFAULT_LOG_DIR,
         app_name: str = "langit",
         level: str = "info",
-        max_bytes: int = 10 * 1024 * 1024,  # 10MB
+        max_bytes: int = 10 * 1024 * 1024,
         backup_count: int = 5,
         console_output: bool = True,
         websocket_output: bool = True,
-        separate_error_log: bool = True,  # 是否分离 error.log
-        use_date_directory: bool = True,  # 是否按日期分目录
+        separate_error_log: bool = True,
+        use_date_directory: bool = True,
     ):
-        """
-        初始化日志管理器
-
-        Args:
-            log_dir: 日志根目录
-            app_name: 应用名称
-            level: 日志级别
-            max_bytes: 单个日志文件最大大小
-            backup_count: 备份文件数量
-            console_output: 是否输出到控制台
-            websocket_output: 是否通过 WebSocket 实时推送
-            separate_error_log: 是否将错误日志分离到单独文件
-            use_date_directory: 是否按日期分目录存储
-        """
         self.log_dir = Path(log_dir)
         self.app_name = app_name
         self.level = self.LEVEL_MAP.get(level.lower(), logging.INFO)
@@ -90,7 +77,7 @@ class LogManager:
         self.separate_error_log = separate_error_log
         self.use_date_directory = use_date_directory
 
-        self._logger: Optional[logging.Logger] = None
+        self._initialized = False
 
     def _get_log_dir(self) -> Path:
         """获取日志目录（支持按日期分目录）"""
@@ -141,7 +128,6 @@ class LogManager:
     def _create_app_handler(self) -> RotatingFileHandler:
         """创建 app.log 处理器"""
         handler = self._create_file_handler(f"{self.app_name}.log", logging.DEBUG)
-        # 如果启用错误日志分离，添加过滤器只记录 INFO 及以下级别
         if self.separate_error_log:
             handler.addFilter(lambda record: record.levelno <= logging.INFO)
         return handler
@@ -151,6 +137,35 @@ class LogManager:
         handler = self._create_file_handler("error.log", logging.WARNING)
         return handler
 
+    def setup_root_logger(self) -> None:
+        """
+        配置根日志器
+
+        在根日志器上配置处理器，所有子日志器自动继承
+        这确保 WebSocket 能接收所有模块的日志
+        """
+        if self._initialized:
+            return
+
+        root_logger = logging.getLogger()
+        root_logger.setLevel(self.level)
+
+        if not root_logger.handlers:
+            root_logger.addHandler(self._create_app_handler())
+
+            if self.separate_error_log:
+                root_logger.addHandler(self._create_error_handler())
+
+            if self.console_output:
+                root_logger.addHandler(self._create_console_handler())
+
+            if self.websocket_output:
+                ws_handler = _get_websocket_log_handler()
+                ws_handler.setLevel(self.level)
+                root_logger.addHandler(ws_handler)
+
+        self._initialized = True
+
     def get_logger(self, name: Optional[str] = None) -> logging.Logger:
         """
         获取日志记录器
@@ -159,32 +174,16 @@ class LogManager:
             name: 日志记录器名称
 
         Returns:
-            logging.Logger: 配置好的日志记录器
+            logging.Logger: 日志记录器（继承根日志器的处理器）
         """
+        self.setup_root_logger()
+
         if name is None:
             name = self.app_name
 
         logger = logging.getLogger(name)
         logger.setLevel(self.level)
-
-        # 避免重复添加处理器
-        if not logger.handlers:
-            # 添加 app.log 处理器
-            logger.addHandler(self._create_app_handler())
-
-            # 添加 error.log 处理器（如果启用）
-            if self.separate_error_log:
-                logger.addHandler(self._create_error_handler())
-
-            # 添加控制台处理器
-            if self.console_output:
-                logger.addHandler(self._create_console_handler())
-
-            # 添加 WebSocket 处理器（实时推送）
-            if self.websocket_output:
-                ws_handler = _get_websocket_log_handler()
-                ws_handler.setLevel(self.level)
-                logger.addHandler(ws_handler)
+        logger.propagate = True
 
         return logger
 
@@ -198,17 +197,17 @@ class LogManager:
 
         审计日志单独存储在 audit.log 中
         """
+        self.setup_root_logger()
+
         logger = logging.getLogger(f"{self.app_name}.audit")
         logger.setLevel(logging.INFO)
+        logger.propagate = False
 
-        # 审计日志只添加一次处理器
         if not logger.handlers:
-            # 创建 audit.log 处理器
             handler = self._create_file_handler("audit.log", logging.INFO)
             handler.setFormatter(self._create_formatter())
             logger.addHandler(handler)
 
-            # 可选：同时输出到控制台
             if self.console_output:
                 console_handler = logging.StreamHandler(sys.stdout)
                 console_handler.setFormatter(
@@ -216,7 +215,6 @@ class LogManager:
                 )
                 logger.addHandler(console_handler)
 
-            # 添加 WebSocket 处理器（实时推送）
             if self.websocket_output:
                 ws_handler = _get_websocket_log_handler()
                 ws_handler.setLevel(logging.INFO)
@@ -224,8 +222,6 @@ class LogManager:
 
         return logger
 
-
-# ==================== 便捷函数 ====================
 
 _log_manager: Optional[LogManager] = None
 
@@ -244,23 +240,10 @@ def init_logging(
     """
     初始化日志系统
 
-    Args:
-        log_dir: 日志根目录
-        app_name: 应用名称
-        level: 日志级别
-        max_bytes: 单个日志文件最大大小
-        backup_count: 备份文件数量
-        console_output: 是否输出到控制台
-        websocket_output: 是否通过 WebSocket 实时推送
-        separate_error_log: 是否分离错误日志
-        use_date_directory: 是否按日期分目录
-
-    Returns:
-        LogManager: 日志管理器实例
+    在根日志器上配置处理器，所有子日志器自动继承
     """
     global _log_manager
 
-    # 如果日志系统已经初始化，直接返回现有实例（幂等性）
     if _log_manager is not None:
         return _log_manager
 
@@ -275,6 +258,9 @@ def init_logging(
         separate_error_log=separate_error_log,
         use_date_directory=use_date_directory,
     )
+
+    _log_manager.setup_root_logger()
+
     return _log_manager
 
 
@@ -323,9 +309,6 @@ def get_audit_logger() -> logging.Logger:
     return _log_manager.get_audit_logger()
 
 
-# ==================== 日志清理工具 ====================
-
-
 def cleanup_old_logs(log_dir: str = "logs", keep_days: int = 30) -> int:
     """
     清理指定天数之前的日志目录
@@ -355,13 +338,9 @@ def cleanup_old_logs(log_dir: str = "logs", keep_days: int = 30) -> int:
                     shutil.rmtree(item)
                     deleted_count += 1
             except ValueError:
-                # 目录名不是日期格式，跳过
                 pass
 
     return deleted_count
-
-
-# ==================== 日志信息获取 ====================
 
 
 def get_log_info(log_dir: str = "logs") -> Dict[str, any]:
@@ -394,7 +373,6 @@ def get_log_info(log_dir: str = "logs") -> Dict[str, any]:
                     "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
                 })
 
-    # 获取所有日期目录
     available_dates = []
     if log_path.exists():
         for item in log_path.iterdir():

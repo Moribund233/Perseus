@@ -37,59 +37,27 @@ class AppLifecycleManager:
         应用启动时执行的初始化操作
         
         包括：
-        - 记录启动日志
         - 验证数据库连接
         - 初始化WebSocket管理器
         """
-        logger.info("=" * 60)
-        logger.info("应用启动中...")
-        logger.info("=" * 60)
-        
         try:
-            # 验证数据库连接
             await self._verify_database_connection()
-        except Exception as e:
-            logger.error(f"数据库连接验证失败: {e}")
-            # 不阻止应用启动
-        
-        try:
-            # 初始化WebSocket管理器（启动心跳检测任务）
             await self._init_websocket_manager()
         except Exception as e:
-            logger.error(f"WebSocket管理器初始化失败: {e}")
-            # 不阻止应用启动
-        
-        logger.info("应用启动完成")
+            logger.error(f"启动初始化失败: {e}")
 
     async def shutdown(self) -> None:
         """
         应用关闭时执行的清理操作
-        
-        包括：
-        - 标记关闭状态，阻止新请求
-        - 优雅关闭所有WebSocket连接
-        - 释放数据库连接池
-        - 清理其他资源
         """
         if self._is_shutting_down:
-            logger.warning("关闭流程已在进行中，跳过重复调用")
             return
         
         self._is_shutting_down = True
-        logger.info("=" * 60)
-        logger.info("应用关闭中...")
-        logger.info("=" * 60)
-        
-        # 触发关闭事件，通知所有监听者
         self._shutdown_event.set()
         
-        # 1. 优雅关闭WebSocket连接
         await self._shutdown_websocket_connections()
-        
-        # 2. 释放数据库连接池
         await self._dispose_database_engine()
-        
-        logger.info("应用关闭完成")
     
     async def _verify_database_connection(self) -> None:
         """验证数据库连接是否正常"""
@@ -98,7 +66,6 @@ class AppLifecycleManager:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
                 conn.commit()
-            logger.info("数据库连接验证成功")
         except Exception as e:
             logger.error(f"数据库连接验证失败: {e}")
             # 不抛出异常，允许应用继续启动
@@ -107,9 +74,7 @@ class AppLifecycleManager:
     async def _init_websocket_manager(self) -> None:
         """初始化WebSocket管理器"""
         try:
-            # 启动WebSocket心跳检测任务
             asyncio.create_task(self._websocket_manager.heartbeat_checker())
-            logger.info("WebSocket管理器初始化完成")
         except Exception as e:
             logger.error(f"WebSocket管理器初始化失败: {e}")
             raise
@@ -117,42 +82,28 @@ class AppLifecycleManager:
     async def _shutdown_websocket_connections(self) -> None:
         """优雅关闭所有WebSocket连接"""
         try:
-            logger.info("正在关闭WebSocket连接...")
-            
-            # 获取所有活跃连接
             active_connections = list(self._websocket_manager.active_connections.values())
             
             if not active_connections:
-                logger.info("没有活跃的WebSocket连接")
                 return
             
-            logger.info(f"需要关闭 {len(active_connections)} 个WebSocket连接")
-            
-            # 发送关闭通知
             close_message = {
                 "type": "system",
                 "event": "shutdown",
                 "message": "服务器即将关闭，连接将被断开"
             }
             
-            # 广播关闭通知给所有连接
             await self._websocket_manager.broadcast(close_message)
-            
-            # 给客户端一点时间处理关闭通知
             await asyncio.sleep(0.5)
             
-            # 关闭所有连接
             for connection in active_connections:
                 try:
                     await connection.websocket.close(code=1001, reason="服务器关闭")
-                except Exception as e:
-                    logger.debug(f"关闭WebSocket连接时出错: {e}")
+                except Exception:
+                    pass
             
-            # 清空连接管理器
             self._websocket_manager.active_connections.clear()
             self._websocket_manager.user_connections.clear()
-            
-            logger.info("WebSocket连接已关闭")
             
         except Exception as e:
             logger.error(f"关闭WebSocket连接时出错: {e}")
@@ -160,21 +111,14 @@ class AppLifecycleManager:
     async def _dispose_database_engine(self) -> None:
         """释放数据库连接池"""
         try:
-            logger.info("正在释放数据库连接池...")
-            
-            # 同步引擎使用 run_in_executor 进行异步释放
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, engine.dispose)
-            
-            logger.info("同步数据库连接池已释放")
         except Exception as e:
-            logger.error(f"释放同步数据库连接池时出错: {e}")
+            logger.error(f"释放数据库连接池时出错: {e}")
         
-        # 关闭异步数据库引擎
         try:
             from models.async_db import close_async_engine
             await close_async_engine()
-            logger.info("异步数据库连接池已释放")
         except Exception as e:
             logger.error(f"释放异步数据库连接池时出错: {e}")
     

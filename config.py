@@ -217,40 +217,28 @@ class DatabaseSettings(BaseSettings):
             except Exception as e:
                 logger.warning(f"处理环境变量编码时出错: {e}")
         
-        original_url = env_url  # 保存原始 URL 用于日志
+        original_url = env_url
         
-        # 检查是否已经验证过相同的 URL（避免重复输出日志）
         if _db_url_validated and _original_db_url == original_url:
-            # 使用缓存的验证结果
             env_url = _validation_result
         else:
-            # 首次验证或 URL 发生变化
             _original_db_url = original_url
             
             if not env_url:
-                # 未设置环境变量，使用默认 SQLite
-                logger.warning("未设置 DATABASE_URL 环境变量，使用默认 SQLite 配置")
                 env_url = "sqlite:///./langit.db"
             else:
-                # 验证数据库 URL 是否有效，无效则回退到 SQLite
                 is_valid, error_msg = self._validate_db_url_with_error(env_url)
                 if not is_valid:
-                    logger.warning(f"数据库连接失败: {error_msg}")
-                    logger.warning(f"从 {self._mask_url(original_url)} 回退到 SQLite")
+                    logger.warning(f"数据库连接失败，回退到 SQLite: {error_msg}")
                     env_url = "sqlite:///./langit.db"
-                else:
-                    logger.info(f"数据库连接成功: {self._mask_url(env_url)}")
             
-            # 缓存验证结果
             _validation_result = env_url
             _db_url_validated = True
         
         kwargs["url"] = env_url
         
-        # 从环境变量读取 LANGIT_STRESS_TEST
         stress_test = os.environ.get("LANGIT_STRESS_TEST")
         if stress_test is None:
-            logger.debug("未设置 LANGIT_STRESS_TEST 环境变量，使用默认值 false")
             stress_test = "false"
         kwargs["is_stress_test"] = stress_test.lower() in ("true", "1", "yes")
         

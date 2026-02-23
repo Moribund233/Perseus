@@ -80,7 +80,6 @@ def _create_engine_with_config():
         Engine: SQLAlchemy引擎实例
     """
     db_type = db_config.db_type
-    logger.info(f"数据库类型: {db_type}, URL: {db_config.url}")
     
     if db_type == "sqlite":
         return _create_sqlite_engine()
@@ -95,7 +94,6 @@ def _create_engine_with_config():
 def _create_sqlite_engine():
     """创建 SQLite 引擎"""
     if db_config.is_stress_test:
-        logger.info("启用 SQLite 压力测试模式配置")
         return create_engine(
             db_config.url,
             connect_args=_get_sqlite_connect_args(),
@@ -108,7 +106,6 @@ def _create_sqlite_engine():
             echo=db_config.stress_echo,
         )
     elif _config.app.debug:
-        logger.info("启用 SQLite 开发模式配置")
         return create_engine(
             db_config.url,
             connect_args=_get_sqlite_connect_args(),
@@ -121,7 +118,6 @@ def _create_sqlite_engine():
             echo=db_config.echo,
         )
     else:
-        logger.info("启用 SQLite 生产模式配置")
         return create_engine(
             db_config.url,
             connect_args=_get_sqlite_connect_args(),
@@ -154,12 +150,9 @@ def _get_postgresql_url_with_driver(url: str) -> str:
 
 def _create_postgresql_engine():
     """创建 PostgreSQL 引擎"""
-    # 转换 URL 为带驱动的格式
     url_with_driver = _get_postgresql_url_with_driver(db_config.url)
-    logger.info(f"PostgreSQL URL: {db_config.url.replace(db_config.url.split('@')[0].split(':')[-1] if '@' in db_config.url else '', '****')}")
     
     if db_config.is_stress_test:
-        logger.info("启用 PostgreSQL 压力测试模式配置")
         return create_engine(
             url_with_driver,
             connect_args=_get_postgresql_connect_args(),
@@ -172,7 +165,6 @@ def _create_postgresql_engine():
             echo=db_config.stress_echo,
         )
     elif _config.app.debug:
-        logger.info("启用 PostgreSQL 开发模式配置")
         return create_engine(
             url_with_driver,
             connect_args=_get_postgresql_connect_args(),
@@ -185,7 +177,6 @@ def _create_postgresql_engine():
             echo=db_config.echo,
         )
     else:
-        logger.info("启用 PostgreSQL 生产模式配置")
         return create_engine(
             url_with_driver,
             connect_args=_get_postgresql_connect_args(),
@@ -216,11 +207,9 @@ def _get_mysql_url_with_driver(url: str) -> str:
 
 def _create_mysql_engine():
     """创建 MySQL 引擎"""
-    # 转换 URL 为带驱动的格式
     mysql_url = _get_mysql_url_with_driver(db_config.url)
 
     if db_config.is_stress_test:
-        logger.info("启用 MySQL 压力测试模式配置")
         return create_engine(
             mysql_url,
             connect_args=_get_mysql_connect_args(),
@@ -233,7 +222,6 @@ def _create_mysql_engine():
             echo=db_config.stress_echo,
         )
     elif _config.app.debug:
-        logger.info("启用 MySQL 开发模式配置")
         return create_engine(
             mysql_url,
             connect_args=_get_mysql_connect_args(),
@@ -246,7 +234,6 @@ def _create_mysql_engine():
             echo=db_config.echo,
         )
     else:
-        logger.info("启用 MySQL 生产模式配置")
         return create_engine(
             mysql_url,
             connect_args=_get_mysql_connect_args(),

@@ -290,7 +290,6 @@ class AppInitializer:
         else:
             try:
                 self.config_manager.get_config(force_reload=True)
-                self._logger.debug("配置文件验证通过")
             except Exception as e:
                 self._logger.warning(f"配置文件验证失败: {e}，重新生成默认配置")
                 default_config = self._gen_default_config()
@@ -301,7 +300,6 @@ class AppInitializer:
         """检查 JWT Secret Key 是否已设置"""
         secret_key = os.environ.get("LANGIT_SECURITY_SECRET_KEY")
         if secret_key:
-            self._logger.debug("安全密钥已就绪（从环境变量加载）")
             return True
         else:
             self._logger.error("安全密钥检查失败")
@@ -311,12 +309,10 @@ class AppInitializer:
         """初始化数据库"""
         from utils.init_database import init_database
         
-        # 根据 debug 配置决定是否创建测试数据
         config = self.config_manager.get_config()
         should_create_test_data = create_test_data or config.app.debug
 
         if init_database(create_test_data=should_create_test_data):
-            self._logger.info("数据库初始化完成")
             return True
         else:
             self._logger.error("数据库初始化失败")
@@ -327,8 +323,7 @@ class AppInitializer:
         from utils.git_utils import ensure_repository_root
         
         try:
-            repo_root = ensure_repository_root()
-            self._logger.info(f"仓库根目录: {repo_root}")
+            ensure_repository_root()
             return True
         except Exception as e:
             self._logger.error(f"仓库根目录初始化失败: {e}")
@@ -348,7 +343,6 @@ class AppInitializer:
                 separate_error_log=True,
                 websocket_output=True
             )
-            self._logger.info("日志系统已启动")
             return True
         except Exception as e:
             print(f"日志初始化失败: {e}")

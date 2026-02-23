@@ -177,8 +177,10 @@ def test_database_connection(url: str, db_type: str, timeout: int = 10, auto_cre
             ]
             if any(re.search(keyword, error_msg, re.IGNORECASE) for keyword in db_not_exist_keywords):
                 logger.info(f"数据库不存在，尝试自动创建: {url}")
-                from utils.db_migration_utils import create_database_if_not_exists
-                created, create_error = create_database_if_not_exists(url, db_type)
+                from utils.migration.connection import create_database_if_not_exists
+                from utils.migration.dialect import DbType
+                db_type_enum = DbType(db_type)
+                created, create_error = create_database_if_not_exists(url, db_type_enum)
                 if created:
                     # 重新尝试连接
                     try:
@@ -222,27 +224,20 @@ def validate_database_config(url: str, db_type: str) -> bool:
     Returns:
         bool: 验证是否通过，失败时记录警告但不抛出异常
     """
-    logger.info(f"Validating database configuration: {db_type}")
-    
-    # 1. Validate URL format
     is_valid, error = validate_database_url(url)
     if not is_valid:
         logger.warning(f"Database URL validation failed: {error}")
         return False
     
-    # 2. Check driver installation
     is_installed, error = check_driver_installed(db_type, url)
     if not is_installed:
         logger.warning(f"Database driver not found: {error}")
         return False
     
-    # 3. Test connection (optional, don't fail startup if connection fails)
     is_connected, error = test_database_connection(url, db_type)
     if not is_connected:
         logger.warning(f"Database connection test failed: {error}")
-        # 连接测试失败不阻止启动，让应用尝试运行时连接
     
-    logger.info(f"Database validation passed: {db_type}")
     return True
 
 

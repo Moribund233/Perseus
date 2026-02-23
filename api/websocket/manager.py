@@ -130,7 +130,6 @@ class ConnectionManager:
         self._running: bool = False
         
         ConnectionManager._initialized = True
-        logger.info("ConnectionManager初始化完成")
     
     def _generate_connection_id(self) -> str:
         """生成唯一的连接ID"""
@@ -152,9 +151,8 @@ class ConnectionManager:
         connection = Connection(websocket, connection_id)
         self._connections[connection_id] = connection
         
-        logger.info(f"新WebSocket连接 connection_id={connection_id}, 当前连接数: {len(self._connections)}")
+        logger.debug(f"WebSocket连接: {connection_id}, 当前: {len(self._connections)}")
         
-        # 启动后台清理任务（如果未运行）
         if not self._running:
             self._start_background_tasks()
         
@@ -188,7 +186,7 @@ class ConnectionManager:
             del self._connections[connection_id]
         
         connection.is_alive = False
-        logger.info(f"WebSocket连接断开 connection_id={connection_id}, 当前连接数: {len(self._connections)}")
+        logger.debug(f"WebSocket断开: {connection_id}, 当前: {len(self._connections)}")
     
     def bind_user(self, connection: Connection, user_id: int, username: str) -> None:
         """
@@ -348,7 +346,6 @@ class ConnectionManager:
             handler: 处理函数，接收(connection, message)参数
         """
         self._message_handlers[message_type] = handler
-        logger.info(f"注册消息处理器: {message_type}")
     
     async def handle_message(self, connection: Connection, message: Dict[str, Any]) -> None:
         """
@@ -385,14 +382,12 @@ class ConnectionManager:
         """启动后台任务"""
         self._running = True
         self._cleanup_task = asyncio.create_task(self._cleanup_loop())
-        logger.info("后台清理任务已启动")
-    
+
     def stop_background_tasks(self) -> None:
         """停止后台任务"""
         self._running = False
         if self._cleanup_task:
             self._cleanup_task.cancel()
-        logger.info("后台清理任务已停止")
 
     async def heartbeat_checker(self) -> None:
         """
@@ -400,13 +395,11 @@ class ConnectionManager:
         
         由 lifespan 管理器启动，用于监控连接健康状态
         """
-        logger.info("WebSocket心跳检测任务已启动")
         while self._running:
             try:
-                await asyncio.sleep(30)  # 每30秒检查一次
+                await asyncio.sleep(30)
                 await self._cleanup_timeout_connections()
             except asyncio.CancelledError:
-                logger.info("WebSocket心跳检测任务已取消")
                 break
             except Exception as e:
                 logger.error(f"心跳检测任务异常: {e}")

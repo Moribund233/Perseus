@@ -70,13 +70,8 @@ def _create_async_engine_with_config() -> AsyncEngine:
     config = get_config()
     db_config = config.database
     
-    # 转换 URL 为异步版本
     async_url = _get_async_url(db_config.url)
-    db_type = db_config.db_type
     
-    logger.info(f"创建异步数据库引擎: {db_type}")
-    
-    # 连接池配置
     if db_config.is_stress_test:
         pool_size = db_config.stress_pool_size
         max_overflow = db_config.stress_max_overflow
@@ -88,7 +83,6 @@ def _create_async_engine_with_config() -> AsyncEngine:
         pool_timeout = db_config.pool_timeout
         pool_recycle = db_config.pool_recycle
     
-    # 创建异步引擎
     engine = create_async_engine(
         async_url,
         pool_size=pool_size,
@@ -97,16 +91,10 @@ def _create_async_engine_with_config() -> AsyncEngine:
         pool_recycle=pool_recycle,
         pool_pre_ping=True,
         echo=db_config.echo,
-        # 异步引擎特定配置
         future=True,
     )
     
-    logger.info(
-        f"异步数据库引擎已创建: "
-        f"pool_size={pool_size}, "
-        f"max_overflow={max_overflow}, "
-        f"pool_timeout={pool_timeout}s"
-    )
+    logger.debug(f"异步引擎创建: pool_size={pool_size}, max_overflow={max_overflow}")
     
     return engine
 
