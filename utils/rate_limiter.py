@@ -15,20 +15,27 @@ from config import get_config
 # 日志记录器
 logger = logging.getLogger(__name__)
 
+# 限流器实例（延迟初始化）
+limiter = None
 
-# 获取速率限制配置
-_config = get_config()
-_rate_limit_config = getattr(_config, 'rate_limit', None)
 
-# 使用配置或默认值
-_default_limits = getattr(_rate_limit_config, 'default_limits', ["200 per minute", "1000 per hour"]) if _rate_limit_config else ["200 per minute", "1000 per hour"]
-
-# 创建速率限制器实例
-# 使用客户端 IP 作为标识
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=_default_limits
-)
+def _get_rate_limit_config():
+    """获取限流配置"""
+    try:
+        _config = get_config()
+        _rate_limit_config = getattr(_config, 'rate_limit', None)
+        if _rate_limit_config:
+            return {
+                'default_limits': getattr(_rate_limit_config, 'default_limits', ["200 per minute", "1000 per hour"]),
+                'strict': getattr(_rate_limit_config, 'strict', ["5 per minute", "20 per hour"]),
+                'standard': getattr(_rate_limit_config, 'standard', ["30 per minute", "500 per hour"]),
+                'generous': getattr(_rate_limit_config, 'generous', ["100 per minute", "2000 per hour"]),
+                'git_operations': getattr(_rate_limit_config, 'git_operations', ["10 per minute", "100 per hour"]),
+                'download': getattr(_rate_limit_config, 'download', ["20 per minute", "200 per hour"])
+            }
+    except Exception as e:
+        logger.warning(f"Failed to load rate limit config: {e}")
+    return None
 
 
 def get_limiter() -> Limiter:
@@ -38,6 +45,16 @@ def get_limiter() -> Limiter:
     Returns:
         Limiter: 速率限制器实例
     """
+    global limiter
+    if limiter is None:
+        # 延迟初始化，确保配置已加载
+        config = _get_rate_limit_config()
+        default_limits = config['default_limits'] if config else ["200 per minute", "1000 per hour"]
+        limiter = Limiter(
+            key_func=get_remote_address,
+            default_limits=default_limits
+        )
+        logger.info(f"Rate limiter created with limits: {default_limits}")
     return limiter
 
 
@@ -48,8 +65,13 @@ def setup_rate_limiter(app):
     Args:
         app: FastAPI 应用实例
     """
+    global limiter
+    
+    # 获取或创建限流器实例
+    _limiter = get_limiter()
+    
     # 将限制器状态附加到应用
-    app.state.limiter = limiter
+    app.state.limiter = _limiter
 
     # 添加速率限制异常处理器
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -62,36 +84,50 @@ class RateLimitConfig:
     """
     速率限制配置类
 
-    提供常用的速率限制配置，从配置文件读取或使用默认值
+    提供常用的速率限制配置，从配置文件动态读取
     返回逗号分隔的字符串格式，兼容 slowapi
     """
 
-    STRICT = "5 per minute, 20 per hour"
-    STANDARD = "30 per minute, 500 per hour"
-    GENEROUS = "100 per minute, 2000 per hour"
-    GIT_OPERATIONS = "10 per minute, 100 per hour"
-    DOWNLOAD = "20 per minute, 200 per hour"
+    # 默认值（当配置不可用时使用）
+    _DEFAULTS = {
+        'STRICT': "5 per minute, 20 per hour",
+        'STANDARD': "30 per minute, 500 per hour",
+        'GENEROUS': "100 per minute, 2000 per hour",
+        'GIT_OPERATIONS': "10 per minute, 100 per hour",
+        'DOWNLOAD': "20 per minute, 200 per hour"
+    }
 
-    def __init__(self):
-        """初始化，从配置读取或使用默认值"""
-        _config = get_config()
-        _rate_limit_config = getattr(_config, 'rate_limit', None)
+    @classmethod
+    def _get_config_value(cls, key: str, config_key: str) -> str:
+        """
+        动态从配置读取限流值
 
-        if _rate_limit_config:
-            self.STRICT = self._format_limit(getattr(_rate_limit_config, 'strict', ["5 per minute", "20 per hour"]))
-            self.STANDARD = self._format_limit(getattr(_rate_limit_config, 'standard', ["30 per minute", "500 per hour"]))
-            self.GENEROUS = self._format_limit(getattr(_rate_limit_config, 'generous', ["100 per minute", "2000 per hour"]))
-            self.GIT_OPERATIONS = self._format_limit(getattr(_rate_limit_config, 'git_operations', ["10 per minute", "100 per hour"]))
-            self.DOWNLOAD = self._format_limit(getattr(_rate_limit_config, 'download', ["20 per minute", "200 per hour"]))
+        Args:
+            key: 类属性名
+            config_key: 配置中的键名
+
+        Returns:
+            str: 限流配置字符串
+        """
+        try:
+            _config = get_config()
+            _rate_limit_config = getattr(_config, 'rate_limit', None)
+            if _rate_limit_config:
+                limits = getattr(_rate_limit_config, config_key, None)
+                if limits:
+                    return cls._format_limit(limits)
+        except Exception:
+            pass
+        return cls._DEFAULTS.get(key, "30 per minute, 500 per hour")
 
     @staticmethod
     def _format_limit(limits) -> str:
         """
         将限制配置格式化为 slowapi 兼容的字符串
-        
+
         Args:
             limits: 列表或字符串
-            
+
         Returns:
             str: 逗号分隔的限制字符串
         """
@@ -101,22 +137,46 @@ class RateLimitConfig:
             return ", ".join(limits)
         return str(limits)
 
+    @classmethod
+    @property
+    def STRICT(cls) -> str:
+        """严格限流配置"""
+        return cls._get_config_value('STRICT', 'strict')
 
-# 创建单例实例
-_rate_limit_config_instance = None
+    @classmethod
+    @property
+    def STANDARD(cls) -> str:
+        """标准限流配置"""
+        return cls._get_config_value('STANDARD', 'standard')
+
+    @classmethod
+    @property
+    def GENEROUS(cls) -> str:
+        """宽松限流配置"""
+        return cls._get_config_value('GENEROUS', 'generous')
+
+    @classmethod
+    @property
+    def GIT_OPERATIONS(cls) -> str:
+        """Git 操作限流配置"""
+        return cls._get_config_value('GIT_OPERATIONS', 'git_operations')
+
+    @classmethod
+    @property
+    def DOWNLOAD(cls) -> str:
+        """下载限流配置"""
+        return cls._get_config_value('DOWNLOAD', 'download')
 
 
-def get_rate_limit_config() -> RateLimitConfig:
+# 为了保持向后兼容，提供函数式接口
+def get_rate_limit_config():
     """
-    获取速率限制配置实例
+    获取速率限制配置类
 
     Returns:
-        RateLimitConfig: 速率限制配置实例
+        RateLimitConfig: 速率限制配置类
     """
-    global _rate_limit_config_instance
-    if _rate_limit_config_instance is None:
-        _rate_limit_config_instance = RateLimitConfig()
-    return _rate_limit_config_instance
+    return RateLimitConfig
 
 
 # 自定义 key 函数

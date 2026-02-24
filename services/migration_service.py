@@ -5,7 +5,7 @@
 """
 import time
 import hashlib
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional, Callable, Set
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -14,8 +14,17 @@ from sqlalchemy import text
 from utils.logging import get_named_logger
 from utils.migration import Connection, SchemaReader, DbType
 from utils.migration.schema import SchemaMigrator
+from utils.migration.auto_dependency import DependencyResolver
 
 logger = get_named_logger("migration")
+
+
+# 可选：手动覆盖的表依赖关系
+# 当自动检测无法满足需求时，可在此添加特殊依赖
+# 格式: {父表: [子表列表]}
+MANUAL_DEPENDENCIES: Dict[str, List[str]] = {
+    # 示例: "users": ["user_profiles"],
+}
 
 
 @dataclass
@@ -63,12 +72,73 @@ class DatabaseMigrationService:
         self.target_url = target_url
         self.batch_size = batch_size
         self.check_sync = check_sync
-        
+
         self.source_conn = Connection(source_url)
         self.target_conn = Connection(target_url)
-        
+
         self.progress: Dict[str, MigrationProgress] = {}
         self._is_running = True
+
+    def _sort_tables_by_dependency(self, tables: List[str]) -> List[str]:
+        """
+        根据外键依赖关系对表进行拓扑排序
+        确保父表先于子表迁移，避免外键约束错误
+
+        使用自动依赖发现机制，从数据库外键约束中自动提取依赖关系。
+
+        Args:
+            tables: 表名列表
+
+        Returns:
+            List[str]: 排序后的表名列表（父表在前，子表在后）
+        """
+        try:
+            # 使用自动依赖发现
+            resolver = DependencyResolver(self.source_conn)
+            sorted_tables = resolver.topological_sort(tables)
+
+            # 应用手动覆盖的依赖（如果有）
+            if MANUAL_DEPENDENCIES:
+                sorted_tables = self._apply_manual_dependencies(sorted_tables, tables)
+
+            return sorted_tables
+        except Exception as e:
+            logger.warning(f"自动依赖发现失败，使用原始顺序: {e}")
+            return tables
+
+    def _apply_manual_dependencies(self, sorted_tables: List[str], original_tables: List[str]) -> List[str]:
+        """
+        应用手动指定的依赖关系
+
+        Args:
+            sorted_tables: 已排序的表列表
+            original_tables: 原始表列表
+
+        Returns:
+            List[str]: 调整后的表列表
+        """
+        # 构建位置映射
+        positions = {table: idx for idx, table in enumerate(sorted_tables)}
+
+        for parent, children in MANUAL_DEPENDENCIES.items():
+            if parent not in positions:
+                continue
+            parent_pos = positions[parent]
+
+            for child in children:
+                if child not in positions or child not in original_tables:
+                    continue
+                child_pos = positions[child]
+
+                # 确保子表在父表之后
+                if child_pos < parent_pos:
+                    # 交换位置
+                    sorted_tables.remove(child)
+                    sorted_tables.insert(parent_pos, child)
+                    # 更新位置映射
+                    positions = {table: idx for idx, table in enumerate(sorted_tables)}
+
+        return sorted_tables
     
     def migrate(
         self,
@@ -105,7 +175,7 @@ class DatabaseMigrationService:
         source_reader = SchemaReader(self.source_conn)
         if tables is None:
             tables = source_reader.get_all_tables()
-        
+
         if not tables:
             self._close_connections()
             return MigrationResult(
@@ -116,22 +186,26 @@ class DatabaseMigrationService:
                 total_rows_failed=0,
                 duration_seconds=time.time() - start_time
             )
-        
+
+        # 根据外键依赖关系对表进行排序，确保父表先于子表迁移
+        sorted_tables = self._sort_tables_by_dependency(tables)
+        logger.info(f"表迁移顺序（按依赖排序）: {sorted_tables}")
+
         tables_migrated = 0
         tables_failed = 0
         total_rows_migrated = 0
         total_rows_failed = 0
         errors: List[Dict[str, Any]] = []
-        
+
         if migrate_schema:
             schema_migrator = SchemaMigrator(self.source_conn, self.target_conn)
-            schema_results = schema_migrator.migrate(tables)
-            
+            schema_results = schema_migrator.migrate(sorted_tables)
+
             for table_name, (success, error_msg) in schema_results.items():
                 if not success:
                     errors.append({"table": table_name, "error": f"表结构迁移失败: {error_msg}"})
-        
-        for table_name in tables:
+
+        for table_name in sorted_tables:
             if not self._is_running:
                 logger.warning("迁移被中断")
                 break
@@ -221,16 +295,17 @@ class DatabaseMigrationService:
         
         target_schema = target_reader.get_table_schema(table_name)
         target_column_types = {c.name: c.type for c in target_schema.columns}
-        
-        dialect = self.target_conn.dialect
-        insert_sql = text(dialect.insert_on_conflict(table_name, common_columns))
-        
+
+        source_dialect = self.source_conn.dialect
+        target_dialect = self.target_conn.dialect
+        insert_sql = text(target_dialect.insert_on_conflict(table_name, common_columns))
+
         offset = 0
         migrated = 0
         col_list = ", ".join(common_columns)
-        
+
         while True:
-            select_sql = text(f"SELECT {col_list} FROM {dialect.quote_ident(table_name)} LIMIT :limit OFFSET :offset")
+            select_sql = text(f"SELECT {col_list} FROM {source_dialect.quote_ident(table_name)} LIMIT :limit OFFSET :offset")
             
             rows = self.source_conn.fetch_all(select_sql, {"limit": self.batch_size, "offset": offset})
             

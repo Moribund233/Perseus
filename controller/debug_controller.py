@@ -52,6 +52,16 @@ class InitConfResponse(BaseModel):
     backup_path: Optional[str] = None
 
 
+class RateLimitInfo(BaseModel):
+    """限流配置信息"""
+    default_limits: list = Field(default_factory=list, description="默认限流规则")
+    strict: list = Field(default_factory=list, description="严格限流规则")
+    standard: list = Field(default_factory=list, description="标准限流规则")
+    generous: list = Field(default_factory=list, description="宽松限流规则")
+    git_operations: list = Field(default_factory=list, description="Git操作限流规则")
+    download: list = Field(default_factory=list, description="下载限流规则")
+
+
 class DebugStatusResponse(BaseModel):
     """调试状态响应模型"""
     debug_mode: bool
@@ -59,6 +69,9 @@ class DebugStatusResponse(BaseModel):
     config_exists: bool
     database_url: str
     database_type: str
+    environment: dict = Field(default_factory=dict, description="环境变量信息")
+    stress_test_mode: bool = Field(default=False, description="是否处于压力测试模式")
+    rate_limit: RateLimitInfo = Field(default_factory=RateLimitInfo, description="限流配置信息")
 
 
 # ============== 依赖函数 ==============
@@ -238,21 +251,54 @@ async def debug_status(
 ):
     """
     获取调试状态信息
-    
-    显示当前调试模式状态、配置文件状态等信息
-    
+
+    显示当前调试模式状态、配置文件状态、环境变量等信息
+
     Returns:
         DebugStatusResponse: 调试状态信息
     """
     config = get_config()
     config_path = "config.toml"
-    
+
+    # 收集环境变量信息（排除敏感信息）
+    env_info = {}
+    sensitive_keys = {'password', 'secret', 'token', 'key', 'jwt', 'auth'}
+
+    for key, value in os.environ.items():
+        # 只包含 LANGIT_ 开头的环境变量
+        if key.startswith('LANGIT_'):
+            # 检查是否是敏感信息
+            key_lower = key.lower()
+            is_sensitive = any(s in key_lower for s in sensitive_keys)
+
+            if is_sensitive:
+                env_info[key] = "***masked***"
+            else:
+                env_info[key] = value
+
+    # 检查是否处于压力测试模式
+    stress_test_mode = os.environ.get('LANGIT_STRESS_TEST', 'false').lower() == 'true'
+
+    # 获取限流配置
+    rate_limit_config = getattr(config, 'rate_limit', None)
+    rate_limit_info = RateLimitInfo(
+        default_limits=getattr(rate_limit_config, 'default_limits', ["200 per minute", "1000 per hour"]) if rate_limit_config else ["200 per minute", "1000 per hour"],
+        strict=getattr(rate_limit_config, 'strict', ["5 per minute", "20 per hour"]) if rate_limit_config else ["5 per minute", "20 per hour"],
+        standard=getattr(rate_limit_config, 'standard', ["30 per minute", "500 per hour"]) if rate_limit_config else ["30 per minute", "500 per hour"],
+        generous=getattr(rate_limit_config, 'generous', ["100 per minute", "2000 per hour"]) if rate_limit_config else ["100 per minute", "2000 per hour"],
+        git_operations=getattr(rate_limit_config, 'git_operations', ["10 per minute", "100 per hour"]) if rate_limit_config else ["10 per minute", "100 per hour"],
+        download=getattr(rate_limit_config, 'download', ["20 per minute", "200 per hour"]) if rate_limit_config else ["20 per minute", "200 per hour"]
+    )
+
     return DebugStatusResponse(
         debug_mode=config.app.debug,
         config_path=config_path,
         config_exists=os.path.exists(config_path),
         database_url=config.database._mask_url(config.database.url),
-        database_type=config.database.db_type
+        database_type=config.database.db_type,
+        environment=env_info,
+        stress_test_mode=stress_test_mode,
+        rate_limit=rate_limit_info
     )
 
 

@@ -7,7 +7,7 @@ import Modal from '../components/Modal.vue'
 import Progress from '../components/Progress.vue'
 import { useDatabaseStore, useServiceStore } from '../stores'
 import type { DatabaseType, DatabaseConfig } from '../services/databaseApi'
-import { switchDatabaseType, getDatabaseType, getDatabaseUrls } from '../services/api'
+import { switchDatabaseType, getDatabaseType, getDatabaseUrls, getStressTest } from '../services/api'
 import { switchDatabase, precheckMigration, type PrecheckResponse, type MigrationResponse } from '../services/migrationApi'
 import { useDatabaseConnection } from '../composables/useDatabaseConnection'
 
@@ -20,6 +20,9 @@ import { useDatabaseConnection } from '../composables/useDatabaseConnection'
 const dbStore = useDatabaseStore()
 const serviceStore = useServiceStore()
 const { checkConnection, checking } = useDatabaseConnection()
+
+// 压力测试模式状态
+const isStressTestMode = ref(false)
 
 // 确认弹窗状态
 const showConfirmModal = ref(false)
@@ -314,9 +317,10 @@ const cancelSwitch = (): void => {
 onMounted(async () => {
   // 无论服务是否启动，都先读取客户端配置中的数据库类型和 URL
   try {
-    const [dbType, urls] = await Promise.all([
+    const [dbType, urls, stressTest] = await Promise.all([
       getDatabaseType(),
-      getDatabaseUrls()
+      getDatabaseUrls(),
+      getStressTest()
     ])
     if (dbType && ['sqlite', 'postgresql', 'mysql'].includes(dbType)) {
       clientDbType.value = dbType as DatabaseType
@@ -324,6 +328,7 @@ onMounted(async () => {
     if (urls) {
       databaseUrls.value = urls
     }
+    isStressTestMode.value = stressTest
   } catch (err) {
     console.error('获取客户端配置失败:', err)
   } finally {
@@ -438,6 +443,53 @@ onMounted(async () => {
             <input v-model="config.echo" type="checkbox" :disabled="!serviceStore.isRunning" />
             <span>打印 SQL 语句（调试用）</span>
           </label>
+        </div>
+      </Card>
+
+      <!-- 压力测试配置 - 仅在压力测试模式开启时显示 -->
+      <Card v-if="isStressTestMode" title="压力测试模式配置" class="mb-lg stress-test-card" :class="{ 'card-disabled': !serviceStore.isRunning }">
+        <template #header-extra>
+          <span class="stress-test-badge">压力测试模式已启用</span>
+        </template>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">压力测试连接池大小</label>
+            <input v-model.number="config.stress_pool_size" type="number" class="form-input" min="1" :disabled="!serviceStore.isRunning" />
+            <span class="form-hint">压力测试模式下连接池中的连接数</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">压力测试最大溢出连接数</label>
+            <input v-model.number="config.stress_max_overflow" type="number" class="form-input" min="0" :disabled="!serviceStore.isRunning" />
+            <span class="form-hint">压力测试模式下允许创建的额外连接</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">压力测试连接超时时间（秒）</label>
+            <input v-model.number="config.stress_pool_timeout" type="number" class="form-input" min="1" :disabled="!serviceStore.isRunning" />
+            <span class="form-hint">压力测试模式下获取连接的最大等待时间</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">压力测试连接回收时间（秒）</label>
+            <input v-model.number="config.stress_pool_recycle" type="number" class="form-input" min="0" :disabled="!serviceStore.isRunning" />
+            <span class="form-hint">压力测试模式下连接自动回收的时间</span>
+          </div>
+        </div>
+        <div v-if="clientDbType === 'sqlite'" class="form-grid mt-md">
+          <div class="form-group">
+            <label class="form-label">压力测试 SQLite 超时时间（秒）</label>
+            <input v-model.number="config.stress_sqlite_timeout" type="number" class="form-input" min="1" :disabled="!serviceStore.isRunning" />
+            <span class="form-hint">压力测试模式下 SQLite 内部超时时间</span>
+          </div>
+        </div>
+        <div class="form-group mt-md">
+          <label class="form-checkbox">
+            <input v-model="config.stress_echo" type="checkbox" :disabled="!serviceStore.isRunning" />
+            <span>压力测试模式打印 SQL 语句（调试用）</span>
+          </label>
+        </div>
+        <div class="stress-test-hint mt-md">
+          <Alert type="info">
+          重启服务后自动应用压力测试参数。
+          </Alert>
         </div>
       </Card>
 
@@ -613,6 +665,27 @@ onMounted(async () => {
   color: var(--text-primary);
   font-size: var(--font-size-md);
   text-align: center;
+}
+
+/* 压力测试模式卡片样式 */
+.stress-test-card :deep(.card-header) {
+  background: linear-gradient(135deg, var(--warning-color) 0%, var(--warning-dark) 100%);
+  color: white;
+}
+
+.stress-test-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+}
+
+.stress-test-hint {
+  border-top: 1px dashed var(--border-color);
+  padding-top: var(--spacing-md);
+  margin-top: var(--spacing-md);
 }
 
 @media (max-width: 768px) {

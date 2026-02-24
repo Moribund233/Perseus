@@ -117,7 +117,7 @@ export const useServiceStore = defineStore('service', () => {
 
   /**
    * 刷新服务状态
-   * 使用防抖和超时控制，避免在压测环境下阻塞UI
+   * 使用防抖和超时控制，避免在压力测试环境下阻塞UI
    * @param force 是否强制刷新（忽略防抖限制）
    */
   async function refreshStatus(force: boolean = false): Promise<void> {
@@ -218,7 +218,7 @@ export const useServiceStore = defineStore('service', () => {
       lastRefreshTime.value = Date.now()
     } catch (err) {
       console.error('刷新服务状态失败:', err)
-      // 静默处理错误，避免在压测环境下干扰用户
+      // 静默处理错误，避免在压力测试环境下干扰用户
     } finally {
       isRefreshing.value = false
     }

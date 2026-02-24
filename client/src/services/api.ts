@@ -167,10 +167,23 @@ export interface CORSConfig {
   max_age: number
 }
 
+/**
+ * 限流配置
+ */
+export interface RateLimitConfig {
+  default_limits: string[]
+  strict: string[]
+  standard: string[]
+  generous: string[]
+  git_operations: string[]
+  download: string[]
+}
+
 export interface ServerAppConfig {
   server?: ServerServiceConfig
   proxy: ServerProxyConfig
   cors?: CORSConfig
+  rate_limit?: RateLimitConfig
 }
 
 /**
