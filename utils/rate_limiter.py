@@ -2,6 +2,7 @@
 速率限制工具
 
 提供基于 slowapi 的速率限制功能，防止暴力破解和 DDoS 攻击
+支持分钟或小时二选一模式
 """
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -19,23 +20,21 @@ logger = logging.getLogger(__name__)
 limiter = None
 
 
-def _get_rate_limit_config():
-    """获取限流配置"""
+def _get_default_limit() -> str:
+    """
+    获取默认限流配置
+    
+    Returns:
+        str: slowapi 兼容的限流字符串
+    """
     try:
         _config = get_config()
         _rate_limit_config = getattr(_config, 'rate_limit', None)
-        if _rate_limit_config:
-            return {
-                'default_limits': getattr(_rate_limit_config, 'default_limits', ["200 per minute", "1000 per hour"]),
-                'strict': getattr(_rate_limit_config, 'strict', ["5 per minute", "20 per hour"]),
-                'standard': getattr(_rate_limit_config, 'standard', ["30 per minute", "500 per hour"]),
-                'generous': getattr(_rate_limit_config, 'generous', ["100 per minute", "2000 per hour"]),
-                'git_operations': getattr(_rate_limit_config, 'git_operations', ["10 per minute", "100 per hour"]),
-                'download': getattr(_rate_limit_config, 'download', ["20 per minute", "200 per hour"])
-            }
+        if _rate_limit_config and _rate_limit_config.default_limits:
+            return _rate_limit_config.default_limits.to_limit_string()
     except Exception as e:
         logger.warning(f"Failed to load rate limit config: {e}")
-    return None
+    return "200 per minute"
 
 
 def get_limiter() -> Limiter:
@@ -48,13 +47,12 @@ def get_limiter() -> Limiter:
     global limiter
     if limiter is None:
         # 延迟初始化，确保配置已加载
-        config = _get_rate_limit_config()
-        default_limits = config['default_limits'] if config else ["200 per minute", "1000 per hour"]
+        default_limit = _get_default_limit()
         limiter = Limiter(
             key_func=get_remote_address,
-            default_limits=default_limits
+            default_limits=[default_limit]
         )
-        logger.info(f"Rate limiter created with limits: {default_limits}")
+        logger.info(f"Rate limiter created with limit: {default_limit}")
     return limiter
 
 
@@ -85,26 +83,26 @@ class RateLimitConfig:
     速率限制配置类
 
     提供常用的速率限制配置，从配置文件动态读取
-    返回逗号分隔的字符串格式，兼容 slowapi
+    返回 slowapi 兼容的字符串格式
     """
 
     # 默认值（当配置不可用时使用）
     _DEFAULTS = {
-        'STRICT': "5 per minute, 20 per hour",
-        'STANDARD': "30 per minute, 500 per hour",
-        'GENEROUS': "100 per minute, 2000 per hour",
-        'GIT_OPERATIONS': "10 per minute, 100 per hour",
-        'DOWNLOAD': "20 per minute, 200 per hour"
+        'STRICT': "5 per minute",
+        'STANDARD': "30 per minute",
+        'GENEROUS': "2000 per hour",
+        'GIT_OPERATIONS': "10 per minute",
+        'DOWNLOAD': "20 per minute"
     }
 
     @classmethod
-    def _get_config_value(cls, key: str, config_key: str) -> str:
+    def _get_config_value(cls, key: str, config_attr: str) -> str:
         """
         动态从配置读取限流值
 
         Args:
             key: 类属性名
-            config_key: 配置中的键名
+            config_attr: 配置中的属性名
 
         Returns:
             str: 限流配置字符串
@@ -113,29 +111,12 @@ class RateLimitConfig:
             _config = get_config()
             _rate_limit_config = getattr(_config, 'rate_limit', None)
             if _rate_limit_config:
-                limits = getattr(_rate_limit_config, config_key, None)
-                if limits:
-                    return cls._format_limit(limits)
+                rate_limit_item = getattr(_rate_limit_config, config_attr, None)
+                if rate_limit_item:
+                    return rate_limit_item.to_limit_string()
         except Exception:
             pass
-        return cls._DEFAULTS.get(key, "30 per minute, 500 per hour")
-
-    @staticmethod
-    def _format_limit(limits) -> str:
-        """
-        将限制配置格式化为 slowapi 兼容的字符串
-
-        Args:
-            limits: 列表或字符串
-
-        Returns:
-            str: 逗号分隔的限制字符串
-        """
-        if isinstance(limits, str):
-            return limits
-        if isinstance(limits, list):
-            return ", ".join(limits)
-        return str(limits)
+        return cls._DEFAULTS.get(key, "30 per minute")
 
     @classmethod
     @property
@@ -231,7 +212,7 @@ def get_git_operation_key(request: Request) -> str:
 
 
 def create_custom_limiter(
-    limits: list,
+    limit: str,
     key_func: Optional[Callable] = None,
     per_method: bool = False,
     exempt_when: Optional[Callable] = None
@@ -240,7 +221,7 @@ def create_custom_limiter(
     创建自定义速率限制装饰器
 
     Args:
-        limits: 限制规则列表
+        limit: 限制规则字符串（如 "100 per minute" 或 "1000 per hour"）
         key_func: 自定义 key 函数
         per_method: 是否按 HTTP 方法分别限制
         exempt_when: 豁免条件函数
@@ -249,7 +230,7 @@ def create_custom_limiter(
         callable: 速率限制装饰器
     """
     return limiter.limit(
-        ",".join(limits),
+        limit,
         key_func=key_func or get_remote_address,
         per_method=per_method,
         exempt_when=exempt_when

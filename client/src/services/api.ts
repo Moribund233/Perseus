@@ -168,15 +168,23 @@ export interface CORSConfig {
 }
 
 /**
+ * 限流配置项
+ */
+export interface RateLimitItem {
+  mode: 'minute' | 'hour'
+  value: number
+}
+
+/**
  * 限流配置
  */
 export interface RateLimitConfig {
-  default_limits: string[]
-  strict: string[]
-  standard: string[]
-  generous: string[]
-  git_operations: string[]
-  download: string[]
+  default_limits: RateLimitItem
+  strict: RateLimitItem
+  standard: RateLimitItem
+  generous: RateLimitItem
+  git_operations: RateLimitItem
+  download: RateLimitItem
 }
 
 export interface ServerAppConfig {

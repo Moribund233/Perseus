@@ -82,14 +82,42 @@ class LoggingSettings(BaseSettings):
     audit_log_enabled: bool = Field(default=True, description="是否启用审计日志")
 
 
+class RateLimitItem(BaseSettings):
+    """单个限流配置项"""
+    mode: str = Field(default="minute", description="限流模式: minute 或 hour", pattern="^(minute|hour)$")
+    value: int = Field(default=200, ge=1, description="限流值")
+    
+    def to_limit_string(self) -> str:
+        """转换为 slowapi 兼容的限流字符串"""
+        return f"{self.value} per {self.mode}"
+
+
 class RateLimitSettings(BaseSettings):
-    """速率限制配置类"""
-    default_limits: list = Field(default=["200 per minute", "1000 per hour"], description="默认速率限制")
-    strict: list = Field(default=["5 per minute", "20 per hour"], description="严格限制（用于敏感操作）")
-    standard: list = Field(default=["30 per minute", "500 per hour"], description="标准限制（用于普通API）")
-    generous: list = Field(default=["100 per minute", "2000 per hour"], description="宽松限制（用于读取操作）")
-    git_operations: list = Field(default=["10 per minute", "100 per hour"], description="Git操作限制")
-    download: list = Field(default=["20 per minute", "200 per hour"], description="下载限制")
+    """速率限制配置类 - 支持分钟或小时二选一模式"""
+    default_limits: RateLimitItem = Field(
+        default_factory=lambda: RateLimitItem(mode="minute", value=200),
+        description="默认速率限制"
+    )
+    strict: RateLimitItem = Field(
+        default_factory=lambda: RateLimitItem(mode="minute", value=5),
+        description="严格限制（用于敏感操作）"
+    )
+    standard: RateLimitItem = Field(
+        default_factory=lambda: RateLimitItem(mode="minute", value=30),
+        description="标准限制（用于普通API）"
+    )
+    generous: RateLimitItem = Field(
+        default_factory=lambda: RateLimitItem(mode="hour", value=2000),
+        description="宽松限制（用于读取操作）"
+    )
+    git_operations: RateLimitItem = Field(
+        default_factory=lambda: RateLimitItem(mode="minute", value=10),
+        description="Git操作限制"
+    )
+    download: RateLimitItem = Field(
+        default_factory=lambda: RateLimitItem(mode="minute", value=20),
+        description="下载限制"
+    )
 
 
 # 全局标志：记录是否已进行数据库URL验证（避免重复输出日志）

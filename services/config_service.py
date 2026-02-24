@@ -309,11 +309,36 @@ class ConfigService:
             return errors
 
         valid_limit_types = {"default_limits", "strict", "standard", "generous", "git_operations", "download"}
+        valid_modes = {"minute", "hour"}
+
         for key in rate_limit.keys():
             if key not in valid_limit_types:
                 errors.append(f"rate_limit 不支持 '{key}'，支持的类型: {', '.join(valid_limit_types)}")
-            elif not isinstance(rate_limit[key], list):
-                errors.append(f"rate_limit.{key} 必须是字符串数组")
+                continue
+
+            item = rate_limit[key]
+            # 支持新的对象格式: { mode: "minute|hour", value: number }
+            if isinstance(item, dict):
+                if "mode" not in item:
+                    errors.append(f"rate_limit.{key}.mode 是必填项")
+                elif item["mode"] not in valid_modes:
+                    errors.append(f"rate_limit.{key}.mode 必须是 'minute' 或 'hour'")
+
+                if "value" not in item:
+                    errors.append(f"rate_limit.{key}.value 是必填项")
+                else:
+                    try:
+                        value = int(item["value"])
+                        if value < 1:
+                            errors.append(f"rate_limit.{key}.value 必须是正整数")
+                    except (ValueError, TypeError):
+                        errors.append(f"rate_limit.{key}.value 必须是正整数")
+            # 向后兼容：支持旧的字符串数组格式
+            elif isinstance(item, list):
+                # 旧格式验证通过，但给出警告
+                pass
+            else:
+                errors.append(f"rate_limit.{key} 必须是对象 {{mode, value}} 或字符串数组")
 
         return errors
 
