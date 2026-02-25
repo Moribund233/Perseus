@@ -232,6 +232,11 @@ class DatabaseMigrationService:
         if schema_migrator and tables_failed == 0:
             logger.info("数据迁移完成，开始添加外键约束...")
             schema_migrator.add_pending_foreign_keys()
+
+            # 如果是 PostgreSQL，重置自增序列
+            if self.target_conn.db_type == DbType.POSTGRESQL:
+                logger.info("重置 PostgreSQL 自增序列...")
+                schema_migrator.reset_postgresql_sequences(sorted_tables)
         
         duration = time.time() - start_time
         self._close_connections()

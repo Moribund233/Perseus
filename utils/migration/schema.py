@@ -309,6 +309,77 @@ class SchemaMigrator:
                     logger.info(f"外键 {fk_dict.get('name')} 添加成功")
             except Exception as e:
                 logger.warning(f"外键 {fk_dict.get('name')} 添加失败: {e}")
+
+    def reset_postgresql_sequences(self, tables: Optional[List[str]] = None):
+        """
+        重置 PostgreSQL 表的自增序列
+
+        当从其他数据库迁移到 PostgreSQL 时，需要重置序列以确保
+        新插入的记录能获得正确的自增 ID。
+
+        Args:
+            tables: 要重置序列的表名列表，None 表示所有表
+        """
+        if self.target_conn.db_type != DbType.POSTGRESQL:
+            return
+
+        if tables is None:
+            tables = self.target_reader.get_all_tables()
+
+        for table_name in tables:
+            try:
+                schema = self.target_reader.get_table_schema(table_name)
+
+                # 找到自增主键列
+                for col in schema.columns:
+                    if col.autoincrement and col.name in schema.primary_keys:
+                        # 重置序列
+                        seq_name = f"{table_name}_{col.name}_seq"
+                        sql = f"""
+                            SELECT setval('{seq_name}', 
+                                (SELECT COALESCE(MAX({col.name}), 0) + 1 FROM {table_name}),
+                                false
+                            )
+                        """
+                        try:
+                            self.target_conn.execute(sql)
+                            logger.info(f"表 {table_name} 的序列 {seq_name} 已重置")
+                        except Exception as e:
+                            # 序列可能不存在，尝试创建
+                            logger.warning(f"重置序列失败 {seq_name}: {e}")
+                            self._create_sequence_if_not_exists(table_name, col.name)
+
+            except Exception as e:
+                logger.warning(f"重置表 {table_name} 序列失败: {e}")
+
+    def _create_sequence_if_not_exists(self, table_name: str, col_name: str):
+        """为 PostgreSQL 表创建自增序列（如果不存在）"""
+        seq_name = f"{table_name}_{col_name}_seq"
+
+        # 检查序列是否存在
+        check_sql = f"""
+            SELECT 1 FROM pg_sequences 
+            WHERE schemaname = 'public' AND sequencename = '{seq_name}'
+        """
+        result = self.target_conn.fetch_one(check_sql)
+
+        if not result:
+            # 创建序列
+            create_sql = f"""
+                CREATE SEQUENCE {seq_name};
+                SELECT setval('{seq_name}', 
+                    (SELECT COALESCE(MAX({col_name}), 0) + 1 FROM {table_name}),
+                    false
+                );
+                ALTER TABLE {table_name} 
+                    ALTER COLUMN {col_name} 
+                    SET DEFAULT nextval('{seq_name}');
+            """
+            try:
+                self.target_conn.execute(create_sql)
+                logger.info(f"为表 {table_name} 创建序列 {seq_name}")
+            except Exception as e:
+                logger.error(f"创建序列失败 {seq_name}: {e}")
     
     def _collect_foreign_keys(self, tables: List[str], results: Dict[str, tuple]):
         """收集外键约束，延迟添加"""
