@@ -203,10 +203,29 @@ const { isSaving, save } = useConfigSaver<ServerConfig>(
 )
 
 /**
+ * 准备要保存的配置数据（过滤掉不允许修改的字段）
+ */
+const prepareConfigForSave = (config: ServerConfig): ServerConfig => {
+  // 只提取允许修改的字段
+  const prepared: ServerConfig = {
+    server: {
+      host: config.server.host,
+      port: config.server.port,
+      workers: config.server.workers,
+      log_level: config.server.log_level
+    },
+    rate_limit: config.rate_limit ? { ...config.rate_limit } : undefined
+  }
+
+  return prepared
+}
+
+/**
  * 保存服务端配置
  */
 const saveServerConfig = async (): Promise<void> => {
-  await save(serverConfig.value, '服务端配置保存成功')
+  const configToSave = prepareConfigForSave(serverConfig.value)
+  await save(configToSave, '服务端配置保存成功')
 }
 
 /**

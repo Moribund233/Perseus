@@ -30,6 +30,10 @@ export const useLogStore = defineStore('logs', () => {
   const wsClient = getWebSocketLogClient()
   // 连接状态
   const connectionState = ref<LogClientState>(LogClientState.DISCONNECTED)
+  // 所有日志条目（跨页面保持）
+  const allLogs = ref<LogEntry[]>([])
+  // 总日志计数器（不受截断影响）
+  const totalLogCount = ref(0)
   // 最近的日志条目（用于全局通知）
   const recentLogs = ref<LogEntry[]>([])
   // 未读错误/警告数量
@@ -40,6 +44,12 @@ export const useLogStore = defineStore('logs', () => {
   const autoConnectEnabled = ref(true)
   // 连接错误信息
   const connectionError = ref<string | null>(null)
+  // 监听器取消函数
+  const unsubscribeHandlers = ref<(() => void)[]>([])
+
+  // 缓冲区配置
+  const MAX_LOGS_IN_MEMORY = 20000  // 内存中最大日志数
+  const LOGS_KEEP_AFTER_TRUNCATE = 15000  // 截断后保留的日志数
 
   // ============ Getters ============
   // 是否已连接
@@ -81,39 +91,59 @@ export const useLogStore = defineStore('logs', () => {
     try {
       connectionError.value = null
 
+      // 先取消之前的监听器（防止重复注册）
+      unsubscribeHandlers.value.forEach(unsub => unsub())
+      unsubscribeHandlers.value = []
+
       // 注册状态监听
-      wsClient.onStateChange((state) => {
+      const unsubState = wsClient.onStateChange((state) => {
         connectionState.value = state
       })
+      unsubscribeHandlers.value.push(unsubState)
 
       // 注册日志消息监听
-      wsClient.onLog((entry) => {
+      const unsubLog = wsClient.onLog((entry) => {
         handleNewLog(entry)
       })
+      unsubscribeHandlers.value.push(unsubLog)
 
       // 注册历史日志监听
-      wsClient.onHistory((logs) => {
-        // 只保留最近的日志用于通知
+      const unsubHistory = wsClient.onHistory((logs) => {
+        // 将历史日志添加到 allLogs（切换页面时能够显示历史日志）
+        // 使用 message + timestamp 组合作为唯一标识去重
+        const existingKeys = new Set(allLogs.value.map(l => `${l.timestamp}-${l.message}`))
+        const newLogs = logs.filter(l => !existingKeys.has(`${l.timestamp}-${l.message}`))
+        if (newLogs.length > 0) {
+          allLogs.value.push(...newLogs)
+          // 限制总数量
+          if (allLogs.value.length > MAX_LOGS_IN_MEMORY) {
+            allLogs.value = allLogs.value.slice(-LOGS_KEEP_AFTER_TRUNCATE)
+          }
+          // 更新计数器
+          totalLogCount.value += newLogs.length
+        }
         recentLogs.value = logs.slice(-20)
       })
+      unsubscribeHandlers.value.push(unsubHistory)
 
       // 注册错误监听
-      wsClient.onError((errMsg) => {
+      const unsubError = wsClient.onError((errMsg) => {
         connectionError.value = errMsg
         console.warn('WebSocket 日志连接错误:', errMsg)
       })
+      unsubscribeHandlers.value.push(unsubError)
 
       // 连接
       await wsClient.connect()
 
-      // 订阅日志（只订阅 ERROR 和 WARNING，减少流量）
+      // 订阅日志（订阅所有级别，用于全局日志收集）
       const filters: LogFilters = {
-        levels: ['ERROR', 'WARNING', 'CRITICAL']
+        levels: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
       }
 
       wsClient.subscribe({
         filters,
-        historyCount: 10  // 只获取最近10条
+        historyCount: 100  // 获取最近100条历史日志
       })
 
       isInitialized.value = true
@@ -128,6 +158,10 @@ export const useLogStore = defineStore('logs', () => {
    * 断开 WebSocket 连接
    */
   function disconnect(): void {
+    // 取消所有监听器
+    unsubscribeHandlers.value.forEach(unsub => unsub())
+    unsubscribeHandlers.value = []
+
     if (wsClient.isConnected()) {
       wsClient.unsubscribe()
       wsClient.disconnect()
@@ -140,6 +174,15 @@ export const useLogStore = defineStore('logs', () => {
    * 处理新日志条目
    */
   function handleNewLog(entry: LogEntry): void {
+    // 添加到所有日志（跨页面保持）
+    allLogs.value.push(entry)
+    totalLogCount.value++
+
+    // 限制内存中的日志数量
+    if (allLogs.value.length > MAX_LOGS_IN_MEMORY) {
+      allLogs.value = allLogs.value.slice(-LOGS_KEEP_AFTER_TRUNCATE)
+    }
+
     // 添加到最近日志
     recentLogs.value.push(entry)
     // 限制数量
@@ -169,6 +212,16 @@ export const useLogStore = defineStore('logs', () => {
   }
 
   /**
+   * 清除所有日志（包括跨页面保持的日志）
+   */
+  function clearAllLogs(): void {
+    allLogs.value = []
+    totalLogCount.value = 0
+    recentLogs.value = []
+    unreadErrorCount.value = 0
+  }
+
+  /**
    * 重新连接
    */
   async function reconnect(serviceRunning: boolean = true): Promise<void> {
@@ -179,6 +232,8 @@ export const useLogStore = defineStore('logs', () => {
   return {
     // State
     connectionState,
+    allLogs,
+    totalLogCount,
     recentLogs,
     unreadErrorCount,
     isInitialized,
@@ -194,6 +249,8 @@ export const useLogStore = defineStore('logs', () => {
     disconnect,
     reconnect,
     clearUnreadErrors,
-    clearRecentLogs
+    clearRecentLogs,
+    clearAllLogs,
+    handleNewLog
   }
 })

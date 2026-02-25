@@ -6,10 +6,10 @@ import {
 } from '../services/api'
 import {
   getWebSocketLogClient,
-  type LogEntry,
   type LogFilters,
   LogClientState
 } from '../services/websocketLog'
+import { useLogStore } from '../stores/logs'
 
 /**
  * 日志级别类型
@@ -24,67 +24,23 @@ const downloadIcon = new URL('../assets/icons/download.svg', import.meta.url).hr
 const trashIcon = new URL('../assets/icons/trash.svg', import.meta.url).href
 const logIcon = new URL('../assets/icons/log.svg', import.meta.url).href
 
-// 日志数据
-const logEntries = ref<LogEntry[]>([])
+// 使用日志 store（跨页面保持数据）
+const logStore = useLogStore()
+
+// 本地状态
 const selectedLevel = ref<LogLevel>('all')
 const searchQuery = ref('')
 const linesCount = ref(100)
 const error = ref<string | null>(null)
 const isServiceRunningStatus = ref<boolean>(false)
-const wsState = ref<LogClientState>(LogClientState.DISCONNECTED)
+
+// 从 store 获取状态
+const wsState = computed(() => logStore.connectionState)
+const logEntries = computed(() => logStore.allLogs)
+const totalLogCount = computed(() => logStore.totalLogCount)
 
 // WebSocket 客户端
 const wsClient = getWebSocketLogClient()
-
-// 批量更新相关
-const pendingLogs = ref<LogEntry[]>([])
-let batchUpdateTimer: number | null = null
-const BATCH_INTERVAL = 100 // 批量更新间隔（毫秒）
-
-// 执行批量更新
-const flushPendingLogs = () => {
-  if (pendingLogs.value.length === 0) return
-  
-  const newEntries = pendingLogs.value
-  pendingLogs.value = []
-  
-  // 使用 requestAnimationFrame 优化渲染
-  requestAnimationFrame(() => {
-    logEntries.value.push(...newEntries)
-    // 限制内存中的日志数量
-    if (logEntries.value.length > 5000) {
-      logEntries.value = logEntries.value.slice(-3000)
-    }
-  })
-}
-
-// 添加日志到待处理队列
-const queueLogEntry = (entry: LogEntry) => {
-  pendingLogs.value.push(entry)
-  
-  // 如果队列太长，立即刷新
-  if (pendingLogs.value.length >= 50) {
-    flushPendingLogs()
-  }
-}
-
-// 启动批量更新定时器
-const startBatchTimer = () => {
-  if (batchUpdateTimer) return
-  batchUpdateTimer = window.setInterval(() => {
-    flushPendingLogs()
-  }, BATCH_INTERVAL)
-}
-
-// 停止批量更新定时器
-const stopBatchTimer = () => {
-  if (batchUpdateTimer) {
-    clearInterval(batchUpdateTimer)
-    batchUpdateTimer = null
-  }
-  // 刷新剩余日志
-  flushPendingLogs()
-}
 
 // 日志级别配置
 const logLevels: { value: LogLevel; label: string; class: string }[] = [
@@ -219,35 +175,15 @@ const connectWebSocket = async (loadHistory: boolean = true) => {
   }
 
   try {
-    // 注册状态监听
-    wsClient.onStateChange((state) => {
-      wsState.value = state
-    })
+    // 注意：日志消息监听由 store 统一处理，这里不再重复注册
+    // store 中的 handleNewLog 会处理所有日志条目
 
-    // 注册日志消息监听（使用批量更新）
-    wsClient.onLog((entry) => {
-      queueLogEntry(entry)
-    })
+    // 如果 WebSocket 未连接，先建立连接
+    if (!wsClient.isConnected()) {
+      await wsClient.connect()
+    }
 
-    // 注册历史日志监听
-    wsClient.onHistory((logs) => {
-      if (loadHistory) {
-        logEntries.value = logs
-      }
-    })
-
-    // 注册错误监听
-    wsClient.onError((errMsg) => {
-      error.value = errMsg
-    })
-
-    // 连接
-    await wsClient.connect()
-
-    // 启动批量更新定时器
-    startBatchTimer()
-
-    // 订阅日志
+    // 订阅日志（使用当前页面的过滤器设置）
     const filters: LogFilters = {
       levels: selectedLevel.value === 'all'
         ? ['DEBUG', 'INFO', 'WARNING', 'ERROR']
@@ -268,23 +204,19 @@ const connectWebSocket = async (loadHistory: boolean = true) => {
  * 断开 WebSocket 连接
  */
 const disconnectWebSocket = () => {
-  stopBatchTimer()
   wsClient.unsubscribe()
   wsClient.disconnect()
 }
 
 /**
  * 刷新日志
- * 清空当前日志并重新连接，不加载历史日志
+ * 重新连接 WebSocket，不清空日志
  */
 const refreshLogs = async (): Promise<void> => {
   await checkServiceStatus()
 
   if (isServiceRunningStatus.value) {
-    // 清空当前日志显示
-    logEntries.value = []
-
-    // 重新连接 WebSocket，不加载历史日志
+    // 重新连接 WebSocket，不清空日志
     disconnectWebSocket()
     await connectWebSocket(false)
   }
@@ -292,19 +224,18 @@ const refreshLogs = async (): Promise<void> => {
 
 /**
  * 重新连接 WebSocket
- * 清空当前日志并重新连接，不加载历史日志
+ * 不清空日志
  */
 const reconnectWebSocket = async () => {
-  logEntries.value = []
   disconnectWebSocket()
   await connectWebSocket(false)
 }
 
 /**
- * 清空日志显示
+ * 清空显示（保留连接）
  */
 const clearDisplay = (): void => {
-  logEntries.value = []
+  logStore.clearAllLogs()
 }
 
 /**
@@ -339,11 +270,20 @@ const scrollToBottom = (): void => {
 }
 
 onMounted(() => {
-  refreshLogs()
+  // 先检查服务状态
+  checkServiceStatus().then(() => {
+    if (isServiceRunningStatus.value) {
+      // 如果 store 中已有连接，只重新订阅（使用当前页面的过滤器设置）
+      // 如果 store 中没有连接，则建立新连接
+      connectWebSocket(true)
+    }
+  })
 })
 
 onUnmounted(() => {
-  disconnectWebSocket()
+  // 切换页面时取消订阅，但保持 WebSocket 连接（由 store 管理）
+  // 这样切换回来时可以快速恢复
+  wsClient.unsubscribe()
 })
 </script>
 
@@ -451,7 +391,7 @@ onUnmounted(() => {
 
     <!-- 日志统计 -->
     <div class="log-stats card">
-      <span>总条目: {{ logEntries.length }}</span>
+      <span>总条目: {{ totalLogCount }}</span>
       <span>显示: {{ filteredLogEntries.length }}</span>
       <span v-if="wsState === LogClientState.SUBSCRIBED" class="tag tag-success">实时</span>
       <span v-else class="tag tag-warning">静态</span>

@@ -707,43 +707,55 @@ pub fn update_database_url(db_type: String, url: String) -> Result<(), String> {
 ///
 /// 返回已安装的数据库类型列表：["sqlite", "postgresql", "mysql"]
 /// - SQLite: 总是可用（内置于 Python）
-/// - PostgreSQL: 检查 pg8000 驱动是否可用
-/// - MySQL: 检查 pymysql 驱动是否可用
+/// - PostgreSQL: 检查 psql/pg_isready 命令是否存在
+/// - MySQL: 检查 mysql/mysqld 命令是否存在
 #[tauri::command]
 pub async fn check_installed_databases() -> Result<Vec<String>, String> {
     let mut installed = vec!["sqlite".to_string()];
 
-    // 检查 PostgreSQL 驱动 (pg8000)
-    match check_python_module("pg8000").await {
-        Ok(true) => installed.push("postgresql".to_string()),
-        Ok(false) => log::info!("PostgreSQL 驱动 (pg8000) 未安装"),
-        Err(e) => log::warn!("检查 PostgreSQL 驱动失败: {}", e),
+    // 检查 PostgreSQL (psql 或 pg_isready)
+    if check_any_command_exists(&["psql", "pg_isready"]).await {
+        installed.push("postgresql".to_string());
+        log::info!("PostgreSQL 已安装");
     }
 
-    // 检查 MySQL 驱动 (pymysql)
-    match check_python_module("pymysql").await {
-        Ok(true) => installed.push("mysql".to_string()),
-        Ok(false) => log::info!("MySQL 驱动 (pymysql) 未安装"),
-        Err(e) => log::warn!("检查 MySQL 驱动失败: {}", e),
+    // 检查 MySQL (mysql 或 mysqld)
+    if check_any_command_exists(&["mysql", "mysqld"]).await {
+        installed.push("mysql".to_string());
+        log::info!("MySQL 已安装");
     }
 
     log::info!("已安装的数据库: {:?}", installed);
     Ok(installed)
 }
 
-/// 检查 Python 模块是否可用
-///
-/// 通过执行 Python 解释器检查指定模块是否可以导入
-async fn check_python_module(module_name: &str) -> Result<bool, String> {
-    use tokio::process::Command;
+/// 检查任一命令是否存在
+async fn check_any_command_exists(commands: &[&str]) -> bool {
+    for cmd in commands {
+        if check_command_exists(cmd).await.unwrap_or(false) {
+            return true;
+        }
+    }
+    false
+}
 
-    let output = Command::new("python")
-        .args(["-c", &format!("import {}", module_name)])
+/// 检查命令是否存在
+#[cfg(target_os = "windows")]
+async fn check_command_exists(command: &str) -> Result<bool, std::io::Error> {
+    tokio::process::Command::new("where")
+        .arg(command)
         .output()
         .await
-        .map_err(|e| format!("执行 Python 命令失败: {}", e))?;
+        .map(|output| output.status.success())
+}
 
-    Ok(output.status.success())
+#[cfg(not(target_os = "windows"))]
+async fn check_command_exists(command: &str) -> Result<bool, std::io::Error> {
+    tokio::process::Command::new("which")
+        .arg(command)
+        .output()
+        .await
+        .map(|output| output.status.success())
 }
 
 // ==================== 数据库连接测试命令 ====================
