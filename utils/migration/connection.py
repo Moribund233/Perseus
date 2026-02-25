@@ -54,16 +54,26 @@ def create_database_if_not_exists(url: str, db_type: DbType) -> Tuple[bool, Opti
             server_url = url.replace(f"/{database_name}", "/postgres", 1) if f"/{database_name}" in url else url
             server_url = dialect.to_sync_url(server_url)
             engine = create_engine(server_url, pool_pre_ping=True)
+            
+            # 检查数据库是否存在
             with engine.connect() as conn:
                 result = conn.execute(text(f"SELECT 1 FROM pg_database WHERE datname = '{database_name}'"))
-                if not result.fetchone():
-                    conn.commit()
-                    conn.close()
-                    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as autocommit_conn:
-                        autocommit_conn.execute(text(f'CREATE DATABASE "{database_name}"'))
-                    logger.info(f"PostgreSQL 数据库 '{database_name}' 已创建")
-                else:
-                    logger.info(f"PostgreSQL 数据库 '{database_name}' 已存在")
+                db_exists = result.fetchone() is not None
+            
+            if not db_exists:
+                # 使用 AUTOCOMMIT 模式创建数据库（CREATE DATABASE 不能在事务中执行）
+                autocommit_engine = create_engine(
+                    server_url, 
+                    pool_pre_ping=True, 
+                    isolation_level="AUTOCOMMIT"
+                )
+                with autocommit_engine.connect() as conn:
+                    conn.execute(text(f'CREATE DATABASE "{database_name}"'))
+                autocommit_engine.dispose()
+                logger.info(f"PostgreSQL 数据库 '{database_name}' 已创建")
+            else:
+                logger.info(f"PostgreSQL 数据库 '{database_name}' 已存在")
+            
             engine.dispose()
             return True, None
 
