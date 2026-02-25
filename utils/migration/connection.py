@@ -57,7 +57,10 @@ def create_database_if_not_exists(url: str, db_type: DbType) -> Tuple[bool, Opti
             with engine.connect() as conn:
                 result = conn.execute(text(f"SELECT 1 FROM pg_database WHERE datname = '{database_name}'"))
                 if not result.fetchone():
-                    conn.execute(text(f'CREATE DATABASE "{database_name}"'))
+                    conn.commit()
+                    conn.close()
+                    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as autocommit_conn:
+                        autocommit_conn.execute(text(f'CREATE DATABASE "{database_name}"'))
                     logger.info(f"PostgreSQL 数据库 '{database_name}' 已创建")
                 else:
                     logger.info(f"PostgreSQL 数据库 '{database_name}' 已存在")
