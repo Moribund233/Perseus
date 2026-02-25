@@ -197,9 +197,10 @@ class DatabaseMigrationService:
         total_rows_failed = 0
         errors: List[Dict[str, Any]] = []
 
+        schema_migrator = None
         if migrate_schema:
             schema_migrator = SchemaMigrator(self.source_conn, self.target_conn)
-            schema_results = schema_migrator.migrate(sorted_tables)
+            schema_results = schema_migrator.migrate(sorted_tables, defer_foreign_keys=True)
 
             for table_name, (success, error_msg) in schema_results.items():
                 if not success:
@@ -226,6 +227,11 @@ class DatabaseMigrationService:
                 tables_failed += 1
                 logger.error(f"表 {table_name} 迁移异常: {e}")
                 errors.append({"table": table_name, "error": str(e)})
+        
+        # 数据迁移完成后，添加外键约束
+        if schema_migrator and tables_failed == 0:
+            logger.info("数据迁移完成，开始添加外键约束...")
+            schema_migrator.add_pending_foreign_keys()
         
         duration = time.time() - start_time
         self._close_connections()

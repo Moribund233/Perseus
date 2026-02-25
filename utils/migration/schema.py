@@ -251,13 +251,15 @@ class SchemaMigrator:
         self.target_conn = target_conn
         self.source_reader = SchemaReader(source_conn)
         self.target_reader = SchemaReader(target_conn)
+        self._pending_foreign_keys: List[tuple] = []
     
-    def migrate(self, tables: Optional[List[str]] = None) -> Dict[str, tuple]:
+    def migrate(self, tables: Optional[List[str]] = None, defer_foreign_keys: bool = True) -> Dict[str, tuple]:
         """
         迁移表结构
         
         Args:
             tables: 要迁移的表名列表，None 表示迁移所有表
+            defer_foreign_keys: 是否延迟添加外键约束（数据迁移完成后再添加）
         
         Returns:
             Dict[str, Tuple[bool, Optional[str]]]: 表名 -> (是否成功, 错误信息)
@@ -267,6 +269,7 @@ class SchemaMigrator:
         
         results = {}
         target_tables = set(self.target_reader.get_all_tables())
+        self._pending_foreign_keys = []
         
         for table_name in tables:
             try:
@@ -283,10 +286,41 @@ class SchemaMigrator:
                 logger.error(f"表 {table_name} 创建失败: {error_msg}")
                 results[table_name] = (False, error_msg)
         
-        self._add_foreign_keys(tables, results)
+        if defer_foreign_keys:
+            self._collect_foreign_keys(tables, results)
+        else:
+            self._add_foreign_keys(tables, results)
+        
         self._create_indexes(tables, results)
         
         return results
+    
+    def add_pending_foreign_keys(self):
+        """
+        添加延迟的外键约束
+        在数据迁移完成后调用，避免外键约束导致的数据插入失败
+        """
+        for table_name, fk_dict in self._pending_foreign_keys:
+            try:
+                dialect = self.target_conn.dialect
+                sql = dialect.add_foreign_key(table_name, fk_dict)
+                if sql:
+                    self.target_conn.execute(sql)
+                    logger.info(f"外键 {fk_dict.get('name')} 添加成功")
+            except Exception as e:
+                logger.warning(f"外键 {fk_dict.get('name')} 添加失败: {e}")
+    
+    def _collect_foreign_keys(self, tables: List[str], results: Dict[str, tuple]):
+        """收集外键约束，延迟添加"""
+        for table_name in tables:
+            if not results.get(table_name, (False, None))[0]:
+                continue
+            
+            schema = self.source_reader.get_table_schema(table_name)
+            
+            for fk in schema.foreign_keys:
+                self._pending_foreign_keys.append((table_name, fk.to_dict()))
+                logger.debug(f"收集外键 {fk.name} (表: {table_name}) 待延迟添加")
     
     def _create_table(self, table_name: str):
         """创建表"""
