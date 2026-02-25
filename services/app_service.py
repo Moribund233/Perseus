@@ -47,24 +47,26 @@ def _get_restart_command() -> List[str]:
     """
     获取重启命令
 
+    根据当前运行环境返回适当的重启命令。
+    支持Python脚本、PyInstaller可执行文件等模式。
+
     Returns:
         List[str]: 命令列表，可直接用于 subprocess
     """
-    import psutil
+    executable = sys.executable.lower()
 
-    current_process = psutil.Process()
+    # PyInstaller打包的可执行文件
+    # 特征: sys.frozen为True，或executable不是python解释器
+    if getattr(sys, 'frozen', False):
+        return [sys.executable]
 
-    try:
-        cmdline = current_process.cmdline()
-        if cmdline and len(cmdline) > 1:
-            return cmdline
-    except Exception:
-        pass
+    # 检查是否为PyInstaller单文件模式（Linux下frozen可能为False）
+    if not executable.endswith(('.exe', 'python', 'python3')):
+        return [sys.executable]
 
-    python = sys.executable
+    # Python脚本模式
     script = sys.argv[0] if sys.argv else "app.py"
-
-    return [python, script]
+    return [sys.executable, script]
 
 
 class AppService:
@@ -98,6 +100,10 @@ class AppService:
         """
         关闭应用
 
+        支持单进程(Uvicorn)和多进程(Gunicorn)模式：
+        - 单进程模式：直接触发关闭流程
+        - 多进程模式：通过IPC通知所有worker关闭
+
         Args:
             is_debug: 是否调试模式
             is_admin: 是否管理员
@@ -111,31 +117,22 @@ class AppService:
         def _shutdown():
             """执行关闭流程"""
             import time
-            import asyncio
-
             time.sleep(0.5)
 
-            if not force:
-                try:
-                    from lifespan import get_lifecycle_manager
+            try:
+                from lifespan import trigger_graceful_shutdown
+                
+                # 使用新的生命周期管理接口触发关闭
+                # 支持单进程和多进程模式
+                success = trigger_graceful_shutdown(reason="api_request")
+                
+                if not success:
+                    logger.error("触发关闭失败，将强制终止")
+                    _terminate_process()
                     
-                    manager = get_lifecycle_manager()
-                    
-                    try:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        loop.run_until_complete(manager.shutdown())
-                        loop.close()
-                        _terminate_process()
-                        return
-                    except Exception as loop_error:
-                        logger.error(f"事件循环执行失败: {loop_error}")
-                        raise
-                        
-                except Exception as e:
-                    logger.error(f"优雅关闭失败，将强制终止: {e}")
-
-            _terminate_process()
+            except Exception as e:
+                logger.error(f"优雅关闭失败，将强制终止: {e}")
+                _terminate_process()
 
         import threading
         shutdown_thread = threading.Thread(target=_shutdown)

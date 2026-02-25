@@ -5,12 +5,15 @@
 - 启动时初始化：数据库连接池、WebSocket管理器、日志系统
 - 关闭时清理：优雅关闭WebSocket连接、释放数据库连接池、停止后台任务
 
+支持单进程(Uvicorn)和多进程(Gunicorn)两种模式
+
 使用 FastAPI 的 lifespan 上下文管理器实现
 """
+import os
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Dict, Any
+from typing import AsyncGenerator, Dict, Any, Optional
 
 from fastapi import FastAPI
 
@@ -25,12 +28,65 @@ class AppLifecycleManager:
     应用生命周期管理器
     
     管理应用启动和关闭时的资源初始化和清理工作
+    支持单进程和多进程(Gunicorn)模式
     """
     
     def __init__(self):
         self._shutdown_event = asyncio.Event()
         self._websocket_manager = websocket_manager
         self._is_shutting_down = False
+        self._is_worker = False
+        self._worker_id: Optional[int] = None
+        self._ipc_manager: Optional[Any] = None
+    
+    def setup_for_worker(self, worker_id: int, master_pid: int) -> None:
+        """
+        设置为Worker模式（Gunicorn worker使用）
+        
+        Args:
+            worker_id: Worker ID
+            master_pid: Master进程PID
+        """
+        self._is_worker = True
+        self._worker_id = worker_id
+        
+        # 初始化IPC管理器
+        from utils.ipc_manager import get_ipc_manager
+        self._ipc_manager = get_ipc_manager()
+        self._ipc_manager.initialize_worker(worker_id, master_pid)
+        
+        # 注册关闭回调
+        self._ipc_manager.register_shutdown_callback(self._on_ipc_shutdown)
+        
+        logger.info(f"生命周期管理器已设置为Worker模式 (ID: {worker_id})")
+    
+    def setup_for_master(self, master_pid: int) -> None:
+        """
+        设置为Master模式（Gunicorn master使用）
+        
+        Args:
+            master_pid: Master进程PID
+        """
+        self._is_worker = False
+        
+        # 初始化IPC管理器
+        from utils.ipc_manager import get_ipc_manager
+        self._ipc_manager = get_ipc_manager()
+        self._ipc_manager.initialize_master(master_pid)
+        
+        logger.info(f"生命周期管理器已设置为Master模式 (PID: {master_pid})")
+    
+    def _on_ipc_shutdown(self) -> None:
+        """IPC触发的关闭回调"""
+        logger.info("收到IPC关闭信号，执行清理...")
+        # 创建新的事件循环来执行异步清理
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.shutdown())
+            loop.close()
+        except Exception as e:
+            logger.error(f"IPC关闭回调执行失败: {e}")
     
     async def startup(self) -> None:
         """
@@ -56,8 +112,16 @@ class AppLifecycleManager:
         self._is_shutting_down = True
         self._shutdown_event.set()
         
+        logger.info("开始执行关闭流程...")
+        
         await self._shutdown_websocket_connections()
         await self._dispose_database_engine()
+        
+        # 清理IPC资源
+        if self._ipc_manager:
+            self._ipc_manager.stop_monitor()
+        
+        logger.info("关闭流程执行完成")
     
     async def _verify_database_connection(self) -> None:
         """验证数据库连接是否正常"""
@@ -129,6 +193,53 @@ class AppLifecycleManager:
     async def wait_for_shutdown(self) -> None:
         """等待关闭信号"""
         await self._shutdown_event.wait()
+    
+    def request_graceful_shutdown(self, reason: str = "manual") -> bool:
+        """
+        请求优雅关闭
+        
+        在Gunicorn模式下，通过IPC通知所有worker关闭
+        在单进程模式下，直接触发关闭
+        
+        Args:
+            reason: 关闭原因
+            
+        Returns:
+            bool: 是否成功触发关闭
+        """
+        if self._ipc_manager:
+            # 多进程模式：使用IPC通知
+            return self._ipc_manager.request_shutdown(reason)
+        else:
+            # 单进程模式：直接触发
+            asyncio.create_task(self._trigger_single_process_shutdown())
+            return True
+    
+    async def _trigger_single_process_shutdown(self) -> None:
+        """单进程模式下的关闭触发"""
+        try:
+            # 给响应一点时间返回
+            await asyncio.sleep(0.5)
+            
+            # 触发关闭
+            await self.shutdown()
+            
+            # 终止进程
+            import signal
+            
+            pid = os.getpid()
+            logger.info(f"发送终止信号到进程 {pid}")
+            
+            if os.name == 'nt':  # Windows
+                os.kill(pid, signal.SIGTERM)
+            else:  # Unix/Linux/Mac
+                os.kill(pid, signal.SIGTERM)
+                
+        except Exception as e:
+            logger.error(f"执行关闭流程时出错: {e}")
+            # 强制退出
+            import sys
+            sys.exit(1)
 
 
 # 全局生命周期管理器实例
@@ -143,6 +254,12 @@ def get_lifecycle_manager() -> AppLifecycleManager:
         AppLifecycleManager: 生命周期管理器实例
     """
     return _lifecycle_manager
+
+
+def reset_lifecycle_manager() -> None:
+    """重置生命周期管理器实例（用于测试）"""
+    global _lifecycle_manager
+    _lifecycle_manager = AppLifecycleManager()
 
 
 @asynccontextmanager
@@ -170,42 +287,31 @@ async def app_lifespan(app: FastAPI) -> AsyncGenerator[Dict[str, Any], None]:
         await manager.shutdown()
 
 
-def trigger_graceful_shutdown() -> None:
+def trigger_graceful_shutdown(reason: str = "manual") -> bool:
     """
     触发优雅关闭
     
     可以被外部调用（如shutdown接口）来触发应用关闭流程
+    支持单进程和多进程(Gunicorn)模式
+    
+    Args:
+        reason: 关闭原因
+        
+    Returns:
+        bool: 是否成功触发关闭
     """
     manager = get_lifecycle_manager()
+    return manager.request_graceful_shutdown(reason)
+
+
+def is_shutdown_requested() -> bool:
+    """
+    检查是否已请求关闭
     
-    # 在后台任务中执行关闭，避免阻塞当前请求
-    asyncio.create_task(_execute_shutdown(manager))
-
-
-async def _execute_shutdown(manager: AppLifecycleManager) -> None:
-    """执行关闭流程"""
-    try:
-        # 给响应一点时间返回
-        await asyncio.sleep(0.5)
-        
-        # 触发关闭
-        await manager.shutdown()
-        
-        # 终止进程
-        import os
-        import signal
-        import sys
-        
-        pid = os.getpid()
-        logger.info(f"发送终止信号到进程 {pid}")
-        
-        if os.name == 'nt':  # Windows
-            os.kill(pid, signal.SIGTERM)
-        else:  # Unix/Linux/Mac
-            os.kill(pid, signal.SIGTERM)
-            
-    except Exception as e:
-        logger.error(f"执行关闭流程时出错: {e}")
-        # 强制退出
-        import sys
-        sys.exit(1)
+    Returns:
+        bool: 是否已请求关闭
+    """
+    manager = get_lifecycle_manager()
+    if manager._ipc_manager:
+        return manager._ipc_manager.is_shutdown_requested()
+    return manager.is_shutting_down()

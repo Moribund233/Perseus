@@ -41,11 +41,13 @@ def generate_default_config() -> Dict[str, Any]:
     config_dict = default_config.model_dump()
 
     # 默认配置：禁用 reload（避免打包后反复重启）
-    config_dict["server"]["workers"] = 1
     config_dict["server"]["reload"] = False
 
+    # Gunicorn配置：根据CPU核心数设置workers（仅非Windows平台）
     if sys.platform != "win32":
-        config_dict["server"]["workers"] = min(4, os.cpu_count() or 2)
+        config_dict["gunicorn"]["workers"] = min(4, os.cpu_count() or 2)
+    else:
+        config_dict["gunicorn"]["workers"] = 1
 
     config_dict["system"] = system_info
 

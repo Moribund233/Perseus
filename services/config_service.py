@@ -19,10 +19,16 @@ class ConfigService:
     提供配置管理功能
     """
 
-    ALLOWED_CONFIG_SECTIONS = {"server", "proxy", "rate_limit", "cors", "database"}
+    ALLOWED_CONFIG_SECTIONS = {"server", "gunicorn", "proxy", "rate_limit", "cors", "database"}
     PROTECTED_CONFIG_SECTIONS = {"storage", "security", "app", "logging", "system"}
     RESTART_REQUIRED_CONFIGS = {
-        "server": {"host", "port", "workers", "log_level"},
+        "server": {"host", "port", "log_level"},
+        "gunicorn": {
+            "workers", "worker_class", "threads", "worker_connections", "backlog",
+            "timeout", "graceful_timeout", "keepalive", "max_requests", "max_requests_jitter",
+            "preload_app", "daemon", "access_log", "access_log_format", "capture_output",
+            "enable_reuse_port"
+        },
         "proxy": {"proxy"},
         "cors": {"allow_origins", "allow_credentials", "allow_methods", "allow_headers", "max_age"},
         "rate_limit": {"default_limits", "strict", "standard", "generous", "git_operations", "download"},
@@ -236,6 +242,9 @@ class ConfigService:
         if "server" in config_data:
             errors.extend(self._validate_server_config(config_data["server"]))
 
+        if "gunicorn" in config_data:
+            errors.extend(self._validate_gunicorn_config(config_data["gunicorn"]))
+
         if "proxy" in config_data:
             errors.extend(self._validate_proxy_config(config_data["proxy"]))
 
@@ -285,6 +294,95 @@ class ConfigService:
             valid_levels = {"debug", "info", "warning", "error", "critical"}
             if server["log_level"] not in valid_levels:
                 errors.append(f"日志级别必须是以下之一: {', '.join(valid_levels)}")
+
+        return errors
+
+    def _validate_gunicorn_config(self, gunicorn: Any) -> List[str]:
+        """验证Gunicorn配置"""
+        errors = []
+        if not isinstance(gunicorn, dict):
+            errors.append("gunicorn 配置必须是对象")
+            return errors
+
+        # 验证workers
+        if "workers" in gunicorn:
+            try:
+                workers = int(gunicorn["workers"])
+                if workers < 1 or workers > 32:
+                    errors.append("Gunicorn workers 必须是1-32之间的整数")
+            except (ValueError, TypeError):
+                errors.append("Gunicorn workers 必须是1-32之间的整数")
+
+        # 验证worker_class
+        if "worker_class" in gunicorn:
+            if not isinstance(gunicorn["worker_class"], str) or not gunicorn["worker_class"]:
+                errors.append("Gunicorn worker_class 不能为空")
+
+        # 验证threads
+        if "threads" in gunicorn:
+            try:
+                threads = int(gunicorn["threads"])
+                if threads < 1:
+                    errors.append("Gunicorn threads 必须是正整数")
+            except (ValueError, TypeError):
+                errors.append("Gunicorn threads 必须是正整数")
+
+        # 验证worker_connections
+        if "worker_connections" in gunicorn:
+            try:
+                conn = int(gunicorn["worker_connections"])
+                if conn < 100:
+                    errors.append("Gunicorn worker_connections 必须至少为100")
+            except (ValueError, TypeError):
+                errors.append("Gunicorn worker_connections 必须是整数")
+
+        # 验证backlog
+        if "backlog" in gunicorn:
+            try:
+                backlog = int(gunicorn["backlog"])
+                if backlog < 128:
+                    errors.append("Gunicorn backlog 必须至少为128")
+            except (ValueError, TypeError):
+                errors.append("Gunicorn backlog 必须是整数")
+
+        # 验证超时配置
+        for timeout_field in ["timeout", "graceful_timeout", "keepalive"]:
+            if timeout_field in gunicorn:
+                try:
+                    val = int(gunicorn[timeout_field])
+                    if val < 1:
+                        errors.append(f"Gunicorn {timeout_field} 必须是正整数")
+                except (ValueError, TypeError):
+                    errors.append(f"Gunicorn {timeout_field} 必须是正整数")
+
+        # 验证max_requests
+        if "max_requests" in gunicorn:
+            try:
+                max_req = int(gunicorn["max_requests"])
+                if max_req < 1000:
+                    errors.append("Gunicorn max_requests 必须至少为1000")
+            except (ValueError, TypeError):
+                errors.append("Gunicorn max_requests 必须是整数")
+
+        # 验证max_requests_jitter
+        if "max_requests_jitter" in gunicorn:
+            try:
+                jitter = int(gunicorn["max_requests_jitter"])
+                if jitter < 0:
+                    errors.append("Gunicorn max_requests_jitter 必须是非负整数")
+            except (ValueError, TypeError):
+                errors.append("Gunicorn max_requests_jitter 必须是非负整数")
+
+        # 验证布尔值配置
+        for bool_field in ["preload_app", "daemon", "access_log", "capture_output", "enable_reuse_port"]:
+            if bool_field in gunicorn:
+                if not isinstance(gunicorn[bool_field], bool):
+                    errors.append(f"Gunicorn {bool_field} 必须是布尔值")
+
+        # 验证access_log_format
+        if "access_log_format" in gunicorn:
+            if not isinstance(gunicorn["access_log_format"], str):
+                errors.append("Gunicorn access_log_format 必须是字符串")
 
         return errors
 

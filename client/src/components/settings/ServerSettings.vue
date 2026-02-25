@@ -5,14 +5,16 @@ import {
   updateAppConfig,
   validateAppConfig,
   type ConfigResponse,
-  type RateLimitItem
+  type RateLimitItem,
+  type GunicornConfig
 } from '../../services/api'
 import { useServiceStore } from '../../stores'
 
 /**
  * 服务端配置组件
  *
- * 提供服务端主机、端口、工作进程数、日志级别等配置
+ * 提供服务端主机、端口、日志级别等配置（开发模式）
+ * Gunicorn生产环境配置
  * 支持限流配置（分钟或小时二选一模式）
  */
 
@@ -48,6 +50,8 @@ const selectedRateLimitMode = ref<RateLimitMode>('default_limits')
 const rateLimitMode = ref<'minute' | 'hour'>('minute')
 const rateLimitValue = ref(200)
 
+
+
 /**
  * 限流配置类型
  */
@@ -67,10 +71,29 @@ interface ServerConfig {
   server: {
     host: string
     port: number
-    workers: number
     log_level: string
   }
+  gunicorn: GunicornConfig
   rate_limit?: RateLimitConfig
+}
+
+// Gunicorn默认值
+const defaultGunicornConfig: GunicornConfig = {
+  workers: 4,
+  worker_class: 'gunicorn_worker.LanGitUvicornWorker',
+  threads: 1,
+  worker_connections: 1000,
+  backlog: 2048,
+  timeout: 30,
+  graceful_timeout: 30,
+  keepalive: 2,
+  max_requests: 10000,
+  max_requests_jitter: 1000,
+  preload_app: false,
+  daemon: false,
+  access_log: true,
+  capture_output: true,
+  enable_reuse_port: true
 }
 
 // 服务端配置（仅包含允许修改的字段）
@@ -78,9 +101,9 @@ const serverConfig = ref<ServerConfig>({
   server: {
     host: '0.0.0.0',
     port: 8000,
-    workers: 1,
     log_level: 'info'
   },
+  gunicorn: { ...defaultGunicornConfig },
   rate_limit: {
     default_limits: { mode: 'minute', value: 200 },
     strict: { mode: 'minute', value: 5 },
@@ -90,6 +113,9 @@ const serverConfig = ref<ServerConfig>({
     download: { mode: 'minute', value: 20 }
   }
 })
+
+// 当前激活的配置标签页
+const activeTab = ref<'server' | 'gunicorn' | 'ratelimit'>('server')
 
 /**
  * 获取指定模式的限流配置
@@ -139,6 +165,9 @@ const syncConfig = (newConfig: typeof serverConfigFromStore.value) => {
   if (!newConfig) return
   if (newConfig.server) {
     serverConfig.value.server = { ...serverConfig.value.server, ...newConfig.server }
+  }
+  if (newConfig.gunicorn) {
+    serverConfig.value.gunicorn = { ...serverConfig.value.gunicorn, ...newConfig.gunicorn }
   }
   if (newConfig.rate_limit) {
     serverConfig.value.rate_limit = { ...serverConfig.value.rate_limit, ...newConfig.rate_limit }
@@ -211,8 +240,24 @@ const prepareConfigForSave = (config: ServerConfig): ServerConfig => {
     server: {
       host: config.server.host,
       port: config.server.port,
-      workers: config.server.workers,
       log_level: config.server.log_level
+    },
+    gunicorn: {
+      workers: config.gunicorn.workers,
+      worker_class: config.gunicorn.worker_class,
+      threads: config.gunicorn.threads,
+      worker_connections: config.gunicorn.worker_connections,
+      backlog: config.gunicorn.backlog,
+      timeout: config.gunicorn.timeout,
+      graceful_timeout: config.gunicorn.graceful_timeout,
+      keepalive: config.gunicorn.keepalive,
+      max_requests: config.gunicorn.max_requests,
+      max_requests_jitter: config.gunicorn.max_requests_jitter,
+      preload_app: config.gunicorn.preload_app,
+      daemon: config.gunicorn.daemon,
+      access_log: config.gunicorn.access_log,
+      capture_output: config.gunicorn.capture_output,
+      enable_reuse_port: config.gunicorn.enable_reuse_port
     },
     rate_limit: config.rate_limit ? { ...config.rate_limit } : undefined
   }
@@ -242,13 +287,39 @@ const handleResetServerConfig = async (): Promise<void> => {
     <div class="card info-card">
       <p class="info-text">
         <img :src="infoIcon" class="info-icon icon-info" alt="info" />
-        修改主机地址、端口或工作进程数后需要重启服务才能生效
+        修改服务器设置或Gunicorn配置后需要重启服务才能生效
       </p>
     </div>
 
-    <div class="card">
+    <!-- 标签页切换 -->
+    <div class="tabs">
+      <button
+        class="tab-btn"
+        :class="{ active: activeTab === 'server' }"
+        @click="activeTab = 'server'"
+      >
+        开发服务器
+      </button>
+      <button
+        class="tab-btn"
+        :class="{ active: activeTab === 'gunicorn' }"
+        @click="activeTab = 'gunicorn'"
+      >
+        Gunicorn生产环境
+      </button>
+      <button
+        class="tab-btn"
+        :class="{ active: activeTab === 'ratelimit' }"
+        @click="activeTab = 'ratelimit'"
+      >
+        限流配置
+      </button>
+    </div>
+
+    <!-- 开发服务器配置 -->
+    <div v-show="activeTab === 'server'" class="card">
       <div class="card-header">
-        <h2 class="card-title">服务器设置</h2>
+        <h2 class="card-title">开发服务器设置</h2>
         <span class="restart-badge">需重启</span>
       </div>
 
@@ -275,17 +346,6 @@ const handleResetServerConfig = async (): Promise<void> => {
         </div>
 
         <div class="form-group">
-          <label class="form-label">工作进程数</label>
-          <input
-            v-model.number="serverConfig.server.workers"
-            type="number"
-            class="input"
-            min="1"
-            max="16"
-          />
-        </div>
-
-        <div class="form-group">
           <label class="form-label">日志级别</label>
           <select v-model="serverConfig.server.log_level" class="input">
             <option v-for="level in logLevels" :key="level" :value="level">
@@ -296,8 +356,192 @@ const handleResetServerConfig = async (): Promise<void> => {
       </div>
     </div>
 
+    <!-- Gunicorn生产环境配置 -->
+    <div v-show="activeTab === 'gunicorn'" class="card">
+      <div class="card-header">
+        <h2 class="card-title">Gunicorn生产环境配置</h2>
+        <span class="restart-badge">需重启</span>
+      </div>
+
+      <div class="form-grid">
+        <!-- Worker配置 -->
+        <div class="form-group">
+          <label class="form-label">
+            Worker进程数
+            <span class="hint">建议: 2-4 x CPU核心数</span>
+          </label>
+          <input
+            v-model.number="serverConfig.gunicorn.workers"
+            type="number"
+            class="input"
+            min="1"
+            max="32"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Worker类</label>
+          <input
+            v-model="serverConfig.gunicorn.worker_class"
+            type="text"
+            class="input"
+            readonly
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">线程数</label>
+          <input
+            v-model.number="serverConfig.gunicorn.threads"
+            type="number"
+            class="input"
+            min="1"
+          />
+        </div>
+
+        <!-- 连接配置 -->
+        <div class="form-group">
+          <label class="form-label">最大并发连接数</label>
+          <input
+            v-model.number="serverConfig.gunicorn.worker_connections"
+            type="number"
+            class="input"
+            min="100"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">连接队列长度</label>
+          <input
+            v-model.number="serverConfig.gunicorn.backlog"
+            type="number"
+            class="input"
+            min="128"
+          />
+        </div>
+
+        <!-- 超时配置 -->
+        <div class="form-group">
+          <label class="form-label">
+            Worker超时时间
+            <span class="hint">秒</span>
+          </label>
+          <input
+            v-model.number="serverConfig.gunicorn.timeout"
+            type="number"
+            class="input"
+            min="10"
+            max="300"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            优雅关闭超时
+            <span class="hint">秒</span>
+          </label>
+          <input
+            v-model.number="serverConfig.gunicorn.graceful_timeout"
+            type="number"
+            class="input"
+            min="5"
+            max="120"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            Keep-alive超时
+            <span class="hint">秒</span>
+          </label>
+          <input
+            v-model.number="serverConfig.gunicorn.keepalive"
+            type="number"
+            class="input"
+            min="1"
+            max="60"
+          />
+        </div>
+
+        <!-- 请求限制 -->
+        <div class="form-group">
+          <label class="form-label">
+            最大请求数
+            <span class="hint">Worker重启前处理的请求数</span>
+          </label>
+          <input
+            v-model.number="serverConfig.gunicorn.max_requests"
+            type="number"
+            class="input"
+            min="1000"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            请求数随机偏移
+            <span class="hint">防止所有Worker同时重启</span>
+          </label>
+          <input
+            v-model.number="serverConfig.gunicorn.max_requests_jitter"
+            type="number"
+            class="input"
+            min="0"
+          />
+        </div>
+      </div>
+
+      <!-- 开关配置 -->
+      <div class="switch-grid">
+        <label class="switch-item">
+          <input
+            v-model="serverConfig.gunicorn.preload_app"
+            type="checkbox"
+          />
+          <span class="switch-label">预加载应用</span>
+          <span class="switch-hint">节省内存但影响热重载</span>
+        </label>
+
+        <label class="switch-item">
+          <input
+            v-model="serverConfig.gunicorn.daemon"
+            type="checkbox"
+          />
+          <span class="switch-label">守护进程模式</span>
+          <span class="switch-hint">后台运行</span>
+        </label>
+
+        <label class="switch-item">
+          <input
+            v-model="serverConfig.gunicorn.access_log"
+            type="checkbox"
+          />
+          <span class="switch-label">访问日志</span>
+          <span class="switch-hint">记录HTTP请求</span>
+        </label>
+
+        <label class="switch-item">
+          <input
+            v-model="serverConfig.gunicorn.capture_output"
+            type="checkbox"
+          />
+          <span class="switch-label">捕获输出</span>
+          <span class="switch-hint">捕获stdout/stderr</span>
+        </label>
+
+        <label class="switch-item">
+          <input
+            v-model="serverConfig.gunicorn.enable_reuse_port"
+            type="checkbox"
+          />
+          <span class="switch-label">SO_REUSEPORT</span>
+          <span class="switch-hint">Linux多核负载均衡优化</span>
+        </label>
+      </div>
+    </div>
+
     <!-- 限流配置 -->
-    <div class="card">
+    <div v-show="activeTab === 'ratelimit'" class="card">
       <div class="card-header">
         <h2 class="card-title">限流配置</h2>
         <span class="restart-badge">需重启</span>
@@ -372,7 +616,7 @@ const handleResetServerConfig = async (): Promise<void> => {
           class="btn-icon spinning"
           alt="loading"
         />
-        <span v-else>保存服务端配置</span>
+        <span v-else>保存配置</span>
       </button>
 
       <button class="btn btn-secondary" @click="handleResetServerConfig" :disabled="isSaving">
@@ -383,6 +627,37 @@ const handleResetServerConfig = async (): Promise<void> => {
 </template>
 
 <style scoped>
+/* 标签页样式 */
+.tabs {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: var(--spacing-sm);
+}
+
+.tab-btn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: transparent;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.tab-btn.active {
+  color: var(--primary-color);
+  background: var(--primary-light);
+  font-weight: 500;
+}
+
 /* 限流配置容器 */
 .rate-limit-container {
   display: grid;
@@ -443,6 +718,14 @@ const handleResetServerConfig = async (): Promise<void> => {
   color: var(--text-secondary);
 }
 
+/* 标签提示 */
+.hint {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  font-weight: normal;
+  margin-left: var(--spacing-xs);
+}
+
 /* 重启标签 */
 .restart-badge {
   display: inline-block;
@@ -469,7 +752,45 @@ const handleResetServerConfig = async (): Promise<void> => {
   font-weight: 600;
 }
 
+/* 开关网格 */
+.switch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--border-color);
+}
+
+.switch-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  cursor: pointer;
+}
+
+.switch-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.switch-label {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.switch-hint {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
 @media (max-width: 768px) {
+  .tabs {
+    flex-wrap: wrap;
+  }
+
   .rate-limit-container {
     grid-template-columns: 1fr;
   }
@@ -477,6 +798,10 @@ const handleResetServerConfig = async (): Promise<void> => {
   .radio-group {
     flex-direction: column;
     gap: var(--spacing-sm);
+  }
+
+  .switch-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

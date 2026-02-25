@@ -6,12 +6,54 @@ from pydantic import Field
 
 
 class ServerSettings(BaseSettings):
-    """服务器配置类"""
+    """服务器配置类 - 开发模式配置"""
     host: str = Field(default="0.0.0.0", description="服务器监听地址")
     port: int = Field(default=8000, ge=1, le=65535, description="服务器监听端口")  # 添加端口范围验证
     reload: bool = Field(default=False, description="是否启用热重载")
-    workers: int = Field(default=1, ge=1, description="服务器工作进程数")  # 添加workers数量验证
     log_level: str = Field(default="info", description="日志级别", pattern="^(debug|info|warning|error|critical)$")  # 添加日志级别验证
+
+
+class GunicornSettings(BaseSettings):
+    """Gunicorn生产环境配置类"""
+    # Worker进程数配置
+    workers: int = Field(default=4, ge=1, le=32, description="Worker进程数，建议: 2-4 x CPU核心数")
+    
+    # Worker类型
+    worker_class: str = Field(
+        default="gunicorn_worker.LanGitUvicornWorker",
+        description="Worker类，使用自定义UvicornWorker支持ASGI"
+    )
+    
+    # 线程配置（仅适用于sync worker）
+    threads: int = Field(default=1, ge=1, description="每个worker的线程数")
+    
+    # 连接配置
+    worker_connections: int = Field(default=1000, ge=100, description="最大并发连接数")
+    backlog: int = Field(default=2048, ge=128, description="等待连接的最大队列长度")
+    
+    # 超时配置
+    timeout: int = Field(default=30, ge=10, le=300, description="Worker超时时间（秒）")
+    graceful_timeout: int = Field(default=30, ge=5, le=120, description="优雅关闭超时时间（秒）")
+    keepalive: int = Field(default=2, ge=1, le=60, description="Keep-alive连接超时时间（秒）")
+    
+    # 请求限制（防止内存泄漏）
+    max_requests: int = Field(default=10000, ge=1000, description="Worker最大请求数，达到后自动重启")
+    max_requests_jitter: int = Field(default=1000, ge=0, description="最大请求数随机偏移量")
+    
+    # 进程管理
+    preload_app: bool = Field(default=False, description="是否预加载应用（节省内存但影响热重载）")
+    daemon: bool = Field(default=False, description="是否以守护进程模式运行")
+    
+    # 日志配置
+    access_log: bool = Field(default=True, description="是否启用访问日志")
+    access_log_format: str = Field(
+        default='%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(D)s',
+        description="访问日志格式"
+    )
+    capture_output: bool = Field(default=True, description="是否捕获stdout/stderr")
+    
+    # 性能调优
+    enable_reuse_port: bool = Field(default=True, description="是否启用SO_REUSEPORT（Linux多核优化）")
 
 
 class AppSettings(BaseSettings):
@@ -396,6 +438,7 @@ class DatabaseSettings(BaseSettings):
 class Config(BaseSettings):
     """配置主类"""
     server: ServerSettings = Field(default_factory=ServerSettings)
+    gunicorn: GunicornSettings = Field(default_factory=GunicornSettings)
     app: AppSettings = Field(default_factory=AppSettings)
     cors: CORSSettings = Field(default_factory=CORSSettings)
     proxy: ProxySettings = Field(default_factory=ProxySettings)

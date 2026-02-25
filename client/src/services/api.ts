@@ -149,8 +149,28 @@ export interface ServerProxyConfig {
 export interface ServerServiceConfig {
   host: string
   port: number
-  workers: number
   log_level: string
+}
+
+/**
+ * Gunicorn配置
+ */
+export interface GunicornConfig {
+  workers: number
+  worker_class: string
+  threads: number
+  worker_connections: number
+  backlog: number
+  timeout: number
+  graceful_timeout: number
+  keepalive: number
+  max_requests: number
+  max_requests_jitter: number
+  preload_app: boolean
+  daemon: boolean
+  access_log: boolean
+  capture_output: boolean
+  enable_reuse_port: boolean
 }
 
 /**
@@ -189,6 +209,7 @@ export interface RateLimitConfig {
 
 export interface ServerAppConfig {
   server?: ServerServiceConfig
+  gunicorn?: GunicornConfig
   proxy: ServerProxyConfig
   cors?: CORSConfig
   rate_limit?: RateLimitConfig

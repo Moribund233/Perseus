@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -233,39 +236,85 @@ def start_server():
         if not is_windows:
             try:
                 import gunicorn.app.base
+                from gunicorn.config import Config
                 
-                class GunicornApp(gunicorn.app.base.BaseApplication):
+                class LanGitGunicornApp(gunicorn.app.base.BaseApplication):
+                    """
+                    LanGit自定义Gunicorn应用
+                    
+                    集成生命周期管理和IPC通信
+                    """
                     def __init__(self, app, options=None):
                         self.options = options or {}
                         self.application = app
                         super().__init__()
+                    
+                    def init(self, parser, opts, args):
+                        """初始化配置"""
+                        pass
+                    
                     def load_config(self):
+                        """加载配置"""
+                        # 应用自定义选项
                         for key, value in self.options.items():
                             if key in self.cfg.settings and value is not None:
                                 self.cfg.set(key.lower(), value)
+                    
                     def load(self):
+                        """加载应用"""
                         return self.application
+                    
+                    def run(self):
+                        """运行服务器"""
+                        try:
+                            # 初始化Master进程的生命周期管理器
+                            from lifespan import get_lifecycle_manager
+                            manager = get_lifecycle_manager()
+                            manager.setup_for_master(os.getpid())
+                        except Exception as e:
+                            logger.warning(f"初始化Master生命周期管理器失败: {e}")
+                        
+                        # 调用父类run方法
+                        super().run()
                 
-                GunicornApp(app, {
+                # 使用自定义Worker类和配置（从gunicorn配置读取）
+                gunicorn_cfg = config.gunicorn
+                options = {
                     "bind": f"{config.server.host}:{config.server.port}",
-                    "workers": config.server.workers,
-                    "worker_class": "uvicorn.workers.UvicornWorker",
+                    "workers": gunicorn_cfg.workers,
+                    "worker_class": gunicorn_cfg.worker_class,
+                    "threads": gunicorn_cfg.threads,
+                    "worker_connections": gunicorn_cfg.worker_connections,
+                    "backlog": gunicorn_cfg.backlog,
+                    "timeout": gunicorn_cfg.timeout,
+                    "graceful_timeout": gunicorn_cfg.graceful_timeout,
+                    "keepalive": gunicorn_cfg.keepalive,
+                    "max_requests": gunicorn_cfg.max_requests,
+                    "max_requests_jitter": gunicorn_cfg.max_requests_jitter,
+                    "preload_app": gunicorn_cfg.preload_app,
+                    "daemon": gunicorn_cfg.daemon,
                     "loglevel": config.server.log_level,
-                    "accesslog": "-",
+                    "accesslog": "-" if gunicorn_cfg.access_log else None,
                     "errorlog": "-",
-                }).run()
+                    "capture_output": gunicorn_cfg.capture_output,
+                    "pidfile": str(Path(__file__).parent / "langit.pid"),
+                    "proc_name": "langit",
+                }
+                
+                LanGitGunicornApp(app, options).run()
                 return
             except ImportError:
-                pass
+                logger.info("Gunicorn未安装，使用Uvicorn作为替代")
             except Exception as e:
-                logger.warning(f"Gunicorn启动失败: {e}")
+                logger.warning(f"Gunicorn启动失败: {e}，回退到Uvicorn")
 
+        # 使用Uvicorn作为回退方案（开发模式，默认1个worker）
         uvicorn.run(
             app,
             host=config.server.host,
             port=config.server.port,
             log_level=config.server.log_level,
-            workers=config.server.workers
+            workers=1
         )
 
 

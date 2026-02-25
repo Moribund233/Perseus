@@ -47,15 +47,66 @@ def kill_process(pid: int, timeout: int = 5) -> bool:
 
 
 def is_related_service_process(pid: int) -> bool:
-    """检查进程是否为当前服务相关的进程"""
+    """
+    检查进程是否为当前服务相关的进程
+
+    通过比较工作目录和命令行特征来判断。
+    同一工作目录下的langit相关进程被认为是相关进程。
+
+    Args:
+        pid: 进程ID
+
+    Returns:
+        bool: 是否为相关进程
+    """
     try:
-        proc = psutil.Process(pid)
-        cmd_line = " ".join(proc.cmdline()).lower()
-        return "langit" in cmd_line or "app.py" in cmd_line or "gunicorn" in cmd_line
+        current_pid = os.getpid()
+        if pid == current_pid:
+            return True
+
+        current_proc = psutil.Process(current_pid)
+        target_proc = psutil.Process(pid)
+
+        # 获取当前进程的工作目录
+        try:
+            current_cwd = Path(current_proc.cwd()).resolve()
+        except (psutil.AccessDenied, psutil.NoSuchProcess):
+            return False
+
+        # 获取目标进程的工作目录和命令行
+        try:
+            target_cwd = Path(target_proc.cwd()).resolve()
+            cmd_line = " ".join(target_proc.cmdline()).lower()
+        except (psutil.AccessDenied, psutil.NoSuchProcess):
+            return False
+
+        # 工作目录不同，肯定不是同一应用
+        if current_cwd != target_cwd:
+            return False
+
+        # 在工作目录相同的前提下，检查命令行特征
+        indicators = [
+            "langit-server",      # 可执行文件名
+            "langit_server",      # 模块名
+            "app:app",            # Uvicorn/FastAPI入口
+            "gunicorn_worker",    # 自定义worker
+        ]
+
+        # 排除其他Python应用
+        exclusions = [
+            "jupyter", "ipython", "pytest", "unittest",
+            "pip", "conda", "npm", "node"
+        ]
+
+        has_indicator = any(ind in cmd_line for ind in indicators)
+        has_exclusion = any(exc in cmd_line for exc in exclusions)
+
+        return has_indicator and not has_exclusion
+
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         return False
     except Exception as e:
-        logger.error(f"检查进程 {pid} 命令行时出错: {e}")
+        logger.error(f"检查进程 {pid} 时出错: {e}")
         return False
 
 
