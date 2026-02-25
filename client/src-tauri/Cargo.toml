@@ -57,3 +57,19 @@ version = "2.0.0"
 
 [dependencies.tauri-plugin-dialog]
 version = "2"
+
+# ==================== 编译优化配置 ====================
+[profile.dev]
+# 开发模式优化 - 平衡编译速度和运行时性能
+opt-level = 1           # 基本优化
+lto = false             # 禁用链接时优化（加快编译）
+codegen-units = 16      # 并行代码生成单元
+panic = "unwind"        # 使用 unwind 而非 abort
+
+[profile.release]
+# 发布模式优化
+opt-level = 3           # 最高优化级别
+lto = true              # 启用链接时优化
+codegen-units = 1       # 单代码生成单元（更好的优化）
+panic = "abort"         # 使用 abort 减小体积
+strip = true            # 剥离符号表
