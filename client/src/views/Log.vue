@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Alert from '../components/Alert.vue'
+import { isServiceRunning } from '../services/api'
 import {
-  isServiceRunning
-} from '../services/api'
-import {
-  getWebSocketLogClient,
+  subscribeLogs,
+  unsubscribeLogs,
   type LogFilters,
-  LogClientState
-} from '../services/websocketLog'
+  ConnectionState
+} from '../services/logService'
 import { useLogStore } from '../stores/logs'
 
 /**
@@ -24,7 +23,7 @@ const downloadIcon = new URL('../assets/icons/download.svg', import.meta.url).hr
 const trashIcon = new URL('../assets/icons/trash.svg', import.meta.url).href
 const logIcon = new URL('../assets/icons/log.svg', import.meta.url).href
 
-// 使用日志 store（跨页面保持数据）
+// 使用日志 store
 const logStore = useLogStore()
 
 // 本地状态
@@ -39,9 +38,6 @@ const wsState = computed(() => logStore.connectionState)
 const logEntries = computed(() => logStore.allLogs)
 const totalLogCount = computed(() => logStore.totalLogCount)
 
-// WebSocket 客户端
-const wsClient = getWebSocketLogClient()
-
 // 日志级别配置
 const logLevels: { value: LogLevel; label: string; class: string }[] = [
   { value: 'all', label: '全部', class: '' },
@@ -51,11 +47,8 @@ const logLevels: { value: LogLevel; label: string; class: string }[] = [
   { value: 'debug', label: '调试', class: 'tag-secondary' }
 ]
 
-
-
 /**
  * 日志级别匹配映射
- * 将前端选择的级别映射到服务端可能的级别值
  */
 const levelMatchMap: Record<string, string[]> = {
   'info': ['info'],
@@ -96,15 +89,15 @@ const filteredLogEntries = computed(() => {
 // WebSocket 状态文本
 const wsStateText = computed(() => {
   switch (wsState.value) {
-    case LogClientState.DISCONNECTED:
+    case ConnectionState.Disconnected:
       return '未连接'
-    case LogClientState.CONNECTING:
+    case ConnectionState.Connecting:
       return '连接中...'
-    case LogClientState.CONNECTED:
+    case ConnectionState.Connected:
       return '已连接'
-    case LogClientState.SUBSCRIBED:
+    case ConnectionState.Subscribed:
       return '实时接收中'
-    case LogClientState.ERROR:
+    case ConnectionState.Error:
       return '连接错误'
     default:
       return '未知'
@@ -114,14 +107,14 @@ const wsStateText = computed(() => {
 // WebSocket 状态样式类
 const wsStateClass = computed(() => {
   switch (wsState.value) {
-    case LogClientState.DISCONNECTED:
+    case ConnectionState.Disconnected:
       return 'status-disconnected'
-    case LogClientState.CONNECTING:
+    case ConnectionState.Connecting:
       return 'status-connecting'
-    case LogClientState.CONNECTED:
-    case LogClientState.SUBSCRIBED:
+    case ConnectionState.Connected:
+    case ConnectionState.Subscribed:
       return 'status-connected'
-    case LogClientState.ERROR:
+    case ConnectionState.Error:
       return 'status-error'
     default:
       return ''
@@ -166,73 +159,57 @@ const checkServiceStatus = async (): Promise<void> => {
 }
 
 /**
- * 连接到 WebSocket 日志服务
- * @param loadHistory 是否加载历史日志，默认为 true
+ * 连接到日志服务
  */
-const connectWebSocket = async (loadHistory: boolean = true) => {
+const connectLogService = async () => {
   if (!isServiceRunningStatus.value) {
     return
   }
 
   try {
-    // 注意：日志消息监听由 store 统一处理，这里不再重复注册
-    // store 中的 handleNewLog 会处理所有日志条目
+    // 通过 store 连接
+    await logStore.connect(true)
 
-    // 如果 WebSocket 未连接，先建立连接
-    if (!wsClient.isConnected()) {
-      await wsClient.connect()
-    }
-
-    // 订阅日志（使用当前页面的过滤器设置）
+    // 使用当前页面的过滤器设置订阅
     const filters: LogFilters = {
       levels: selectedLevel.value === 'all'
         ? ['DEBUG', 'INFO', 'WARNING', 'ERROR']
         : [selectedLevel.value.toUpperCase()]
     }
 
-    wsClient.subscribe({
+    await subscribeLogs({
       filters,
-      historyCount: loadHistory ? linesCount.value : 0
+      historyCount: linesCount.value
     })
   } catch (err) {
-    console.error('WebSocket 连接失败:', err)
+    console.error('日志连接失败:', err)
     error.value = '实时日志连接失败，请检查服务状态'
   }
 }
 
 /**
- * 断开 WebSocket 连接
- */
-const disconnectWebSocket = () => {
-  wsClient.unsubscribe()
-  wsClient.disconnect()
-}
-
-/**
  * 刷新日志
- * 重新连接 WebSocket，不清空日志
  */
 const refreshLogs = async (): Promise<void> => {
   await checkServiceStatus()
 
   if (isServiceRunningStatus.value) {
-    // 重新连接 WebSocket，不清空日志
-    disconnectWebSocket()
-    await connectWebSocket(false)
+    // 重新订阅，不清空日志
+    await unsubscribeLogs()
+    await connectLogService()
   }
 }
 
 /**
- * 重新连接 WebSocket
- * 不清空日志
+ * 重新连接
  */
 const reconnectWebSocket = async () => {
-  disconnectWebSocket()
-  await connectWebSocket(false)
+  await logStore.reconnect(true)
+  await connectLogService()
 }
 
 /**
- * 清空显示（保留连接）
+ * 清空显示
  */
 const clearDisplay = (): void => {
   logStore.clearAllLogs()
@@ -257,8 +234,6 @@ const exportLogs = (): void => {
   URL.revokeObjectURL(url)
 }
 
-
-
 /**
  * 滚动到底部
  */
@@ -273,17 +248,14 @@ onMounted(() => {
   // 先检查服务状态
   checkServiceStatus().then(() => {
     if (isServiceRunningStatus.value) {
-      // 如果 store 中已有连接，只重新订阅（使用当前页面的过滤器设置）
-      // 如果 store 中没有连接，则建立新连接
-      connectWebSocket(true)
+      connectLogService()
     }
   })
 })
 
 onUnmounted(() => {
-  // 切换页面时取消订阅，但保持 WebSocket 连接（由 store 管理）
-  // 这样切换回来时可以快速恢复
-  wsClient.unsubscribe()
+  // 切换页面时取消订阅，但保持连接（由 store 管理）
+  unsubscribeLogs()
 })
 </script>
 
@@ -319,8 +291,8 @@ onUnmounted(() => {
 
       <!-- 重新连接按钮 -->
       <div class="toolbar-group">
-        <button class="btn btn-sm" @click="reconnectWebSocket" :disabled="wsState === LogClientState.CONNECTING">
-          {{ wsState === LogClientState.CONNECTING ? '连接中...' : '重新连接' }}
+        <button class="btn btn-sm" @click="reconnectWebSocket" :disabled="wsState === ConnectionState.Connecting">
+          {{ wsState === ConnectionState.Connecting ? '连接中...' : '重新连接' }}
         </button>
       </div>
 
@@ -393,7 +365,7 @@ onUnmounted(() => {
     <div class="log-stats card">
       <span>总条目: {{ totalLogCount }}</span>
       <span>显示: {{ filteredLogEntries.length }}</span>
-      <span v-if="wsState === LogClientState.SUBSCRIBED" class="tag tag-success">实时</span>
+      <span v-if="wsState === ConnectionState.Subscribed" class="tag tag-success">实时</span>
       <span v-else class="tag tag-warning">静态</span>
     </div>
 

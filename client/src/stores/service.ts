@@ -194,7 +194,7 @@ export const useServiceStore = defineStore('service', () => {
 
         // 服务运行时自动连接日志 WebSocket
         const logStore = useLogStore()
-        if (logStore.autoConnectEnabled && !logStore.isConnected) {
+        if (!logStore.isConnected) {
           logStore.connect(true).catch(err => {
             console.warn('自动连接日志失败:', err)
           })

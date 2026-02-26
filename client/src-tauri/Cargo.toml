@@ -26,6 +26,13 @@ tauri-plugin-log = "2"
 reqwest = { version = "0.12", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
 
+# WebSocket 客户端
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+futures = "0.3"
+
+# 时间处理
+chrono = { version = "0.4", features = ["serde"] }
+
 # 进程管理
 sysinfo = "0.30"
 

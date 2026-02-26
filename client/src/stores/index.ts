@@ -15,7 +15,5 @@ export {
   useDatabaseStore,
   type DatabaseTypeOption
 } from './database'
-export {
-  useLogStore,
-  type LogNotification
-} from './logs'
+export { useLogStore } from './logs'
+export { type LogEntry, type LogFilters } from '../services/logService'

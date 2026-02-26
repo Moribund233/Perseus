@@ -7,6 +7,7 @@ pub mod api_client;
 pub mod commands;
 pub mod config;
 pub mod local_auth;
+pub mod log_websocket;
 pub mod models;
 pub mod nginx_manager;
 pub mod process_manager;
@@ -30,6 +31,9 @@ pub fn run() {
 
             // 初始化应用状态
             app.manage(commands::AppState::default());
+
+            // 初始化 WebSocket 日志状态
+            app.manage(commands::LogWsState::default());
 
             Ok(())
         })
@@ -115,6 +119,13 @@ pub fn run() {
             commands::rollback_database_switch,
             commands::get_current_database_info,
             commands::test_database_connection,
+            // WebSocket 日志（后端代理）
+            commands::init_log_websocket,
+            commands::connect_log_websocket,
+            commands::disconnect_log_websocket,
+            commands::get_log_websocket_state,
+            commands::subscribe_logs,
+            commands::unsubscribe_logs,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
