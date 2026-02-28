@@ -71,6 +71,7 @@ fn merge_configs(
         result.log = app.log;
         result.advanced = app.advanced;
         result.nginx = app.nginx;
+        result.redis = app.redis;
         result.db_type = app.db_type;
     }
 
@@ -82,6 +83,7 @@ fn merge_configs(
         result.log = user.log;
         result.advanced = user.advanced;
         result.nginx = user.nginx;
+        result.redis = user.redis;
         result.db_type = user.db_type;
     }
 

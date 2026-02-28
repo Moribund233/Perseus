@@ -95,6 +95,59 @@ pub struct RedisConfigUpdateRequest {
     pub data_dir: Option<String>,
 }
 
+/// Redis运行时配置项
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RedisRuntimeConfig {
+    /// 配置项名称
+    pub name: String,
+    /// 配置项值
+    pub value: String,
+    /// 配置项描述
+    pub description: String,
+    /// 配置项类型
+    pub config_type: String,
+}
+
+/// Redis运行时配置更新请求
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RedisRuntimeConfigUpdateRequest {
+    /// 配置项名称
+    pub name: String,
+    /// 配置项值
+    pub value: String,
+}
+
+/// Redis运行时配置批量更新请求
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RedisRuntimeConfigBatchUpdateRequest {
+    /// 配置项列表
+    pub configs: Vec<RedisRuntimeConfigUpdateRequest>,
+}
+
+/// Redis运行时配置响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RedisRuntimeConfigResponse {
+    /// 是否成功
+    pub success: bool,
+    /// 消息
+    pub message: String,
+    /// 配置项列表
+    pub configs: Vec<RedisRuntimeConfig>,
+}
+
+/// Redis运行时配置更新响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RedisRuntimeConfigUpdateResponse {
+    /// 是否成功
+    pub success: bool,
+    /// 消息
+    pub message: String,
+    /// 已更新的配置项
+    pub updated_configs: Vec<String>,
+    /// 失败的配置项及原因
+    pub failed_configs: Vec<(String, String)>,
+}
+
 /// Redis配置保存响应
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RedisConfigSaveResponse {

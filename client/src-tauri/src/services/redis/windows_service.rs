@@ -14,6 +14,23 @@ use crate::models::WindowsServiceResponse;
 const REDIS_SERVICE_NAME: &str = "Redis";
 
 /**
+ * 解码Windows命令行输出
+ * Windows命令行使用GBK编码，需要转换为UTF-8
+ *
+ * @param bytes 原始字节
+ * @return 解码后的字符串
+ */
+fn decode_windows_output(bytes: &[u8]) -> String {
+    // 首先尝试UTF-8解码
+    if let Ok(s) = String::from_utf8(bytes.to_vec()) {
+        return s;
+    }
+    // 如果失败，尝试GBK解码
+    let (s, _) = encoding_rs::GBK.decode_without_bom_handling(bytes);
+    s.to_string()
+}
+
+/**
  * 安装Redis为Windows服务
  *
  * @param exe_dir Redis可执行文件目录
@@ -172,8 +189,15 @@ pub fn start_redis_service(service_name: &str) -> Result<(), String> {
             if output.status.success() {
                 Ok(())
             } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                Err(format!("启动服务失败: {}", stderr))
+                // Windows命令行使用GBK编码，需要转换
+                let stderr = decode_windows_output(&output.stderr);
+
+                // 检查是否是权限错误（系统错误5）
+                if stderr.contains("系统错误 5") || stderr.contains("拒绝访问") {
+                    Err("启动服务失败: 需要管理员权限。请右键点击应用程序选择'以管理员身份运行'，或使用服务管理器手动启动服务。".to_string())
+                } else {
+                    Err(format!("启动服务失败: {}", stderr))
+                }
             }
         }
         Err(e) => Err(format!("执行启动命令失败: {}", e)),
@@ -192,8 +216,15 @@ pub fn stop_redis_service(service_name: &str) -> Result<(), String> {
             if output.status.success() {
                 Ok(())
             } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                Err(format!("停止服务失败: {}", stderr))
+                // Windows命令行使用GBK编码，需要转换
+                let stderr = decode_windows_output(&output.stderr);
+
+                // 检查是否是权限错误（系统错误5）
+                if stderr.contains("系统错误 5") || stderr.contains("拒绝访问") {
+                    Err("停止服务失败: 需要管理员权限。请右键点击应用程序选择'以管理员身份运行'，或使用服务管理器手动停止服务。".to_string())
+                } else {
+                    Err(format!("停止服务失败: {}", stderr))
+                }
             }
         }
         Err(e) => Err(format!("执行停止命令失败: {}", e)),

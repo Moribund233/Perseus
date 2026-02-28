@@ -38,7 +38,9 @@ pub use nginx::{
 // 重新导出常用类型 - Redis相关
 pub use redis::{
     RedisActionResponse, RedisConfig, RedisConfigSaveResponse, RedisConfigUpdateRequest,
-    RedisStatusResponse, WindowsServiceAction, WindowsServiceResponse,
+    RedisRuntimeConfig, RedisRuntimeConfigBatchUpdateRequest, RedisRuntimeConfigResponse,
+    RedisRuntimeConfigUpdateRequest, RedisRuntimeConfigUpdateResponse, RedisStatusResponse,
+    WindowsServiceAction, WindowsServiceResponse,
 };
 
 // 重新导出常用类型 - 服务相关

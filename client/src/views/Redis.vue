@@ -1,20 +1,23 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, reactive } from 'vue'
 import {
   getRedisStatus,
   loadRedis,
   startRedis,
   stopRedis,
   restartRedis,
-  getRedisPlatformInfo,
-  updateRedisConfig,
+  getPlatformInfo,
   installRedisService,
   uninstallRedisService,
   isRedisServiceInstalled,
   validateRedisDir,
+  getRedisRuntimeConfigs,
+  batchUpdateRedisRuntimeConfigs,
+  rewriteRedisConfig,
   type RedisStatusResponse,
-  type RedisPlatformInfo,
-  type RedisConfigUpdateRequest
+  type PlatformInfo,
+  type RedisRuntimeConfig,
+  type RedisRuntimeConfigUpdateRequest
 } from '../services/api'
 
 /**
@@ -24,7 +27,7 @@ import {
  * 1. 载入Redis：选择Redis目录，验证并保存配置
  * 2. Windows服务管理：安装/卸载Redis为Windows服务
  * 3. 控制Redis：启动、停止、重启
- * 4. 配置管理：端口、认证、数据目录等
+ * 4. 运行时配置管理：可视化修改Redis配置
  */
 
 // 状态
@@ -34,19 +37,10 @@ const message = ref<string | null>(null)
 const messageType = ref<'success' | 'error' | 'info'>('info')
 
 // 平台信息
-const platformInfo = ref<RedisPlatformInfo | null>(null)
+const platformInfo = ref<PlatformInfo | null>(null)
 
 // 服务安装状态
 const isServiceInstalled = ref(false)
-
-// 配置编辑
-const isEditingConfig = ref(false)
-const configForm = ref({
-  port: 6379,
-  require_pass: false,
-  password: '',
-  data_dir: ''
-})
 
 // 计算属性：状态文本
 const statusText = computed(() => {
@@ -122,12 +116,98 @@ const showWindowsService = computed(() => {
   return supportsManualLoad.value && status.value?.is_loaded
 })
 
+// ==================== 运行时配置管理 ====================
+
+// 配置数据
+const runtimeConfigs = ref<RedisRuntimeConfig[]>([])
+const configLoading = ref(false)
+const configError = ref<string | null>(null)
+const hasConfigChanges = ref(false)
+
+// 配置编辑状态
+const editingConfigs = reactive<Record<string, string>>({})
+
+// 配置分类
+const configCategories = computed(() => {
+  const categories: Record<string, RedisRuntimeConfig[]> = {
+    network: [],
+    security: [],
+    performance: [],
+    memory: [],
+    persistence: [],
+    monitoring: [],
+    general: []
+  }
+  runtimeConfigs.value.forEach(config => {
+    if (categories[config.config_type]) {
+      categories[config.config_type].push(config)
+    } else {
+      categories.general.push(config)
+    }
+  })
+  return categories
+})
+
+// 分类显示名称
+const categoryNames: Record<string, string> = {
+  network: '网络配置',
+  security: '安全配置',
+  performance: '性能配置',
+  memory: '内存配置',
+  persistence: '持久化配置',
+  monitoring: '监控配置',
+  general: '常规配置'
+}
+
+// 计算属性：是否显示配置管理（Redis运行中）
+const showConfigManagement = computed(() => {
+  return status.value?.is_loaded && status.value?.status === 'running'
+})
+
+// 配置项默认值映射
+const configDefaults: Record<string, string> = {
+  // 网络配置
+  'port': '6379',
+  'bind': '127.0.0.1',
+  'protected-mode': 'yes',
+  'tcp-backlog': '511',
+  // 安全配置
+  'requirepass': '',
+  'masterauth': '',
+  // 性能配置
+  'maxclients': '10000',
+  'timeout': '0',
+  'tcp-keepalive': '300',
+  'hz': '10',
+  // 内存配置
+  'maxmemory': '0',
+  'maxmemory-policy': 'noeviction',
+  'maxmemory-samples': '5',
+  // 持久化配置
+  'save': '3600 1 300 100 60 10000',
+  'appendonly': 'no',
+  'appendfsync': 'everysec',
+  'auto-aof-rewrite-percentage': '100',
+  'auto-aof-rewrite-min-size': '64mb',
+  // 监控配置
+  'slowlog-log-slower-than': '10000',
+  'slowlog-max-len': '128',
+  'latency-monitor-threshold': '0',
+  // 常规配置
+  'databases': '16',
+  'loglevel': 'notice',
+  'supervised': 'no'
+}
+
 /**
  * 加载Redis状态
  */
 async function loadStatus() {
   try {
-    status.value = await getRedisStatus()
+    const result = await getRedisStatus()
+    console.log('[Redis] getRedisStatus 返回:', result)
+    status.value = result
+    console.log('[Redis] status.value 已更新:', status.value)
   } catch (e) {
     showMessage('获取状态失败: ' + e, 'error')
   }
@@ -138,7 +218,7 @@ async function loadStatus() {
  */
 async function loadPlatformInfo() {
   try {
-    platformInfo.value = await getRedisPlatformInfo()
+    platformInfo.value = await getPlatformInfo()
   } catch (e) {
     console.error('获取平台信息失败:', e)
   }
@@ -185,10 +265,13 @@ async function handleLoadRedis() {
     showMessage('正在载入Redis...', 'info')
 
     const result = await loadRedis(exeDir)
+    console.log('[Redis] loadRedis 返回:', result)
 
     if (result.success) {
       showMessage(result.message, 'success')
+      console.log('[Redis] 准备调用 loadStatus 刷新状态')
       await loadStatus()
+      console.log('[Redis] loadStatus 完成, 当前 status:', status.value)
       await checkServiceStatus()
     } else {
       showMessage(result.message, 'error')
@@ -326,58 +409,6 @@ async function handleRestartRedis() {
 }
 
 /**
- * 打开配置编辑
- */
-function openConfigEdit() {
-  if (!status.value) return
-
-  configForm.value = {
-    port: status.value.port,
-    require_pass: status.value.require_pass,
-    password: '',
-    data_dir: status.value.data_dir || ''
-  }
-  isEditingConfig.value = true
-}
-
-/**
- * 关闭配置编辑
- */
-function closeConfigEdit() {
-  isEditingConfig.value = false
-}
-
-/**
- * 保存配置
- */
-async function handleSaveConfig() {
-  isLoading.value = true
-
-  try {
-    const request: RedisConfigUpdateRequest = {
-      port: configForm.value.port,
-      require_pass: configForm.value.require_pass,
-      password: configForm.value.password || undefined,
-      data_dir: configForm.value.data_dir || undefined
-    }
-
-    const result = await updateRedisConfig(request)
-
-    if (result.success) {
-      showMessage(result.message, 'success')
-      isEditingConfig.value = false
-      await loadStatus()
-    } else {
-      showMessage(result.message, 'error')
-    }
-  } catch (e) {
-    showMessage('保存配置失败: ' + e, 'error')
-  } finally {
-    isLoading.value = false
-  }
-}
-
-/**
  * 显示消息
  */
 function showMessage(msg: string, type: 'success' | 'error' | 'info' = 'info') {
@@ -390,6 +421,154 @@ function showMessage(msg: string, type: 'success' | 'error' | 'info' = 'info') {
   }, 5000)
 }
 
+// ==================== 运行时配置管理函数 ====================
+
+/**
+ * 加载Redis运行时配置
+ */
+async function loadRuntimeConfigs() {
+  if (!showConfigManagement.value) return
+
+  configLoading.value = true
+  configError.value = null
+
+  try {
+    const response = await getRedisRuntimeConfigs()
+    if (response.success) {
+      runtimeConfigs.value = response.configs
+      // 初始化编辑状态
+      response.configs.forEach(config => {
+        editingConfigs[config.name] = config.value
+      })
+      hasConfigChanges.value = false
+    } else {
+      configError.value = response.message
+    }
+  } catch (e) {
+    configError.value = '加载配置失败: ' + e
+  } finally {
+    configLoading.value = false
+  }
+}
+
+/**
+ * 处理配置值变更
+ */
+function handleConfigChange(configName: string, value: string) {
+  editingConfigs[configName] = value
+  hasConfigChanges.value = true
+}
+
+/**
+ * 保存配置变更
+ */
+async function saveRuntimeConfigs() {
+  if (!hasConfigChanges.value) return
+
+  configLoading.value = true
+
+  try {
+    // 构建变更列表
+    const changedConfigs: RedisRuntimeConfigUpdateRequest[] = []
+    runtimeConfigs.value.forEach(config => {
+      if (editingConfigs[config.name] !== config.value) {
+        changedConfigs.push({
+          name: config.name,
+          value: editingConfigs[config.name]
+        })
+      }
+    })
+
+    if (changedConfigs.length === 0) {
+      configLoading.value = false
+      return
+    }
+
+    // 批量更新配置
+    const response = await batchUpdateRedisRuntimeConfigs({ configs: changedConfigs })
+
+    if (response.success) {
+      // 重写配置文件
+      await rewriteRedisConfig()
+      showMessage('配置已更新并保存到配置文件', 'success')
+      hasConfigChanges.value = false
+      // 重新加载配置
+      await loadRuntimeConfigs()
+    } else {
+      showMessage(response.message, 'error')
+    }
+  } catch (e) {
+    showMessage('保存配置失败: ' + e, 'error')
+  } finally {
+    configLoading.value = false
+  }
+}
+
+/**
+ * 重置配置变更
+ */
+function resetRuntimeConfigs() {
+  runtimeConfigs.value.forEach(config => {
+    editingConfigs[config.name] = config.value
+  })
+  hasConfigChanges.value = false
+}
+
+/**
+ * 获取配置输入类型
+ */
+function getConfigInputType(configName: string): string {
+  // 根据配置名判断输入类型
+  const booleanConfigs = ['protected-mode', 'appendonly']
+  const numberConfigs = ['port', 'maxclients', 'timeout', 'tcp-keepalive', 'hz', 'maxmemory', 'maxmemory-samples', 'slowlog-log-slower-than', 'slowlog-max-len', 'latency-monitor-threshold', 'databases']
+
+  if (booleanConfigs.includes(configName)) {
+    return 'select'
+  }
+  if (numberConfigs.includes(configName)) {
+    return 'number'
+  }
+  return 'text'
+}
+
+/**
+ * 获取配置选项（用于select类型）
+ */
+function getConfigOptions(configName: string): { label: string; value: string }[] {
+  switch (configName) {
+    case 'protected-mode':
+    case 'appendonly':
+      return [
+        { label: '启用', value: 'yes' },
+        { label: '禁用', value: 'no' }
+      ]
+    case 'maxmemory-policy':
+      return [
+        { label: '不淘汰', value: 'noeviction' },
+        { label: '所有键LRU', value: 'allkeys-lru' },
+        { label: '所有键随机', value: 'allkeys-random' },
+        { label: '过期键LRU', value: 'volatile-lru' },
+        { label: '过期键随机', value: 'volatile-random' },
+        { label: '过期键TTL', value: 'volatile-ttl' }
+      ]
+    case 'appendfsync':
+      return [
+        { label: '总是同步', value: 'always' },
+        { label: '每秒同步', value: 'everysec' },
+        { label: '不同步', value: 'no' }
+      ]
+    case 'loglevel':
+      return [
+        { label: '调试', value: 'debug' },
+        { label: '详细', value: 'verbose' },
+        { label: '通知', value: 'notice' },
+        { label: '警告', value: 'warning' }
+      ]
+    default:
+      return []
+  }
+}
+
 /**
  * 页面加载时获取状态
  */
@@ -397,6 +576,7 @@ onMounted(async () => {
   await loadPlatformInfo()
   await loadStatus()
   await checkServiceStatus()
+  await loadRuntimeConfigs()
 })
 </script>
 
@@ -490,13 +670,6 @@ onMounted(async () => {
           >
             重启
           </button>
-          <button
-            class="btn btn-secondary"
-            @click="openConfigEdit"
-            :disabled="isLoading"
-          >
-            配置
-          </button>
         </template>
       </div>
     </div>
@@ -531,75 +704,142 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- 配置编辑对话框 -->
-    <div v-if="isEditingConfig" class="modal-overlay" @click.self="closeConfigEdit">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>Redis配置</h3>
-          <button class="btn-close" @click="closeConfigEdit">&times;</button>
-        </div>
+    <!-- Redis运行时配置管理卡片 -->
+    <div class="config-card" v-if="showConfigManagement">
+      <div class="config-header">
+        <h2>运行时配置</h2>
+        <span v-if="hasConfigChanges" class="unsaved-badge">有未保存的更改</span>
+      </div>
 
-        <div class="modal-body">
-          <div class="form-group">
-            <label>监听端口</label>
-            <input
-              v-model.number="configForm.port"
-              type="number"
-              class="form-input"
-              min="1"
-              max="65535"
-            />
-          </div>
+      <!-- 加载状态 -->
+      <div v-if="configLoading && runtimeConfigs.length === 0" class="status-box info">
+        <span class="spinner"></span>
+        <span class="loading-text">正在加载配置...</span>
+      </div>
 
-          <div class="form-group">
-            <label class="form-checkbox">
+      <!-- 错误提示 -->
+      <div v-if="configError" class="status-box error">
+        <span class="status-icon">⚠️</span>
+        <span>{{ configError }}</span>
+      </div>
+
+      <!-- 配置表单 -->
+      <div v-if="runtimeConfigs.length > 0" class="runtime-config-form">
+        <!-- 按分类渲染配置项 -->
+        <div
+          v-for="(configs, category) in configCategories"
+          :key="category"
+          class="preference-section"
+        >
+          <h3 v-if="configs.length > 0">{{ categoryNames[category] }}</h3>
+          <div class="config-items">
+            <div
+              v-for="config in configs"
+              :key="config.name"
+              class="form-group"
+            >
+              <label class="form-label">
+                {{ config.description }}
+                <span class="config-name">({{ config.name }})</span>
+              </label>
+
+              <!-- select 类型输入 -->
+              <select
+                v-if="getConfigInputType(config.name) === 'select'"
+                v-model="editingConfigs[config.name]"
+                class="form-input"
+                @change="handleConfigChange(config.name, editingConfigs[config.name])"
+              >
+                <option
+                  v-for="option in getConfigOptions(config.name)"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </option>
+              </select>
+
+              <!-- number 类型输入 -->
               <input
-                v-model="configForm.require_pass"
-                type="checkbox"
+                v-else-if="getConfigInputType(config.name) === 'number'"
+                v-model="editingConfigs[config.name]"
+                type="number"
+                class="form-input"
+                @input="handleConfigChange(config.name, editingConfigs[config.name])"
               />
-              <span>启用密码认证</span>
-            </label>
-          </div>
 
-          <div class="form-group" v-if="configForm.require_pass">
-            <label>密码</label>
-            <input
-              v-model="configForm.password"
-              type="password"
-              class="form-input"
-              placeholder="留空表示不修改密码"
-            />
-            <span class="form-hint">留空表示不修改当前密码</span>
-          </div>
+              <!-- text 类型输入 -->
+              <input
+                v-else
+                v-model="editingConfigs[config.name]"
+                type="text"
+                class="form-input"
+                @input="handleConfigChange(config.name, editingConfigs[config.name])"
+              />
 
-          <div class="form-group">
-            <label>数据目录</label>
-            <input
-              v-model="configForm.data_dir"
-              type="text"
-              class="form-input"
-              placeholder="数据文件存储目录"
-            />
+              <!-- 显示原始值（如果有变更） -->
+              <div
+                v-if="editingConfigs[config.name] !== config.value"
+                class="config-original"
+              >
+                原始值: {{ config.value || '(空)' }}
+              </div>
+
+              <!-- 显示默认值提示 -->
+              <div
+                v-else-if="config.value === configDefaults[config.name] && configDefaults[config.name]"
+                class="config-default"
+              >
+                默认值
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="modal-footer">
-          <button class="btn btn-secondary" @click="closeConfigEdit">取消</button>
+        <!-- 操作按钮 -->
+        <div class="config-actions">
+          <button
+            class="btn btn-secondary"
+            @click="resetRuntimeConfigs"
+            :disabled="!hasConfigChanges || configLoading"
+          >
+            重置
+          </button>
           <button
             class="btn btn-primary"
-            @click="handleSaveConfig"
-            :disabled="isLoading"
+            @click="saveRuntimeConfigs"
+            :disabled="!hasConfigChanges || configLoading"
           >
-            保存
+            <span v-if="configLoading" class="spinner"></span>
+            <span v-else>保存配置</span>
           </button>
+        </div>
+
+        <!-- 提示信息 -->
+        <div class="status-box info mt-md">
+          <span class="status-icon">ℹ️</span>
+          <span>配置修改后会立即生效，并自动保存到Redis配置文件中。</span>
         </div>
       </div>
     </div>
+
+    <!-- 配置管理提示（Redis未运行） -->
+    <div class="config-card" v-else-if="status?.is_loaded && status?.status !== 'running'">
+      <div class="config-header">
+        <h2>运行时配置</h2>
+      </div>
+      <div class="status-box warning">
+        <span class="status-icon">⚠️</span>
+        <span>Redis未运行，请先启动Redis以管理运行时配置。</span>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <style scoped>
 @import '../styles/page-common.css';
+@import '../styles/guide-steps.css';
 
 /* 状态徽章 */
 .status-badge {
@@ -629,91 +869,143 @@ onMounted(async () => {
   color: var(--error-color);
 }
 
-/* 模态框 */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+/* 运行时配置管理样式 */
+.runtime-config-form {
+  margin-top: var(--spacing-lg);
+}
+
+.config-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background-color: var(--bg-secondary);
-  border-radius: var(--border-radius-lg);
-  width: 100%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
-.modal-header {
-  display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: var(--spacing-lg);
-  border-bottom: 1px solid var(--border-color);
+  margin-bottom: var(--spacing-md);
 }
 
-.modal-header h3 {
+.config-header h2 {
   margin: 0;
-  font-size: var(--font-size-lg);
-  color: var(--text-primary);
 }
 
-.btn-close {
-  background: none;
-  border: none;
-  font-size: var(--font-size-xl);
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.unsaved-badge {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: var(--warning-color);
+  color: white;
+  font-size: var(--font-size-xs);
   border-radius: var(--border-radius-sm);
+  font-weight: 500;
 }
 
-.btn-close:hover {
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
+.config-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--spacing-md);
 }
 
-.modal-body {
-  padding: var(--spacing-lg);
-  overflow-y: auto;
+.config-name {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: normal;
 }
 
-.modal-footer {
+.config-original {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  margin-top: var(--spacing-xs);
+}
+
+.config-default {
+  font-size: var(--font-size-xs);
+  color: var(--success-color);
+  margin-top: var(--spacing-xs);
+}
+
+.config-actions {
   display: flex;
   justify-content: flex-end;
-  gap: var(--spacing-md);
-  padding: var(--spacing-lg);
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-lg);
   border-top: 1px solid var(--border-color);
 }
 
-/* 加载动画 */
-.spinner {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--border-color);
-  border-top-color: var(--primary-color);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+.mt-md {
+  margin-top: var(--spacing-md);
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+/* 表单输入框样式增强 */
+.form-input {
+  width: 100%;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  transition: border-color var(--transition-fast);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.form-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+select.form-input {
+  cursor: pointer;
+}
+
+/* 偏好设置区域样式 */
+.preference-section {
+  margin-bottom: var(--spacing-xl);
+}
+
+.preference-section h3 {
+  font-size: var(--font-size-md);
+  margin-bottom: var(--spacing-md);
+  color: var(--text-primary);
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* 状态框样式微调 */
+.status-box {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  background-color: var(--bg-tertiary);
+}
+
+.status-box.success {
+  background-color: rgba(16, 185, 129, 0.1);
+  border: 1px solid var(--success-color);
+}
+
+.status-box.warning {
+  background-color: rgba(245, 158, 11, 0.1);
+  border: 1px solid var(--warning-color);
+}
+
+.status-box.error {
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--error-color);
+}
+
+.status-box.info {
+  background-color: rgba(6, 182, 212, 0.1);
+  border: 1px solid var(--info-color);
+}
+
+.status-icon {
+  flex-shrink: 0;
+  font-size: var(--font-size-md);
+}
+
+.loading-text {
+  color: var(--text-secondary);
 }
 </style>

@@ -11,10 +11,10 @@ import {
   updateNginxDownloadUrl,
   getNginxProxyConfig,
   saveNginxProxyConfig,
-  getNginxPlatformInfo,
+  getPlatformInfo,
   type NginxStatusResponse,
   type NginxProxyConfig,
-  type NginxPlatformInfo
+  type PlatformInfo
 } from '../services/api'
 import { useServiceStore } from '../stores/service'
 
@@ -36,7 +36,7 @@ const message = ref<string | null>(null)
 const messageType = ref<'success' | 'error' | 'info'>('info')
 
 // 平台信息
-const platformInfo = ref<NginxPlatformInfo | null>(null)
+const platformInfo = ref<PlatformInfo | null>(null)
 
 // 下载配置
 const downloadUrl = ref('')
@@ -199,7 +199,7 @@ async function loadStatus() {
  */
 async function loadPlatformInfo() {
   try {
-    platformInfo.value = await getNginxPlatformInfo()
+    platformInfo.value = await getPlatformInfo()
   } catch (e) {
     console.error('获取平台信息失败:', e)
   }

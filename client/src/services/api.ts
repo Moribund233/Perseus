@@ -747,23 +747,30 @@ export async function saveNginxProxyConfig(
 }
 
 /**
- * Nginx平台信息
+ * 平台类型
  */
-export interface NginxPlatformInfo {
-  platform: string
+export type PlatformType = 'Windows' | 'Linux' | 'MacOS' | 'Other'
+
+/**
+ * 平台信息（统一）
+ */
+export interface PlatformInfo {
+  platform_type: PlatformType
   supports_manual_load: boolean
   supports_download: boolean
   uses_package_manager: boolean
   package_manager?: string
-  package_version?: string
-  config_path?: string
+  nginx_package_version?: string
+  nginx_config_path?: string
+  redis_package_version?: string
+  redis_config_path?: string
 }
 
 /**
- * 获取Nginx平台信息
+ * 获取平台信息
  */
-export async function getNginxPlatformInfo(): Promise<NginxPlatformInfo> {
-  return invoke('get_nginx_platform_info')
+export async function getPlatformInfo(): Promise<PlatformInfo> {
+  return invoke('get_platform_info')
 }
 
 // ==================== 引导页面 API ====================
@@ -970,18 +977,6 @@ export interface RedisActionResponse {
 }
 
 /**
- * Redis平台信息
- */
-export interface RedisPlatformInfo {
-  platform: string
-  supports_manual_load: boolean
-  uses_package_manager: boolean
-  package_manager?: string
-  package_version?: string
-  system_config_path?: string
-}
-
-/**
  * Redis配置更新请求
  */
 export interface RedisConfigUpdateRequest {
@@ -1013,7 +1008,9 @@ export interface WindowsServiceResponse {
  * 获取Redis状态
  */
 export async function getRedisStatus(): Promise<RedisStatusResponse> {
-  return invoke('get_redis_status')
+  const result = await invoke('get_redis_status')
+  console.log('[API] getRedisStatus 原始返回:', result)
+  return result as RedisStatusResponse
 }
 
 /**
@@ -1021,7 +1018,7 @@ export async function getRedisStatus(): Promise<RedisStatusResponse> {
  * @param exe_dir Redis可执行文件目录路径
  */
 export async function loadRedis(exe_dir: string): Promise<RedisActionResponse> {
-  return invoke('load_redis', { exe_dir })
+  return invoke('load_redis', { exeDir: exe_dir })
 }
 
 /**
@@ -1046,13 +1043,6 @@ export async function restartRedis(): Promise<RedisActionResponse> {
 }
 
 /**
- * 获取Redis平台信息
- */
-export async function getRedisPlatformInfo(): Promise<RedisPlatformInfo> {
-  return invoke('get_redis_platform_info')
-}
-
-/**
  * 更新Redis配置
  * @param request 配置更新请求
  */
@@ -1067,7 +1057,7 @@ export async function updateRedisConfig(
  * @param exe_dir Redis可执行文件目录
  */
 export async function installRedisService(exe_dir: string): Promise<WindowsServiceResponse> {
-  return invoke('install_redis_service', { exe_dir })
+  return invoke('install_redis_service', { exeDir: exe_dir })
 }
 
 /**
@@ -1089,5 +1079,105 @@ export async function isRedisServiceInstalled(): Promise<boolean> {
  * @param exe_dir Redis可执行文件目录
  */
 export async function validateRedisDir(exe_dir: string): Promise<boolean> {
-  return invoke('validate_redis_dir', { exe_dir })
+  return invoke('validate_redis_dir', { exeDir: exe_dir })
+}
+
+// ==================== Redis运行时配置 API ====================
+
+/**
+ * Redis运行时配置项
+ */
+export interface RedisRuntimeConfig {
+  name: string
+  value: string
+  description: string
+  config_type: string
+}
+
+/**
+ * Redis运行时配置更新请求
+ */
+export interface RedisRuntimeConfigUpdateRequest {
+  name: string
+  value: string
+}
+
+/**
+ * Redis运行时配置批量更新请求
+ */
+export interface RedisRuntimeConfigBatchUpdateRequest {
+  configs: RedisRuntimeConfigUpdateRequest[]
+}
+
+/**
+ * Redis运行时配置响应
+ */
+export interface RedisRuntimeConfigResponse {
+  success: boolean
+  message: string
+  configs: RedisRuntimeConfig[]
+}
+
+/**
+ * Redis运行时配置更新响应
+ */
+export interface RedisRuntimeConfigUpdateResponse {
+  success: boolean
+  message: string
+  updated_configs: string[]
+  failed_configs: [string, string][]
+}
+
+/**
+ * 获取Redis常用运行时配置
+ * @returns 配置响应
+ */
+export async function getRedisRuntimeConfigs(): Promise<RedisRuntimeConfigResponse> {
+  return invoke('get_redis_runtime_configs')
+}
+
+/**
+ * 更新Redis运行时配置
+ * @param request 配置更新请求
+ * @returns 更新响应
+ */
+export async function updateRedisRuntimeConfig(
+  request: RedisRuntimeConfigUpdateRequest
+): Promise<RedisRuntimeConfigUpdateResponse> {
+  return invoke('update_redis_runtime_config', { request })
+}
+
+/**
+ * 批量更新Redis运行时配置
+ * @param request 批量配置更新请求
+ * @returns 更新响应
+ */
+export async function batchUpdateRedisRuntimeConfigs(
+  request: RedisRuntimeConfigBatchUpdateRequest
+): Promise<RedisRuntimeConfigUpdateResponse> {
+  return invoke('batch_update_redis_runtime_configs', { request })
+}
+
+/**
+ * 重写Redis配置文件
+ * @returns 操作结果
+ */
+export async function rewriteRedisConfig(): Promise<void> {
+  return invoke('rewrite_redis_config')
+}
+
+/**
+ * 获取Redis内存信息
+ * @returns 内存信息
+ */
+export async function getRedisMemoryInfo(): Promise<Record<string, string>> {
+  return invoke('get_redis_memory_info')
+}
+
+/**
+ * 获取Redis客户端连接信息
+ * @returns 客户端信息列表
+ */
+export async function getRedisClientInfo(): Promise<Record<string, string>[]> {
+  return invoke('get_redis_client_info')
 }

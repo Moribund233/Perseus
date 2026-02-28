@@ -4,17 +4,110 @@
  * 管理Redis配置的读取、修改和保存
  * 使用redis-cli命令进行跨平台的配置管理
  */
-use std::fs;
+use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
 
 use crate::core::config;
-use crate::models::{RedisActionResponse, RedisConfigSaveResponse, RedisConfigUpdateRequest};
+use crate::models::{
+    RedisActionResponse, RedisConfigSaveResponse, RedisConfigUpdateRequest, RedisRuntimeConfig,
+    RedisRuntimeConfigBatchUpdateRequest, RedisRuntimeConfigResponse,
+    RedisRuntimeConfigUpdateRequest, RedisRuntimeConfigUpdateResponse,
+};
 
-/// 检查是否为Windows平台
+// ============================================================================
+// 基础工具函数
+// ============================================================================
+
+/**
+ * 检查是否为Windows平台
+ *
+ * @return 是否为Windows平台
+ */
 fn is_windows() -> bool {
     cfg!(target_os = "windows")
 }
+
+/**
+ * 获取redis-cli路径
+ *
+ * @return redis-cli路径
+ */
+fn get_redis_cli_path() -> Result<std::path::PathBuf, String> {
+    let client_config = config::load_config().map_err(|e| format!("加载配置失败: {}", e))?;
+    let redis_config = client_config.redis;
+
+    if !redis_config.is_loaded {
+        return Err("Redis未载入".to_string());
+    }
+
+    let exe_dir = redis_config.exe_dir.ok_or("Redis目录未设置")?;
+    let redis_cli_path = Path::new(&exe_dir).join(if is_windows() {
+        "redis-cli.exe"
+    } else {
+        "redis-cli"
+    });
+
+    if !redis_cli_path.exists() {
+        return Err(format!("redis-cli不存在: {}", redis_cli_path.display()));
+    }
+
+    Ok(redis_cli_path)
+}
+
+/**
+ * 获取Redis连接参数
+ *
+ * @return (端口, 密码)
+ */
+fn get_redis_connection_args() -> Result<(u16, Option<String>), String> {
+    let client_config = config::load_config().map_err(|e| format!("加载配置失败: {}", e))?;
+    let redis_config = client_config.redis;
+
+    if !redis_config.is_loaded {
+        return Err("Redis未载入".to_string());
+    }
+
+    Ok((redis_config.port, redis_config.password))
+}
+
+/**
+ * 执行redis-cli命令
+ *
+ * @param args 命令参数
+ * @return 命令输出
+ */
+fn execute_redis_cli(args: &[&str]) -> Result<String, String> {
+    let redis_cli_path = get_redis_cli_path()?;
+    let (port, password) = get_redis_connection_args()?;
+
+    let mut cmd = Command::new(&redis_cli_path);
+    cmd.arg("-p").arg(port.to_string());
+
+    // 如果有密码，添加认证
+    if let Some(pwd) = password {
+        cmd.arg("-a").arg(pwd);
+    }
+
+    cmd.args(args);
+
+    match cmd.output() {
+        Ok(output) => {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                Ok(stdout.trim().to_string())
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                Err(format!("redis-cli执行失败: {}", stderr))
+            }
+        }
+        Err(e) => Err(format!("执行redis-cli失败: {}", e)),
+    }
+}
+
+// ============================================================================
+// 目录和版本管理
+// ============================================================================
 
 /**
  * 检查Windows平台Redis目录是否有效
@@ -80,6 +173,53 @@ fn get_redis_version(exe_dir: &str) -> Option<String> {
 }
 
 /**
+ * 检测Redis配置文件路径
+ *
+ * @param exe_dir Redis可执行文件目录
+ * @return 配置文件路径
+ */
+fn detect_config_path(exe_dir: &str) -> Option<String> {
+    let possible_paths = vec![
+        Path::new(exe_dir).join("redis.conf"),
+        Path::new(exe_dir).join("redis.windows.conf"),
+        Path::new(exe_dir).join("redis.windows-service.conf"),
+    ];
+
+    for path in possible_paths {
+        if path.exists() {
+            return Some(path.to_string_lossy().to_string());
+        }
+    }
+
+    None
+}
+
+/**
+ * 检测Redis数据目录
+ *
+ * @param exe_dir Redis可执行文件目录
+ * @return 数据目录路径
+ */
+fn detect_data_dir(exe_dir: &str) -> Option<String> {
+    let possible_dirs = vec![
+        Path::new(exe_dir).join("data"),
+        Path::new(exe_dir).to_path_buf(),
+    ];
+
+    for dir in possible_dirs {
+        if dir.exists() {
+            return Some(dir.to_string_lossy().to_string());
+        }
+    }
+
+    None
+}
+
+// ============================================================================
+// Redis载入和状态
+// ============================================================================
+
+/**
  * 载入Redis目录
  *
  * @param exe_dir Redis可执行文件目录路径
@@ -104,12 +244,11 @@ pub fn load_redis(exe_dir: String) -> RedisActionResponse {
     // 检测数据目录
     let data_dir = detect_data_dir(&exe_dir);
 
-    // 读取当前配置
-    let (port, require_pass, password) = if let Some(ref config_file) = config_path {
-        parse_redis_config(config_file)
-    } else {
-        (6379, false, None)
-    };
+    // 使用默认配置值（载入时Redis可能未运行，无法通过redis-cli获取）
+    // 实际配置值将在Redis启动后通过redis-cli动态获取
+    let port = 6379u16;
+    let require_pass = false;
+    let password: Option<String> = None;
 
     // 检查是否已作为Windows服务安装
     let is_windows_service = if is_windows() {
@@ -185,375 +324,450 @@ pub fn get_redis_status() -> crate::models::RedisStatusResponse {
     }
 }
 
+// ============================================================================
+// 运行时配置管理
+// ============================================================================
+
 /**
- * 更新Redis配置
+ * 获取单个配置项
  *
- * @param request 配置更新请求
- * @return 保存响应
+ * @param config_name 配置项名称
+ * @return 配置值
  */
-pub fn update_redis_config(request: RedisConfigUpdateRequest) -> RedisConfigSaveResponse {
-    match config::load_config() {
-        Ok(mut client_config) => {
-            let mut config_reloaded = false;
+pub fn get_config(config_name: &str) -> Result<String, String> {
+    execute_redis_cli(&["CONFIG", "GET", config_name])
+}
 
-            // 更新端口
-            if let Some(port) = request.port {
-                client_config.redis.port = port;
+/**
+ * 设置单个配置项
+ *
+ * @param config_name 配置项名称
+ * @param value 配置值
+ */
+pub fn set_config(config_name: &str, value: &str) -> Result<(), String> {
+    execute_redis_cli(&["CONFIG", "SET", config_name, value])?;
+    Ok(())
+}
+
+/**
+ * 获取所有配置项
+ *
+ * @return 所有配置项的HashMap
+ */
+pub fn get_all_configs() -> Result<HashMap<String, String>, String> {
+    let output = execute_redis_cli(&["CONFIG", "GET", "*"])?;
+    let mut configs = HashMap::new();
+
+    // 解析输出，格式为：key\nvalue\nkey\nvalue...
+    let lines: Vec<&str> = output.lines().collect();
+    for i in (0..lines.len()).step_by(2) {
+        if i + 1 < lines.len() {
+            configs.insert(lines[i].to_string(), lines[i + 1].to_string());
+        }
+    }
+
+    Ok(configs)
+}
+
+/**
+ * 获取配置项默认值
+ *
+ * @param config_name 配置项名称
+ * @return 默认值
+ */
+fn get_config_default(config_name: &str) -> Option<String> {
+    match config_name {
+        // 网络配置
+        "port" => Some("6379".to_string()),
+        "bind" => Some("127.0.0.1".to_string()),
+        "protected-mode" => Some("yes".to_string()),
+        "tcp-backlog" => Some("511".to_string()),
+        // 安全配置
+        "requirepass" => Some("".to_string()),
+        "masterauth" => Some("".to_string()),
+        // 性能配置
+        "maxclients" => Some("10000".to_string()),
+        "timeout" => Some("0".to_string()),
+        "tcp-keepalive" => Some("300".to_string()),
+        "hz" => Some("10".to_string()),
+        // 内存配置
+        "maxmemory" => Some("0".to_string()),
+        "maxmemory-policy" => Some("noeviction".to_string()),
+        "maxmemory-samples" => Some("5".to_string()),
+        // 持久化配置
+        "save" => Some("3600 1 300 100 60 10000".to_string()),
+        "appendonly" => Some("no".to_string()),
+        "appendfsync" => Some("everysec".to_string()),
+        "auto-aof-rewrite-percentage" => Some("100".to_string()),
+        "auto-aof-rewrite-min-size" => Some("64mb".to_string()),
+        // 监控配置
+        "slowlog-log-slower-than" => Some("10000".to_string()),
+        "slowlog-max-len" => Some("128".to_string()),
+        "latency-monitor-threshold" => Some("0".to_string()),
+        // 常规配置
+        "databases" => Some("16".to_string()),
+        "loglevel" => Some("notice".to_string()),
+        "supervised" => Some("no".to_string()),
+        _ => None,
+    }
+}
+
+/**
+ * 获取常用配置项列表
+ *
+ * @return 常用配置项响应
+ */
+pub fn get_common_configs() -> RedisRuntimeConfigResponse {
+    let common_config_keys = vec![
+        // 网络配置
+        ("port", "监听端口", "network"),
+        ("bind", "绑定地址", "network"),
+        ("protected-mode", "保护模式", "network"),
+        ("tcp-backlog", "TCP连接队列长度", "network"),
+        // 安全配置
+        ("requirepass", "访问密码", "security"),
+        ("masterauth", "主节点认证密码", "security"),
+        // 性能配置
+        ("maxclients", "最大客户端连接数", "performance"),
+        ("timeout", "连接超时时间(秒)", "performance"),
+        ("tcp-keepalive", "TCP保活时间(秒)", "performance"),
+        ("hz", "后台任务执行频率", "performance"),
+        // 内存配置
+        ("maxmemory", "最大内存限制", "memory"),
+        ("maxmemory-policy", "内存淘汰策略", "memory"),
+        ("maxmemory-samples", "内存淘汰采样数", "memory"),
+        // 持久化配置
+        ("save", "RDB保存策略", "persistence"),
+        ("appendonly", "启用AOF持久化", "persistence"),
+        ("appendfsync", "AOF同步策略", "persistence"),
+        (
+            "auto-aof-rewrite-percentage",
+            "AOF重写触发百分比",
+            "persistence",
+        ),
+        (
+            "auto-aof-rewrite-min-size",
+            "AOF重写最小大小",
+            "persistence",
+        ),
+        // 监控配置
+        ("slowlog-log-slower-than", "慢查询阈值(微秒)", "monitoring"),
+        ("slowlog-max-len", "慢查询日志长度", "monitoring"),
+        ("latency-monitor-threshold", "延迟监控阈值", "monitoring"),
+        // 常规配置
+        ("databases", "数据库数量", "general"),
+        ("loglevel", "日志级别", "general"),
+        ("supervised", "进程管理器", "general"),
+    ];
+
+    match get_all_configs() {
+        Ok(all_configs) => {
+            let mut configs = Vec::new();
+
+            for (key, desc, config_type) in common_config_keys {
+                // 获取配置值，优先使用当前值，其次使用默认值，最后使用空字符串
+                let value = all_configs
+                    .get(key)
+                    .cloned()
+                    .filter(|v| !v.is_empty())
+                    .or_else(|| get_config_default(key))
+                    .unwrap_or_default();
+                configs.push(RedisRuntimeConfig {
+                    name: key.to_string(),
+                    value,
+                    description: desc.to_string(),
+                    config_type: config_type.to_string(),
+                });
             }
 
-            // 尝试更新配置文件（在移动值之前克隆）
-            let config_port = request.port;
-            let config_require_pass = request.require_pass;
-            let config_password = request.password.clone();
-            let config_data_dir = request.data_dir.clone();
-
-            // 更新认证设置
-            if let Some(require_pass) = request.require_pass {
-                client_config.redis.require_pass = require_pass;
-            }
-
-            // 更新密码
-            if let Some(password) = request.password {
-                client_config.redis.password = Some(password);
-            }
-
-            // 更新数据目录
-            if let Some(data_dir) = request.data_dir {
-                client_config.redis.data_dir = Some(data_dir);
-            }
-
-            if let Some(ref config_path) = client_config.redis.config_path {
-                if Path::new(config_path).exists() {
-                    match modify_redis_config_file(
-                        config_path,
-                        config_port,
-                        config_require_pass,
-                        config_password,
-                        config_data_dir,
-                    ) {
-                        Ok(_) => {
-                            config_reloaded = true;
-                        }
-                        Err(e) => {
-                            return RedisConfigSaveResponse {
-                                success: false,
-                                message: format!("修改配置文件失败: {}", e),
-                                config_reloaded: false,
-                            };
-                        }
-                    }
-                }
-            }
-
-            // 保存配置
-            match config::save_config(&client_config) {
-                Ok(_) => RedisConfigSaveResponse {
-                    success: true,
-                    message: "配置已保存".to_string(),
-                    config_reloaded,
-                },
-                Err(e) => RedisConfigSaveResponse {
-                    success: false,
-                    message: format!("保存配置失败: {}", e),
-                    config_reloaded: false,
-                },
+            RedisRuntimeConfigResponse {
+                success: true,
+                message: "获取配置成功".to_string(),
+                configs,
             }
         }
-        Err(e) => RedisConfigSaveResponse {
+        Err(e) => RedisRuntimeConfigResponse {
             success: false,
-            message: format!("加载配置失败: {}", e),
-            config_reloaded: false,
+            message: format!("获取配置失败: {}", e),
+            configs: Vec::new(),
         },
     }
 }
 
 /**
- * 使用redis-cli动态修改配置（无需重启）
+ * 更新单个配置项
  *
- * @param config 配置项名称
- * @param value 配置值
- * @return 操作结果
+ * @param request 更新请求
+ * @return 更新响应
  */
-#[allow(dead_code)]
-pub fn set_runtime_config(config: &str, value: &str) -> Result<(), String> {
-    let client_config = config::load_config().map_err(|e| format!("加载配置失败: {}", e))?;
-    let redis_config = client_config.redis;
+pub fn update_config(request: RedisRuntimeConfigUpdateRequest) -> RedisRuntimeConfigUpdateResponse {
+    let mut updated = Vec::new();
+    let mut failed = Vec::new();
 
-    if !redis_config.is_loaded {
-        return Err("Redis未载入".to_string());
+    match set_config(&request.name, &request.value) {
+        Ok(_) => {
+            updated.push(request.name);
+        }
+        Err(e) => {
+            failed.push((request.name, e));
+        }
     }
 
-    let exe_dir = redis_config.exe_dir.ok_or("Redis目录未设置")?;
-    let redis_cli_path = Path::new(&exe_dir).join(if is_windows() {
-        "redis-cli.exe"
+    let success = !updated.is_empty();
+    let message = if success {
+        "配置更新成功".to_string()
     } else {
-        "redis-cli"
-    });
-
-    if !redis_cli_path.exists() {
-        return Err(format!("redis-cli不存在: {}", redis_cli_path.display()));
-    }
-
-    let mut cmd = Command::new(&redis_cli_path);
-    cmd.arg("-p")
-        .arg(redis_config.port.to_string())
-        .arg("CONFIG")
-        .arg("SET")
-        .arg(config)
-        .arg(value);
-
-    // 如果有密码，添加认证
-    if redis_config.require_pass {
-        if let Some(password) = &redis_config.password {
-            cmd.arg("-a").arg(password);
-        }
-    }
-
-    match cmd.output() {
-        Ok(output) => {
-            if output.status.success() {
-                Ok(())
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                Err(format!("设置配置失败: {}", stderr))
-            }
-        }
-        Err(e) => Err(format!("执行redis-cli失败: {}", e)),
-    }
-}
-
-/**
- * 使用redis-cli获取运行时配置
- *
- * @param config 配置项名称
- * @return 配置值
- */
-#[allow(dead_code)]
-pub fn get_runtime_config(config: &str) -> Result<String, String> {
-    let client_config = config::load_config().map_err(|e| format!("加载配置失败: {}", e))?;
-    let redis_config = client_config.redis;
-
-    if !redis_config.is_loaded {
-        return Err("Redis未载入".to_string());
-    }
-
-    let exe_dir = redis_config.exe_dir.ok_or("Redis目录未设置")?;
-    let redis_cli_path = Path::new(&exe_dir).join(if is_windows() {
-        "redis-cli.exe"
-    } else {
-        "redis-cli"
-    });
-
-    if !redis_cli_path.exists() {
-        return Err(format!("redis-cli不存在: {}", redis_cli_path.display()));
-    }
-
-    let mut cmd = Command::new(&redis_cli_path);
-    cmd.arg("-p")
-        .arg(redis_config.port.to_string())
-        .arg("CONFIG")
-        .arg("GET")
-        .arg(config);
-
-    // 如果有密码，添加认证
-    if redis_config.require_pass {
-        if let Some(password) = &redis_config.password {
-            cmd.arg("-a").arg(password);
-        }
-    }
-
-    match cmd.output() {
-        Ok(output) => {
-            if output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                Ok(stdout.trim().to_string())
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                Err(format!("获取配置失败: {}", stderr))
-            }
-        }
-        Err(e) => Err(format!("执行redis-cli失败: {}", e)),
-    }
-}
-
-/**
- * 检测Redis配置文件路径
- *
- * @param exe_dir Redis可执行文件目录
- * @return 配置文件路径
- */
-fn detect_config_path(exe_dir: &str) -> Option<String> {
-    let possible_paths = vec![
-        Path::new(exe_dir).join("redis.conf"),
-        Path::new(exe_dir).join("redis.windows.conf"),
-        Path::new(exe_dir).join("redis.windows-service.conf"),
-    ];
-
-    for path in possible_paths {
-        if path.exists() {
-            return Some(path.to_string_lossy().to_string());
-        }
-    }
-
-    None
-}
-
-/**
- * 检测Redis数据目录
- *
- * @param exe_dir Redis可执行文件目录
- * @return 数据目录路径
- */
-fn detect_data_dir(exe_dir: &str) -> Option<String> {
-    let possible_dirs = vec![
-        Path::new(exe_dir).join("data"),
-        Path::new(exe_dir).to_path_buf(),
-    ];
-
-    for dir in possible_dirs {
-        if dir.exists() {
-            return Some(dir.to_string_lossy().to_string());
-        }
-    }
-
-    None
-}
-
-/**
- * 解析Redis配置文件
- *
- * @param config_path 配置文件路径
- * @return (端口, 是否需要认证, 密码)
- */
-fn parse_redis_config(config_path: &str) -> (u16, bool, Option<String>) {
-    let content = match fs::read_to_string(config_path) {
-        Ok(c) => c,
-        Err(_) => return (6379, false, None),
+        "配置更新失败".to_string()
     };
 
-    let mut port = 6379u16;
-    let mut require_pass = false;
-    let mut password = None;
-
-    for line in content.lines() {
-        let line = line.trim();
-
-        // 跳过注释和空行
-        if line.starts_with('#') || line.is_empty() {
-            continue;
-        }
-
-        // 解析端口
-        if line.starts_with("port ") {
-            if let Some(value) = line.split_whitespace().nth(1) {
-                if let Ok(p) = value.parse::<u16>() {
-                    port = p;
-                }
-            }
-        }
-
-        // 解析密码
-        if line.starts_with("requirepass ") {
-            if let Some(value) = line.split_whitespace().nth(1) {
-                require_pass = true;
-                password = Some(value.to_string());
-            }
-        }
+    RedisRuntimeConfigUpdateResponse {
+        success,
+        message,
+        updated_configs: updated,
+        failed_configs: failed,
     }
-
-    (port, require_pass, password)
 }
 
 /**
- * 修改Redis配置文件
+ * 批量更新配置项
  *
- * @param config_path 配置文件路径
- * @param port 端口
- * @param require_pass 是否需要认证
- * @param password 密码
- * @param data_dir 数据目录
+ * @param request 批量更新请求
+ * @return 更新响应
+ */
+pub fn batch_update_configs(
+    request: RedisRuntimeConfigBatchUpdateRequest,
+) -> RedisRuntimeConfigUpdateResponse {
+    let mut updated = Vec::new();
+    let mut failed = Vec::new();
+
+    for config in request.configs {
+        match set_config(&config.name, &config.value) {
+            Ok(_) => {
+                updated.push(config.name);
+            }
+            Err(e) => {
+                failed.push((config.name, e));
+            }
+        }
+    }
+
+    let success = !updated.is_empty() && failed.is_empty();
+    let message = if failed.is_empty() {
+        "所有配置更新成功".to_string()
+    } else if updated.is_empty() {
+        "所有配置更新失败".to_string()
+    } else {
+        format!(
+            "部分配置更新成功: {}/{}失败",
+            failed.len(),
+            failed.len() + updated.len()
+        )
+    };
+
+    RedisRuntimeConfigUpdateResponse {
+        success,
+        message,
+        updated_configs: updated,
+        failed_configs: failed,
+    }
+}
+
+/**
+ * 将运行时配置写入配置文件
+ *
  * @return 操作结果
  */
-fn modify_redis_config_file(
-    config_path: &str,
-    port: Option<u16>,
-    require_pass: Option<bool>,
-    password: Option<String>,
-    data_dir: Option<String>,
-) -> Result<(), String> {
-    let content =
-        fs::read_to_string(config_path).map_err(|e| format!("读取配置文件失败: {}", e))?;
-
-    let mut new_lines: Vec<String> = Vec::new();
-    let mut port_updated = port.is_none();
-    let mut pass_updated = require_pass.is_none() && password.is_none();
-    let mut dir_updated = data_dir.is_none();
-
-    for line in content.lines() {
-        let trimmed = line.trim();
-
-        // 更新端口
-        if !port_updated && trimmed.starts_with("port ") {
-            if let Some(p) = port {
-                new_lines.push(format!("port {}", p));
-                port_updated = true;
-                continue;
-            }
-        }
-
-        // 更新密码
-        if !pass_updated && trimmed.starts_with("requirepass ") {
-            if let Some(req) = require_pass {
-                if req {
-                    if let Some(ref pwd) = password {
-                        new_lines.push(format!("requirepass {}", pwd));
-                    } else {
-                        new_lines.push(line.to_string());
-                    }
-                } else {
-                    new_lines.push(format!("# {}", line));
-                }
-                pass_updated = true;
-                continue;
-            }
-        }
-
-        // 更新数据目录
-        if !dir_updated && trimmed.starts_with("dir ") {
-            if let Some(ref d) = data_dir {
-                new_lines.push(format!("dir \"{}\"", d));
-                dir_updated = true;
-                continue;
-            }
-        }
-
-        new_lines.push(line.to_string());
-    }
-
-    // 如果配置项不存在，添加到文件末尾
-    if !port_updated {
-        if let Some(p) = port {
-            new_lines.push(format!("port {}", p));
-        }
-    }
-
-    if !pass_updated {
-        if let Some(req) = require_pass {
-            if req {
-                if let Some(ref pwd) = password {
-                    new_lines.push(format!("requirepass {}", pwd));
-                }
-            }
-        }
-    }
-
-    if !dir_updated {
-        if let Some(ref d) = data_dir {
-            new_lines.push(format!("dir \"{}\"", d));
-        }
-    }
-
-    fs::write(config_path, new_lines.join("\n")).map_err(|e| format!("写入配置文件失败: {}", e))?;
-
+pub fn rewrite_config_file() -> Result<(), String> {
+    execute_redis_cli(&["CONFIG", "REWRITE"])?;
     Ok(())
+}
+
+/**
+ * 获取内存使用情况
+ *
+ * @return 内存信息HashMap
+ */
+pub fn get_memory_info() -> Result<HashMap<String, String>, String> {
+    let output = execute_redis_cli(&["INFO", "memory"])?;
+    let mut info = HashMap::new();
+
+    for line in output.lines() {
+        if let Some(pos) = line.find(':') {
+            let key = &line[..pos];
+            let value = &line[pos + 1..];
+            info.insert(key.to_string(), value.to_string());
+        }
+    }
+
+    Ok(info)
+}
+
+/**
+ * 获取客户端连接信息
+ *
+ * @return 客户端信息列表
+ */
+pub fn get_client_info() -> Result<Vec<HashMap<String, String>>, String> {
+    let output = execute_redis_cli(&["CLIENT", "LIST"])?;
+    let mut clients = Vec::new();
+
+    for line in output.lines() {
+        let mut client_info = HashMap::new();
+        for part in line.split_whitespace() {
+            if let Some(pos) = part.find('=') {
+                let key = &part[..pos];
+                let value = &part[pos + 1..];
+                client_info.insert(key.to_string(), value.to_string());
+            }
+        }
+        if !client_info.is_empty() {
+            clients.push(client_info);
+        }
+    }
+
+    Ok(clients)
+}
+
+// ============================================================================
+// 配置更新（高层接口）
+// ============================================================================
+
+/**
+ * 更新Redis配置
+ *
+ * 使用redis-cli动态修改配置，支持跨平台
+ * 修改会立即生效，并通过CONFIG REWRITE保存到配置文件
+ *
+ * @param request 配置更新请求
+ * @return 保存响应
+ */
+pub fn update_redis_config(request: RedisConfigUpdateRequest) -> RedisConfigSaveResponse {
+    use crate::services::redis::lifecycle::check_redis_status;
+
+    let client_config = match config::load_config() {
+        Ok(c) => c,
+        Err(e) => {
+            return RedisConfigSaveResponse {
+                success: false,
+                message: format!("加载配置失败: {}", e),
+                config_reloaded: false,
+            };
+        }
+    };
+
+    let redis_config = &client_config.redis;
+
+    if !redis_config.is_loaded {
+        return RedisConfigSaveResponse {
+            success: false,
+            message: "Redis未载入".to_string(),
+            config_reloaded: false,
+        };
+    }
+
+    // 检查Redis是否正在运行（使用实时状态检查）
+    let current_status = check_redis_status();
+    if current_status != "running" {
+        return RedisConfigSaveResponse {
+            success: false,
+            message: "Redis未运行，请先启动Redis".to_string(),
+            config_reloaded: false,
+        };
+    }
+
+    let mut updated_configs = Vec::new();
+    let mut failed_configs = Vec::new();
+
+    // 更新端口
+    if let Some(port) = request.port {
+        match set_config("port", &port.to_string()) {
+            Ok(_) => {
+                updated_configs.push("port".to_string());
+            }
+            Err(e) => {
+                failed_configs.push(("port".to_string(), e));
+            }
+        }
+    }
+
+    // 更新密码认证
+    if let Some(require_pass) = request.require_pass {
+        if require_pass {
+            if let Some(ref password) = request.password {
+                match set_config("requirepass", password) {
+                    Ok(_) => {
+                        updated_configs.push("requirepass".to_string());
+                    }
+                    Err(e) => {
+                        failed_configs.push(("requirepass".to_string(), e));
+                    }
+                }
+            }
+        } else {
+            // 禁用密码认证 - 设置为空字符串
+            match set_config("requirepass", "") {
+                Ok(_) => {
+                    updated_configs.push("requirepass".to_string());
+                }
+                Err(e) => {
+                    failed_configs.push(("requirepass".to_string(), e));
+                }
+            }
+        }
+    }
+
+    // 保存到客户端配置
+    let mut new_config = client_config.clone();
+    if let Some(port) = request.port {
+        new_config.redis.port = port;
+    }
+    if let Some(require_pass) = request.require_pass {
+        new_config.redis.require_pass = require_pass;
+        if require_pass {
+            if let Some(password) = request.password {
+                new_config.redis.password = Some(password);
+            }
+        } else {
+            new_config.redis.password = None;
+        }
+    }
+    if let Some(data_dir) = request.data_dir {
+        new_config.redis.data_dir = Some(data_dir.clone());
+    }
+
+    // 保存配置到文件
+    if let Err(e) = config::save_config(&new_config) {
+        return RedisConfigSaveResponse {
+            success: false,
+            message: format!("保存配置失败: {}", e),
+            config_reloaded: false,
+        };
+    }
+
+    // 执行CONFIG REWRITE将配置保存到Redis配置文件
+    let config_reloaded = if failed_configs.is_empty() {
+        match rewrite_config_file() {
+            Ok(_) => true,
+            Err(e) => {
+                failed_configs.push(("CONFIG REWRITE".to_string(), e));
+                false
+            }
+        }
+    } else {
+        false
+    };
+
+    let message = if failed_configs.is_empty() {
+        "配置已更新并保存".to_string()
+    } else if updated_configs.is_empty() {
+        format!("配置更新失败: {}", failed_configs[0].1)
+    } else {
+        format!("部分配置更新成功，{}个失败", failed_configs.len())
+    };
+
+    RedisConfigSaveResponse {
+        success: !updated_configs.is_empty(),
+        message,
+        config_reloaded,
+    }
 }

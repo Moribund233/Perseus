@@ -6,8 +6,8 @@ import {
   loadNginx,
   downloadAndExtractNginx,
   updateNginxDownloadUrl,
-  getNginxPlatformInfo,
-  type NginxPlatformInfo
+  getPlatformInfo,
+  type PlatformInfo
 } from '../../services/api'
 import { useGuideEventBus } from '../../composables/useGuideEvents'
 
@@ -27,7 +27,7 @@ const state = eventBus.state.value.nginxConfig
 const nginxDownloadUrl = ref('https://nginx.org/download/nginx-1.24.0.zip')
 const isLoading = ref(false)
 const isNginxDownloading = ref(false)
-const nginxPlatformInfo = ref<NginxPlatformInfo | null>(null)
+const nginxPlatformInfo = ref<PlatformInfo | null>(null)
 
 // Nginx平台相关计算属性
 const supportsNginxManualLoad = computed(() => {
@@ -67,7 +67,7 @@ async function checkNginx(): Promise<void> {
  */
 async function loadNginxPlatformInfo(): Promise<void> {
   try {
-    nginxPlatformInfo.value = await getNginxPlatformInfo()
+    nginxPlatformInfo.value = await getPlatformInfo()
   } catch (e) {
     console.error('获取Nginx平台信息失败:', e)
   }

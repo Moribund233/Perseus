@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useServiceStore } from '../../stores'
 import { useHomeEventBus } from '../../composables/useHomeEvents'
 import { useDatabaseConnection } from '../../composables/useDatabaseConnection'
+import { getRedisStatus, type RedisStatusResponse } from '../../services/api'
 
 /**
  * 性能监控组件
@@ -23,6 +24,10 @@ const performanceState = eventBus.state.value.performance
 // 使用数据库连接 composable
 const { state: dbConnectionState, badgeConfig: dbBadgeConfig, checkConnection: checkDbConnection } = useDatabaseConnection()
 
+// Redis 状态
+const redisStatus = ref<RedisStatusResponse | null>(null)
+let redisCheckTimer: number | null = null
+
 // 定时刷新数据库连接状态
 let dbCheckTimer: number | null = null
 
@@ -33,6 +38,9 @@ const dbIcons: Record<string, string> = {
   mysql: new URL('../../assets/icons/mysql.svg', import.meta.url).href,
   default: new URL('../../assets/icons/database.svg', import.meta.url).href
 }
+
+// Redis 图标路径
+const redisIcon = new URL('../../assets/icons/redis.svg', import.meta.url).href
 
 /**
  * 获取当前数据库类型对应的图标
@@ -45,6 +53,40 @@ const getDbIcon = (): string => {
 // 服务状态
 const serviceStatus = computed(() => {
   return storeIsRunning.value ? 'running' : 'stopped'
+})
+
+// Redis 状态文本
+const redisStatusText = computed(() => {
+  if (!redisStatus.value?.is_loaded) {
+    return '未载入'
+  }
+  switch (redisStatus.value.status) {
+    case 'running':
+      return '运行中'
+    case 'stopped':
+      return '已停止'
+    case 'error':
+      return '错误'
+    default:
+      return '未知'
+  }
+})
+
+// Redis 状态样式类
+const redisStatusClass = computed(() => {
+  if (!redisStatus.value?.is_loaded) {
+    return 'status-unloaded'
+  }
+  switch (redisStatus.value.status) {
+    case 'running':
+      return 'status-connected'
+    case 'stopped':
+      return 'status-disconnected'
+    case 'error':
+      return 'status-error'
+    default:
+      return 'status-unknown'
+  }
 })
 
 // 上次网络字节数（用于计算速率）
@@ -147,15 +189,33 @@ const getNetworkSpeedDisplay = (): string => {
   return `${total.toFixed(1)} KB/s`
 }
 
-// 组件挂载时开始检查数据库连接
+/**
+ * 检查 Redis 状态
+ */
+const checkRedisStatus = async () => {
+  try {
+    redisStatus.value = await getRedisStatus()
+  } catch (e) {
+    console.error('获取 Redis 状态失败:', e)
+    redisStatus.value = null
+  }
+}
+
+// 组件挂载时开始检查
 onMounted(() => {
   // 立即检查一次
   checkDbConnection()
+  checkRedisStatus()
 
   // 每 30 秒检查一次数据库连接
   dbCheckTimer = window.setInterval(() => {
     checkDbConnection()
   }, 30000)
+
+  // 每 10 秒检查一次 Redis 状态
+  redisCheckTimer = window.setInterval(() => {
+    checkRedisStatus()
+  }, 10000)
 })
 
 // 组件卸载时清理定时器
@@ -163,6 +223,10 @@ onUnmounted(() => {
   if (dbCheckTimer) {
     clearInterval(dbCheckTimer)
     dbCheckTimer = null
+  }
+  if (redisCheckTimer) {
+    clearInterval(redisCheckTimer)
+    redisCheckTimer = null
   }
 })
 </script>
@@ -370,6 +434,27 @@ onUnmounted(() => {
         </span>
       </div>
     </div>
+
+    <!-- Redis 连接状态 -->
+    <div class="card metric-card redis-card">
+      <div class="metric-header">
+        <div class="metric-icon redis" :class="`redis-status-${redisStatusClass}`">
+          <img :src="redisIcon" class="icon-redis" alt="redis" />
+        </div>
+        <div class="metric-info">
+          <span class="metric-label">Redis</span>
+          <span class="metric-value" :class="`redis-status-text-${redisStatusClass}`">
+            {{ redisStatusText }}
+          </span>
+        </div>
+      </div>
+      <div v-if="redisStatus?.is_loaded" class="redis-details">
+        <span class="redis-port">端口: {{ redisStatus.port }}</span>
+        <span v-if="redisStatus.status === 'running'" class="redis-auth">
+          {{ redisStatus.require_pass ? '有密码' : '无密码' }}
+        </span>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -433,14 +518,85 @@ onUnmounted(() => {
   height: 24px;
 }
 
+/* Redis 图标 */
+.icon-redis {
+  width: 24px;
+  height: 24px;
+}
+
 /* 亮色模式：图标保持原色 */
-:root:not([data-theme='dark']) .icon-database {
+:root:not([data-theme='dark']) .icon-database,
+:root:not([data-theme='dark']) .icon-redis {
   filter: none;
 }
 
 /* 暗色模式：图标反转为白色 */
 :root[data-theme='dark'] .icon-database,
-.icon-database {
+:root[data-theme='dark'] .icon-redis,
+.icon-database,
+.icon-redis {
   filter: brightness(0) invert(1);
+}
+
+/* Redis 卡片样式 */
+.redis-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.redis-details {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--border-color);
+}
+
+.redis-port,
+.redis-auth {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+/* Redis 状态颜色 - 图标背景 */
+.redis-status-status-connected {
+  background-color: var(--success-color);
+}
+
+.redis-status-status-disconnected {
+  background-color: var(--error-color);
+}
+
+.redis-status-status-unloaded {
+  background-color: var(--bg-tertiary);
+}
+
+.redis-status-status-error {
+  background-color: var(--warning-color);
+}
+
+.redis-status-status-unknown {
+  background-color: var(--text-secondary);
+}
+
+/* Redis 状态颜色 - 文字 */
+.redis-status-text-status-connected {
+  color: var(--success-color);
+}
+
+.redis-status-text-status-disconnected {
+  color: var(--error-color);
+}
+
+.redis-status-text-status-unloaded {
+  color: var(--text-secondary);
+}
+
+.redis-status-text-status-error {
+  color: var(--warning-color);
+}
+
+.redis-status-text-status-unknown {
+  color: var(--text-secondary);
 }
 </style>

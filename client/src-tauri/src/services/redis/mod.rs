@@ -20,7 +20,11 @@ mod response;
 mod windows_service;
 
 // 重新导出公共接口
-pub use config_manager::{get_redis_status, load_redis, set_runtime_config, update_redis_config};
+pub use config_manager::{
+    batch_update_configs, get_all_configs, get_client_info, get_common_configs, get_config,
+    get_memory_info, get_redis_status, load_redis, rewrite_config_file, set_config, update_config,
+    update_redis_config,
+};
 pub use lifecycle::{check_redis_status, restart_redis, start_redis, stop_redis};
 pub use windows_service::{
     add_to_path, install_redis_service, is_redis_service_installed, is_redis_service_running,

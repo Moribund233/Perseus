@@ -3,8 +3,12 @@
  *
  * 提供Redis状态查询、启动、停止、配置管理等功能
  */
+use std::collections::HashMap;
+
 use crate::models::{
-    RedisActionResponse, RedisConfigSaveResponse, RedisConfigUpdateRequest, RedisStatusResponse,
+    RedisActionResponse, RedisConfigSaveResponse, RedisConfigUpdateRequest,
+    RedisRuntimeConfigBatchUpdateRequest, RedisRuntimeConfigResponse,
+    RedisRuntimeConfigUpdateRequest, RedisRuntimeConfigUpdateResponse, RedisStatusResponse,
     WindowsServiceResponse,
 };
 
@@ -70,6 +74,72 @@ pub fn update_redis_config(
     request: RedisConfigUpdateRequest,
 ) -> Result<RedisConfigSaveResponse, String> {
     Ok(crate::services::redis::update_redis_config(request))
+}
+
+/**
+ * 获取Redis常用运行时配置
+ *
+ * @return 配置响应
+ */
+#[tauri::command]
+pub fn get_redis_runtime_configs() -> Result<RedisRuntimeConfigResponse, String> {
+    Ok(crate::services::redis::get_common_configs())
+}
+
+/**
+ * 更新Redis运行时配置
+ *
+ * @param request 配置更新请求
+ * @return 更新响应
+ */
+#[tauri::command]
+pub fn update_redis_runtime_config(
+    request: RedisRuntimeConfigUpdateRequest,
+) -> Result<RedisRuntimeConfigUpdateResponse, String> {
+    Ok(crate::services::redis::update_config(request))
+}
+
+/**
+ * 批量更新Redis运行时配置
+ *
+ * @param request 批量配置更新请求
+ * @return 更新响应
+ */
+#[tauri::command]
+pub fn batch_update_redis_runtime_configs(
+    request: RedisRuntimeConfigBatchUpdateRequest,
+) -> Result<RedisRuntimeConfigUpdateResponse, String> {
+    Ok(crate::services::redis::batch_update_configs(request))
+}
+
+/**
+ * 重写Redis配置文件
+ *
+ * @return 操作结果
+ */
+#[tauri::command]
+pub fn rewrite_redis_config() -> Result<(), String> {
+    crate::services::redis::rewrite_config_file()
+}
+
+/**
+ * 获取Redis内存信息
+ *
+ * @return 内存信息
+ */
+#[tauri::command]
+pub fn get_redis_memory_info() -> Result<HashMap<String, String>, String> {
+    crate::services::redis::get_memory_info()
+}
+
+/**
+ * 获取Redis客户端连接信息
+ *
+ * @return 客户端信息列表
+ */
+#[tauri::command]
+pub fn get_redis_client_info() -> Result<Vec<HashMap<String, String>>, String> {
+    crate::services::redis::get_client_info()
 }
 
 /**
