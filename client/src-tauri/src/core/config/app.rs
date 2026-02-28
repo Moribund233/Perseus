@@ -8,7 +8,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::models::ClientConfig;
-use crate::secure_config;
+
+use super::secure as secure_config;
 
 /// 配置文件名（新版 TOML 格式）- 非敏感配置
 const CONFIG_FILE_NAME_TOML: &str = "client.toml";

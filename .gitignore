@@ -144,7 +144,6 @@ Thumbs.db
 # Custom
 *.log
 *.pid
-nginx/
 repositories/
 
 # Database migration files

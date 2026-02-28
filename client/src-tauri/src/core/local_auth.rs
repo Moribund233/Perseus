@@ -10,7 +10,7 @@
 use rand::{distributions::Alphanumeric, Rng};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::secure_config::{self, SecureConfig};
+use crate::core::config::secure::{self as secure_config, SecureConfig};
 
 /// 本地认证请求头名
 pub const LOCAL_AUTH_HEADER: &str = "X-LanGit-Local";
@@ -60,7 +60,7 @@ impl From<LocalAuthConfig> for SecureConfig {
             security_password: String::new(),
             key_version: 0,
             stress_test: false,
-            database_urls: crate::secure_config::default_database_urls(),
+            database_urls: crate::core::config::secure::default_database_urls(),
         }
     }
 }
@@ -188,7 +188,7 @@ pub fn get_server_env_vars() -> Result<Vec<(String, String)>, String> {
     let secure_config = secure_config::load_secure_config()?;
 
     // 从 client.toml 读取当前选择的数据库类型
-    let client_config = crate::config::load_config()?;
+    let client_config = crate::core::config::load_config()?;
     let db_type = client_config.db_type;
 
     // 根据 db_type 从钥匙串中获取对应的 URL
@@ -215,10 +215,7 @@ pub fn get_server_env_vars() -> Result<Vec<(String, String)>, String> {
             "LANGIT_STRESS_TEST".to_string(),
             secure_config.stress_test.to_string(),
         ),
-        (
-            "DATABASE_URL".to_string(),
-            database_url,
-        ),
+        ("DATABASE_URL".to_string(), database_url),
     ])
 }
 

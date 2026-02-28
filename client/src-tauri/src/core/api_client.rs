@@ -1,10 +1,13 @@
-use crate::config::{get_auth_token, get_server_url};
-use crate::models::*;
 /**
  * API 客户端模块
  *
  * 封装与后端服务的 HTTP 通信
  */
+use super::config::{get_auth_token, get_server_url};
+use crate::models::{
+    ActionResponse, ConfigResponse, ConfigUpdateRequest, LogCleanupResponse, LogContentResponse,
+    LogInfoResponse, ServiceStatus,
+};
 use reqwest::{header, Client};
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -67,7 +70,7 @@ impl ApiClient {
 
         // 优先使用本地认证（如果启用）
         if self.use_local_auth {
-            match crate::local_auth::get_auth_headers() {
+            match super::local_auth::get_auth_headers() {
                 Ok(auth_headers) => {
                     log::debug!("获取到本地认证头，数量: {}", auth_headers.len());
                     for (key, value) in auth_headers {
@@ -317,7 +320,9 @@ pub async fn validate_app_config(
 // ==================== 数据库迁移 API ====================
 
 /// 执行迁移预检查
-pub async fn precheck_migration(target_url: &str) -> Result<crate::models::PrecheckResponse, String> {
+pub async fn precheck_migration(
+    target_url: &str,
+) -> Result<crate::models::PrecheckResponse, String> {
     let client = ApiClient::new()?;
     let request = crate::models::PrecheckRequest {
         target_url: target_url.to_string(),
@@ -342,10 +347,19 @@ pub async fn execute_migration(
 // ==================== Debug 端点 API ====================
 
 /// 重置数据库
-pub async fn reset_database(force: bool, create_test_data: bool) -> Result<serde_json::Value, String> {
+pub async fn reset_database(
+    force: bool,
+    create_test_data: bool,
+) -> Result<serde_json::Value, String> {
     let client = ApiClient::new()?;
     client
-        .post(&format!("/api/v1/debug/initdb?force={}&create_test_data={}", force, create_test_data), &serde_json::json!({}))
+        .post(
+            &format!(
+                "/api/v1/debug/initdb?force={}&create_test_data={}",
+                force, create_test_data
+            ),
+            &serde_json::json!({}),
+        )
         .await
 }
 
@@ -353,7 +367,10 @@ pub async fn reset_database(force: bool, create_test_data: bool) -> Result<serde
 pub async fn reset_config(force: bool, backup: bool) -> Result<serde_json::Value, String> {
     let client = ApiClient::new()?;
     client
-        .post(&format!("/api/v1/debug/initconf?force={}&backup={}", force, backup), &serde_json::json!({}))
+        .post(
+            &format!("/api/v1/debug/initconf?force={}&backup={}", force, backup),
+            &serde_json::json!({}),
+        )
         .await
 }
 

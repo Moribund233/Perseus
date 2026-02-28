@@ -9,7 +9,7 @@ use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use sysinfo::System;
 
-use crate::config;
+use super::config;
 
 /// 全局进程 ID 存储
 static SERVER_PID: Lazy<Mutex<Option<u32>>> = Lazy::new(|| Mutex::new(None));
@@ -115,8 +115,8 @@ pub fn start_server() -> Result<u32, String> {
     }
 
     // 确保本地认证已初始化
-    if !crate::local_auth::is_initialized()? {
-        crate::local_auth::init_local_auth()?;
+    if !super::local_auth::is_initialized()? {
+        super::local_auth::init_local_auth()?;
     }
 
     // 获取服务端可执行文件路径
@@ -129,7 +129,7 @@ pub fn start_server() -> Result<u32, String> {
         .to_path_buf();
 
     // 获取环境变量配置
-    let env_vars = crate::local_auth::get_server_env_vars()?;
+    let env_vars = super::local_auth::get_server_env_vars()?;
 
     // 构建启动命令
     let mut cmd = Command::new(&server_exe);

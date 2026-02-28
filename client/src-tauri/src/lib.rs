@@ -3,15 +3,10 @@
  *
  * 导出所有模块并初始化应用
  */
-pub mod api_client;
 pub mod commands;
-pub mod config;
-pub mod local_auth;
-pub mod log_websocket;
+pub mod core;
 pub mod models;
-pub mod nginx_manager;
-pub mod process_manager;
-pub mod secure_config;
+pub mod services;
 
 use tauri::{Manager, RunEvent};
 
@@ -139,13 +134,13 @@ pub fn run() {
             log::info!("应用退出请求，执行清理...");
 
             // 检查 Nginx 是否在运行，只有在运行中才尝试停止
-            let nginx_status = nginx_manager::get_nginx_status();
+            let nginx_status = services::nginx::get_nginx_status();
             if nginx_status.status == "running" {
                 log::info!(
                     "Nginx 正在运行中 (PID: {:?})，执行停止操作...",
                     nginx_status.pid
                 );
-                let nginx_result = nginx_manager::stop_nginx();
+                let nginx_result = services::nginx::stop_nginx();
                 if !nginx_result.success {
                     log::warn!("停止 Nginx 失败: {}", nginx_result.message);
                 } else {
@@ -156,7 +151,7 @@ pub fn run() {
             }
 
             // 停止服务端进程
-            if let Err(e) = process_manager::stop_server() {
+            if let Err(e) = core::process_manager::stop_server() {
                 log::warn!("停止服务端失败: {}", e);
             }
 
