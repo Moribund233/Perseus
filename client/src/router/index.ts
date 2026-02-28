@@ -5,6 +5,7 @@ import Log from '../views/Log.vue'
 import Setting from '../views/Setting.vue'
 import Nginx from '../views/Nginx.vue'
 import Database from '../views/Database.vue'
+import Redis from '../views/Redis.vue'
 import Guide from '../views/Guide.vue'
 import { isGuideCompleted } from '../services/api'
 
@@ -64,6 +65,14 @@ const routes = [
         component: Database,
         meta: {
           title: '数据库配置'
+        }
+      },
+      {
+        path: 'redis',
+        name: 'Redis',
+        component: Redis,
+        meta: {
+          title: 'Redis管理'
         }
       }
     ]

@@ -8,13 +8,15 @@ pub mod config;
 pub mod database;
 pub mod log;
 pub mod nginx;
+pub mod redis;
 pub mod service;
 pub mod system;
 
 // 重新导出常用类型 - 配置相关
 pub use config::{
     AdvancedConfig, AppearanceConfig, AppearanceSettings, ClientConfig, LocalAuthConfig, LogConfig,
-    NotificationConfig, NotificationSettings, ServerConfig, ServerPathConfig, ServerSettings,
+    NotificationConfig, NotificationSettings, PlatformInfo, PlatformType, ServerConfig,
+    ServerPathConfig, ServerSettings,
 };
 
 // 重新导出常用类型 - 数据库相关
@@ -30,7 +32,13 @@ pub use log::{LogCleanupResponse, LogContentResponse, LogFileInfo, LogInfoRespon
 // 重新导出常用类型 - Nginx相关
 pub use nginx::{
     NginxActionResponse, NginxConfig, NginxConfigSaveRequest, NginxConfigSaveResponse,
-    NginxDownloadConfig, NginxPlatformInfo, NginxProxyConfig, NginxStatusResponse,
+    NginxDownloadConfig, NginxProxyConfig, NginxStatusResponse,
+};
+
+// 重新导出常用类型 - Redis相关
+pub use redis::{
+    RedisActionResponse, RedisConfig, RedisConfigSaveResponse, RedisConfigUpdateRequest,
+    RedisStatusResponse, WindowsServiceAction, WindowsServiceResponse,
 };
 
 // 重新导出常用类型 - 服务相关

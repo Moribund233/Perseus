@@ -9,7 +9,6 @@ use std::path::Path;
 use sysinfo::{ProcessRefreshKind, RefreshKind, System};
 
 use super::config_paths::get_nginx_config_dir;
-use super::platform::is_linux;
 
 /// 从进程列表中查找主进程
 fn find_master_process(processes: &[(u32, Option<u32>)]) -> Option<u32> {
@@ -51,8 +50,11 @@ fn read_pid_from_file() -> Option<u32> {
  * @return 进程ID
  */
 pub fn find_nginx_process(exe_path: &str) -> Option<u32> {
+    // 检测平台
+    let is_linux_platform = cfg!(target_os = "linux");
+
     // Linux平台：首先尝试从PID文件读取
-    if is_linux() {
+    if is_linux_platform {
         if let Some(pid) = read_pid_from_file() {
             let s = System::new_with_specifics(
                 RefreshKind::new().with_processes(ProcessRefreshKind::everything()),
@@ -73,7 +75,7 @@ pub fn find_nginx_process(exe_path: &str) -> Option<u32> {
 
     let mut matched_processes: Vec<(u32, Option<u32>)> = Vec::new();
 
-    if is_linux() {
+    if is_linux_platform {
         find_linux_nginx_processes(&s, &mut matched_processes);
     } else {
         find_windows_nginx_processes(&s, exe_path, &mut matched_processes);

@@ -11,7 +11,6 @@ use crate::models::{NginxConfigSaveResponse, NginxProxyConfig};
 use super::config_gen::generate_nginx_config;
 use super::config_paths::{get_nginx_config_dir, get_nginx_config_path};
 use super::lifecycle::ensure_nginx_config_files;
-use super::platform::is_linux;
 use super::process::find_nginx_process;
 
 /**
@@ -32,7 +31,9 @@ pub fn save_nginx_proxy_config(proxy_config: NginxProxyConfig) -> NginxConfigSav
         }
     };
 
-    let was_running = if is_linux() {
+    let is_linux_platform = client_config.platform.platform_type.is_linux();
+
+    let was_running = if is_linux_platform {
         find_nginx_process("").is_some()
     } else {
         client_config.nginx.status == "running"
@@ -42,13 +43,13 @@ pub fn save_nginx_proxy_config(proxy_config: NginxProxyConfig) -> NginxConfigSav
 
     match config::save_config(&client_config) {
         Ok(_) => {
-            let config_dir = if is_linux() {
+            let config_dir = if is_linux_platform {
                 get_nginx_config_dir()
             } else {
                 client_config.nginx.config_dir.clone()
             };
 
-            let conf_path = if is_linux() {
+            let conf_path = if is_linux_platform {
                 get_nginx_config_path()
             } else {
                 client_config

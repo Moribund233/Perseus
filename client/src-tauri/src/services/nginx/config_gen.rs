@@ -5,8 +5,6 @@
  */
 use crate::models::NginxProxyConfig;
 
-use super::platform::is_linux;
-
 /**
  * 从后端URL提取主机地址
  *
@@ -120,10 +118,7 @@ fn generate_cors_preflight_config(
         "{}add_header 'Access-Control-Max-Age' 1728000;\n",
         inner_spaces
     ));
-    cors_conf.push_str(&format!(
-        "{}add_header 'Content-Length' 0;\n",
-        inner_spaces
-    ));
+    cors_conf.push_str(&format!("{}add_header 'Content-Length' 0;\n", inner_spaces));
     cors_conf.push_str(&format!("{}return 204;\n", inner_spaces));
     cors_conf.push_str(&format!("{}}}\n", spaces));
 
@@ -149,7 +144,7 @@ pub fn generate_nginx_config(config: &NginxProxyConfig, config_dir: &str) -> Str
 
     nginx_conf.push_str("events {\n");
     nginx_conf.push_str("    worker_connections 1024;\n");
-    if config.enable_performance && is_linux() {
+    if config.enable_performance && cfg!(target_os = "linux") {
         nginx_conf.push_str("    use epoll;\n");
         nginx_conf.push_str("    multi_accept on;\n");
     }
@@ -240,7 +235,11 @@ pub fn generate_nginx_config(config: &NginxProxyConfig, config_dir: &str) -> Str
         nginx_conf.push_str("        }\n\n");
 
         nginx_conf.push_str("        location / {\n");
-        nginx_conf.push_str(&generate_cors_preflight_config(config, 12, &config.cors_methods));
+        nginx_conf.push_str(&generate_cors_preflight_config(
+            config,
+            12,
+            &config.cors_methods,
+        ));
         nginx_conf.push('\n');
         nginx_conf.push_str(&generate_proxy_config(config, 12));
         nginx_conf.push_str("        }\n");

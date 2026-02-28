@@ -6,6 +6,220 @@
 use serde::{Deserialize, Serialize};
 
 use super::nginx::NginxConfig;
+use super::redis::RedisConfig;
+
+/// 平台类型
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum PlatformType {
+    Windows,
+    Linux,
+    MacOS,
+    Other,
+}
+
+impl Default for PlatformType {
+    fn default() -> Self {
+        match std::env::consts::OS {
+            "windows" => PlatformType::Windows,
+            "linux" => PlatformType::Linux,
+            "macos" => PlatformType::MacOS,
+            _ => PlatformType::Other,
+        }
+    }
+}
+
+impl PlatformType {
+    /// 检查是否为Windows平台
+    pub fn is_windows(&self) -> bool {
+        matches!(self, PlatformType::Windows)
+    }
+
+    /// 检查是否为Linux平台
+    pub fn is_linux(&self) -> bool {
+        matches!(self, PlatformType::Linux)
+    }
+
+    /// 检查是否为macOS平台
+    pub fn is_macos(&self) -> bool {
+        matches!(self, PlatformType::MacOS)
+    }
+
+    /// 获取平台名称字符串
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            PlatformType::Windows => "windows",
+            PlatformType::Linux => "linux",
+            PlatformType::MacOS => "macos",
+            PlatformType::Other => "other",
+        }
+    }
+}
+
+/// 平台信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlatformInfo {
+    /// 平台类型
+    #[serde(default)]
+    pub platform_type: PlatformType,
+    /// 是否支持手动载入（Windows平台）
+    #[serde(default)]
+    pub supports_manual_load: bool,
+    /// 是否支持下载（Windows平台，用于Nginx）
+    #[serde(default)]
+    pub supports_download: bool,
+    /// 是否使用包管理器（Linux平台）
+    #[serde(default)]
+    pub uses_package_manager: bool,
+    /// 包管理器类型: apt, yum, dnf, pacman, apk等
+    pub package_manager: Option<String>,
+    /// Nginx版本（通过包管理器获取，Linux）
+    pub nginx_package_version: Option<String>,
+    /// Nginx配置文件路径（Linux系统路径）
+    pub nginx_config_path: Option<String>,
+    /// Redis版本（通过包管理器获取，Linux）
+    pub redis_package_version: Option<String>,
+    /// Redis配置文件路径（Linux系统路径）
+    pub redis_config_path: Option<String>,
+}
+
+impl Default for PlatformInfo {
+    fn default() -> Self {
+        let platform_type = PlatformType::default();
+        Self {
+            platform_type: platform_type.clone(),
+            supports_manual_load: platform_type.is_windows(),
+            supports_download: platform_type.is_windows(),
+            uses_package_manager: platform_type.is_linux(),
+            package_manager: None,
+            nginx_package_version: None,
+            nginx_config_path: None,
+            redis_package_version: None,
+            redis_config_path: None,
+        }
+    }
+}
+
+impl PlatformInfo {
+    /// 检测Linux包管理器
+    pub fn detect_package_manager() -> Option<String> {
+        let managers = vec![
+            ("/usr/bin/apt", "apt"),
+            ("/usr/bin/apt-get", "apt"),
+            ("/usr/bin/yum", "yum"),
+            ("/usr/bin/dnf", "dnf"),
+            ("/usr/bin/pacman", "pacman"),
+            ("/sbin/apk", "apk"),
+        ];
+
+        for (path, name) in managers {
+            if std::path::Path::new(path).exists() {
+                return Some(name.to_string());
+            }
+        }
+
+        None
+    }
+
+    /// 检测Nginx配置文件路径
+    pub fn detect_nginx_config_path() -> Option<String> {
+        let common_paths = vec![
+            "/etc/nginx/nginx.conf",
+            "/usr/local/nginx/conf/nginx.conf",
+            "/opt/nginx/conf/nginx.conf",
+        ];
+
+        for path in common_paths {
+            if std::path::Path::new(path).exists() {
+                return Some(path.to_string());
+            }
+        }
+
+        None
+    }
+
+    /// 检测Redis配置文件路径
+    pub fn detect_redis_config_path() -> Option<String> {
+        let common_paths = vec![
+            "/etc/redis/redis.conf",
+            "/etc/redis.conf",
+            "/usr/local/etc/redis.conf",
+            "/opt/redis/redis.conf",
+        ];
+
+        for path in common_paths {
+            if std::path::Path::new(path).exists() {
+                return Some(path.to_string());
+            }
+        }
+
+        None
+    }
+
+    /// 获取Linux系统上Nginx的版本
+    pub fn detect_nginx_version() -> Option<String> {
+        use std::process::Command;
+
+        if let Ok(output) = Command::new("nginx").arg("-v").output() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+
+            let version_info = if stderr.contains("nginx") {
+                stderr.to_string()
+            } else if stdout.contains("nginx") {
+                stdout.to_string()
+            } else {
+                return None;
+            };
+
+            return version_info.lines().next().map(|s| s.trim().to_string());
+        }
+
+        None
+    }
+
+    /// 获取Linux系统上Redis的版本
+    pub fn detect_redis_version() -> Option<String> {
+        use std::process::Command;
+
+        if let Ok(output) = Command::new("redis-server").arg("--version").output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+
+            let version_info = if stdout.contains("Redis") {
+                stdout.to_string()
+            } else if stderr.contains("Redis") {
+                stderr.to_string()
+            } else {
+                return None;
+            };
+
+            return version_info.lines().next().map(|s| s.trim().to_string());
+        }
+
+        None
+    }
+
+    /// 检测并填充平台信息
+    pub fn detect() -> Self {
+        let platform_type = PlatformType::default();
+
+        if platform_type.is_linux() {
+            Self {
+                platform_type: platform_type.clone(),
+                supports_manual_load: false,
+                supports_download: false,
+                uses_package_manager: true,
+                package_manager: Self::detect_package_manager(),
+                nginx_package_version: Self::detect_nginx_version(),
+                nginx_config_path: Self::detect_nginx_config_path(),
+                redis_package_version: Self::detect_redis_version(),
+                redis_config_path: Self::detect_redis_config_path(),
+            }
+        } else {
+            Self::default()
+        }
+    }
+}
 
 /// 应用配置（旧版，用于向后兼容）
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -196,7 +410,7 @@ impl Default for AdvancedConfig {
 
 /// 客户端配置（新版 TOML 格式）
 /// 注意：敏感配置（JWT密钥、本地Token）存储在加密的 client-config.json 中
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClientConfig {
     /// 服务器配置
     #[serde(default)]
@@ -213,15 +427,38 @@ pub struct ClientConfig {
     /// 高级配置
     #[serde(default)]
     pub advanced: AdvancedConfig,
+    /// 平台信息（启动时自动检测）
+    #[serde(default)]
+    pub platform: PlatformInfo,
     /// 认证令牌（保留用于向后兼容，建议迁移到加密存储）
     #[serde(default)]
     pub auth_token: Option<String>,
     /// Nginx配置
     #[serde(default)]
     pub nginx: NginxConfig,
+    /// Redis配置
+    #[serde(default)]
+    pub redis: RedisConfig,
     /// 数据库类型（sqlite/postgresql/mysql）
     #[serde(default = "default_db_type")]
     pub db_type: String,
+}
+
+impl Default for ClientConfig {
+    fn default() -> Self {
+        Self {
+            server: ServerConfig::default(),
+            appearance: AppearanceConfig::default(),
+            notification: NotificationConfig::default(),
+            log: LogConfig::default(),
+            advanced: AdvancedConfig::default(),
+            platform: PlatformInfo::detect(),
+            auth_token: None,
+            nginx: NginxConfig::default(),
+            redis: RedisConfig::default(),
+            db_type: default_db_type(),
+        }
+    }
 }
 
 fn default_db_type() -> String {

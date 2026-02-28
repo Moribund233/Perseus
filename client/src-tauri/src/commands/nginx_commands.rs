@@ -3,9 +3,10 @@
  *
  * 提供Nginx状态查询、启动、停止、配置管理等功能
  */
+use crate::core::config;
 use crate::models::{
-    NginxActionResponse, NginxConfigSaveResponse, NginxPlatformInfo, NginxProxyConfig,
-    NginxStatusResponse,
+    NginxActionResponse, NginxConfigSaveResponse, NginxProxyConfig, NginxStatusResponse,
+    PlatformInfo,
 };
 
 /**
@@ -130,11 +131,12 @@ pub fn save_nginx_proxy_config(
 }
 
 /**
- * 获取Nginx平台信息
+ * 获取平台信息
  *
  * @return 平台信息
  */
 #[tauri::command]
-pub fn get_nginx_platform_info() -> Result<NginxPlatformInfo, String> {
-    Ok(crate::services::nginx::get_nginx_platform_info())
+pub fn get_platform_info() -> Result<PlatformInfo, String> {
+    let config = config::load_config()?;
+    Ok(config.platform)
 }

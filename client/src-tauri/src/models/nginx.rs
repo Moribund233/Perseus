@@ -193,22 +193,3 @@ pub struct NginxDownloadConfig {
     /// 解压目标目录
     pub target_dir: Option<String>,
 }
-
-/// Nginx平台信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NginxPlatformInfo {
-    /// 当前平台: windows, linux, macos
-    pub platform: String,
-    /// 是否支持手动载入（Windows）
-    pub supports_manual_load: bool,
-    /// 是否支持下载（Windows）
-    pub supports_download: bool,
-    /// 是否使用包管理器（Linux）
-    pub uses_package_manager: bool,
-    /// 包管理器类型: apt, yum, dnf, pacman, apk等
-    pub package_manager: Option<String>,
-    /// Nginx版本（通过包管理器获取）
-    pub package_version: Option<String>,
-    /// 配置文件路径（Linux系统路径）
-    pub config_path: Option<String>,
-}

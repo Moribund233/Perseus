@@ -11,8 +11,6 @@ use crate::core::config;
 use crate::models::{NginxActionResponse, NginxConfig, NginxStatusResponse};
 
 use super::config_paths::{get_nginx_config_dir, infer_config_dir};
-use super::platform::get_nginx_platform_info;
-use super::platform::is_linux;
 use super::process::find_nginx_process;
 use super::response::{error_response, success_response_with_status};
 
@@ -123,12 +121,16 @@ pub fn load_nginx(exe_path: String) -> NginxActionResponse {
  * @return 状态响应
  */
 pub fn get_nginx_status() -> NginxStatusResponse {
-    if is_linux() {
-        return get_linux_nginx_status();
-    }
-
     match config::load_config() {
         Ok(client_config) => {
+            let platform = &client_config.platform;
+
+            // Linux平台：使用系统安装的Nginx
+            if platform.platform_type.is_linux() {
+                return get_linux_nginx_status(&client_config);
+            }
+
+            // Windows平台：使用载入的Nginx
             let nginx = client_config.nginx;
 
             let (status, pid) = if nginx.is_loaded {
@@ -168,31 +170,32 @@ pub fn get_nginx_status() -> NginxStatusResponse {
 /**
  * 获取Linux系统上的Nginx状态
  *
+ * @param client_config 客户端配置
  * @return 状态响应
  */
-fn get_linux_nginx_status() -> NginxStatusResponse {
-    let platform_info = get_nginx_platform_info();
+fn get_linux_nginx_status(client_config: &crate::models::ClientConfig) -> NginxStatusResponse {
+    let platform = &client_config.platform;
 
     let pid = find_nginx_process("");
     let is_running = pid.is_some();
 
     let config_dir = get_nginx_config_dir().or_else(|| {
-        platform_info
-            .config_path
+        platform
+            .nginx_config_path
             .as_ref()
             .and_then(|p| Path::new(p).parent())
             .map(|p| p.to_string_lossy().to_string())
     });
 
     NginxStatusResponse {
-        is_loaded: is_running || platform_info.package_version.is_some(),
+        is_loaded: is_running || platform.nginx_package_version.is_some(),
         status: if is_running {
             "running".to_string()
         } else {
             "stopped".to_string()
         },
         pid,
-        version: platform_info.package_version,
+        version: platform.nginx_package_version.clone(),
         exe_path: Some("/usr/sbin/nginx".to_string()),
         config_dir,
     }

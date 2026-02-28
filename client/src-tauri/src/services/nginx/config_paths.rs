@@ -7,25 +7,30 @@ use std::path::{Path, PathBuf};
 
 use crate::core::config;
 
-use super::platform::is_linux;
-
 /**
  * 获取Nginx配置文件保存路径
  *
  * @return 配置文件路径
  */
 pub fn get_nginx_config_path() -> Option<PathBuf> {
-    if is_linux() {
-        // Linux平台：在用户目录下创建配置文件
-        dirs::config_dir().map(|dir| dir.join("langit-client").join("nginx").join("nginx.conf"))
-    } else {
-        // Windows平台：使用配置目录
-        match config::load_config() {
-            Ok(client_config) => client_config
-                .nginx
-                .config_dir
-                .map(|dir| Path::new(&dir).join("nginx.conf")),
-            Err(_) => None,
+    // 优先从配置中检测平台
+    match config::load_config() {
+        Ok(client_config) => {
+            if client_config.platform.platform_type.is_linux() {
+                // Linux平台：在用户目录下创建配置文件
+                dirs::config_dir()
+                    .map(|dir| dir.join("langit-client").join("nginx").join("nginx.conf"))
+            } else {
+                // Windows平台：使用配置目录
+                client_config
+                    .nginx
+                    .config_dir
+                    .map(|dir| Path::new(&dir).join("nginx.conf"))
+            }
+        }
+        Err(_) => {
+            // 默认使用配置目录
+            dirs::config_dir().map(|dir| dir.join("langit-client").join("nginx").join("nginx.conf"))
         }
     }
 }

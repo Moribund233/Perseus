@@ -69,6 +69,7 @@ const navItems: NavItem[] = [
   { path: '/log', name: '日志', icon: 'log' },
   { path: '/nginx', name: '代理', icon: 'proxy' },
   { path: '/database', name: '数据库', icon: 'database' },
+  { path: '/redis', name: 'Redis', icon: 'database' },
   { path: '/setting', name: '设置', icon: 'setting' }
 ]
 

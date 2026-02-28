@@ -942,3 +942,152 @@ export async function getDebugStatus(): Promise<{
 }> {
   return invoke('get_debug_status')
 }
+
+// ==================== Redis管理 API ====================
+
+/**
+ * Redis状态响应
+ */
+export interface RedisStatusResponse {
+  is_loaded: boolean
+  status: string
+  version?: string
+  exe_dir?: string
+  port: number
+  require_pass: boolean
+  config_path?: string
+  data_dir?: string
+  is_windows_service: boolean
+}
+
+/**
+ * Redis操作响应
+ */
+export interface RedisActionResponse {
+  success: boolean
+  message: string
+  status?: string
+}
+
+/**
+ * Redis平台信息
+ */
+export interface RedisPlatformInfo {
+  platform: string
+  supports_manual_load: boolean
+  uses_package_manager: boolean
+  package_manager?: string
+  package_version?: string
+  system_config_path?: string
+}
+
+/**
+ * Redis配置更新请求
+ */
+export interface RedisConfigUpdateRequest {
+  port?: number
+  require_pass?: boolean
+  password?: string
+  data_dir?: string
+}
+
+/**
+ * Redis配置保存响应
+ */
+export interface RedisConfigSaveResponse {
+  success: boolean
+  message: string
+  config_reloaded: boolean
+}
+
+/**
+ * Windows服务操作响应
+ */
+export interface WindowsServiceResponse {
+  success: boolean
+  message: string
+  is_installed: boolean
+}
+
+/**
+ * 获取Redis状态
+ */
+export async function getRedisStatus(): Promise<RedisStatusResponse> {
+  return invoke('get_redis_status')
+}
+
+/**
+ * 载入Redis目录
+ * @param exe_dir Redis可执行文件目录路径
+ */
+export async function loadRedis(exe_dir: string): Promise<RedisActionResponse> {
+  return invoke('load_redis', { exe_dir })
+}
+
+/**
+ * 启动Redis
+ */
+export async function startRedis(): Promise<RedisActionResponse> {
+  return invoke('start_redis')
+}
+
+/**
+ * 停止Redis
+ */
+export async function stopRedis(): Promise<RedisActionResponse> {
+  return invoke('stop_redis')
+}
+
+/**
+ * 重启Redis
+ */
+export async function restartRedis(): Promise<RedisActionResponse> {
+  return invoke('restart_redis')
+}
+
+/**
+ * 获取Redis平台信息
+ */
+export async function getRedisPlatformInfo(): Promise<RedisPlatformInfo> {
+  return invoke('get_redis_platform_info')
+}
+
+/**
+ * 更新Redis配置
+ * @param request 配置更新请求
+ */
+export async function updateRedisConfig(
+  request: RedisConfigUpdateRequest
+): Promise<RedisConfigSaveResponse> {
+  return invoke('update_redis_config', { request })
+}
+
+/**
+ * 安装Redis为Windows服务
+ * @param exe_dir Redis可执行文件目录
+ */
+export async function installRedisService(exe_dir: string): Promise<WindowsServiceResponse> {
+  return invoke('install_redis_service', { exe_dir })
+}
+
+/**
+ * 卸载Redis Windows服务
+ */
+export async function uninstallRedisService(): Promise<WindowsServiceResponse> {
+  return invoke('uninstall_redis_service')
+}
+
+/**
+ * 检查Redis服务是否已安装
+ */
+export async function isRedisServiceInstalled(): Promise<boolean> {
+  return invoke('is_redis_service_installed')
+}
+
+/**
+ * 验证Redis目录是否有效
+ * @param exe_dir Redis可执行文件目录
+ */
+export async function validateRedisDir(exe_dir: string): Promise<boolean> {
+  return invoke('validate_redis_dir', { exe_dir })
+}

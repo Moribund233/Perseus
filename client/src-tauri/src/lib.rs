@@ -77,7 +77,18 @@ pub fn run() {
             commands::validate_nginx,
             commands::get_nginx_proxy_config,
             commands::save_nginx_proxy_config,
-            commands::get_nginx_platform_info,
+            commands::get_platform_info,
+            // Redis管理
+            commands::get_redis_status,
+            commands::load_redis,
+            commands::start_redis,
+            commands::stop_redis,
+            commands::restart_redis,
+            commands::update_redis_config,
+            commands::install_redis_service,
+            commands::uninstall_redis_service,
+            commands::is_redis_service_installed,
+            commands::validate_redis_dir,
             // 引导页面
             commands::check_server_path,
             commands::validate_and_save_server_path,
@@ -148,6 +159,20 @@ pub fn run() {
                 }
             } else {
                 log::info!("Nginx 未在运行，跳过停止操作");
+            }
+
+            // 检查 Redis 是否在运行，只有在运行中才尝试停止
+            let redis_status = services::redis::get_redis_status();
+            if redis_status.status == "running" {
+                log::info!("Redis 正在运行中，执行停止操作...");
+                let redis_result = services::redis::stop_redis();
+                if !redis_result.success {
+                    log::warn!("停止 Redis 失败: {}", redis_result.message);
+                } else {
+                    log::info!("Redis 已停止");
+                }
+            } else {
+                log::info!("Redis 未在运行，跳过停止操作");
             }
 
             // 停止服务端进程

@@ -11,7 +11,6 @@ use crate::core::config;
 use crate::models::NginxActionResponse;
 
 use super::config_paths::{get_nginx_config_dir, get_nginx_config_path, get_nginx_work_dir};
-use super::platform::is_linux;
 use super::process::find_nginx_process;
 use super::response::{error_response, error_response_with_status, success_response_with_status};
 
@@ -71,14 +70,17 @@ fn update_nginx_status(status: &str, pid: Option<u32>) {
  * @return 操作响应
  */
 pub fn start_nginx() -> NginxActionResponse {
-    if is_linux() {
+    let client_config = match config::load_config() {
+        Ok(c) => c,
+        Err(e) => return error_response(format!("加载配置失败: {}", e)),
+    };
+
+    // Linux平台：使用系统安装的Nginx
+    if client_config.platform.platform_type.is_linux() {
         return start_linux_nginx();
     }
 
-    let config = match config::load_config() {
-        Ok(c) => c.nginx,
-        Err(e) => return error_response(format!("加载配置失败: {}", e)),
-    };
+    let config = client_config.nginx;
 
     if !config.is_loaded {
         return error_response_with_status("Nginx未载入，请先载入Nginx", "stopped", None);
@@ -193,14 +195,17 @@ fn start_linux_nginx() -> NginxActionResponse {
  * @return 操作响应
  */
 pub fn stop_nginx() -> NginxActionResponse {
-    if is_linux() {
+    let client_config = match config::load_config() {
+        Ok(c) => c,
+        Err(e) => return error_response(format!("加载配置失败: {}", e)),
+    };
+
+    // Linux平台：使用系统安装的Nginx
+    if client_config.platform.platform_type.is_linux() {
         return stop_linux_nginx();
     }
 
-    let config = match config::load_config() {
-        Ok(c) => c.nginx,
-        Err(e) => return error_response(format!("加载配置失败: {}", e)),
-    };
+    let config = client_config.nginx;
 
     let exe_path = match &config.exe_path {
         Some(p) => p.clone(),
