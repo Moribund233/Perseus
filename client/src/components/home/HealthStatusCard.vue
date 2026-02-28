@@ -1,24 +1,19 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import Card from '../Card.vue'
 import { useServiceStore } from '../../stores'
-import { useDatabaseConnection } from '../../composables/useDatabaseConnection'
 
 /**
  * 健康状态卡片组件
  *
- * 功能：显示系统健康状态和数据库连接状态
+ * 功能：显示系统健康状态
  * 数据来源：调用后端 /health 接口获取真实健康状态
- * 数据库连接：客户端本地测试
  */
 
 // 使用 Pinia store
 const serviceStore = useServiceStore()
 const { healthStatus: storeHealthStatus, isRunning: storeIsRunning } = storeToRefs(serviceStore)
-
-// 使用数据库连接 composable
-const { state: dbConnectionState, badgeConfig: dbBadgeConfig, checkConnection: checkDbConnection } = useDatabaseConnection()
 
 // 是否有健康状态
 const hasHealthStatus = computed(() => {
@@ -45,9 +40,6 @@ onMounted(() => {
       serviceStore.refreshHealthStatus()
     }
   }, 30000)
-
-  // 检查数据库连接
-  checkDbConnection()
 })
 
 onUnmounted(() => {
@@ -57,12 +49,7 @@ onUnmounted(() => {
   }
 })
 
-// 监听服务状态变化，服务启动时刷新数据库连接
-watch(storeIsRunning, (isRunning) => {
-  if (isRunning) {
-    checkDbConnection()
-  }
-})
+
 </script>
 
 <template>
@@ -82,28 +69,6 @@ watch(storeIsRunning, (isRunning) => {
         <span class="health-label">检查时间</span>
         <span class="health-value" style="font-size: var(--font-size-xs);">
           {{ healthStatus?.timestamp ? new Date(healthStatus.timestamp).toLocaleTimeString('zh-CN') : '-' }}
-        </span>
-      </div>
-      <!-- 数据库连接状态 -->
-      <div class="health-item">
-        <span class="health-label">数据库连接</span>
-        <span
-          class="health-value db-status-badge"
-          :class="`db-status-${dbConnectionState.status}`"
-        >
-          {{ dbBadgeConfig.text }}
-        </span>
-      </div>
-      <div v-if="dbConnectionState.dbType" class="health-item">
-        <span class="health-label">数据库类型</span>
-        <span class="health-value" style="text-transform: uppercase;">
-          {{ dbConnectionState.dbType }}
-        </span>
-      </div>
-      <div v-if="dbConnectionState.latency !== undefined" class="health-item">
-        <span class="health-label">连接延迟</span>
-        <span class="health-value">
-          {{ dbConnectionState.latency }}ms
         </span>
       </div>
     </div>

@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useConfigSaver } from '../../composables/useConfigSaver'
 import {
   updateAppConfig,
   validateAppConfig,
+  isServiceRunning,
   type ConfigResponse,
   type RateLimitItem,
   type GunicornConfig
 } from '../../services/api'
 import { useServiceStore } from '../../stores'
+import Alert from '../Alert.vue'
 
 /**
  * 服务端配置组件
@@ -203,6 +205,21 @@ const currentRateLimitHint = computed(() => {
   return mode?.hint || ''
 })
 
+// 服务运行状态
+const isServiceRunningStatus = ref<boolean>(false)
+
+/**
+ * 检查服务运行状态
+ */
+const checkServiceStatus = async (): Promise<void> => {
+  isServiceRunningStatus.value = await isServiceRunning()
+}
+
+// 组件挂载时检查服务状态
+onMounted(() => {
+  checkServiceStatus()
+})
+
 // 定义事件
 const emit = defineEmits<{
   (e: 'error', message: string): void
@@ -283,6 +300,11 @@ const handleResetServerConfig = async (): Promise<void> => {
 
 <template>
   <div class="config-section">
+    <!-- 服务未启动提示 -->
+    <Alert v-if="!isServiceRunningStatus" type="info" class="mb-lg">
+      服务未启动，请前往控制台启动服务以修改服务端配置
+    </Alert>
+
     <!-- 重启提示 -->
     <div class="card info-card">
       <p class="info-text">
@@ -609,7 +631,12 @@ const handleResetServerConfig = async (): Promise<void> => {
     </div>
 
     <div class="form-actions">
-      <button class="btn btn-primary" @click="saveServerConfig" :disabled="isSaving">
+      <button
+        class="btn btn-primary"
+        @click="saveServerConfig"
+        :disabled="isSaving || !isServiceRunningStatus"
+        :title="!isServiceRunningStatus ? '服务未启动' : ''"
+      >
         <img
           v-if="isSaving"
           :src="loaderIcon"
@@ -619,7 +646,12 @@ const handleResetServerConfig = async (): Promise<void> => {
         <span v-else>保存配置</span>
       </button>
 
-      <button class="btn btn-secondary" @click="handleResetServerConfig" :disabled="isSaving">
+      <button
+        class="btn btn-secondary"
+        @click="handleResetServerConfig"
+        :disabled="isSaving || !isServiceRunningStatus"
+        :title="!isServiceRunningStatus ? '服务未启动' : ''"
+      >
         重置为默认
       </button>
     </div>

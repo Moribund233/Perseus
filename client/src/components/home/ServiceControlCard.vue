@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import Card from '../Card.vue'
 import StatusBadge from '../StatusBadge.vue'
 import { useServiceStore } from '../../stores'
 import { useHomeEventBus } from '../../composables/useHomeEvents'
+import { getDebugMode, getStressTest, getNginxStatus, type NginxStatusResponse } from '../../services/api'
 
 /**
  * 服务控制卡片组件
@@ -17,6 +18,13 @@ import { useHomeEventBus } from '../../composables/useHomeEvents'
 const refreshIcon = new URL('../../assets/icons/refresh.svg', import.meta.url).href
 const playIcon = new URL('../../assets/icons/play.svg', import.meta.url).href
 const stopIcon = new URL('../../assets/icons/stop.svg', import.meta.url).href
+
+// 功能状态
+const featureStatus = ref({
+  debugMode: false,
+  stressTest: false,
+  nginxStatus: null as NginxStatusResponse | null
+})
 
 // 使用 Pinia store 管理服务状态
 const serviceStore = useServiceStore()
@@ -65,6 +73,46 @@ const handleRestart = async (): Promise<void> => {
   if (state.isLoading) return
   eventBus.emit('service:restart')
 }
+
+/**
+ * 加载功能状态
+ */
+const loadFeatureStatus = async (): Promise<void> => {
+  if (!storeIsRunning.value) {
+    featureStatus.value.debugMode = false
+    featureStatus.value.stressTest = false
+    featureStatus.value.nginxStatus = null
+    return
+  }
+  try {
+    const [debugMode, stressTest, nginxStatus] = await Promise.all([
+      getDebugMode(),
+      getStressTest(),
+      getNginxStatus()
+    ])
+    featureStatus.value.debugMode = debugMode
+    featureStatus.value.stressTest = stressTest
+    featureStatus.value.nginxStatus = nginxStatus
+  } catch (err) {
+    console.error('加载功能状态失败:', err)
+  }
+}
+
+// 监听服务状态变化，自动刷新功能状态
+watch(storeIsRunning, (isRunning) => {
+  if (isRunning) {
+    loadFeatureStatus()
+  } else {
+    featureStatus.value.debugMode = false
+    featureStatus.value.stressTest = false
+    featureStatus.value.nginxStatus = null
+  }
+})
+
+// 组件挂载时加载功能状态
+onMounted(() => {
+  loadFeatureStatus()
+})
 </script>
 
 <template>
@@ -72,6 +120,12 @@ const handleRestart = async (): Promise<void> => {
     <template #header>
       <div class="service-info">
         <StatusBadge :status="serviceStatus || 'default'" />
+        <!-- 功能状态标签 -->
+        <div v-if="storeIsRunning" class="feature-tags">
+          <span v-if="featureStatus.debugMode" class="feature-tag tag-debug">调试</span>
+          <span v-if="featureStatus.stressTest" class="feature-tag tag-stress">压测</span>
+          <span v-if="featureStatus.nginxStatus?.status === 'running'" class="feature-tag tag-nginx">Nginx</span>
+        </div>
       </div>
     </template>
     <template #actions>
@@ -119,4 +173,35 @@ const handleRestart = async (): Promise<void> => {
 
 <style scoped>
 @import '../../styles/home-components.css';
+
+/* 功能状态标签 */
+.feature-tags {
+  display: flex;
+  gap: var(--spacing-xs);
+  margin-left: var(--spacing-sm);
+}
+
+.feature-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+}
+
+.tag-debug {
+  background-color: var(--warning-color);
+  color: white;
+}
+
+.tag-stress {
+  background-color: var(--error-color);
+  color: white;
+}
+
+.tag-nginx {
+  background-color: var(--success-color);
+  color: white;
+}
 </style>

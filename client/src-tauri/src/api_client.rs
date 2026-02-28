@@ -338,3 +338,27 @@ pub async fn execute_migration(
     };
     client.post("/api/v1/migration/execute", &request).await
 }
+
+// ==================== Debug 端点 API ====================
+
+/// 重置数据库
+pub async fn reset_database(force: bool, create_test_data: bool) -> Result<serde_json::Value, String> {
+    let client = ApiClient::new()?;
+    client
+        .post(&format!("/api/v1/debug/initdb?force={}&create_test_data={}", force, create_test_data), &serde_json::json!({}))
+        .await
+}
+
+/// 重置配置文件
+pub async fn reset_config(force: bool, backup: bool) -> Result<serde_json::Value, String> {
+    let client = ApiClient::new()?;
+    client
+        .post(&format!("/api/v1/debug/initconf?force={}&backup={}", force, backup), &serde_json::json!({}))
+        .await
+}
+
+/// 获取调试状态
+pub async fn get_debug_status() -> Result<serde_json::Value, String> {
+    let client = ApiClient::new()?;
+    client.get("/api/v1/debug/status").await
+}

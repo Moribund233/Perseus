@@ -10,10 +10,15 @@ import {
   getJwtSecretKey,
   getLocalToken,
   resetAllTokens,
-  resetClientConfig
+  resetClientConfig,
+  resetDatabase,
+  resetConfig,
+  getDebugStatus,
+  isServiceRunning
 } from '../../services/api'
 import { useRouter } from 'vue-router'
 import ConfirmDialog from '../ConfirmDialog.vue'
+import Alert from '../Alert.vue'
 
 /**
  * 数据库类型
@@ -62,6 +67,9 @@ const databaseConfig = ref({
   urlValidationError: ''
 })
 
+// 服务运行状态
+const isServiceRunningStatus = ref<boolean>(false)
+
 // 危险操作验证对话框状态
 const dangerDialog = ref<{
   show: boolean
@@ -69,7 +77,7 @@ const dangerDialog = ref<{
   message: string
   confirmText: string
   expectedInput: string
-  action: 'resetClient' | 'resetTokens' | 'showTokens' | 'editDatabase' | null
+  action: 'resetClient' | 'resetTokens' | 'showTokens' | 'editDatabase' | 'resetDatabase' | 'resetConfig' | null
 }>({
   show: false,
   title: '',
@@ -85,6 +93,7 @@ const dangerInput = ref('')
  * 初始化加载配置
  */
 onMounted(async () => {
+  isServiceRunningStatus.value = await isServiceRunning()
   await loadAllConfigs()
 })
 
@@ -288,13 +297,57 @@ const maskDatabaseUrl = (url: string): string => {
   }
 }
 
+// ==================== Debug 端点操作 ====================
+
+/**
+ * 处理重置数据库
+ */
+const handleResetDatabase = (): void => {
+  openDangerDialog(
+    'resetDatabase',
+    '重置数据库',
+    '此操作将删除所有数据并重新初始化数据库。请输入 "RESET DATABASE" 确认操作。',
+    '确认重置',
+    'RESET DATABASE'
+  )
+}
+
+/**
+ * 处理重置配置
+ */
+const handleResetConfig = (): void => {
+  openDangerDialog(
+    'resetConfig',
+    '重置配置文件',
+    '此操作将恢复默认配置，原配置将自动备份。请输入 "RESET CONFIG" 确认操作。',
+    '确认重置',
+    'RESET CONFIG'
+  )
+}
+
+/**
+ * 处理显示调试状态
+ */
+const handleShowDebugStatus = async (): Promise<void> => {
+  isSaving.value = true
+  try {
+    const status = await getDebugStatus()
+    emit('success', `调试状态: 模式=${status.debug_mode}, 数据库=${status.database_type}, 压力测试=${status.stress_test_mode}`)
+  } catch (err) {
+    console.error('获取调试状态失败:', err)
+    emit('error', '获取调试状态失败: ' + String(err))
+  } finally {
+    isSaving.value = false
+  }
+}
+
 // ==================== 危险操作对话框 ====================
 
 /**
  * 打开危险操作验证对话框
  */
 const openDangerDialog = (
-  action: 'resetClient' | 'resetTokens' | 'showTokens' | 'editDatabase',
+  action: 'resetClient' | 'resetTokens' | 'showTokens' | 'editDatabase' | 'resetDatabase' | 'resetConfig',
   title: string,
   message: string,
   confirmText: string,
@@ -349,6 +402,12 @@ const confirmDangerAction = async (): Promise<void> => {
       emit('success', '安全令牌已显示')
     } else if (dangerDialog.value.action === 'editDatabase') {
       startEditDatabaseUrl()
+    } else if (dangerDialog.value.action === 'resetDatabase') {
+      const result = await resetDatabase(true, true)
+      emit('success', `数据库已重置: ${result.message}`)
+    } else if (dangerDialog.value.action === 'resetConfig') {
+      const result = await resetConfig(true, true)
+      emit('success', `配置已重置: ${result.message}`)
     }
   } catch (err) {
     console.error('危险操作失败:', err)
@@ -414,43 +473,109 @@ const handleResetClientConfig = (): void => {
 
 <template>
   <div class="developer-options">
-    <!-- 调试与测试设置 -->
+    <!-- 服务未启动提示 -->
+    <Alert v-if="!isServiceRunningStatus" type="info" class="mb-lg">
+      服务未启动，部分功能将不可用
+    </Alert>
+
+    <!-- 开发者操作 -->
     <div class="card">
       <div class="card-header">
-        <h2 class="card-title">调试与测试设置</h2>
+        <h2 class="card-title">开发者操作</h2>
       </div>
 
-      <div class="form-group checkbox-group">
-        <label class="checkbox-label">
-          <input
-            type="checkbox"
-            :checked="debugSettings.debugMode"
-            @change="handleUpdateDebugMode(!debugSettings.debugMode)"
+      <!-- 调试模式开关 -->
+      <div class="form-group switch-group">
+        <div class="switch-item">
+          <div class="switch-info">
+            <span class="switch-label">启用调试模式</span>
+            <p class="switch-help-text">启用后将显示详细的调试信息</p>
+          </div>
+          <button
+            class="toggle-switch"
+            :class="{ active: debugSettings.debugMode }"
+            @click="handleUpdateDebugMode(!debugSettings.debugMode)"
             :disabled="isSaving"
-          />
-          <span>启用调试模式</span>
-        </label>
-        <p class="help-text">启用后将显示详细的调试信息</p>
+            type="button"
+          >
+            <span class="toggle-slider"></span>
+          </button>
+        </div>
       </div>
 
-      <div class="form-group checkbox-group">
-        <label class="checkbox-label">
-          <input
-            type="checkbox"
-            :checked="debugSettings.stressTest"
-            @change="handleUpdateStressTest(!debugSettings.stressTest)"
+      <!-- 压力测试模式开关 -->
+      <div class="form-group switch-group">
+        <div class="switch-item">
+          <div class="switch-info">
+            <span class="switch-label">启用压力测试模式</span>
+            <p class="switch-help-text">启用后服务端将加载压力测试数据，用于性能测试</p>
+          </div>
+          <button
+            class="toggle-switch"
+            :class="{ active: debugSettings.stressTest }"
+            @click="handleUpdateStressTest(!debugSettings.stressTest)"
             :disabled="isSaving"
-          />
-          <span>启用压力测试模式</span>
-        </label>
-        <p class="help-text">启用后服务端将加载压力测试数据，用于性能测试</p>
+            type="button"
+          >
+            <span class="toggle-slider"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Debug 端点操作 -->
+      <div class="subsection debug-operations">
+        <h4>数据库与配置管理</h4>
+        <div class="debug-actions">
+          <div class="debug-action-item">
+            <div class="debug-action-info">
+              <span class="debug-action-title">重置数据库</span>
+              <span class="debug-action-desc">删除所有数据并重新初始化（危险操作）</span>
+            </div>
+            <button
+              class="btn btn-error btn-sm"
+              @click="handleResetDatabase"
+              :disabled="isSaving || !isServiceRunningStatus"
+              :title="!isServiceRunningStatus ? '服务未启动' : ''"
+            >
+              重置数据库
+            </button>
+          </div>
+          <div class="debug-action-item">
+            <div class="debug-action-info">
+              <span class="debug-action-title">重置配置文件</span>
+              <span class="debug-action-desc">恢复默认配置（自动备份原配置）</span>
+            </div>
+            <button
+              class="btn btn-warning btn-sm"
+              @click="handleResetConfig"
+              :disabled="isSaving || !isServiceRunningStatus"
+              :title="!isServiceRunningStatus ? '服务未启动' : ''"
+            >
+              重置配置
+            </button>
+          </div>
+          <div class="debug-action-item">
+            <div class="debug-action-info">
+              <span class="debug-action-title">查看调试状态</span>
+              <span class="debug-action-desc">显示当前调试模式、数据库状态等信息</span>
+            </div>
+            <button
+              class="btn btn-primary btn-sm"
+              @click="handleShowDebugStatus"
+              :disabled="isSaving || !isServiceRunningStatus"
+              :title="!isServiceRunningStatus ? '服务未启动' : ''"
+            >
+              查看状态
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- 安全令牌与数据库配置 -->
+    <!-- 敏感信息管理 -->
     <div class="card">
       <div class="card-header">
-        <h2 class="card-title">安全令牌与数据库配置</h2>
+        <h2 class="card-title">敏感信息管理</h2>
       </div>
 
       <div class="admin-required-content">
@@ -830,5 +955,129 @@ const handleResetClientConfig = (): void => {
   margin: 0;
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
+}
+
+/* Debug 操作样式 */
+.debug-operations {
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--border-color);
+}
+
+.debug-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.debug-action-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.debug-action-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  flex: 1;
+}
+
+.debug-action-title {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.debug-action-desc {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+/* 开关样式 */
+.switch-group {
+  margin-bottom: var(--spacing-md);
+}
+
+.switch-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.switch-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  flex: 1;
+}
+
+.switch-label {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.switch-help-text {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+/* 切换开关按钮 */
+.toggle-switch {
+  position: relative;
+  width: 48px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background-color: var(--border-color);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.toggle-switch:hover:not(:disabled) {
+  background-color: var(--text-secondary);
+}
+
+.toggle-switch.active {
+  background-color: var(--primary-color);
+}
+
+.toggle-switch.active:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+}
+
+.toggle-switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggle-slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: white;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch.active .toggle-slider {
+  transform: translateX(24px);
 }
 </style>

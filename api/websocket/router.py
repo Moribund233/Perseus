@@ -94,6 +94,8 @@ async def logs_websocket(
         while connection.is_alive:
             try:
                 data = await websocket.receive_json()
+                # 更新心跳时间，保持连接活跃
+                connection.update_ping()
                 await manager.handle_message(connection, data)
 
             except WebSocketDisconnect:
@@ -200,7 +202,10 @@ async def websocket_endpoint(
                 # 接收消息
                 data = await websocket.receive_json()
                 logger.debug(f"收到消息 connection_id={connection.connection_id}: {data}")
-                
+
+                # 更新心跳时间，保持连接活跃
+                connection.update_ping()
+
                 # 处理消息
                 await manager.handle_message(connection, data)
                 

@@ -761,12 +761,33 @@ async fn check_command_exists(command: &str) -> Result<bool, std::io::Error> {
 // ==================== 数据库连接测试命令 ====================
 
 /// 检查 SQLite 数据库文件是否存在
+/// 相对路径基于服务端可执行文件所在目录解析
 #[tauri::command]
 pub fn check_sqlite_file(file_path: String) -> Result<bool, String> {
+    use crate::process_manager::get_server_exe_path;
     use std::path::Path;
 
     let path = Path::new(&file_path);
-    Ok(path.exists() && path.is_file())
+
+    // 获取服务端可执行文件所在目录
+    let server_dir = get_server_exe_path()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()));
+
+    // 构建完整路径
+    let full_path = if path.is_relative() {
+        match &server_dir {
+            Some(dir) => dir.join(path),
+            None => path.to_path_buf(),
+        }
+    } else {
+        path.to_path_buf()
+    };
+
+    let exists = full_path.exists();
+    let is_file = full_path.is_file();
+
+    Ok(exists && is_file)
 }
 
 /// 测试 TCP 连接（用于 PostgreSQL/MySQL）
@@ -1144,4 +1165,27 @@ pub async fn unsubscribe_logs(state: State<'_, LogWsState>) -> Result<(), String
     } else {
         Err("WebSocket 日志管理器未初始化".to_string())
     }
+}
+
+// ==================== Debug 端点命令 ====================
+
+/// 重置数据库
+#[tauri::command]
+pub async fn reset_database(
+    force: bool,
+    create_test_data: bool,
+) -> Result<serde_json::Value, String> {
+    api_client::reset_database(force, create_test_data).await
+}
+
+/// 重置配置文件
+#[tauri::command]
+pub async fn reset_config(force: bool, backup: bool) -> Result<serde_json::Value, String> {
+    api_client::reset_config(force, backup).await
+}
+
+/// 获取调试状态
+#[tauri::command]
+pub async fn get_debug_status() -> Result<serde_json::Value, String> {
+    api_client::get_debug_status().await
 }

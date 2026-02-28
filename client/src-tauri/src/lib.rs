@@ -126,6 +126,9 @@ pub fn run() {
             commands::get_log_websocket_state,
             commands::subscribe_logs,
             commands::unsubscribe_logs,
+            commands::reset_database,
+            commands::reset_config,
+            commands::get_debug_status,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

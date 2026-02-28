@@ -61,11 +61,31 @@ const isChecking = ref(false)
 async function testSQLiteConnection(url: string): Promise<ConnectionTestResult> {
   try {
     // 从 URL 提取文件路径
-    const match = url.match(/^sqlite:\/\/(.+)$/)
-    if (!match) {
+    // 支持格式: 
+    // - sqlite:///path/to/file.db (相对路径)
+    // - sqlite:///C:/path/to/file.db (Windows 绝对路径)
+    // - sqlite:////absolute/path/to/file.db (Unix 绝对路径)
+    let filePath: string
+    
+    if (url.startsWith('sqlite:////')) {
+      // Unix 绝对路径: sqlite:////absolute/path/to/file.db -> /absolute/path/to/file.db
+      filePath = url.substring('sqlite://'.length)
+    } else if (url.startsWith('sqlite:///')) {
+      // 可能是 Windows 绝对路径或相对路径
+      // sqlite:///C:/path/to/file.db -> C:/path/to/file.db
+      // sqlite:///path/to/file.db -> path/to/file.db
+      const path = url.substring('sqlite:///'.length)
+      // 检查是否是 Windows 盘符路径 (如 C:/, D:/)
+      if (/^[A-Za-z]:/.test(path)) {
+        // Windows 绝对路径，转换为反斜杠
+        filePath = path.replace(/\//g, '\\')
+      } else {
+        // 相对路径
+        filePath = path
+      }
+    } else {
       return { status: 'error', message: 'URL 格式不正确', error: 'Invalid URL format' }
     }
-    const filePath = match[1]
 
     // 使用 Tauri 命令检查文件是否存在
     const exists = await invoke<boolean>('check_sqlite_file', { filePath })

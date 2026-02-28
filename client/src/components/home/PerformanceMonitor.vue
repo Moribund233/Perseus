@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useServiceStore } from '../../stores'
 import { useHomeEventBus } from '../../composables/useHomeEvents'
+import { useDatabaseConnection } from '../../composables/useDatabaseConnection'
 
 /**
  * 性能监控组件
@@ -18,6 +19,28 @@ const { localSystemInfo: storeLocalSystemInfo, isRunning: storeIsRunning, servic
 // 使用事件总线
 const eventBus = useHomeEventBus()
 const performanceState = eventBus.state.value.performance
+
+// 使用数据库连接 composable
+const { state: dbConnectionState, badgeConfig: dbBadgeConfig, checkConnection: checkDbConnection } = useDatabaseConnection()
+
+// 定时刷新数据库连接状态
+let dbCheckTimer: number | null = null
+
+// 数据库类型图标路径
+const dbIcons: Record<string, string> = {
+  sqlite: new URL('../../assets/icons/sqlite.svg', import.meta.url).href,
+  postgresql: new URL('../../assets/icons/postgresql.svg', import.meta.url).href,
+  mysql: new URL('../../assets/icons/mysql.svg', import.meta.url).href,
+  default: new URL('../../assets/icons/database.svg', import.meta.url).href
+}
+
+/**
+ * 获取当前数据库类型对应的图标
+ */
+const getDbIcon = (): string => {
+  const dbType = dbConnectionState.value.dbType?.toLowerCase() || ''
+  return dbIcons[dbType] || dbIcons.default
+}
 
 // 服务状态
 const serviceStatus = computed(() => {
@@ -123,6 +146,25 @@ const getNetworkSpeedDisplay = (): string => {
   }
   return `${total.toFixed(1)} KB/s`
 }
+
+// 组件挂载时开始检查数据库连接
+onMounted(() => {
+  // 立即检查一次
+  checkDbConnection()
+
+  // 每 30 秒检查一次数据库连接
+  dbCheckTimer = window.setInterval(() => {
+    checkDbConnection()
+  }, 30000)
+})
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  if (dbCheckTimer) {
+    clearInterval(dbCheckTimer)
+    dbCheckTimer = null
+  }
+})
 </script>
 
 <template>
@@ -307,9 +349,98 @@ const getNetworkSpeedDisplay = (): string => {
         </div>
       </div>
     </div>
+
+    <!-- 数据库连接状态（客户端独立检测） -->
+    <div class="card metric-card db-card">
+      <div class="metric-header">
+        <div class="metric-icon database" :class="`db-status-${dbConnectionState.status}`">
+          <img :src="getDbIcon()" class="icon-database" :alt="dbConnectionState.dbType || 'database'" />
+        </div>
+        <div class="metric-info">
+          <span class="metric-label">数据库连接</span>
+          <span class="metric-value" :class="`db-status-text-${dbConnectionState.status}`">
+            {{ dbBadgeConfig.text }}
+          </span>
+        </div>
+      </div>
+      <div v-if="dbConnectionState.dbType" class="db-details">
+        <span class="db-type">{{ dbConnectionState.dbType.toUpperCase() }}</span>
+        <span v-if="dbConnectionState.latency !== undefined" class="db-latency">
+          {{ dbConnectionState.latency }}ms
+        </span>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
 @import '../../styles/home-components.css';
+
+/* 数据库卡片样式 */
+.db-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.db-details {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--border-color);
+}
+
+.db-type {
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.db-latency {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+/* 数据库状态颜色 */
+.db-status-connected {
+  background-color: var(--success-color);
+}
+
+.db-status-disconnected {
+  background-color: var(--error-color);
+}
+
+.db-status-checking {
+  background-color: var(--warning-color);
+}
+
+.db-status-text-connected {
+  color: var(--success-color);
+}
+
+.db-status-text-disconnected {
+  color: var(--error-color);
+}
+
+.db-status-text-checking {
+  color: var(--warning-color);
+}
+
+/* 数据库图标 */
+.icon-database {
+  width: 24px;
+  height: 24px;
+}
+
+/* 亮色模式：图标保持原色 */
+:root:not([data-theme='dark']) .icon-database {
+  filter: none;
+}
+
+/* 暗色模式：图标反转为白色 */
+:root[data-theme='dark'] .icon-database,
+.icon-database {
+  filter: brightness(0) invert(1);
+}
 </style>

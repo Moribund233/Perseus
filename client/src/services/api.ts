@@ -897,9 +897,48 @@ export async function updateDatabaseUrl(dbType: string, url: string): Promise<vo
  * - SQLite: 总是可用（内置于 Python）
  * - PostgreSQL: 需要 pg8000 驱动
  * - MySQL: 需要 pymysql 驱动
+/**
  * 
  * @returns 已安装的数据库类型列表，如 ['sqlite', 'postgresql']
  */
 export async function checkInstalledDatabases(): Promise<string[]> {
   return invoke('check_installed_databases')
+}
+
+// ==================== Debug 端点操作 ====================
+
+/**
+ * 重置数据库
+ * @param force 是否强制重置
+ * @param createTestData 是否创建测试数据
+ * @returns 操作结果
+ */
+export async function resetDatabase(force: boolean = true, createTestData: boolean = true): Promise<{ success: boolean; message: string; details: any }> {
+  return invoke('reset_database', { force, createTestData })
+}
+
+/**
+ * 重置配置文件
+ * @param force 是否强制重置
+ * @param backup 是否备份原配置
+ * @returns 操作结果
+ */
+export async function resetConfig(force: boolean = true, backup: boolean = true): Promise<{ success: boolean; message: string; configPath: string; backupPath?: string }> {
+  return invoke('reset_config', { force, backup })
+}
+
+/**
+ * 获取调试状态
+ * @returns 调试状态信息
+ */
+export async function getDebugStatus(): Promise<{
+  debug_mode: boolean
+  config_path: string
+  config_exists: boolean
+  database_url: string
+  database_type: string
+  environment: Record<string, string>
+  stress_test_mode: boolean
+}> {
+  return invoke('get_debug_status')
 }

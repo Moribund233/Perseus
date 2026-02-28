@@ -246,8 +246,7 @@ def _drop_all_tables_mysql(engine):
 
 @router.get("/status", response_model=DebugStatusResponse)
 async def debug_status(
-    _: User = Depends(require_local_or_admin),
-    __: None = Depends(require_debug_mode)
+    _: User = Depends(require_local_or_admin)
 ):
     """
     获取调试状态信息
@@ -306,8 +305,7 @@ async def debug_status(
 async def init_database(
     force: bool = False,
     create_test_data: bool = True,
-    current_user: User = Depends(require_local_or_admin),
-    _: None = Depends(require_debug_mode)
+    current_user: User = Depends(require_local_or_admin)
 ):
     """
     重置数据库
@@ -409,8 +407,7 @@ async def init_database(
 async def init_config(
     force: bool = False,
     backup: bool = True,
-    current_user: User = Depends(require_local_or_admin),
-    _: None = Depends(require_debug_mode)
+    current_user: User = Depends(require_local_or_admin)
 ):
     """
     重置配置文件
