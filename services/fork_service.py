@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from models import Repository, User
-from exception import NotFoundException, ValidationException, AuthorizationException
+from core.exception import NotFoundException, ValidationException, AuthorizationException
 from utils.permission_utils import check_repository_permission
 from utils.db_utils import paginate
 from utils.response_builder import build_pagination_response
@@ -50,7 +50,7 @@ async def fork_repository(
     """
     from services.repository_service import create_repository
     from utils.git_utils import get_repository_path
-    from config import get_config
+    from core.config import get_config
 
     # 获取源仓库
     stmt = select(Repository).filter(Repository.id == source_repository_id)
@@ -328,7 +328,7 @@ async def sync_fork(
         AuthorizationException: 无权限同步
     """
     from utils.git_utils import get_repository_path
-    from config import get_config
+    from core.config import get_config
 
     # 获取 Fork 仓库
     stmt = select(Repository).filter(Repository.id == repository_id)

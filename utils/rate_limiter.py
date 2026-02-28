@@ -11,7 +11,7 @@ from fastapi import Request, Response
 from typing import Optional, Callable
 import logging
 
-from config import get_config
+from core.config import get_config
 
 # 日志记录器
 logger = logging.getLogger(__name__)

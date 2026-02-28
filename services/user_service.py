@@ -7,7 +7,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from models import User
-from exception import ValidationException, NotFoundException, ConflictException, AuthenticationException
+from core.exception import ValidationException, NotFoundException, ConflictException, AuthenticationException
 from passlib.context import CryptContext
 from services.token_service import create_token_pair
 
@@ -183,7 +183,7 @@ async def update_user(user_id: int, user_data: dict, db: AsyncSession, current_u
         NotFoundException: 用户不存在时抛出404异常
         AuthorizationException: 无权限时抛出403异常
     """
-    from exception import AuthorizationException
+    from core.exception import AuthorizationException
 
     result = await db.execute(select(User).filter(User.id == user_id))
     db_user = result.scalar_one_or_none()

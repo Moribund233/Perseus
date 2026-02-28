@@ -10,7 +10,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy import select
 
 from models import PullRequest, PRComment, PRReview, User
-from exception import ValidationException, NotFoundException, AuthorizationException
+from core.exception import ValidationException, NotFoundException, AuthorizationException
 from utils.permission_utils import check_resource_author_or_admin, check_repository_permission
 from utils.query_utils import get_pull_request_or_404
 from utils.response_builder import (

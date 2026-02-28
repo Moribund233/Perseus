@@ -15,7 +15,7 @@ from models.branch import Branch
 from models.repository import Repository
 from models.user import User
 from services import commit_service
-from exception import NotFoundException, ValidationException, ConflictException
+from core.exception import NotFoundException, ValidationException, ConflictException
 
 # 使用内存数据库进行测试
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

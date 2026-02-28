@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 
-from config import get_config
+from core.config import get_config
 
 logger = logging.getLogger(__name__)
 

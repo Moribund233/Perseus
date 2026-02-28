@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 
-from config import get_config, ConfigManager, reset_module_config_manager
+from core.config import get_config, ConfigManager, reset_module_config_manager
 from api.dependencies import security
 from api.local_auth import LocalUser
 from models.user import User

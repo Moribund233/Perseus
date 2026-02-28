@@ -19,7 +19,7 @@ from services import release_service
 from services.release_service import (
     _create_git_tag, _delete_git_tag, list_git_tags, get_git_tag
 )
-from exception import NotFoundException, ValidationException
+from core.exception import NotFoundException, ValidationException
 
 # 使用内存数据库进行测试
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

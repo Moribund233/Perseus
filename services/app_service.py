@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
-from config import get_config
-from exception import ValidationException, AuthorizationException, AppServiceException
+from core.config import get_config
+from core.exception import ValidationException, AuthorizationException, AppServiceException
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +120,7 @@ class AppService:
             time.sleep(0.5)
 
             try:
-                from lifespan import trigger_graceful_shutdown
+                from core.lifespan import trigger_graceful_shutdown
                 
                 # 使用新的生命周期管理接口触发关闭
                 # 支持单进程和多进程模式
@@ -183,7 +183,7 @@ class AppService:
                 time.sleep(1)
 
                 try:
-                    from lifespan import get_lifecycle_manager
+                    from core.lifespan import get_lifecycle_manager
 
                     manager = get_lifecycle_manager()
 

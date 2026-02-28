@@ -15,7 +15,7 @@ from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exception import NotFoundException, AuthorizationException
+from core.exception import NotFoundException, AuthorizationException
 from models import Repository, User
 from models.repository_member import RepositoryMember
 from utils.git_utils import get_repository_storage_path, repo_exists

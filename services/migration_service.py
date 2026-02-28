@@ -452,7 +452,7 @@ def run_migration_from_env(
     Returns:
         MigrationResult: 迁移结果
     """
-    from config import get_config
+    from core.config import get_config
     config = get_config()
     source_url = config.database.url
     

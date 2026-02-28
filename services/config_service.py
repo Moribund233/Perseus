@@ -9,7 +9,7 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 from utils.config_utils import ConfigManager, generate_default_config, get_config_manager
-from exception import ValidationException, AuthorizationException
+from core.exception import ValidationException, AuthorizationException
 
 
 class ConfigService:

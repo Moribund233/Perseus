@@ -18,7 +18,7 @@ from sqlalchemy.orm import selectinload
 
 from models import WebHook, WebHookDelivery
 from models.webhook import WEBHOOK_EVENTS
-from exception import NotFoundException, ValidationException, AuthorizationException
+from core.exception import NotFoundException, ValidationException, AuthorizationException
 from utils.permission_utils import check_repository_permission
 from utils.db_utils import paginate
 from utils.response_builder import build_pagination_response

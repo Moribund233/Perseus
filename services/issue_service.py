@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import select, func
 
 from models import Issue, Label, IssueComment
-from exception import ValidationException, NotFoundException
+from core.exception import ValidationException, NotFoundException
 from utils.permission_utils import check_resource_author_or_admin
 from utils.query_utils import get_issue_or_404
 from utils.response_builder import (

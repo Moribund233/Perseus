@@ -22,7 +22,7 @@ from models.repository_member import RepositoryMember
 from models.base import BaseModel
 from services import repository_service
 from services import user_service
-from exception import NotFoundException, ConflictException, ValidationException
+from core.exception import NotFoundException, ConflictException, ValidationException
 
 
 # 使用内存中的 SQLite 进行测试

@@ -4,7 +4,7 @@ from typing import List, Optional
 
 import psutil
 
-from config import ConfigManager
+from core.config import ConfigManager
 from utils.logging import get_named_logger
 
 logger = get_named_logger("port")

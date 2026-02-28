@@ -16,12 +16,12 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, Query, Body
 from pydantic import BaseModel, Field
 
-from config import get_config
+from core.config import get_config
 from services.app_service import get_app_service
 from services.config_service import get_config_service
 from api.dependencies import get_current_user
 from api.local_auth import get_local_auth_user, LocalUser
-from exception import AuthorizationException
+from core.exception import AuthorizationException
 
 # 创建路由实例
 router = APIRouter(tags=["app-management"])

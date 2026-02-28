@@ -409,7 +409,7 @@ def run_precheck_from_env(target_url: str) -> PrecheckReport:
     Returns:
         PrecheckReport: 预检查报告
     """
-    from config import get_config
+    from core.config import get_config
     config = get_config()
     source_url = config.database.url
     

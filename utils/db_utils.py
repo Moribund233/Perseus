@@ -8,7 +8,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exception import NotFoundException
+from core.exception import NotFoundException
 
 T = TypeVar('T')
 

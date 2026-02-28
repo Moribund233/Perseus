@@ -18,7 +18,7 @@ if project_root not in sys.path:
 from models.user import User
 from models.base import BaseModel
 from services import user_service
-from exception import NotFoundException, ConflictException, AuthenticationException
+from core.exception import NotFoundException, ConflictException, AuthenticationException
 
 
 # 使用内存中的 SQLite 进行测试

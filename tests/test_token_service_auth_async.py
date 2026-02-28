@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 from models import BaseModel
 from models.user import User
 from services import token_service
-from exception import AuthenticationException
+from core.exception import AuthenticationException
 
 # 使用内存数据库进行测试
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

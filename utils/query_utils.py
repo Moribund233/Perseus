@@ -5,7 +5,7 @@
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from exception import NotFoundException
+from core.exception import NotFoundException
 
 
 async def get_resource_or_404(

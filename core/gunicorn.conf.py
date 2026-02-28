@@ -23,7 +23,7 @@ from pathlib import Path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-from config import get_config
+from core.config import get_config
 from utils.logging import get_logger
 
 # 加载应用配置
@@ -151,7 +151,7 @@ def when_ready(server):
     
     # 初始化Master进程的IPC管理器
     try:
-        from lifespan import get_lifecycle_manager
+        from core.lifespan import get_lifecycle_manager
         manager = get_lifecycle_manager()
         manager.setup_for_master(server.pid)
     except Exception as e:
@@ -189,7 +189,7 @@ def on_exit(server):
     
     # 清理IPC资源
     try:
-        from lifespan import get_lifecycle_manager
+        from core.lifespan import get_lifecycle_manager
         manager = get_lifecycle_manager()
         manager.cleanup()
     except Exception as e:

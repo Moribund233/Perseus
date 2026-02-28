@@ -21,7 +21,7 @@ from services.repository_browser_service import (
     get_diff
 )
 from utils.git_utils import get_repository_storage_path
-from exception import NotFoundException
+from core.exception import NotFoundException
 
 # 创建路由实例
 router = APIRouter(prefix="/api/v1/repositories", tags=["repository-browser"])

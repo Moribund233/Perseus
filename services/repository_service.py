@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models import Repository
 from models.branch import Branch
 from models.repository_member import RepositoryMember
-from exception import ValidationException, NotFoundException, ConflictException
+from core.exception import ValidationException, NotFoundException, ConflictException
 from utils.git_utils import init_bare_repo, get_repository_storage_path, repo_exists_async, GitError
 from utils.response_builder import build_repo_response
 from utils.db_utils import exists

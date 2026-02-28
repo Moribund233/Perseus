@@ -7,7 +7,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.commit import Commit
 from models.branch import Branch
-from exception import ValidationException, NotFoundException, ConflictException
+from core.exception import ValidationException, NotFoundException, ConflictException
 
 
 async def get_commits(repo_id: int, db: AsyncSession, limit: int = 100, offset: int = 0):

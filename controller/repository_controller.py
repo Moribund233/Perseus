@@ -15,7 +15,7 @@ from utils.permission_utils import (
     require_repository_owner_or_admin
 )
 from utils.rate_limiter import limiter, RateLimitConfig
-from exception import AuthorizationException
+from core.exception import AuthorizationException
 
 from services.repository_service import (
     get_repositories as service_get_repositories,

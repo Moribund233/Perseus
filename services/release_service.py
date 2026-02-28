@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from models import Release, ReleaseAsset, Repository, User
-from exception import NotFoundException, ValidationException, AuthorizationException
+from core.exception import NotFoundException, ValidationException, AuthorizationException
 from utils.permission_utils import check_repository_permission
 from utils.db_utils import paginate, get_next_sequence_number
 from utils.response_builder import build_pagination_response

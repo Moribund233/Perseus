@@ -13,7 +13,7 @@ from models.repository_member import RepositoryMember
 from models.repository import Repository
 from models.user import User
 from services import member_service
-from exception import NotFoundException, ValidationException, ConflictException, AuthorizationException
+from core.exception import NotFoundException, ValidationException, ConflictException, AuthorizationException
 
 # 使用内存数据库进行测试
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

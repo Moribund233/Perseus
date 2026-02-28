@@ -191,7 +191,7 @@ async def get_migration_status(
     
     **需要管理员权限**
     """
-    from config import get_config
+    from core.config import get_config
     config = get_config()
     
     return {

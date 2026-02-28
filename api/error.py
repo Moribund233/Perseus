@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from typing import Optional
 from pydantic import BaseModel
 
-from config import get_config
+from core.config import get_config
 from api.dependencies import get_current_user, get_current_admin_user
 from models.user import User
 

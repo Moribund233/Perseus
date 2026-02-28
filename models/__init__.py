@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # 导入配置 - 环境变量检测由 init 模块统一负责
-from config import get_config
+from core.config import get_config
 from utils.db_validation import (
     validate_database_config,
     check_sqlite_stress_test_warning,

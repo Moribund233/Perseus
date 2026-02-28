@@ -14,7 +14,7 @@ from models.issue import Issue, Label
 from models.repository import Repository
 from models.user import User
 from services import issue_service
-from exception import NotFoundException, ValidationException
+from core.exception import NotFoundException, ValidationException
 
 # 使用内存数据库进行测试
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

@@ -21,7 +21,7 @@ from models.base import BaseModel
 from services import branch_service
 from services import repository_service
 from services import user_service
-from exception import NotFoundException, ConflictException, ValidationException, AuthorizationException
+from core.exception import NotFoundException, ConflictException, ValidationException, AuthorizationException
 
 
 # 使用内存中的 SQLite 进行测试

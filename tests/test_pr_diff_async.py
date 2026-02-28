@@ -20,7 +20,7 @@ from utils.git_utils import (
     get_pr_diff, get_pr_files, get_pr_stats, get_file_diff,
     DiffFileStatus, init_bare_repo, GitError
 )
-from exception import NotFoundException, ValidationException
+from core.exception import NotFoundException, ValidationException
 
 # 使用内存数据库进行测试
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

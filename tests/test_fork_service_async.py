@@ -16,7 +16,7 @@ from models import BaseModel
 from models.repository import Repository
 from models.user import User
 from services import fork_service
-from exception import NotFoundException, ValidationException, AuthorizationException
+from core.exception import NotFoundException, ValidationException, AuthorizationException
 
 # 使用内存数据库进行测试
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

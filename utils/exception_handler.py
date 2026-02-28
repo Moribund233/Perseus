@@ -7,7 +7,7 @@ import logging
 import traceback
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from exception import (
+from core.exception import (
     BaseException,
     ValidationException,
     AuthenticationException,
@@ -30,7 +30,7 @@ logger = get_named_logger("exception")
 def _is_debug_mode() -> bool:
     """检查是否处于调试模式"""
     try:
-        from config import get_config
+        from core.config import get_config
         config = get_config()
         return getattr(config.app, 'debug', True)
     except Exception:

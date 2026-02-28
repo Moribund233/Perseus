@@ -5,7 +5,7 @@
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from exception import AuthorizationException
+from core.exception import AuthorizationException
 
 
 async def check_resource_author_or_admin(

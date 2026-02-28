@@ -22,7 +22,7 @@
 - 环境变量检查为最高优先级，缺失时立即失败
 
 使用示例:
-    from init import init_app
+    from core.init import init_app
     
     # 初始化应用
     if init_app():
@@ -248,7 +248,7 @@ class AppInitializer:
             bool: 导入是否成功
         """
         try:
-            from config import ConfigManager
+            from core.config import ConfigManager
             from utils.config_utils import generate_default_config, write_config_file, get_config_manager
             from utils.logging import init_logging, get_logger
             

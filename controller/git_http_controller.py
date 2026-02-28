@@ -34,7 +34,7 @@ from services.git_http_service import (
     get_git_backend_service,
     GitHttpBackendError
 )
-from exception import NotFoundException, AuthorizationException
+from core.exception import NotFoundException, AuthorizationException
 from utils.rate_limiter import limiter, RateLimitConfig, get_git_operation_key
 
 # 创建路由实例

@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.branch import Branch
 from models.repository import Repository
-from exception import ValidationException, NotFoundException, ConflictException, AuthorizationException
+from core.exception import ValidationException, NotFoundException, ConflictException, AuthorizationException
 
 
 async def get_branches(repo_id: int, db: AsyncSession):

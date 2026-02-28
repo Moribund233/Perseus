@@ -141,7 +141,7 @@ class TestLifecycleManager:
     
     def setup_method(self):
         """每个测试方法前执行"""
-        from lifespan import reset_lifecycle_manager
+        from core.lifespan import reset_lifecycle_manager
         from utils.ipc_manager import reset_ipc_manager
         
         reset_lifecycle_manager()
@@ -151,7 +151,7 @@ class TestLifecycleManager:
     
     def teardown_method(self):
         """每个测试方法后执行"""
-        from lifespan import reset_lifecycle_manager
+        from core.lifespan import reset_lifecycle_manager
         from utils.ipc_manager import reset_ipc_manager
         
         reset_lifecycle_manager()
@@ -162,7 +162,7 @@ class TestLifecycleManager:
     
     def test_lifecycle_manager_singleton(self):
         """测试生命周期管理器单例模式"""
-        from lifespan import get_lifecycle_manager
+        from core.lifespan import get_lifecycle_manager
         
         manager1 = get_lifecycle_manager()
         manager2 = get_lifecycle_manager()
@@ -171,7 +171,7 @@ class TestLifecycleManager:
     
     def test_master_mode_setup(self):
         """测试Master模式设置"""
-        from lifespan import get_lifecycle_manager
+        from core.lifespan import get_lifecycle_manager
         from utils.ipc_manager import get_ipc_manager
         
         lifecycle_manager = get_lifecycle_manager()
@@ -184,7 +184,7 @@ class TestLifecycleManager:
     
     def test_worker_mode_setup(self):
         """测试Worker模式设置"""
-        from lifespan import get_lifecycle_manager
+        from core.lifespan import get_lifecycle_manager
         
         lifecycle_manager = get_lifecycle_manager()
         master_pid = os.getpid()
@@ -202,7 +202,7 @@ class TestLifecycleManager:
     
     def test_shutdown_request_single_process(self):
         """测试单进程模式关闭请求"""
-        from lifespan import get_lifecycle_manager
+        from core.lifespan import get_lifecycle_manager
         
         lifecycle_manager = get_lifecycle_manager()
         
@@ -213,7 +213,7 @@ class TestLifecycleManager:
     
     def test_shutdown_request_multi_process(self):
         """测试多进程模式关闭请求"""
-        from lifespan import get_lifecycle_manager
+        from core.lifespan import get_lifecycle_manager
         
         lifecycle_manager = get_lifecycle_manager()
         master_pid = os.getpid()
@@ -233,7 +233,7 @@ class TestGunicornIntegration:
     
     def setup_method(self):
         """每个测试方法前执行"""
-        from lifespan import reset_lifecycle_manager
+        from core.lifespan import reset_lifecycle_manager
         from utils.ipc_manager import reset_ipc_manager
         
         reset_lifecycle_manager()
@@ -241,7 +241,7 @@ class TestGunicornIntegration:
     
     def teardown_method(self):
         """每个测试方法后执行"""
-        from lifespan import reset_lifecycle_manager
+        from core.lifespan import reset_lifecycle_manager
         from utils.ipc_manager import reset_ipc_manager
         
         reset_lifecycle_manager()
@@ -250,7 +250,7 @@ class TestGunicornIntegration:
     def test_gunicorn_worker_import(self):
         """测试Gunicorn Worker导入"""
         try:
-            from gunicorn_worker import LanGitUvicornWorker
+            from core.gunicorn_worker import LanGitUvicornWorker
             assert LanGitUvicornWorker is not None
         except ImportError as e:
             pytest.skip(f"Gunicorn Worker导入失败: {e}")
@@ -258,7 +258,7 @@ class TestGunicornIntegration:
     def test_gunicorn_config_import(self):
         """测试Gunicorn配置导入"""
         try:
-            import gunicorn.conf as gunicorn_config
+            import core.gunicorn.conf as gunicorn_config
             assert hasattr(gunicorn_config, 'bind')
             assert hasattr(gunicorn_config, 'workers')
             assert hasattr(gunicorn_config, 'worker_class')
@@ -268,7 +268,7 @@ class TestGunicornIntegration:
     @pytest.mark.asyncio
     async def test_lifespan_context_manager(self):
         """测试lifespan上下文管理器"""
-        from lifespan import app_lifespan
+        from core.lifespan import app_lifespan
         from fastapi import FastAPI
         
         app = FastAPI()
@@ -283,7 +283,7 @@ class TestShutdownAPI:
     
     def setup_method(self):
         """每个测试方法前执行"""
-        from lifespan import reset_lifecycle_manager
+        from core.lifespan import reset_lifecycle_manager
         from utils.ipc_manager import reset_ipc_manager
         
         reset_lifecycle_manager()
@@ -291,7 +291,7 @@ class TestShutdownAPI:
     
     def teardown_method(self):
         """每个测试方法后执行"""
-        from lifespan import reset_lifecycle_manager
+        from core.lifespan import reset_lifecycle_manager
         from utils.ipc_manager import reset_ipc_manager
         
         reset_lifecycle_manager()
@@ -299,7 +299,7 @@ class TestShutdownAPI:
     
     def test_trigger_graceful_shutdown_function(self):
         """测试trigger_graceful_shutdown函数"""
-        from lifespan import trigger_graceful_shutdown, get_lifecycle_manager
+        from core.lifespan import trigger_graceful_shutdown, get_lifecycle_manager
         
         # 单进程模式下应该返回True
         result = trigger_graceful_shutdown("test")
@@ -307,7 +307,7 @@ class TestShutdownAPI:
     
     def test_is_shutdown_requested_function(self):
         """测试is_shutdown_requested函数"""
-        from lifespan import is_shutdown_requested, get_lifecycle_manager
+        from core.lifespan import is_shutdown_requested, get_lifecycle_manager
         
         # 初始状态应该为False
         assert is_shutdown_requested() is False
@@ -325,7 +325,7 @@ class TestAppServiceIntegration:
     
     def setup_method(self):
         """每个测试方法前执行"""
-        from lifespan import reset_lifecycle_manager
+        from core.lifespan import reset_lifecycle_manager
         from utils.ipc_manager import reset_ipc_manager
         
         reset_lifecycle_manager()
@@ -333,7 +333,7 @@ class TestAppServiceIntegration:
     
     def teardown_method(self):
         """每个测试方法后执行"""
-        from lifespan import reset_lifecycle_manager
+        from core.lifespan import reset_lifecycle_manager
         from utils.ipc_manager import reset_ipc_manager
         
         reset_lifecycle_manager()
@@ -353,7 +353,7 @@ class TestAppServiceIntegration:
     def test_app_service_shutdown_no_permission(self):
         """测试AppService关闭权限检查"""
         from services.app_service import AppService
-        from exception import AuthorizationException
+        from core.exception import AuthorizationException
         
         service = AppService()
         
@@ -435,7 +435,7 @@ def manual_test_lifecycle():
     print("生命周期管理器手动测试")
     print("=" * 60)
     
-    from lifespan import get_lifecycle_manager, reset_lifecycle_manager
+    from core.lifespan import get_lifecycle_manager, reset_lifecycle_manager
     from utils.ipc_manager import reset_ipc_manager
     
     reset_lifecycle_manager()
@@ -461,7 +461,7 @@ def manual_test_lifecycle():
         print("   ✓ 关闭请求已发送")
         
         print(f"\n4. 检查关闭状态")
-        from lifespan import is_shutdown_requested
+        from core.lifespan import is_shutdown_requested
         is_requested = is_shutdown_requested()
         print(f"   关闭已请求: {is_requested}")
         print("   ✓ 状态检查完成")

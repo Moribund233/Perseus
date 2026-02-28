@@ -11,7 +11,7 @@ import pygit2
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from exception import NotFoundException, ValidationException
+from core.exception import NotFoundException, ValidationException
 from models import Repository
 
 # 创建线程池用于执行同步IO操作
@@ -72,7 +72,7 @@ class GitService:
             raise NotFoundException(detail="Repository not found")
 
         # 从配置获取仓库根目录
-        from config import get_config
+        from core.config import get_config
         config = get_config()
         repo_root = config.storage.repo_root
 
@@ -240,7 +240,7 @@ async def get_repository_path(db: AsyncSession, repository_id: int) -> str:
         raise NotFoundException(detail="Repository not found")
 
     # 从配置获取仓库根目录
-    from config import get_config
+    from core.config import get_config
     config = get_config()
     repo_root = config.storage.repo_root
 

@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 import toml
 
-from config import Config
+from core.config import Config
 from utils.logging import get_named_logger
 
 logger = get_named_logger("config")

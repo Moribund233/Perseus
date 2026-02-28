@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from init import init_app
+from core.init import init_app
 
 # 注意：logger 和 config 的导入被延迟到 create_app() 内部
 # 以确保 init_app() 先执行环境变量检查
@@ -22,8 +22,8 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     """
     # 延迟导入所有可能触发 config/models 加载的模块
     # 确保 init_app() 先执行环境变量检查
-    from lifespan import app_lifespan
-    from config import get_config
+    from core.lifespan import app_lifespan
+    from core.config import get_config
     from utils.logging import get_logger
 
     # 获取 logger
@@ -204,7 +204,7 @@ def start_server():
     import uvicorn
     from utils.port_utils import get_pid_manager
     from utils.logging import get_logger
-    from config import get_config
+    from core.config import get_config
     
     # 创建应用实例（在 init_app() 成功之后）
     app = get_app()
@@ -268,7 +268,7 @@ def start_server():
                         """运行服务器"""
                         try:
                             # 初始化Master进程的生命周期管理器
-                            from lifespan import get_lifecycle_manager
+                            from core.lifespan import get_lifecycle_manager
                             manager = get_lifecycle_manager()
                             manager.setup_for_master(os.getpid())
                         except Exception as e:

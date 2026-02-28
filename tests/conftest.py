@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app import create_app, AppSingleton
-from config import reset_module_config_manager
+from core.config import reset_module_config_manager
 from models import Base, engine, SessionLocal
 from models.user import User
 from services.token_service import create_access_token

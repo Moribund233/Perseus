@@ -6,7 +6,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.repository_member import RepositoryMember
-from exception import ValidationException, NotFoundException, ConflictException, AuthorizationException
+from core.exception import ValidationException, NotFoundException, ConflictException, AuthorizationException
 
 # 常量定义
 VALID_ROLES = ["owner", "admin", "developer", "readonly"]

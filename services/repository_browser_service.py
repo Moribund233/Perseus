@@ -14,7 +14,7 @@ from datetime import datetime
 import pygit2
 
 from utils.git_utils import repo_exists
-from exception import (
+from core.exception import (
     NotFoundException,
     ValidationException,
     RepositoryNotFoundException,

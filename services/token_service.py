@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.user import User
-from config import get_config
+from core.config import get_config
 
 # 获取配置
 _config = get_config()
@@ -284,7 +284,7 @@ async def authenticate_user(
     Raises:
         AuthenticationException: 认证失败时抛出
     """
-    from exception import AuthenticationException
+    from core.exception import AuthenticationException
 
     user = await get_user_by_username(db, username)
 
@@ -319,7 +319,7 @@ async def get_current_user(
     Raises:
         AuthenticationException: 令牌无效或用户不存在时抛出
     """
-    from exception import AuthenticationException
+    from core.exception import AuthenticationException
 
     token_data = verify_token(token, token_type="access")
 
@@ -357,7 +357,7 @@ async def validate_token(
     Raises:
         AuthenticationException: 令牌无效时抛出
     """
-    from exception import AuthenticationException
+    from core.exception import AuthenticationException
 
     token_data = verify_token(token, token_type="access")
 

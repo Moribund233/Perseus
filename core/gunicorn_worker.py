@@ -56,7 +56,7 @@ class LanGitUvicornWorker(UvicornWorker):
     async def _init_lifecycle_manager(self) -> None:
         """初始化生命周期管理器"""
         try:
-            from lifespan import get_lifecycle_manager
+            from core.lifespan import get_lifecycle_manager
             
             self._lifecycle_manager = get_lifecycle_manager()
             master_pid = os.getppid()
