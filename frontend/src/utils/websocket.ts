@@ -4,8 +4,19 @@
  * 提供WebSocket连接管理和消息处理功能
  */
 
-// WebSocket配置 - 从环境变量读取
-const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL;
+// WebSocket配置 - 从环境变量读取，如果为空则使用当前页面的协议和主机
+const envWsUrl = import.meta.env.VITE_WS_BASE_URL;
+const WS_BASE_URL = envWsUrl || getDefaultWebSocketUrl();
+
+/**
+ * 获取默认 WebSocket URL
+ * 根据当前页面协议自动选择 ws:// 或 wss://
+ */
+function getDefaultWebSocketUrl(): string {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  return `${protocol}//${host}`;
+}
 
 // 定时器类型定义
 type TimerId = ReturnType<typeof setTimeout>;

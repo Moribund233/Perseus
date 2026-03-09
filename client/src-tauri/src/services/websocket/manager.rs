@@ -218,11 +218,29 @@ impl WebSocketManager {
                             }
                         }
                         Err(e) => {
-                            log::error!("WebSocket 错误: {}", e);
-                            ws_stream = None;
-                            *state.write().await = ConnectionState::Error;
-                            emit_state_change(&app_handle, ConnectionState::Error).await;
-                            emit_error(&app_handle, &format!("WebSocket 错误: {}", e)).await;
+                            // 检查是否是服务端正常关闭连接
+                            let error_str = e.to_string();
+                            let is_graceful_shutdown = error_str.contains("os error 10054")  // Windows: 远程主机强迫关闭连接
+                                || error_str.contains("os error 10053")  // Windows: 软件中止连接
+                                || error_str.contains("Connection reset by peer")
+                                || error_str.contains("Connection aborted")
+                                || error_str.contains("broken pipe");
+
+                            if is_graceful_shutdown {
+                                // 服务端正常关闭，使用 WARN 级别并显示友好消息
+                                log::warn!("WebSocket 连接已断开: 服务端已关闭");
+                                ws_stream = None;
+                                *state.write().await = ConnectionState::Disconnected;
+                                emit_state_change(&app_handle, ConnectionState::Disconnected).await;
+                                // 不发送错误事件，因为这是预期的行为
+                            } else {
+                                // 真正的错误，使用 ERROR 级别
+                                log::error!("WebSocket 错误: {}", e);
+                                ws_stream = None;
+                                *state.write().await = ConnectionState::Error;
+                                emit_state_change(&app_handle, ConnectionState::Error).await;
+                                emit_error(&app_handle, &format!("WebSocket 错误: {}", e)).await;
+                            }
                         }
                     }
                 }

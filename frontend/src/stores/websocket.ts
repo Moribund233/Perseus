@@ -10,6 +10,16 @@ import type {
   WebSocketMessage,
 } from '@/utils/websocket';
 
+/**
+ * 获取默认 WebSocket URL
+ * 根据当前页面协议自动选择 ws:// 或 wss://
+ */
+function getDefaultWebSocketUrl(): string {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  return `${protocol}//${host}`;
+}
+
 // 通知消息类型
 export interface NotificationMessage {
   id: string;
@@ -94,8 +104,9 @@ export const useWebSocketStore = defineStore('websocket', () => {
       client.value.close();
     }
 
-    // 从环境变量获取 WebSocket 基础 URL
-    const wsBaseUrl = import.meta.env.VITE_WS_BASE_URL;
+    // 从环境变量获取 WebSocket 基础 URL，如果为空则使用当前页面协议和主机
+    const envWsUrl = import.meta.env.VITE_WS_BASE_URL;
+    const wsBaseUrl = envWsUrl || getDefaultWebSocketUrl();
 
     // 创建新连接，传入事件处理器
     const wsConfig = {

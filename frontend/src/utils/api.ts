@@ -1,5 +1,6 @@
-// API基础配置 - 从环境变量读取
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+// API基础配置 - 从环境变量读取，如果为空则使用相对路径
+const envApiUrl = import.meta.env.VITE_API_BASE_URL;
+export const API_BASE_URL = envApiUrl || '';
 
 // 导入安全存储
 import {
@@ -119,6 +120,20 @@ export const apiRequest = async <T>(
         success: false,
         error: '请求超时，请稍后重试'
       };
+    }
+
+    // 处理网络连接错误
+    if (error instanceof TypeError) {
+      const errorMsg = error.message.toLowerCase();
+      if (errorMsg.includes('failed to fetch') || 
+          errorMsg.includes('networkerror') ||
+          errorMsg.includes('net::err_connection') ||
+          errorMsg.includes('network request failed')) {
+        return {
+          success: false,
+          error: '无法连接到服务器，请检查网络设置或服务是否正常运行'
+        };
+      }
     }
 
     return {

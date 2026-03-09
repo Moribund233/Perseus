@@ -105,6 +105,14 @@ pub fn start_nginx() -> NginxActionResponse {
         cmd.current_dir(work_dir);
     }
 
+    // 指定配置文件路径
+    let conf_path = get_nginx_config_path();
+    if let Some(ref conf_path) = conf_path {
+        if conf_path.exists() {
+            cmd.arg("-c").arg(conf_path);
+        }
+    }
+
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;

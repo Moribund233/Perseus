@@ -126,6 +126,17 @@ fn generate_cors_preflight_config(
 }
 
 /**
+ * 将路径转换为Nginx配置兼容格式
+ * 在Windows上将反斜杠转换为正斜杠
+ *
+ * @param path 原始路径
+ * @return 转换后的路径
+ */
+fn to_nginx_path(path: &str) -> String {
+    path.replace('\\', "/")
+}
+
+/**
  * 生成Nginx配置文件内容
  *
  * @param config 代理配置
@@ -134,13 +145,14 @@ fn generate_cors_preflight_config(
  */
 pub fn generate_nginx_config(config: &NginxProxyConfig, config_dir: &str) -> String {
     let mut nginx_conf = String::new();
+    let nginx_path = to_nginx_path(config_dir);
 
     nginx_conf.push_str(&format!(
         "worker_processes {};\n\n",
         config.worker_processes
     ));
     nginx_conf.push_str("# PID文件路径\n");
-    nginx_conf.push_str(&format!("pid {}/logs/nginx.pid;\n\n", config_dir));
+    nginx_conf.push_str(&format!("pid {}/logs/nginx.pid;\n\n", nginx_path));
 
     nginx_conf.push_str("events {\n");
     nginx_conf.push_str("    worker_connections 1024;\n");
@@ -151,15 +163,15 @@ pub fn generate_nginx_config(config: &NginxProxyConfig, config_dir: &str) -> Str
     nginx_conf.push_str("}\n\n");
 
     nginx_conf.push_str("http {\n");
-    nginx_conf.push_str(&format!("    include       {}/mime.types;\n", config_dir));
+    nginx_conf.push_str(&format!("    include       {}/mime.types;\n", nginx_path));
     nginx_conf.push_str("    default_type  application/octet-stream;\n\n");
     nginx_conf.push_str(&format!(
         "    access_log    {}/logs/access.log;\n",
-        config_dir
+        nginx_path
     ));
     nginx_conf.push_str(&format!(
         "    error_log     {}/logs/error.log;\n\n",
-        config_dir
+        nginx_path
     ));
     nginx_conf.push_str("    sendfile        on;\n");
 
@@ -187,7 +199,13 @@ pub fn generate_nginx_config(config: &NginxProxyConfig, config_dir: &str) -> Str
     }
 
     nginx_conf.push_str("    server {\n");
-    nginx_conf.push_str(&format!("        listen {};\n", config.listen_port));
+    // 根据监听地址生成listen指令
+    let listen_addr = if config.listen_address.is_empty() || config.listen_address == "0.0.0.0" {
+        config.listen_port.to_string()
+    } else {
+        format!("{}:{}", config.listen_address, config.listen_port)
+    };
+    nginx_conf.push_str(&format!("        listen {};\n", listen_addr));
     nginx_conf.push_str(&format!("        server_name {};\n\n", config.server_name));
 
     if config.add_security_headers {
@@ -234,7 +252,9 @@ pub fn generate_nginx_config(config: &NginxProxyConfig, config_dir: &str) -> Str
         nginx_conf.push_str(&generate_proxy_config(config, 12));
         nginx_conf.push_str("        }\n\n");
 
-        nginx_conf.push_str("        location / {\n");
+        // API请求代理到后端
+        nginx_conf.push_str("        # API请求代理\n");
+        nginx_conf.push_str("        location /api/ {\n");
         nginx_conf.push_str(&generate_cors_preflight_config(
             config,
             12,
@@ -242,11 +262,83 @@ pub fn generate_nginx_config(config: &NginxProxyConfig, config_dir: &str) -> Str
         ));
         nginx_conf.push('\n');
         nginx_conf.push_str(&generate_proxy_config(config, 12));
-        nginx_conf.push_str("        }\n");
-    } else {
-        nginx_conf.push_str("        location / {\n");
+        nginx_conf.push_str("        }\n\n");
+
+        // Git HTTP协议代理
+        nginx_conf.push_str("        # Git HTTP协议代理\n");
+        nginx_conf.push_str("        location ~* ^/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+\\.git/ {\n");
+        nginx_conf.push_str(&generate_cors_preflight_config(
+            config,
+            12,
+            &config.cors_methods,
+        ));
+        nginx_conf.push('\n');
         nginx_conf.push_str(&generate_proxy_config(config, 12));
-        nginx_conf.push_str("        }\n");
+        nginx_conf.push_str("        }\n\n");
+
+        // 如果配置了前端静态文件路径，添加静态文件服务
+        if !config.frontend_path.is_empty() {
+            nginx_conf.push_str("        # 前端静态文件服务\n");
+            nginx_conf.push_str("        location / {\n");
+            // 确保路径末尾有斜杠
+            let frontend_path = to_nginx_path(&config.frontend_path);
+            let frontend_path = if frontend_path.ends_with('/') {
+                frontend_path
+            } else {
+                format!("{}/", frontend_path)
+            };
+            nginx_conf.push_str(&format!("            alias {};\n", frontend_path));
+            nginx_conf.push_str("            index index.html;\n");
+            nginx_conf.push_str("            try_files $uri $uri/ =404;\n");
+            nginx_conf.push_str("            add_header Cache-Control \"no-cache\";\n");
+            nginx_conf.push_str("        }\n\n");
+        } else {
+            nginx_conf.push_str("        # 默认代理所有请求\n");
+            nginx_conf.push_str("        location / {\n");
+            nginx_conf.push_str(&generate_cors_preflight_config(
+                config,
+                12,
+                &config.cors_methods,
+            ));
+            nginx_conf.push('\n');
+            nginx_conf.push_str(&generate_proxy_config(config, 12));
+            nginx_conf.push_str("        }\n");
+        }
+    } else {
+        // API请求代理到后端
+        nginx_conf.push_str("        # API请求代理\n");
+        nginx_conf.push_str("        location /api/ {\n");
+        nginx_conf.push_str(&generate_proxy_config(config, 12));
+        nginx_conf.push_str("        }\n\n");
+
+        // Git HTTP协议代理
+        nginx_conf.push_str("        # Git HTTP协议代理\n");
+        nginx_conf.push_str("        location ~* ^/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+\\.git/ {\n");
+        nginx_conf.push_str(&generate_proxy_config(config, 12));
+        nginx_conf.push_str("        }\n\n");
+
+        // 如果配置了前端静态文件路径，添加静态文件服务
+        if !config.frontend_path.is_empty() {
+            nginx_conf.push_str("        # 前端静态文件服务\n");
+            nginx_conf.push_str("        location / {\n");
+            // 确保路径末尾有斜杠
+            let frontend_path = to_nginx_path(&config.frontend_path);
+            let frontend_path = if frontend_path.ends_with('/') {
+                frontend_path
+            } else {
+                format!("{}/", frontend_path)
+            };
+            nginx_conf.push_str(&format!("            alias {};\n", frontend_path));
+            nginx_conf.push_str("            index index.html;\n");
+            nginx_conf.push_str("            try_files $uri $uri/ =404;\n");
+            nginx_conf.push_str("            add_header Cache-Control \"no-cache\";\n");
+            nginx_conf.push_str("        }\n\n");
+        } else {
+            nginx_conf.push_str("        # 默认代理所有请求\n");
+            nginx_conf.push_str("        location / {\n");
+            nginx_conf.push_str(&generate_proxy_config(config, 12));
+            nginx_conf.push_str("        }\n");
+        }
     }
 
     nginx_conf.push_str("    }\n");

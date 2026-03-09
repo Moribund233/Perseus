@@ -118,6 +118,12 @@ pub struct NginxProxyConfig {
     /// 启用性能优化
     #[serde(default = "default_enable_performance")]
     pub enable_performance: bool,
+    /// 监听地址（空字符串表示监听所有地址0.0.0.0）
+    #[serde(default = "default_listen_address")]
+    pub listen_address: String,
+    /// 前端静态文件路径（空字符串表示不使用静态文件服务）
+    #[serde(default = "default_frontend_path")]
+    pub frontend_path: String,
 }
 
 fn default_connect_timeout() -> u32 {
@@ -141,6 +147,12 @@ fn default_worker_processes() -> String {
 fn default_enable_performance() -> bool {
     true
 }
+fn default_listen_address() -> String {
+    String::from("0.0.0.0")
+}
+fn default_frontend_path() -> String {
+    String::from("")
+}
 
 impl Default for NginxProxyConfig {
     fn default() -> Self {
@@ -163,6 +175,8 @@ impl Default for NginxProxyConfig {
             keepalive_connections: default_keepalive_connections(),
             worker_processes: default_worker_processes(),
             enable_performance: default_enable_performance(),
+            listen_address: default_listen_address(),
+            frontend_path: default_frontend_path(),
         }
     }
 }

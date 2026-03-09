@@ -47,6 +47,10 @@
             required
           />
         </div>
+        <!-- 错误信息提示 -->
+        <div v-if="errorMessage" class="error-message">
+          {{ errorMessage }}
+        </div>
         <button type="submit" class="register-button" :disabled="isLoading || !isFormValid">
           {{ isLoading ? '注册中...' : '注册' }}
         </button>
@@ -193,6 +197,17 @@ const handleRegister = async () => {
 .register-button:disabled {
   background-color: #a0cfff;
   cursor: not-allowed;
+}
+
+.error-message {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background-color: #fef0f0;
+  border: 1px solid #fde2e2;
+  border-radius: 4px;
+  color: #f56c6c;
+  font-size: 14px;
+  text-align: center;
 }
 
 .register-footer {

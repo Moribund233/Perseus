@@ -718,6 +718,10 @@ export interface NginxProxyConfig {
   keepalive_connections: number
   worker_processes: string
   enable_performance: boolean
+  // 网络配置
+  listen_address: string
+  // 前端静态文件路径
+  frontend_path: string
 }
 
 /**

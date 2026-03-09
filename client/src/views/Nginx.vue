@@ -69,7 +69,11 @@ const proxyConfig = ref<NginxProxyConfig>({
   enable_keepalive: true,
   keepalive_connections: 32,
   worker_processes: 'auto',
-  enable_performance: true
+  enable_performance: true,
+  // 网络配置
+  listen_address: '0.0.0.0',
+  // 前端静态文件路径
+  frontend_path: ''
 })
 const isSavingConfig = ref(false)
 
@@ -582,6 +586,18 @@ onMounted(() => {
           </div>
           <div class="form-row">
             <div class="form-group">
+              <label for="listen-address">监听地址:</label>
+              <input
+                id="listen-address"
+                v-model="proxyConfig.listen_address"
+                type="text"
+                placeholder="0.0.0.0"
+                class="form-input"
+                :disabled="!proxyConfig.enabled"
+              />
+              <span class="form-hint">0.0.0.0表示监听所有网络接口</span>
+            </div>
+            <div class="form-group">
               <label for="listen-port">监听端口:</label>
               <input
                 id="listen-port"
@@ -593,7 +609,9 @@ onMounted(() => {
                 :disabled="!proxyConfig.enabled"
               />
             </div>
-            <div class="form-group">
+          </div>
+          <div class="form-row">
+            <div class="form-group form-group-full">
               <label for="server-name">服务器名称:</label>
               <input
                 id="server-name"
@@ -615,6 +633,20 @@ onMounted(() => {
                 class="form-input"
                 :disabled="!proxyConfig.enabled"
               />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group form-group-full">
+              <label for="frontend-path">前端静态文件路径:</label>
+              <input
+                id="frontend-path"
+                v-model="proxyConfig.frontend_path"
+                type="text"
+                placeholder="例如: D:/Project/LanGit/client/server/langit-server/_internal/frontend/dist/"
+                class="form-input"
+                :disabled="!proxyConfig.enabled"
+              />
+              <span class="form-hint">配置后Nginx会直接服务前端静态文件，API请求仍会代理到后端</span>
             </div>
           </div>
         </div>
