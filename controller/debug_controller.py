@@ -22,9 +22,8 @@ from pydantic import BaseModel, Field
 
 from core.config import get_config, ConfigManager, reset_module_config_manager
 from api.dependencies import security
-from api.local_auth import LocalUser
 from models.user import User
-from sqlalchemy import create_engine, text, inspect
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from utils.init_database import DatabaseInitializer
@@ -92,80 +91,69 @@ async def require_debug_mode():
         )
 
 
-async def require_local_or_admin(
+async def require_admin(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security)
-):
+) -> User:
     """
-    要求本地认证或管理员权限
-    
-    优先检查本地认证，如果本地认证失败则检查 JWT 管理员认证
-    
+    要求 JWT 管理员权限
+
     Args:
         request: FastAPI 请求对象
         credentials: HTTP 认证凭证
-        
+
     Returns:
-        User 或 LocalUser: 认证通过的用户
-        
+        User: 认证通过的管理员用户
+
     Raises:
-        HTTPException: 权限不足时抛出 403 错误
+        HTTPException: 权限不足时抛出 401/403 错误
     """
-    from api.local_auth import get_local_auth_user, LocalUser
     from services.token_service import verify_token
     from models.async_db import get_async_db
     from sqlalchemy import select
-    from models.user import User
-    
-    # 首先尝试本地认证（不依赖数据库）
-    local_user = await get_local_auth_user(request, credentials)
-    if local_user:
-        return local_user
-    
-    # 本地认证失败，尝试 JWT 认证（需要数据库）
+
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     token = credentials.credentials
     token_data = verify_token(token, token_type="access")
-    
+
     if token_data is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    # 使用异步数据库会话查询用户
+
     async for db in get_async_db():
         try:
             result = await db.execute(select(User).filter(User.id == token_data.user_id))
             user = result.scalar_one_or_none()
-            
+
             if user is None:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="User not found",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
-            
+
             if not user.is_active:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="User is inactive",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
-            
+
             if not user.is_admin:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Admin permission required",
                 )
-            
+
             return user
         finally:
             await db.close()
@@ -187,17 +175,10 @@ def _get_sync_engine_with_url(url: str):
     
     # 转换 URL 为带驱动的格式
     url_lower = url.lower()
-    if url_lower.startswith("mysql://"):
-        url = url.replace("mysql://", "mysql+pymysql://", 1)
-    elif url_lower.startswith("postgresql://") and not url_lower.startswith("postgresql+psycopg2://"):
-        url = url.replace("postgresql://", "postgresql+pg8000://", 1)
-    
-    # 创建引擎
-    connect_args = {}
-    if url_lower.startswith("mysql"):
-        connect_args = {"connect_timeout": 10}
-    
-    return create_engine(url, connect_args=connect_args, pool_pre_ping=True)
+    if url_lower.startswith("postgresql://") and not url_lower.startswith("postgresql+psycopg2://"):
+        url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
+    return create_engine(url, connect_args={"connect_timeout": 10}, pool_pre_ping=True)
 
 
 def _drop_all_tables_postgresql(engine):
@@ -218,35 +199,13 @@ def _drop_all_tables_postgresql(engine):
         logger.info(f"已删除 PostgreSQL 数据库中的 {len(tables)} 个表")
 
 
-def _drop_all_tables_mysql(engine):
-    """删除 MySQL 数据库中的所有表"""
-    with engine.connect() as conn:
-        # 禁用外键检查
-        conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
-        
-        # 获取所有表
-        result = conn.execute(text("""
-            SELECT table_name FROM information_schema.tables 
-            WHERE table_schema = DATABASE()
-        """))
-        tables = [row[0] for row in result.fetchall()]
-        
-        # 删除每个表
-        for table in tables:
-            conn.execute(text(f"DROP TABLE IF EXISTS `{table}`"))
-        
-        # 启用外键检查
-        conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
-        conn.commit()
-        logger.info(f"已删除 MySQL 数据库中的 {len(tables)} 个表")
-
-
 # ============== API 端点 ==============
 
 
 @router.get("/status", response_model=DebugStatusResponse)
 async def debug_status(
-    _: User = Depends(require_local_or_admin)
+    _: User = Depends(require_admin),
+    __: None = Depends(require_debug_mode)
 ):
     """
     获取调试状态信息
@@ -305,20 +264,21 @@ async def debug_status(
 async def init_database(
     force: bool = False,
     create_test_data: bool = True,
-    current_user: User = Depends(require_local_or_admin)
+    _: None = Depends(require_debug_mode),
+    current_user: User = Depends(require_admin)
 ):
     """
     重置数据库
-    
+
     删除所有表并重新创建，可选创建测试数据
-    
+
     Args:
         force: 是否强制重置（跳过确认提示，始终为 true）
         create_test_data: 是否创建测试数据
-        
+
     Returns:
         InitDbResponse: 操作结果
-        
+
     Raises:
         HTTPException: 非调试模式或权限不足时
     """
@@ -355,15 +315,13 @@ async def init_database(
                 os.remove(db_path)
                 logger.info(f"已删除 SQLite 数据库文件: {db_path}")
         
-        # 对于 PostgreSQL 和 MySQL，删除所有表
+        # 对于 PostgreSQL，删除所有表
         else:
             # 创建临时引擎用于删除表
             temp_engine = _get_sync_engine_with_url(db_url)
             try:
                 if db_type == "postgresql":
                     _drop_all_tables_postgresql(temp_engine)
-                elif db_type == "mysql":
-                    _drop_all_tables_mysql(temp_engine)
             finally:
                 temp_engine.dispose()
         
@@ -407,13 +365,14 @@ async def init_database(
 async def init_config(
     force: bool = False,
     backup: bool = True,
-    current_user: User = Depends(require_local_or_admin)
+    _: None = Depends(require_debug_mode),
+    current_user: User = Depends(require_admin)
 ):
     """
     重置配置文件
-    
-    删除当前配置文件并重新生成默认配置
-    
+
+    删除当前配置文件并从 config.example.toml 恢复
+
     Args:
         force: 是否强制重置（跳过确认提示，始终为 true）
         backup: 是否备份原配置文件

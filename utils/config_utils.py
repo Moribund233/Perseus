@@ -6,72 +6,34 @@
 import os
 import re
 import secrets
-import sys
 from typing import Any, Dict, List, Optional
 
 import toml
 
-from core.config import Config
 from utils.logging import get_named_logger
 
 logger = get_named_logger("config")
 
 
-def generate_default_config() -> Dict[str, Any]:
+def load_example_config() -> Dict[str, Any]:
     """
-    生成默认配置，包含系统信息获取
-    注意：敏感配置（JWT Secret Key、Debug 模式）通过环境变量注入，不写入配置文件
+    加载 config.example.toml 作为默认配置模板
 
     Returns:
-        Dict[str, Any]: 默认配置字典
+        Dict[str, Any]: 配置字典，文件不存在返回空字典
+
+    Raises:
+        FileNotFoundError: config.example.toml 不存在时抛出
     """
-    system_info = {
-        "platform": sys.platform,
-        "python_version": sys.version,
-        "python_version_info": {
-            "major": sys.version_info.major,
-            "minor": sys.version_info.minor,
-            "micro": sys.version_info.micro,
-            "releaselevel": sys.version_info.releaselevel,
-            "serial": sys.version_info.serial,
-        },
-    }
+    example_path = "config.example.toml"
+    if not os.path.exists(example_path):
+        raise FileNotFoundError(
+            f"{example_path} 不存在，请确保项目包含配置文件模板"
+        )
 
-    default_config = Config()
-    config_dict = default_config.model_dump()
-
-    # 默认配置：禁用 reload（避免打包后反复重启）
-    config_dict["server"]["reload"] = False
-
-    # Gunicorn配置：根据CPU核心数设置workers（仅非Windows平台）
-    if sys.platform != "win32":
-        config_dict["gunicorn"]["workers"] = min(4, os.cpu_count() or 2)
-    else:
-        config_dict["gunicorn"]["workers"] = 1
-
-    config_dict["system"] = system_info
-
-    # 移除敏感配置项（这些通过环境变量注入，不写入配置文件）
-    # 1. 移除 security.secret_key（JWT Secret Key）
-    if "security" in config_dict and "secret_key" in config_dict["security"]:
-        del config_dict["security"]["secret_key"]
-        logger.debug("已从默认配置中移除 security.secret_key（通过环境变量注入）")
-
-    # 2. 移除 app.debug（调试模式）
-    if "app" in config_dict and "debug" in config_dict["app"]:
-        del config_dict["app"]["debug"]
-        logger.debug("已从默认配置中移除 app.debug（通过环境变量注入）")
-
-    # 3. 移除 database.url 和 database.is_stress_test（数据库连接配置）
-    if "database" in config_dict:
-        if "url" in config_dict["database"]:
-            del config_dict["database"]["url"]
-            logger.debug("已从默认配置中移除 database.url（通过环境变量 DATABASE_URL 注入）")
-        if "is_stress_test" in config_dict["database"]:
-            del config_dict["database"]["is_stress_test"]
-            logger.debug("已从默认配置中移除 database.is_stress_test（通过环境变量 LANGIT_STRESS_TEST 注入）")
-
-    return config_dict
+    import toml
+    with open(example_path, "r", encoding="utf-8") as f:
+        return toml.load(f)
 
 
 def write_config_file(config_data: Dict[str, Any], config_path: str = "config.toml") -> None:
@@ -371,13 +333,13 @@ class ConfigManager:
 
     def reset_to_defaults(self) -> bool:
         """
-        重置为默认配置
+        重置为默认配置（从 config.example.toml 读取）
 
         Returns:
             bool: 重置成功返回True，否则返回False
         """
         try:
-            default_config = generate_default_config()
+            default_config = load_example_config()
             return self.save_config(default_config)
         except Exception as e:
             logger.error(f"重置配置失败: {e}")

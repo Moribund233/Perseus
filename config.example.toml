@@ -1,0 +1,146 @@
+# =============================================================================
+# LanGit 配置文件模板
+#
+# 使用方式:
+#   cp config.example.toml config.toml
+#   然后根据需要修改 config.toml
+#
+# 敏感配置（密钥、数据库密码等）通过环境变量注入，不写入此文件。
+# 环境变量优先级高于 config.toml。
+# =============================================================================
+
+[server]
+# 监听地址
+host = "0.0.0.0"
+# 监听端口
+port = 8000
+# 开发模式启用热重载（仅 Uvicorn）
+reload = false
+# 日志级别: debug | info | warning | error | critical
+log_level = "info"
+
+[app]
+title = "LanGit API"
+description = "A Git-based collaborative development tool API"
+version = "0.1.0"
+# debug 模式由环境变量 LANGIT_APP_DEBUG 控制，此文件中的设置不生效
+
+[gunicorn]
+# Worker 进程数，建议 2-4 x CPU 核心数
+workers = 4
+# Worker 类
+worker_class = "gunicorn_worker.LanGitUvicornWorker"
+# 每个 worker 的线程数（仅 sync worker 有效）
+threads = 1
+# 最大并发连接数
+worker_connections = 1000
+# 等待连接的最大队列长度
+backlog = 2048
+# Worker 超时时间（秒）
+timeout = 30
+# 优雅关闭超时时间（秒）
+graceful_timeout = 30
+# Keep-alive 连接超时时间（秒）
+keepalive = 2
+# Worker 最大请求数，达到后自动重启（防止内存泄漏）
+max_requests = 10000
+max_requests_jitter = 1000
+# 是否预加载应用
+preload_app = false
+# 是否以守护进程模式运行
+daemon = false
+# 是否启用访问日志
+access_log = true
+# 是否捕获 stdout/stderr
+capture_output = true
+# 是否启用 SO_REUSEPORT（Linux 多核优化）
+enable_reuse_port = true
+
+[cors]
+# 允许的源列表，生产环境应限制为具体域名
+allow_origins = ["*"]
+allow_credentials = true
+allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+allow_headers = ["Content-Type", "Authorization", "X-Requested-With"]
+max_age = 600
+
+[proxy]
+# 是否处于反向代理之后（启用后跳过 CORS 和 HSTS 等中间件）
+proxy = true
+
+[storage]
+# Git 仓库根目录
+repo_root = "./repositories"
+# 单个仓库最大大小（字节，默认 1GB）
+max_repo_size = 1073741824
+# 单个文件最大大小（字节，默认 100MB）
+max_file_size = 104857600
+# 是否启用 Git LFS
+enable_lfs = true
+
+[security]
+# JWT 密钥由环境变量 LANGIT_SECURITY_SECRET_KEY 注入，不写入配置文件
+# 访问令牌过期时间（分钟）
+access_token_expire_minutes = 30
+# 刷新令牌过期时间（天）
+refresh_token_expire_days = 7
+# JWT 加密算法
+algorithm = "HS256"
+
+[logging]
+# 审计日志文件路径
+audit_log_path = "logs/audit.log"
+# 审计日志文件最大大小（字节，默认 10MB）
+audit_log_max_size = 10485760
+# 审计日志备份文件数量
+audit_log_backup_count = 5
+# 是否启用审计日志
+audit_log_enabled = true
+
+[database]
+# 数据库 URL 由环境变量 DATABASE_URL 注入，不写入配置文件
+# 连接池大小
+pool_size = 20
+# 最大溢出连接数
+max_overflow = 40
+# 获取连接超时时间（秒）
+pool_timeout = 10
+# 连接回收时间（秒）
+pool_recycle = 1800
+# 是否打印 SQL 语句（调试用）
+echo = false
+
+# SQLite 专用配置
+sqlite_timeout = 10
+sqlite_check_same_thread = false
+# WAL 模式配置
+enable_wal = true
+wal_synchronous = "NORMAL"
+wal_cache_size = 10000
+wal_temp_store = "MEMORY"
+
+# PostgreSQL 专用配置
+pg_ssl_mode = "prefer"
+pg_connect_timeout = 10
+pg_application_name = "langit"
+
+rate_limit.default_limits = { mode = "minute", value = 200 }
+rate_limit.strict = { mode = "minute", value = 5 }
+rate_limit.standard = { mode = "minute", value = 30 }
+rate_limit.generous = { mode = "hour", value = 2000 }
+rate_limit.git_operations = { mode = "minute", value = 10 }
+rate_limit.download = { mode = "minute", value = 20 }
+
+# =============================================================================
+# 以下配置仅通过环境变量注入，在此文件中设置无效
+#
+# 必需的环境变量:
+#   DATABASE_URL                   数据库连接 URL
+#     SQLite:  sqlite:///./langit.db
+#     PostgreSQL: postgresql://user:pass@host:5432/dbname
+#   LANGIT_SECURITY_SECRET_KEY     JWT 签名密钥（必需）
+#
+# 可选的环境变量:
+#   LANGIT_APP_DEBUG               true/false，调试模式
+#   LANGIT_STRESS_TEST             true/false，压力测试模式
+# =============================================================================

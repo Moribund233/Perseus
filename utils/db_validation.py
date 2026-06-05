@@ -35,7 +35,7 @@ def check_driver_installed(db_type: str, url: str = None) -> Tuple[bool, Optiona
     Check if the database driver is installed
     
     Args:
-        db_type: Database type (sqlite, postgresql, mysql)
+        db_type: Database type (sqlite, postgresql)
         url: Database URL (optional,用于检测具体的驱动类型)
         
     Returns:
@@ -45,26 +45,11 @@ def check_driver_installed(db_type: str, url: str = None) -> Tuple[bool, Optiona
     if db_type == "sqlite":
         return True, None
     
-    # PostgreSQL: 支持 pg8000 或 psycopg2
+    # PostgreSQL: 使用 psycopg2
     if db_type == "postgresql":
-        # 检查 URL 中是否指定了 psycopg2
-        if url and "psycopg2" in url.lower():
-            spec = importlib.util.find_spec("psycopg2")
-            if spec is None:
-                return False, "Driver 'psycopg2' not installed. Please install: pip install psycopg2-binary"
-            return True, None
-        else:
-            # 默认检查 pg8000
-            spec = importlib.util.find_spec("pg8000")
-            if spec is None:
-                return False, "Driver 'pg8000' not installed. Please install: pip install pg8000"
-            return True, None
-    
-    # MySQL: 支持 pymysql
-    if db_type == "mysql":
-        spec = importlib.util.find_spec("pymysql")
+        spec = importlib.util.find_spec("psycopg2")
         if spec is None:
-            return False, "Driver 'pymysql' not installed. Please install: pip install pymysql cryptography"
+            return False, "Driver 'psycopg2' not installed. Please install: pip install psycopg2-binary"
         return True, None
     
     return False, f"Unknown database type: {db_type}"
@@ -90,7 +75,7 @@ def validate_database_url(url: str) -> Tuple[bool, Optional[str]]:
             return False, "Database URL missing scheme (e.g., sqlite://, postgresql://)"
         
         # Check supported schemes
-        supported_schemes = ["sqlite", "postgresql", "postgres", "mysql", "mysql+pymysql", "postgresql+psycopg2"]
+        supported_schemes = ["sqlite", "postgresql", "postgres", "postgresql+psycopg2"]
         scheme = parsed.scheme.lower()
         
         if scheme not in supported_schemes:
@@ -112,21 +97,19 @@ def validate_database_url(url: str) -> Tuple[bool, Optional[str]]:
 def _get_url_with_driver(url: str, db_type: str) -> str:
     """
     将数据库 URL 转换为带驱动的格式
-    
+
     Args:
         url: 原始数据库 URL
         db_type: 数据库类型
-        
+
     Returns:
         str: 带驱动的 URL
     """
     url_lower = url.lower()
-    if db_type == "mysql" and url_lower.startswith("mysql://"):
-        return url.replace("mysql://", "mysql+pymysql://", 1)
-    elif db_type == "postgresql" and url_lower.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+pg8000://", 1)
+    if db_type == "postgresql" and url_lower.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
     elif db_type == "postgresql" and url_lower.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+pg8000://", 1)
+        return url.replace("postgres://", "postgresql+psycopg2://", 1)
     return url
 
 
@@ -138,7 +121,7 @@ def test_database_connection(url: str, db_type: str, timeout: int = 10, auto_cre
         url: Database connection URL
         db_type: Database type
         timeout: Connection timeout in seconds
-        auto_create_db: 如果数据库不存在，是否自动创建（仅对 MySQL/PostgreSQL 有效）
+        auto_create_db: 如果数据库不存在，是否自动创建（仅对 PostgreSQL 有效）
 
     Returns:
         Tuple[bool, Optional[str]]: (is_connected, error_message)
@@ -148,13 +131,10 @@ def test_database_connection(url: str, db_type: str, timeout: int = 10, auto_cre
         test_url = _get_url_with_driver(url, db_type)
 
         # Create engine with short timeout for testing
-        # 注意：pg8000 (PostgreSQL) 不支持 connect_timeout 参数
         if db_type == "sqlite":
             engine = create_engine(test_url, connect_args={"timeout": timeout})
         elif db_type == "postgresql":
-            engine = create_engine(test_url, pool_pre_ping=True)  # pg8000 不支持 connect_timeout
-        elif db_type == "mysql":
-            engine = create_engine(test_url, connect_args={"connect_timeout": timeout * 1000})  # MySQL uses milliseconds
+            engine = create_engine(test_url, connect_args={"connect_timeout": timeout}, pool_pre_ping=True)
         else:
             engine = create_engine(test_url)
 
@@ -169,11 +149,10 @@ def test_database_connection(url: str, db_type: str, timeout: int = 10, auto_cre
         error_msg = str(e)
 
         # 检查是否是数据库不存在的错误，并尝试自动创建
-        if auto_create_db and db_type in ("mysql", "postgresql"):
+        if auto_create_db and db_type == "postgresql":
             db_not_exist_keywords = [
                 "unknown database",
                 "database.*does not exist",
-                "1049",  # MySQL error code for unknown database
             ]
             if any(re.search(keyword, error_msg, re.IGNORECASE) for keyword in db_not_exist_keywords):
                 logger.info(f"数据库不存在，尝试自动创建: {url}")
@@ -184,14 +163,7 @@ def test_database_connection(url: str, db_type: str, timeout: int = 10, auto_cre
                 if created:
                     # 重新尝试连接
                     try:
-                        if db_type == "sqlite":
-                            engine = create_engine(test_url, connect_args={"timeout": timeout})
-                        elif db_type == "postgresql":
-                            engine = create_engine(test_url, pool_pre_ping=True)
-                        elif db_type == "mysql":
-                            engine = create_engine(test_url, connect_args={"connect_timeout": timeout * 1000})
-                        else:
-                            engine = create_engine(test_url)
+                        engine = create_engine(test_url, connect_args={"connect_timeout": timeout}, pool_pre_ping=True)
                         with engine.connect() as conn:
                             conn.execute(text("SELECT 1"))
                         engine.dispose()
@@ -258,10 +230,9 @@ def check_sqlite_stress_test_warning(is_sqlite: bool, is_stress_test: bool) -> O
 WARNING: SQLite is not recommended for stress testing
 ================================================================================
 SQLite has limited concurrency capabilities and may not provide accurate
-stress test results. Consider using PostgreSQL or MySQL for stress testing:
+stress test results. Consider using PostgreSQL for stress testing:
 
   DATABASE_URL=postgresql://user:pass@localhost/dbname
-  DATABASE_URL=mysql+pymysql://user:pass@localhost/dbname
 
 If you still want to use SQLite for stress testing, you can ignore this warning.
 ================================================================================

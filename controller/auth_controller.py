@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.async_db import get_async_db
 from services.user_service import login_user as service_login_user
-from utils.rate_limiter import limiter, RateLimitConfig
 
 # 创建路由实例
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -22,7 +21,6 @@ class LoginRequest(BaseModel):
 
 
 @router.post("/login")
-@limiter.limit(RateLimitConfig.STRICT)
 async def login(
     request: Request,
     credentials: LoginRequest,

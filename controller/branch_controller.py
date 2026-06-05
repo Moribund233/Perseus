@@ -20,7 +20,6 @@ from services.branch_service import (
     get_default_branch as service_get_default_branch,
     check_branch_protection as service_check_branch_protection
 )
-from utils.rate_limiter import limiter, RateLimitConfig
 
 # 创建路由实例
 router = APIRouter(prefix="/api/v1/repositories", tags=["branches"])
@@ -84,7 +83,6 @@ async def get_branch(repo_id: int, branch_name: str, db: AsyncSession = Depends(
 
 
 @router.post("/{repo_id}/branches")
-@limiter.limit(RateLimitConfig.STANDARD)
 async def create_branch(
     request: Request,
     repo_id: int,
@@ -113,7 +111,6 @@ async def create_branch(
 
 
 @router.put("/{repo_id}/branches/{branch_name}")
-@limiter.limit(RateLimitConfig.STANDARD)
 async def update_branch(
     request: Request,
     repo_id: int,
@@ -143,7 +140,6 @@ async def update_branch(
 
 
 @router.delete("/{repo_id}/branches/{branch_name}")
-@limiter.limit(RateLimitConfig.STANDARD)
 async def delete_branch(
     request: Request,
     repo_id: int,
@@ -172,7 +168,6 @@ async def delete_branch(
 
 
 @router.put("/{repo_id}/branches/{branch_name}/default")
-@limiter.limit(RateLimitConfig.STANDARD)
 async def set_default_branch(
     request: Request,
     repo_id: int,
@@ -200,7 +195,6 @@ async def set_default_branch(
 
 
 @router.put("/{repo_id}/branches/{branch_name}/protect")
-@limiter.limit(RateLimitConfig.STANDARD)
 async def protect_branch(
     request: Request,
     repo_id: int,
@@ -232,7 +226,6 @@ async def protect_branch(
 
 
 @router.put("/{repo_id}/branches/{branch_name}/unprotect")
-@limiter.limit(RateLimitConfig.STANDARD)
 async def unprotect_branch(
     request: Request,
     repo_id: int,

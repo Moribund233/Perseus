@@ -13,7 +13,6 @@ class DbType(str, Enum):
     """数据库类型枚举"""
     SQLITE = "sqlite"
     POSTGRESQL = "postgresql"
-    MYSQL = "mysql"
 
     @classmethod
     def detect(cls, url: str) -> "DbType":
@@ -23,8 +22,6 @@ class DbType(str, Enum):
             return cls.SQLITE
         elif scheme.startswith("postgresql") or scheme.startswith("postgres"):
             return cls.POSTGRESQL
-        elif scheme.startswith("mysql"):
-            return cls.MYSQL
         return cls.SQLITE
 
 
@@ -53,25 +50,17 @@ class Dialect:
             "FLOAT": "REAL", "DOUBLE": "DOUBLE PRECISION", "DECIMAL": "DECIMAL",
             "BLOB": "BYTEA", "JSON": "JSONB", "JSONB": "JSONB",
         },
-        DbType.MYSQL: {
-            "INTEGER": "INT", "BIGINT": "BIGINT", "SMALLINT": "SMALLINT",
-            "VARCHAR": "VARCHAR(255)", "TEXT": "TEXT", "BOOLEAN": "TINYINT(1)",
-            "DATE": "DATE", "TIME": "TIME", "TIMESTAMP": "TIMESTAMP", "DATETIME": "DATETIME",
-            "FLOAT": "FLOAT", "DOUBLE": "DOUBLE", "DECIMAL": "DECIMAL(10,2)",
-            "BLOB": "BLOB", "JSON": "JSON", "JSONB": "JSON",
-        },
     }
-    
+
     def __init__(self, db_type: DbType):
         self.db_type = db_type
-        self._is_mysql = db_type == DbType.MYSQL
         self._is_pg = db_type == DbType.POSTGRESQL
         self._is_sqlite = db_type == DbType.SQLITE
-    
+
     @property
     def quote(self) -> str:
         """标识符引号"""
-        return "`" if self._is_mysql else '"'
+        return '"'
     
     def quote_ident(self, name: str) -> str:
         """引用标识符"""
@@ -117,8 +106,6 @@ class Dialect:
         
         if self._is_pg:
             return f"INSERT INTO {table_q} ({cols}) VALUES ({placeholders}) ON CONFLICT DO NOTHING"
-        if self._is_mysql:
-            return f"INSERT IGNORE INTO {table_q} ({cols}) VALUES ({placeholders})"
         return f"INSERT OR IGNORE INTO {table_q} ({cols}) VALUES ({placeholders})"
     
     def create_table(
@@ -170,10 +157,8 @@ class Dialect:
         parts = [self.quote_ident(name), col_type]
         
         if autoincrement and not self._is_sqlite:
-            if self._is_mysql:
-                parts.append("AUTO_INCREMENT")
-            elif self._is_pg:
-                pass
+            # PostgreSQL 使用 SERIAL/BIGSERIAL 处理自增，无需额外语法
+            pass
         elif not nullable:
             parts.append("NOT NULL")
         
@@ -246,25 +231,19 @@ class Dialect:
     def to_sync_url(self, url: str) -> str:
         """转换为同步驱动 URL"""
         lower = url.lower()
-        if lower.startswith("mysql://"):
-            return url.replace("mysql://", "mysql+pymysql://", 1)
         if lower.startswith("postgresql://"):
-            return url.replace("postgresql://", "postgresql+pg8000://", 1)
+            return url.replace("postgresql://", "postgresql+psycopg2://", 1)
         if lower.startswith("postgres://"):
-            return url.replace("postgres://", "postgresql+pg8000://", 1)
+            return url.replace("postgres://", "postgresql+psycopg2://", 1)
         return url
-    
+
     def to_async_url(self, url: str) -> str:
         """转换为异步驱动 URL"""
         lower = url.lower()
         if lower.startswith("sqlite"):
             return url.replace("sqlite://", "sqlite+aiosqlite://", 1)
-        if lower.startswith(("postgresql+psycopg2://", "postgresql+pg8000://", "postgresql://", "postgres://")):
-            for prefix in ["postgresql+psycopg2://", "postgresql+pg8000://", "postgresql://", "postgres://"]:
+        if lower.startswith(("postgresql+psycopg2://", "postgresql://", "postgres://")):
+            for prefix in ["postgresql+psycopg2://", "postgresql://", "postgres://"]:
                 if lower.startswith(prefix):
                     return url.replace(prefix, "postgresql+asyncpg://", 1)
-        if lower.startswith("mysql+pymysql://"):
-            return url.replace("mysql+pymysql://", "mysql+aiomysql://", 1)
-        if lower.startswith("mysql://"):
-            return url.replace("mysql://", "mysql+aiomysql://", 1)
         return url

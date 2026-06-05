@@ -8,7 +8,7 @@
 """
 from typing import Any, Dict, List, Optional, Tuple
 
-from utils.config_utils import ConfigManager, generate_default_config, get_config_manager
+from utils.config_utils import ConfigManager, get_config_manager
 from core.exception import ValidationException, AuthorizationException
 
 
@@ -39,8 +39,6 @@ class ConfigService:
             "stress_pool_size", "stress_max_overflow", "stress_pool_timeout", "stress_pool_recycle",
             "stress_sqlite_timeout", "stress_echo",
             "pg_ssl_mode", "pg_connect_timeout", "pg_application_name",
-            "mysql_charset", "mysql_pool_recycle", "mysql_connect_timeout",
-            "mysql_read_timeout", "mysql_write_timeout",
         },
     }
 
@@ -147,10 +145,15 @@ class ConfigService:
         """
         self._check_permission(is_debug, is_admin)
 
-        config_manager = self._get_config_manager()
-        default_config = generate_default_config()
+        import toml
+        try:
+            with open("config.example.toml", "r", encoding="utf-8") as f:
+                example_config = toml.load(f)
+        except FileNotFoundError:
+            return False, ["config.example.toml 不存在，无法重置"]
 
-        success = config_manager.save_config(default_config)
+        config_manager = self._get_config_manager()
+        success = config_manager.save_config(example_config)
         if not success:
             return False, ["重置配置失败"]
 
@@ -567,20 +570,6 @@ class ConfigService:
                     errors.append("database.pg_connect_timeout 必须是正整数")
             except (ValueError, TypeError):
                 errors.append("database.pg_connect_timeout 必须是正整数")
-
-        if "mysql_charset" in database:
-            if not isinstance(database["mysql_charset"], str) or not database["mysql_charset"]:
-                errors.append("database.mysql_charset 必须是非空字符串")
-
-        mysql_timeout_fields = ["mysql_connect_timeout", "mysql_read_timeout", "mysql_write_timeout"]
-        for field in mysql_timeout_fields:
-            if field in database:
-                try:
-                    value = int(database[field])
-                    if value < 1:
-                        errors.append(f"database.{field} 必须是正整数")
-                except (ValueError, TypeError):
-                    errors.append(f"database.{field} 必须是正整数")
 
         return errors
 

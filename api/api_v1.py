@@ -58,7 +58,7 @@ api_v1_router.include_router(error_router)
 from api.websocket import router as websocket_router
 api_v1_router.include_router(websocket_router)
 
-# 注意：Git HTTP 协议路由在 app.py 中直接注册到根路径
-# 遵循 Gitee/GitHub 标准 URL 格式: /{username}/{repo_name}.git/...
+# 注意：Git HTTP Smart Protocol 由 Nginx + git-http-backend 处理
+# 参见 docker/nginx/nginx.conf 配置
 
 __all__ = ["api_v1_router"]

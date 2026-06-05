@@ -22,7 +22,6 @@ from services.commit_service import (
     get_commits_by_author as service_get_commits_by_author
 )
 from services.branch_service import get_branch as service_get_branch
-from utils.rate_limiter import limiter, RateLimitConfig
 
 # 创建路由实例
 router = APIRouter(prefix="/api/v1/repositories", tags=["commits"])
@@ -183,7 +182,6 @@ async def get_commit_by_hash(repo_id: int, commit_hash: str, db: AsyncSession = 
 
 
 @router.post("/{repo_id}/commits")
-@limiter.limit(RateLimitConfig.STANDARD)
 async def create_commit(
     request: Request,
     repo_id: int,

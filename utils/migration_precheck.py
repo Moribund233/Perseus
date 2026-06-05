@@ -75,20 +75,12 @@ class DatabasePrechecker:
     """
     
     INCOMPATIBLE_TYPES = {
-        (DbType.MYSQL, DbType.POSTGRESQL): [
-            {"from": "TINYINT(1)", "to": "BOOLEAN", "note": "MySQL TINYINT(1) 转换为 PostgreSQL BOOLEAN"},
-            {"from": "MEDIUMTEXT", "to": "TEXT", "note": "MySQL MEDIUMTEXT 映射为 PostgreSQL TEXT"},
-            {"from": "LONGTEXT", "to": "TEXT", "note": "MySQL LONGTEXT 映射为 PostgreSQL TEXT"},
-        ],
-        (DbType.POSTGRESQL, DbType.MYSQL): [
-            {"from": "JSONB", "to": "JSON", "note": "PostgreSQL JSONB 转换为 MySQL JSON"},
+        (DbType.POSTGRESQL, DbType.SQLITE): [
+            {"from": "JSONB", "to": "TEXT", "note": "PostgreSQL JSONB 转换为 SQLite TEXT"},
             {"from": "ARRAY", "to": "TEXT", "note": "PostgreSQL ARRAY 类型需要自定义处理"},
-            {"from": "UUID", "to": "VARCHAR(36)", "note": "PostgreSQL UUID 转换为 MySQL VARCHAR"},
         ],
-        (DbType.SQLITE, DbType.MYSQL): [
-            {"from": "INTEGER", "to": "INTEGER/BIGINT", "note": "SQLite INTEGER 可能溢出"},
-            {"from": "DATETIME", "to": "TEXT", "note": "SQLite 无原生 DATETIME 类型"},
-            {"from": "BOOLEAN", "to": "INTEGER", "note": "SQLite 无原生 BOOLEAN 类型"},
+        (DbType.SQLITE, DbType.POSTGRESQL): [
+            {"from": "INTEGER", "to": "INTEGER", "note": "SQLite INTEGER 映射为 PostgreSQL INTEGER"},
         ],
     }
     

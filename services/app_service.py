@@ -31,16 +31,8 @@ def _set_shutdown_flag():
 
 
 def _terminate_process():
-    """终止当前进程（跨平台兼容）"""
-    pid = os.getpid()
-
-    if os.name == 'nt':
-        try:
-            os.kill(pid, signal.SIGTERM)
-        except Exception:
-            sys.exit(0)
-    else:
-        os.kill(pid, signal.SIGTERM)
+    """终止当前进程"""
+    os.kill(os.getpid(), signal.SIGTERM)
 
 
 def _get_restart_command() -> List[str]:
@@ -165,20 +157,12 @@ class AppService:
             cmd = _get_restart_command()
 
             try:
-                if os.name == 'nt':
-                    subprocess.Popen(
-                        cmd,
-                        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL
-                    )
-                else:
-                    subprocess.Popen(
-                        cmd,
-                        start_new_session=True,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL
-                    )
+                subprocess.Popen(
+                    cmd,
+                    start_new_session=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
 
                 time.sleep(1)
 

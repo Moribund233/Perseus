@@ -14,7 +14,6 @@ from utils.permission_utils import (
     require_repository_permission,
     require_repository_owner_or_admin
 )
-from utils.rate_limiter import limiter, RateLimitConfig
 from core.exception import AuthorizationException
 
 from services.repository_service import (
@@ -111,7 +110,6 @@ async def get_repository(
 
 
 @router.post("", summary="创建新仓库")
-@limiter.limit(RateLimitConfig.STANDARD)
 async def create_repository(
     request: Request,
     repo: dict,
@@ -155,7 +153,6 @@ async def create_repository(
 
 
 @router.put("/{repo_id}")
-@limiter.limit(RateLimitConfig.STANDARD)
 async def update_repository(
     request: Request,
     repo_id: int,
@@ -188,7 +185,6 @@ async def update_repository(
 
 
 @router.delete("/{repo_id}")
-@limiter.limit(RateLimitConfig.STANDARD)
 async def delete_repository(
     request: Request,
     repo_id: int,

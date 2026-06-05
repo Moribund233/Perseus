@@ -20,7 +20,7 @@ from core.config import get_config
 from services.app_service import get_app_service
 from services.config_service import get_config_service
 from api.dependencies import get_current_user
-from api.local_auth import get_local_auth_user, LocalUser
+from models.user import User
 from core.exception import AuthorizationException
 
 # 创建路由实例
@@ -107,16 +107,13 @@ class ActionResponse(BaseModel):
 
 
 def check_app_permission(
-    current_user: Optional[Any] = Depends(get_current_user),
-    local_user: Optional[LocalUser] = Depends(get_local_auth_user)
+    current_user: User = Depends(get_current_user),
 ) -> tuple[bool, bool]:
     """
-    检查应用管理权限
-    支持本地认证（Tauri Client）或 JWT 认证（管理员）
+    检查应用管理权限（仅 JWT 管理员可访问）
 
     Args:
-        current_user: 当前用户信息（JWT 认证）- User对象或字典
-        local_user: 本地用户对象（本地认证）
+        current_user: 当前认证用户
 
     Returns:
         tuple[bool, bool]: (是否调试模式, 是否管理员)
@@ -124,31 +121,13 @@ def check_app_permission(
     Raises:
         AuthorizationException: 权限不足
     """
-    from models.user import User
-    
     config = get_config()
     is_debug = config.app.debug
+    is_admin = current_user.is_admin
 
-    # 检查是否是本地认证（Client 具有最高权限）
-    if local_user:
-        return is_debug, True
-
-    # 检查是否是管理员（JWT 认证）
-    is_admin = False
-    if current_user:
-        # 处理 User 对象或字典类型
-        if isinstance(current_user, User):
-            is_admin = current_user.is_admin
-        elif isinstance(current_user, dict):
-            is_admin = current_user.get("is_admin", False)
-        else:
-            # 尝试从对象属性获取
-            is_admin = getattr(current_user, "is_admin", False)
-
-    # 调试模式或本地认证/管理员可以访问
     if not is_debug and not is_admin:
         raise AuthorizationException(
-            detail="该操作需要本地认证或调试模式"
+            detail="该操作需要管理员权限或调试模式"
         )
 
     return is_debug, is_admin

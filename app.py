@@ -62,7 +62,7 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     if config.database.is_sqlite:
         timeout_seconds = 30.0  # SQLite 可能需要更长时间
     else:
-        timeout_seconds = 30.0  # PostgreSQL/MySQL 正常超时
+        timeout_seconds = 30.0  # 正常超时
     app.add_middleware(TimeoutMiddleware, timeout_seconds=timeout_seconds)
 
     from middleware.security_headers import SecurityHeadersMiddleware
@@ -83,10 +83,6 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     # 添加请求统计中间件
     from middleware.request_stats import RequestStatsMiddleware
     app.add_middleware(RequestStatsMiddleware, exclude_paths=["/health", "/docs", "/openapi.json"])
-
-    # 设置速率限制
-    from utils.rate_limiter import setup_rate_limiter
-    setup_rate_limiter(app)
 
     # 根据是否启用反向代理来决定是否启用CORS中间件
     if not config.proxy.proxy:
@@ -124,11 +120,8 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     from api.api_v1 import api_v1_router
     app.include_router(api_v1_router)
 
-    # 注册 Git HTTP 协议路由（根路径，遵循 Gitee/GitHub 标准）
-    # 必须在 API v1 路由之后注册，避免路由冲突
-    # URL 格式: /{username}/{repo_name}.git/...
-    from controller.git_http_controller import router as git_http_router
-    app.include_router(git_http_router)
+    # 注意：Git HTTP Smart Protocol 由 Nginx + git-http-backend 处理
+    # 参见 docker/nginx/nginx.conf 配置
 
     # 设置全局异常处理器（必须在路由注册之后设置，确保能捕获所有异常）
     from utils.exception_handler import setup_exception_handlers
@@ -194,28 +187,21 @@ def get_app(config_path: str = "config.toml") -> FastAPI:
 def start_server():
     """
     启动 Web 服务器
-    
+
     根据 config.app.debug 自动选择服务器：
-    - debug=True: Uvicorn（开发环境，支持热重载）
-    - debug=False: Gunicorn+Uvicorn（生产环境，Linux）
-    
-    回退机制：Windows/Gunicorn未安装/启动失败时自动使用Uvicorn
+    - debug=True: Uvicorn（开发，支持热重载）
+    - debug=False: 优先 Gunicorn，回退 Uvicorn（生产）
     """
     import uvicorn
-    from utils.port_utils import get_pid_manager
     from utils.logging import get_logger
     from core.config import get_config
-    
+
     # 创建应用实例（在 init_app() 成功之后）
     app = get_app()
-    
+
     config = get_config()
     logger = get_logger("app")
     debug = config.app.debug
-    
-    # 记录主进程PID（覆盖写模式，新启动自动覆盖旧内容）
-    pid_manager = get_pid_manager()
-    pid_file = pid_manager.write_pid()
 
     env_name = "开发环境" if debug else "生产环境"
     logger.info(f"服务启动: http://{config.server.host}:{config.server.port} ({env_name})")
@@ -231,84 +217,61 @@ def start_server():
             reload_excludes=["frontend/**"]
         )
     else:
-        is_windows = config.system and config.system.platform == "win32"
-        
-        if not is_windows:
-            try:
-                import gunicorn.app.base
-                from gunicorn.config import Config
-                
-                class LanGitGunicornApp(gunicorn.app.base.BaseApplication):
-                    """
-                    LanGit自定义Gunicorn应用
-                    
-                    集成生命周期管理和IPC通信
-                    """
-                    def __init__(self, app, options=None):
-                        self.options = options or {}
-                        self.application = app
-                        super().__init__()
-                    
-                    def init(self, parser, opts, args):
-                        """初始化配置"""
-                        pass
-                    
-                    def load_config(self):
-                        """加载配置"""
-                        # 应用自定义选项
-                        for key, value in self.options.items():
-                            if key in self.cfg.settings and value is not None:
-                                self.cfg.set(key.lower(), value)
-                    
-                    def load(self):
-                        """加载应用"""
-                        return self.application
-                    
-                    def run(self):
-                        """运行服务器"""
-                        try:
-                            # 初始化Master进程的生命周期管理器
-                            from core.lifespan import get_lifecycle_manager
-                            manager = get_lifecycle_manager()
-                            manager.setup_for_master(os.getpid())
-                        except Exception as e:
-                            logger.warning(f"初始化Master生命周期管理器失败: {e}")
-                        
-                        # 调用父类run方法
-                        super().run()
-                
-                # 使用自定义Worker类和配置（从gunicorn配置读取）
-                gunicorn_cfg = config.gunicorn
-                options = {
-                    "bind": f"{config.server.host}:{config.server.port}",
-                    "workers": gunicorn_cfg.workers,
-                    "worker_class": gunicorn_cfg.worker_class,
-                    "threads": gunicorn_cfg.threads,
-                    "worker_connections": gunicorn_cfg.worker_connections,
-                    "backlog": gunicorn_cfg.backlog,
-                    "timeout": gunicorn_cfg.timeout,
-                    "graceful_timeout": gunicorn_cfg.graceful_timeout,
-                    "keepalive": gunicorn_cfg.keepalive,
-                    "max_requests": gunicorn_cfg.max_requests,
-                    "max_requests_jitter": gunicorn_cfg.max_requests_jitter,
-                    "preload_app": gunicorn_cfg.preload_app,
-                    "daemon": gunicorn_cfg.daemon,
-                    "loglevel": config.server.log_level,
-                    "accesslog": "-" if gunicorn_cfg.access_log else None,
-                    "errorlog": "-",
-                    "capture_output": gunicorn_cfg.capture_output,
-                    "pidfile": str(Path(__file__).parent / "langit.pid"),
-                    "proc_name": "langit",
-                }
-                
-                LanGitGunicornApp(app, options).run()
-                return
-            except ImportError:
-                logger.info("Gunicorn未安装，使用Uvicorn作为替代")
-            except Exception as e:
-                logger.warning(f"Gunicorn启动失败: {e}，回退到Uvicorn")
+        # 生产模式优先尝试 Gunicorn
+        try:
+            import gunicorn.app.base
+            from gunicorn.config import Config
 
-        # 使用Uvicorn作为回退方案（开发模式，默认1个worker）
+            class LanGitGunicornApp(gunicorn.app.base.BaseApplication):
+                """
+                LanGit 自定义 Gunicorn 应用
+                """
+                def __init__(self, app, options=None):
+                    self.options = options or {}
+                    self.application = app
+                    super().__init__()
+
+                def init(self, parser, opts, args):
+                    pass
+
+                def load_config(self):
+                    for key, value in self.options.items():
+                        if key in self.cfg.settings and value is not None:
+                            self.cfg.set(key.lower(), value)
+
+                def load(self):
+                    return self.application
+
+            gunicorn_cfg = config.gunicorn
+            options = {
+                "bind": f"{config.server.host}:{config.server.port}",
+                "workers": gunicorn_cfg.workers,
+                "worker_class": gunicorn_cfg.worker_class,
+                "threads": gunicorn_cfg.threads,
+                "worker_connections": gunicorn_cfg.worker_connections,
+                "backlog": gunicorn_cfg.backlog,
+                "timeout": gunicorn_cfg.timeout,
+                "graceful_timeout": gunicorn_cfg.graceful_timeout,
+                "keepalive": gunicorn_cfg.keepalive,
+                "max_requests": gunicorn_cfg.max_requests,
+                "max_requests_jitter": gunicorn_cfg.max_requests_jitter,
+                "preload_app": gunicorn_cfg.preload_app,
+                "daemon": gunicorn_cfg.daemon,
+                "loglevel": config.server.log_level,
+                "accesslog": "-" if gunicorn_cfg.access_log else None,
+                "errorlog": "-",
+                "capture_output": gunicorn_cfg.capture_output,
+                "proc_name": "langit",
+            }
+
+            LanGitGunicornApp(app, options).run()
+            return
+        except ImportError:
+            logger.info("Gunicorn 未安装，使用 Uvicorn 作为替代")
+        except Exception as e:
+            logger.warning(f"Gunicorn 启动失败: {e}，回退到 Uvicorn")
+
+        # 回退到 Uvicorn
         uvicorn.run(
             app,
             host=config.server.host,

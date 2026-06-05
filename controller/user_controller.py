@@ -18,7 +18,6 @@ from services.user_service import (
     update_user as service_update_user,
     delete_user as service_delete_user
 )
-from utils.rate_limiter import limiter, RateLimitConfig
 
 # 创建路由实例
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
@@ -122,7 +121,6 @@ async def create_user(
 
 
 @router.put("/{user_id}")
-@limiter.limit(RateLimitConfig.STANDARD)
 async def update_user(
     request: Request,
     user_id: int,
@@ -155,7 +153,6 @@ async def update_user(
 
 
 @router.delete("/{user_id}")
-@limiter.limit(RateLimitConfig.STANDARD)
 async def delete_user(
     request: Request,
     user_id: int,

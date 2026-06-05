@@ -47,14 +47,10 @@ async def extract_token_from_query(websocket: WebSocket) -> Optional[str]:
 
 async def verify_token(token: str) -> Optional[Dict[str, Any]]:
     """
-    验证token并返回用户信息
-
-    支持两种认证方式：
-    1. JWT Token - 使用JWT Token服务进行验证
-    2. 本地Token - 用于Tauri客户端本地访问
+    验证 JWT token 并返回用户信息
 
     Args:
-        token: JWT token 或本地 token
+        token: JWT token
 
     Returns:
         Optional[Dict]: 用户信息字典，验证失败返回None
@@ -65,22 +61,8 @@ async def verify_token(token: str) -> Optional[Dict[str, Any]]:
             "username": str,
             "is_active": bool,
             "is_admin": bool,
-            "is_local": bool  # 标记是否为本地用户
         }
     """
-    # 首先尝试验证本地Token（用于Tauri客户端）
-    from api.local_auth import verify_local_token
-    if verify_local_token(token):
-        logger.info("WebSocket local token verification successful")
-        return {
-            "user_id": 0,
-            "username": "local_admin",
-            "is_active": True,
-            "is_admin": True,
-            "is_local": True
-        }
-
-    # 使用真实的JWT验证服务
     token_data = jwt_verify_token(token, token_type="access")
 
     if not token_data:
@@ -102,7 +84,6 @@ async def verify_token(token: str) -> Optional[Dict[str, Any]]:
                 "username": user.username,
                 "is_active": user.is_active,
                 "is_admin": user.is_admin,
-                "is_local": False
             }
     except Exception as e:
         logger.error(f"WebSocket token verification error: {e}")

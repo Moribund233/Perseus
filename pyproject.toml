@@ -37,26 +37,20 @@ httpx = "^0.27.2"
 sqlalchemy = "^2.0.34"
 passlib = { extras = ["bcrypt"], version = "^1.7.4" }
 bcrypt = "4.0.0"
-slowapi = "^0.1.9"
 python-jose = { extras = ["cryptography"], version = "^3.3.0" }
 psutil = "^7.0.0"
 
-# Database drivers (all required for full database support)
-# PostgreSQL drivers
-pg8000 = "^1.31.0"  # Pure Python driver, recommended for Windows (no encoding issues)
-asyncpg = "^0.30.0"  # Async PostgreSQL driver
-psycopg2 = { version = "^2.9.0", markers = "sys_platform != 'win32'" }  # Uncomment for Linux/Mac only
+# Database drivers
+# PostgreSQL
+psycopg2 = "^2.9.0"        # Sync driver
+asyncpg = "^0.30.0"        # Async driver
 
-# MySQL drivers
-pymysql = "^1.1.0"  # MySQL driver
-aiomysql = "^0.2.0"  # Async MySQL driver
-
-# SQLite drivers
-aiosqlite = "^0.20.0"  # Async SQLite driver
+# SQLite
+aiosqlite = "^0.20.0"      # Async driver
 
 # Required dependencies
-greenlet = "^3.1.0"  # Required for SQLAlchemy async operations
-cryptography = "^42.0.0"  # Required for MySQL SSL
+greenlet = "^3.1.0"        # Required for SQLAlchemy async operations
+cryptography = "^42.0.0"   # Required for JWT and SSL
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"

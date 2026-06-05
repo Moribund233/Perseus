@@ -5,21 +5,20 @@
 
 初始化层级（按优先级排序）：
 1. 核心层 (core): 最基础的环境变量，不依赖任何其他配置
-   - LANGIT_SECURITY_SECRET_KEY: JWT安全密钥
+   - LANGIT_SECURITY_SECRET_KEY: JWT安全密钥（可选，未设置时使用开发默认密钥）
    - LANGIT_APP_DEBUG: 调试模式标志
 
 2. 数据库层 (database): 数据库相关配置
-   - DATABASE_URL: 数据库连接URL
-   - LANGIT_STRESS_TEST: 压力测试模式标志
+   - DATABASE_URL: 数据库连接URL（必需）
+   - LANGIT_STRESS_TEST: 压力测试模式标志（可选）
 
 3. 应用层 (app): FastAPI应用配置（预留）
 
 4. 服务层 (service): 各种服务初始化（预留）
 
 安全要求：
-- 所有敏感配置必须通过环境变量设置
-- 不再自动生成或写入敏感配置到 config.toml
-- 环境变量检查为最高优先级，缺失时立即失败
+- 生产环境必须通过环境变量 LANGIT_SECURITY_SECRET_KEY 设置 JWT 密钥
+- 开发环境无需设置，自动使用 fallback 密钥
 
 使用示例:
     from core.init import init_app
@@ -88,7 +87,8 @@ CORE_ENV_VARS = [
     EnvVarConfig(
         name="LANGIT_APP_DEBUG",
         description="调试模式标志，'true'启用调试，'false'为生产模式",
-        example="true"
+        example="true",
+        required=False,
     ),
 ]
 
@@ -102,7 +102,8 @@ DATABASE_ENV_VARS = [
     EnvVarConfig(
         name="LANGIT_STRESS_TEST",
         description="压力测试模式标志，'true'启用压力测试优化",
-        example="false"
+        example="false",
+        required=False,
     ),
 ]
 
@@ -173,23 +174,23 @@ class EnvVarChecker:
                     print(f"    - {var_name}")
         
         print("\n" + "=" * 70)
-        print("请通过以下方式之一设置环境变量：")
+        print("请设置以下必需的环境变量：")
         print("")
-        print("  1. 使用 Tauri Client 启动服务端（推荐）")
-        print("     Client 会自动注入所需的环境变量")
-        print("")
-        print("  2. 手动设置环境变量（PowerShell）：")
-        
-        # 生成示例命令
+
         for layer in INIT_LAYERS:
             for var in layer.env_vars:
-                if var.sensitive:
-                    print(f"     $env:{var.name} = 'your-{var.name.lower().replace('_', '-')}-here'")
-                else:
-                    print(f"     $env:{var.name} = '{var.example}'")
-        
+                if var.required:
+                    if var.sensitive:
+                        print(f"  {var.name} = 'your-{var.name.lower().replace('_', '-')}-here'")
+                    else:
+                        print(f"  {var.name} = '{var.example}'")
+
         print("")
-        print("  3. 使用 .env 文件（需要 python-dotenv）：")
+        print("方式一：export 设置（Linux/Mac）")
+        print("  export LANGIT_SECURITY_SECRET_KEY='your-secret'")
+        print("  export DATABASE_URL='sqlite:///./langit.db'")
+        print("")
+        print("方式二：.env 文件（需要 python-dotenv）")
         print("     pip install python-dotenv")
         print("     在项目根目录创建 .env 文件，包含：")
         
@@ -241,15 +242,15 @@ class AppInitializer:
     def _init_imports(self) -> bool:
         """
         延迟导入依赖模块
-        
+
         在确认环境变量已设置后，才导入可能触发数据库配置加载的模块
-        
+
         Returns:
             bool: 导入是否成功
         """
         try:
             from core.config import ConfigManager
-            from utils.config_utils import generate_default_config, write_config_file, get_config_manager
+            from utils.config_utils import get_config_manager
             from utils.logging import init_logging, get_logger
             
             self.config_manager = ConfigManager(self.config_path)
@@ -268,41 +269,43 @@ class AppInitializer:
             print(f"导入依赖模块时发生错误: {e}")
             return False
 
-    def _gen_default_config(self) -> Dict[str, Any]:
-        """生成默认配置"""
-        from utils.config_utils import generate_default_config
-        return generate_default_config()
-
-    def _write_config(self, config_data: Dict[str, Any]) -> None:
-        """写入配置文件"""
-        from utils.config_utils import write_config_file
-        try:
-            write_config_file(config_data, self.config_path)
-        except IOError as e:
-            raise RuntimeError(f"写入配置文件失败: {e}")
-
     def _init_config(self) -> bool:
-        """初始化配置文件"""
+        """校验配置文件（不再自动生成，提示用户从模板复制）"""
         if not os.path.exists(self.config_path):
-            self._logger.info(f"配置文件不存在，生成默认配置: {self.config_path}")
-            default_config = self._gen_default_config()
-            self._write_config(default_config)
-        else:
-            try:
-                self.config_manager.get_config(force_reload=True)
-            except Exception as e:
-                self._logger.warning(f"配置文件验证失败: {e}，重新生成默认配置")
-                default_config = self._gen_default_config()
-                self._write_config(default_config)
-        return True
+            self._logger.error(
+                f"配置文件不存在: {self.config_path}"
+            )
+            print("=" * 70)
+            print("配置缺失")
+            print("=" * 70)
+            print(f"  {self.config_path} 不存在")
+            print()
+            print("  请执行:")
+            print(f"    cp config.example.toml {self.config_path}")
+            print()
+            print("  然后按需修改配置项。")
+            print("  敏感配置通过环境变量注入。")
+            print("=" * 70)
+            return False
+
+        try:
+            self.config_manager.get_config(force_reload=True)
+            return True
+        except Exception as e:
+            self._logger.error(f"配置文件加载失败: {e}")
+            return False
 
     def _init_secret_key(self) -> bool:
-        """检查 JWT Secret Key 是否已设置"""
+        """检查 JWT Secret Key 是否已通过环境变量设置"""
         secret_key = os.environ.get("LANGIT_SECURITY_SECRET_KEY")
         if secret_key:
             return True
         else:
-            self._logger.error("安全密钥检查失败")
+            self._logger.error(
+                "LANGIT_SECURITY_SECRET_KEY 未设置\n"
+                "  JWT 密钥是必需的，请通过环境变量设置:\n"
+                "    export LANGIT_SECURITY_SECRET_KEY='your-secret-key'"
+            )
             return False
 
     def _init_database(self, create_test_data: bool = False) -> bool:
@@ -348,13 +351,8 @@ class AppInitializer:
             print(f"日志初始化失败: {e}")
             return False
 
-    def _check_service_port(self) -> bool:
-        """检查并终止占用端口的服务"""
-        return self.check_and_terminate_running_service()
-
     def initialize(
         self,
-        check_service: bool = True,
         init_db: bool = True,
         create_test_data: bool = False,
     ) -> bool:
@@ -369,10 +367,8 @@ class AppInitializer:
         5. 安全密钥检查
         6. 数据库初始化
         7. 仓库目录初始化
-        8. 服务端口检查
 
         Args:
-            check_service: 是否检查并终止占用端口的服务
             init_db: 是否初始化数据库
             create_test_data: 是否创建测试数据（仅开发环境）
 
@@ -382,7 +378,7 @@ class AppInitializer:
         # ========== 阶段 0: 环境变量检查（最高优先级） ==========
         if not self._check_all_env_vars():
             return False
-        
+
         # ========== 阶段 1: 延迟导入依赖模块 ==========
         if not self._init_imports():
             return False
@@ -408,10 +404,6 @@ class AppInitializer:
         if not self._init_repository_root():
             return False
 
-        # ========== 阶段 7: 服务端口检查 ==========
-        if check_service:
-            self._check_service_port()
-
         self._logger.info("应用初始化完成")
         return True
 
@@ -427,23 +419,12 @@ class AppInitializer:
         self._logger.info(f"更新配置文件: {self.config_path}")
         self.config_manager.update_config(new_config)
 
-    def check_and_terminate_running_service(self, port: Optional[int] = None) -> bool:
-        """检查并终止占用端口的服务"""
-        from utils.port_utils import check_and_terminate_running_service as _check_and_terminate_service
-        return _check_and_terminate_service(port=port, config_path=self.config_path)
-
-    def terminate_all_python_services(self, port: Optional[int] = None) -> int:
-        """终止所有 Python 服务"""
-        from utils.port_utils import terminate_all_python_services as _terminate_all_services
-        return _terminate_all_services(port=port, config_path=self.config_path)
-
 
 # 创建全局初始化器实例
 initializer = AppInitializer()
 
 
 def init_app(
-    check_service: bool = True,
     init_db: bool = True,
     create_test_data: bool = False,
 ) -> bool:
@@ -451,7 +432,6 @@ def init_app(
     初始化应用的便捷函数
 
     Args:
-        check_service: 是否检查并终止占用端口的服务
         init_db: 是否初始化数据库
         create_test_data: 是否创建测试数据
 
@@ -459,7 +439,6 @@ def init_app(
         bool: 初始化是否成功
     """
     return initializer.initialize(
-        check_service=check_service,
         init_db=init_db,
         create_test_data=create_test_data,
     )

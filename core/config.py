@@ -109,8 +109,11 @@ class StorageSettings(BaseSettings):
 class SecuritySettings(BaseSettings):
     """安全配置类 - JWT密钥优先从环境变量 LANGIT_SECURITY_SECRET_KEY 读取"""
     model_config = SettingsConfigDict(env_prefix="LANGIT_SECURITY_")
-    
-    secret_key: str = Field(default="", description="JWT密钥，优先从环境变量 LANGIT_SECURITY_SECRET_KEY 读取")
+
+    secret_key: str = Field(
+        default="",
+        description="JWT密钥，必须通过环境变量 LANGIT_SECURITY_SECRET_KEY 设置"
+    )
     access_token_expire_minutes: int = Field(default=30, ge=1, description="访问令牌过期时间（分钟）")
     refresh_token_expire_days: int = Field(default=7, ge=1, description="刷新令牌过期时间（天）")
     algorithm: str = Field(default="HS256", description="JWT加密算法")
@@ -217,13 +220,6 @@ class DatabaseSettings(BaseSettings):
     pg_connect_timeout: int = Field(default=10, ge=1, description="PostgreSQL连接超时时间（秒）")
     pg_application_name: str = Field(default="langit", description="PostgreSQL应用名称")
     
-    # MySQL 特定配置
-    mysql_charset: str = Field(default="utf8mb4", description="MySQL字符集")
-    mysql_pool_recycle: int = Field(default=3600, ge=0, description="MySQL连接回收时间（秒）")
-    mysql_connect_timeout: int = Field(default=10, ge=1, description="MySQL连接超时时间（秒）")
-    mysql_read_timeout: int = Field(default=30, ge=1, description="MySQL读取超时时间（秒）")
-    mysql_write_timeout: int = Field(default=30, ge=1, description="MySQL写入超时时间（秒）")
-    
     model_config = SettingsConfigDict(
         env_prefix="LANGIT_DATABASE_",
         extra='ignore'  # 忽略额外的环境变量
@@ -235,32 +231,25 @@ class DatabaseSettings(BaseSettings):
         根据 DATABASE_URL 自动检测数据库类型
         
         Returns:
-            str: 数据库类型 (sqlite, postgresql, mysql)
+            str: 数据库类型 (sqlite, postgresql)
         """
         url_lower = self.url.lower()
         if url_lower.startswith("sqlite"):
             return "sqlite"
         elif url_lower.startswith("postgresql") or url_lower.startswith("postgres"):
             return "postgresql"
-        elif url_lower.startswith("mysql"):
-            return "mysql"
         else:
             return "unknown"
-    
+
     @property
     def is_sqlite(self) -> bool:
         """是否为 SQLite 数据库"""
         return self.db_type == "sqlite"
-    
+
     @property
     def is_postgresql(self) -> bool:
         """是否为 PostgreSQL 数据库"""
         return self.db_type == "postgresql"
-    
-    @property
-    def is_mysql(self) -> bool:
-        """是否为 MySQL 数据库"""
-        return self.db_type == "mysql"
     
     def __init__(self, **kwargs):
         """
@@ -269,24 +258,12 @@ class DatabaseSettings(BaseSettings):
         如果环境变量未设置或配置无效，自动回退到 SQLite 默认值
         """
         import logging
-        import sys
         logger = logging.getLogger(__name__)
         global _db_url_validated, _original_db_url, _validation_result
-        
+
         # 从环境变量读取 DATABASE_URL
         env_url = os.environ.get("DATABASE_URL")
-        
-        # 处理 Windows 环境变量编码问题
-        if env_url and sys.platform == "win32":
-            try:
-                # 在 Windows 上，环境变量可能是系统默认编码（如 GBK）
-                # 尝试将其转换为 UTF-8
-                if isinstance(env_url, str):
-                    # 先编码为字节，再解码为 UTF-8
-                    env_url = env_url.encode('utf-8', errors='ignore').decode('utf-8')
-            except Exception as e:
-                logger.warning(f"处理环境变量编码时出错: {e}")
-        
+
         original_url = env_url
         
         if _db_url_validated and _original_db_url == original_url:
@@ -379,35 +356,25 @@ class DatabaseSettings(BaseSettings):
             return False, f"URL 编码错误: {str(e)}"
         
         url_lower = url.lower()
-        valid_prefixes = ("sqlite://", "postgresql://", "postgres://", "mysql://", "mysql+pymysql://", "postgresql+psycopg2://")
+        valid_prefixes = ("sqlite://", "postgresql://", "postgres://", "postgresql+psycopg2://")
         if not any(url_lower.startswith(prefix) for prefix in valid_prefixes):
             return False, f"不支持的协议类型"
-        
+
         # SQLite 不需要测试连接（本地文件）
         if url_lower.startswith("sqlite://"):
             return True, ""
-        
-        # 对于 PostgreSQL 和 MySQL，尝试测试连接
+
+        # 对于 PostgreSQL，尝试测试连接
         try:
             from sqlalchemy import create_engine, text
             from sqlalchemy.exc import SQLAlchemyError
-            
+
             # 转换 URL 为带驱动的格式（同步验证）
             test_url = url
-            if url_lower.startswith("mysql://"):
-                test_url = url.replace("mysql://", "mysql+pymysql://", 1)
-            elif url_lower.startswith("postgresql://") and not url_lower.startswith("postgresql+psycopg2://"):
-                # 如果已经是 postgresql+psycopg2:// 格式，不需要转换
-                test_url = url.replace("postgresql://", "postgresql+pg8000://", 1)
-            
-            # 创建引擎并测试连接
-            # pg8000 不支持 connect_timeout 参数，使用 SQLAlchemy 的 pool_pre_ping 代替
-            connect_args = {}
-            if url_lower.startswith("mysql://"):
-                connect_args = {"connect_timeout": 5}
-            # PostgreSQL (pg8000) 不使用 connect_timeout
-            
-            engine = create_engine(test_url, connect_args=connect_args, pool_pre_ping=True)
+            if url_lower.startswith("postgresql://") and not url_lower.startswith("postgresql+psycopg2://"):
+                test_url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
+            engine = create_engine(test_url, connect_args={"connect_timeout": 5}, pool_pre_ping=True)
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
             engine.dispose()

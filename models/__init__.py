@@ -48,28 +48,17 @@ def _get_sqlite_connect_args():
 
 
 def _get_postgresql_connect_args():
-    """获取 PostgreSQL 连接参数 (pg8000 驱动)"""
-    # pg8000 使用纯 Python 实现，参数与 psycopg2 不同
+    """获取 PostgreSQL 连接参数"""
     connect_args = {}
-    
+
     # SSL 模式
     if db_config.pg_ssl_mode and db_config.pg_ssl_mode != "prefer":
         connect_args["sslmode"] = db_config.pg_ssl_mode
-    
-    # 注意：pg8000 不直接支持 connect_timeout 和 application_name
-    # 这些参数通过 SQLAlchemy 引擎配置处理
-    
+
+    # 连接超时
+    connect_args["connect_timeout"] = db_config.pg_connect_timeout
+
     return connect_args
-
-
-def _get_mysql_connect_args():
-    """获取 MySQL 连接参数"""
-    return {
-        "charset": db_config.mysql_charset,
-        "connect_timeout": db_config.mysql_connect_timeout,
-        "read_timeout": db_config.mysql_read_timeout,
-        "write_timeout": db_config.mysql_write_timeout,
-    }
 
 
 def _create_engine_with_config():
@@ -85,8 +74,6 @@ def _create_engine_with_config():
         return _create_sqlite_engine()
     elif db_type == "postgresql":
         return _create_postgresql_engine()
-    elif db_type == "mysql":
-        return _create_mysql_engine()
     else:
         raise ValueError(f"不支持的数据库类型: {db_type}")
 
@@ -133,18 +120,18 @@ def _create_sqlite_engine():
 
 def _get_postgresql_url_with_driver(url: str) -> str:
     """
-    将 PostgreSQL URL 转换为带 pg8000 驱动的格式
-    
+    将 PostgreSQL URL 转换为带 psycopg2 驱动的格式
+
     Args:
         url: 原始 PostgreSQL URL (如 postgresql://user:pass@host:port/dbname)
-        
+
     Returns:
-        str: 带驱动的 URL (如 postgresql+pg8000://user:pass@host:port/dbname)
+        str: 带驱动的 URL (如 postgresql+psycopg2://user:pass@host:port/dbname)
     """
     if url.lower().startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+pg8000://", 1)
+        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
     elif url.lower().startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+pg8000://", 1)
+        return url.replace("postgres://", "postgresql+psycopg2://", 1)
     return url
 
 
@@ -180,63 +167,6 @@ def _create_postgresql_engine():
         return create_engine(
             url_with_driver,
             connect_args=_get_postgresql_connect_args(),
-            poolclass=QueuePool,
-            pool_size=db_config.pool_size,
-            max_overflow=db_config.max_overflow,
-            pool_timeout=db_config.pool_timeout,
-            pool_recycle=db_config.pool_recycle,
-            pool_pre_ping=True,
-            echo=db_config.echo,
-        )
-
-
-def _get_mysql_url_with_driver(url: str) -> str:
-    """
-    将 MySQL URL 转换为带驱动的格式
-
-    Args:
-        url: 原始 MySQL URL (mysql://...)
-
-    Returns:
-        str: 带驱动的 URL (mysql+pymysql://...)
-    """
-    if url.lower().startswith("mysql://"):
-        return url.replace("mysql://", "mysql+pymysql://", 1)
-    return url
-
-
-def _create_mysql_engine():
-    """创建 MySQL 引擎"""
-    mysql_url = _get_mysql_url_with_driver(db_config.url)
-
-    if db_config.is_stress_test:
-        return create_engine(
-            mysql_url,
-            connect_args=_get_mysql_connect_args(),
-            poolclass=QueuePool,
-            pool_size=db_config.stress_pool_size,
-            max_overflow=db_config.stress_max_overflow,
-            pool_timeout=db_config.stress_pool_timeout,
-            pool_recycle=db_config.stress_pool_recycle,
-            pool_pre_ping=True,
-            echo=db_config.stress_echo,
-        )
-    elif _config.app.debug:
-        return create_engine(
-            mysql_url,
-            connect_args=_get_mysql_connect_args(),
-            poolclass=QueuePool,
-            pool_size=db_config.pool_size,
-            max_overflow=db_config.max_overflow,
-            pool_timeout=db_config.pool_timeout,
-            pool_recycle=db_config.pool_recycle,
-            pool_pre_ping=True,
-            echo=db_config.echo,
-        )
-    else:
-        return create_engine(
-            mysql_url,
-            connect_args=_get_mysql_connect_args(),
             poolclass=QueuePool,
             pool_size=db_config.pool_size,
             max_overflow=db_config.max_overflow,

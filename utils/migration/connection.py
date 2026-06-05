@@ -40,16 +40,6 @@ def create_database_if_not_exists(url: str, db_type: DbType) -> Tuple[bool, Opti
 
         dialect = Dialect(db_type)
 
-        if db_type == DbType.MYSQL:
-            server_url = url.replace(f"/{database_name}", "", 1) if f"/{database_name}" in url else url
-            server_url = dialect.to_sync_url(server_url)
-            engine = create_engine(server_url, pool_pre_ping=True)
-            with engine.connect() as conn:
-                conn.execute(text(f"CREATE DATABASE IF NOT EXISTS `{database_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
-            engine.dispose()
-            logger.info(f"MySQL 数据库 '{database_name}' 已创建或已存在")
-            return True, None
-
         if db_type == DbType.POSTGRESQL:
             server_url = url.replace(f"/{database_name}", "/postgres", 1) if f"/{database_name}" in url else url
             server_url = dialect.to_sync_url(server_url)
@@ -141,7 +131,7 @@ class Connection:
         except Exception as e:
             error_msg = str(e)
 
-            if auto_create_db and self.db_type in (DbType.MYSQL, DbType.POSTGRESQL):
+            if auto_create_db and self.db_type == DbType.POSTGRESQL:
                 keywords = ["unknown database", "database.*does not exist", "1049"]
                 if any(re.search(k, error_msg, re.IGNORECASE) for k in keywords):
                     logger.info(f"数据库不存在，尝试自动创建: {self.url}")
