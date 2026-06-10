@@ -20,7 +20,7 @@ _config = get_config()
 _security_config = _config.security
 
 # 配置 - 从环境变量读取（由 Client 注入）
-# 注意：SECRET_KEY 必须通过环境变量 LANGIT_SECURITY_SECRET_KEY 设置
+# 注意：SECRET_KEY 必须通过环境变量 PERSEUS_SECURITY_SECRET_KEY 设置
 SECRET_KEY = _security_config.secret_key
 ALGORITHM = _security_config.algorithm
 ACCESS_TOKEN_EXPIRE_MINUTES = _security_config.access_token_expire_minutes

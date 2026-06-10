@@ -1,4 +1,4 @@
-# LanGit 重构路线图
+# Perseus 重构路线图
 
 ## 概览
 
@@ -94,7 +94,7 @@
 
 ## Security — 移除 Tauri 本地认证后门 ✅
 
-**背景：** 原 Tauri Client 通过 `LANGIT_LOCAL_TOKEN` + `X-LanGit-Local: 1` 请求头实现本地认证绕过 JWT。
+**背景：** 原 Tauri Client 通过 `PERSEUS_LOCAL_TOKEN` + `X-Perseus-Local: 1` 请求头实现本地认证绕过 JWT。
 
 ### 完成情况
 

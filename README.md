@@ -1,4 +1,4 @@
-# LanGit
+# Perseus
 
 一个基于 Git 的本地化协作开发平台，提供完整的代码仓库管理、协作开发和部署能力。
 
@@ -6,7 +6,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      LanGit Platform                        │
+│                      Perseus Platform                        │
 ├─────────────────┬─────────────────┬─────────────────────────┤
 │  Desktop Client │   Web Frontend  │      Backend API        │
 │   (Tauri+Rust)  │   (Vue 3+TS)    │    (FastAPI+Python)     │
@@ -83,7 +83,7 @@
 ## 项目结构
 
 ```
-LanGit/
+Perseus/
 ├── api/                    # API路由层
 │   ├── api_v1.py          # RESTful API v1
 │   ├── websocket/         # WebSocket处理
@@ -128,9 +128,9 @@ poetry install
 
 # 配置环境变量 -推荐使用.env文件配置
 - `DATABASE_URL`: 数据库连接URL
-- `LANGIT_SECURITY_SECRET_KEY`: JWT密钥
-- `LANGIT_APP_DEBUG`: 调试模式
-- `LANGIT_STRESS_TEST`: 压力测试模式
+- `PERSEUS_SECURITY_SECRET_KEY`: JWT密钥
+- `PERSEUS_APP_DEBUG`: 调试模式
+- `PERSEUS_STRESS_TEST`: 压力测试模式
 
 
 # 启动服务
@@ -160,9 +160,9 @@ npm run tauri dev
 | 配置项 | 环境变量 | 说明 |
 |--------|----------|------|
 | 数据库连接 | `DATABASE_URL` | 数据库连接URL |
-| JWT密钥 | `LANGIT_SECURITY_SECRET_KEY` | 令牌加密密钥 |
-| 调试模式 | `LANGIT_APP_DEBUG` | 开启调试模式 |
-| 压力测试 | `LANGIT_STRESS_TEST` | 压力测试模式 |
+| JWT密钥 | `PERSEUS_SECURITY_SECRET_KEY` | 令牌加密密钥 |
+| 调试模式 | `PERSEUS_APP_DEBUG` | 开启调试模式 |
+| 压力测试 | `PERSEUS_STRESS_TEST` | 压力测试模式 |
 
 ## 安全特性
 

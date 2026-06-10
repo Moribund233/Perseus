@@ -58,7 +58,7 @@ class LogManager:
     def __init__(
         self,
         log_dir: str = DEFAULT_LOG_DIR,
-        app_name: str = "langit",
+        app_name: str = "perseus",
         level: str = "info",
         max_bytes: int = 10 * 1024 * 1024,
         backup_count: int = 5,
@@ -228,7 +228,7 @@ _log_manager: Optional[LogManager] = None
 
 def init_logging(
     log_dir: str = "logs",
-    app_name: str = "langit",
+    app_name: str = "perseus",
     level: str = "info",
     max_bytes: int = 10 * 1024 * 1024,
     backup_count: int = 5,
@@ -406,7 +406,7 @@ def _format_file_size(size_bytes: int) -> str:
 
 def read_log_file(
     date: str,
-    filename: str = "langit.log",
+    filename: str = "perseus.log",
     lines: int = 100,
     log_dir: str = "logs"
 ) -> List[str]:

@@ -5,19 +5,19 @@
 
 初始化层级（按优先级排序）：
 1. 核心层 (core): 最基础的环境变量，不依赖任何其他配置
-   - LANGIT_SECURITY_SECRET_KEY: JWT安全密钥（可选，未设置时使用开发默认密钥）
-   - LANGIT_APP_DEBUG: 调试模式标志
+   - PERSEUS_SECURITY_SECRET_KEY: JWT安全密钥（可选，未设置时使用开发默认密钥）
+   - PERSEUS_APP_DEBUG: 调试模式标志
 
 2. 数据库层 (database): 数据库相关配置
    - DATABASE_URL: 数据库连接URL（必需）
-   - LANGIT_STRESS_TEST: 压力测试模式标志（可选）
+   - PERSEUS_STRESS_TEST: 压力测试模式标志（可选）
 
 3. 应用层 (app): FastAPI应用配置（预留）
 
 4. 服务层 (service): 各种服务初始化（预留）
 
 安全要求：
-- 生产环境必须通过环境变量 LANGIT_SECURITY_SECRET_KEY 设置 JWT 密钥
+- 生产环境必须通过环境变量 PERSEUS_SECURITY_SECRET_KEY 设置 JWT 密钥
 - 开发环境无需设置，自动使用 fallback 密钥
 
 使用示例:
@@ -79,13 +79,13 @@ class InitLayer:
 # 核心层环境变量
 CORE_ENV_VARS = [
     EnvVarConfig(
-        name="LANGIT_SECURITY_SECRET_KEY",
+        name="PERSEUS_SECURITY_SECRET_KEY",
         description="JWT安全密钥，用于令牌签名和验证",
         example="your-secret-key-here",
         sensitive=True
     ),
     EnvVarConfig(
-        name="LANGIT_APP_DEBUG",
+        name="PERSEUS_APP_DEBUG",
         description="调试模式标志，'true'启用调试，'false'为生产模式",
         example="true",
         required=False,
@@ -97,10 +97,10 @@ DATABASE_ENV_VARS = [
     EnvVarConfig(
         name="DATABASE_URL",
         description="数据库连接URL",
-        example="sqlite:///./langit.db 或 postgresql://user:pass@localhost/dbname"
+        example="sqlite:///./perseus.db 或 postgresql://user:pass@localhost/dbname"
     ),
     EnvVarConfig(
-        name="LANGIT_STRESS_TEST",
+        name="PERSEUS_STRESS_TEST",
         description="压力测试模式标志，'true'启用压力测试优化",
         example="false",
         required=False,
@@ -187,8 +187,8 @@ class EnvVarChecker:
 
         print("")
         print("方式一：export 设置（Linux/Mac）")
-        print("  export LANGIT_SECURITY_SECRET_KEY='your-secret'")
-        print("  export DATABASE_URL='sqlite:///./langit.db'")
+        print("  export PERSEUS_SECURITY_SECRET_KEY='your-secret'")
+        print("  export DATABASE_URL='sqlite:///./perseus.db'")
         print("")
         print("方式二：.env 文件（需要 python-dotenv）")
         print("     pip install python-dotenv")
@@ -297,14 +297,14 @@ class AppInitializer:
 
     def _init_secret_key(self) -> bool:
         """检查 JWT Secret Key 是否已通过环境变量设置"""
-        secret_key = os.environ.get("LANGIT_SECURITY_SECRET_KEY")
+        secret_key = os.environ.get("PERSEUS_SECURITY_SECRET_KEY")
         if secret_key:
             return True
         else:
             self._logger.error(
-                "LANGIT_SECURITY_SECRET_KEY 未设置\n"
+                "PERSEUS_SECURITY_SECRET_KEY 未设置\n"
                 "  JWT 密钥是必需的，请通过环境变量设置:\n"
-                "    export LANGIT_SECURITY_SECRET_KEY='your-secret-key'"
+                "    export PERSEUS_SECURITY_SECRET_KEY='your-secret-key'"
             )
             return False
 
@@ -339,7 +339,7 @@ class AppInitializer:
         try:
             init_logging(
                 log_dir="logs",
-                app_name="langit",
+                app_name="perseus",
                 level="info",
                 console_output=True,
                 use_date_directory=True,

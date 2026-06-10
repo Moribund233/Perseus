@@ -4,7 +4,7 @@
 基于标准 UvicornWorker，在 Linux 环境下使用 uvloop + httptools 获得最佳性能。
 
 使用方法:
-    gunicorn -k gunicorn_worker.LanGitUvicornWorker app:get_app()
+    gunicorn -k gunicorn_worker.PerseusUvicornWorker app:get_app()
 """
 import os
 import logging
@@ -14,9 +14,9 @@ from uvicorn.workers import UvicornWorker
 logger = logging.getLogger(__name__)
 
 
-class LanGitUvicornWorker(UvicornWorker):
+class PerseusUvicornWorker(UvicornWorker):
     """
-    LanGit 自定义 Uvicorn Worker
+    Perseus 自定义 Uvicorn Worker
 
     在 Linux 上使用 uvloop 和 httptools 获得最佳性能。
     """

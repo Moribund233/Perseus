@@ -156,6 +156,7 @@ migration_*.json
 temp/
 !temp/.gitkeep
 server/
+CLAUDE.md
 
 # node_modules
 node_modules/

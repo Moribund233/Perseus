@@ -40,7 +40,7 @@ async def root():
     """
     config = get_config()
     return {
-        "message": "Welcome to LanGit API",
+        "message": "Welcome to Perseus API",
         "title": config.app.title,
         "version": config.app.version,
         "status": "running"

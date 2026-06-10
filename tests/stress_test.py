@@ -328,7 +328,7 @@ async def main():
     主函数
     运行压力测试
     """
-    parser = argparse.ArgumentParser(description="LanGit 服务端压力测试")
+    parser = argparse.ArgumentParser(description="Perseus 服务端压力测试")
     parser.add_argument("--mode", choices=["normal", "extreme", "sustained"], 
                         default="normal", help="测试模式")
     parser.add_argument("--url", default="http://127.0.0.1:8000", help="服务端地址")
@@ -337,7 +337,7 @@ async def main():
     args = parser.parse_args()
     
     print("="*60)
-    print("LanGit 服务端压力测试")
+    print("Perseus 服务端压力测试")
     print("="*60)
     print(f"目标地址: {args.url}")
     print(f"测试模式: {args.mode}")

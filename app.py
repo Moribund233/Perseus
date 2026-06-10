@@ -222,9 +222,9 @@ def start_server():
             import gunicorn.app.base
             from gunicorn.config import Config
 
-            class LanGitGunicornApp(gunicorn.app.base.BaseApplication):
+            class PerseusGunicornApp(gunicorn.app.base.BaseApplication):
                 """
-                LanGit 自定义 Gunicorn 应用
+                Perseus 自定义 Gunicorn 应用
                 """
                 def __init__(self, app, options=None):
                     self.options = options or {}
@@ -261,10 +261,10 @@ def start_server():
                 "accesslog": "-" if gunicorn_cfg.access_log else None,
                 "errorlog": "-",
                 "capture_output": gunicorn_cfg.capture_output,
-                "proc_name": "langit",
+                "proc_name": "perseus",
             }
 
-            LanGitGunicornApp(app, options).run()
+            PerseusGunicornApp(app, options).run()
             return
         except ImportError:
             logger.info("Gunicorn 未安装，使用 Uvicorn 作为替代")

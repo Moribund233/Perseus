@@ -244,13 +244,13 @@ class ConfigManager:
     def get_secret_key(self) -> Optional[str]:
         """
         获取JWT Secret Key
-        只能从环境变量 LANGIT_SECURITY_SECRET_KEY 读取
+        只能从环境变量 PERSEUS_SECURITY_SECRET_KEY 读取
 
         Returns:
             Optional[str]: Secret Key，如果不存在返回None
         """
         # 只能从环境变量读取（Client 注入）
-        return os.environ.get("LANGIT_SECURITY_SECRET_KEY")
+        return os.environ.get("PERSEUS_SECURITY_SECRET_KEY")
 
     def get_repo_root(self) -> str:
         """

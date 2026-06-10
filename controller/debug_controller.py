@@ -223,8 +223,8 @@ async def debug_status(
     sensitive_keys = {'password', 'secret', 'token', 'key', 'jwt', 'auth'}
 
     for key, value in os.environ.items():
-        # 只包含 LANGIT_ 开头的环境变量
-        if key.startswith('LANGIT_'):
+        # 只包含 PERSEUS_ 开头的环境变量
+        if key.startswith('PERSEUS_'):
             # 检查是否是敏感信息
             key_lower = key.lower()
             is_sensitive = any(s in key_lower for s in sensitive_keys)
@@ -235,7 +235,7 @@ async def debug_status(
                 env_info[key] = value
 
     # 检查是否处于压力测试模式
-    stress_test_mode = os.environ.get('LANGIT_STRESS_TEST', 'false').lower() == 'true'
+    stress_test_mode = os.environ.get('PERSEUS_STRESS_TEST', 'false').lower() == 'true'
 
     # 获取限流配置
     rate_limit_config = getattr(config, 'rate_limit', None)

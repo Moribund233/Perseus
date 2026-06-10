@@ -66,7 +66,7 @@ preload_app = gunicorn_config.preload_app
 daemon = gunicorn_config.daemon
 
 # 进程名称
-proc_name = "langit"
+proc_name = "perseus"
 
 # 工作目录
 chdir = str(project_root)

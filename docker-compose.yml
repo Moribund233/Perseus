@@ -1,5 +1,5 @@
 # =============================================================================
-# LanGit Docker Compose
+# Perseus Docker Compose
 #
 # 架构：
 #   nginx → git-http-backend (CGI) — Git HTTP Smart Protocol
@@ -12,8 +12,8 @@
 #   docker compose -f docker-compose.yml up  # 指定文件
 #
 # 环境变量要求:
-#   DATABASE_URL=postgresql://langit:password@db:5432/langit
-#   LANGIT_SECURITY_SECRET_KEY=<random-secret>
+#   DATABASE_URL=postgresql://perseus:password@db:5432/perseus
+#   PERSEUS_SECURITY_SECRET_KEY=<random-secret>
 # =============================================================================
 
 services:
@@ -23,15 +23,15 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: langit
-      POSTGRES_USER: langit
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-langit_secret}
+      POSTGRES_DB: perseus
+      POSTGRES_USER: perseus
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-perseus_secret}
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U langit"]
+      test: ["CMD-SHELL", "pg_isready -U perseus"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -45,10 +45,10 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://langit:langit_secret@db:5432/langit}
-      LANGIT_SECURITY_SECRET_KEY: ${LANGIT_SECURITY_SECRET_KEY:?必需设置 JWT 密钥}
-      LANGIT_APP_DEBUG: "${LANGIT_APP_DEBUG:-false}"
-      LANGIT_STRESS_TEST: "false"
+      DATABASE_URL: ${DATABASE_URL:-postgresql://perseus:perseus_secret@db:5432/perseus}
+      PERSEUS_SECURITY_SECRET_KEY: ${PERSEUS_SECURITY_SECRET_KEY:?必需设置 JWT 密钥}
+      PERSEUS_APP_DEBUG: "${PERSEUS_APP_DEBUG:-false}"
+      PERSEUS_STRESS_TEST: "false"
     volumes:
       - repos:/data/repositories
     ports:

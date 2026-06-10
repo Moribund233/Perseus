@@ -1,5 +1,5 @@
 # =============================================================================
-# LanGit 配置文件模板
+# Perseus 配置文件模板
 #
 # 使用方式:
 #   cp config.example.toml config.toml
@@ -20,16 +20,16 @@ reload = false
 log_level = "info"
 
 [app]
-title = "LanGit API"
+title = "Perseus API"
 description = "A Git-based collaborative development tool API"
 version = "0.1.0"
-# debug 模式由环境变量 LANGIT_APP_DEBUG 控制，此文件中的设置不生效
+# debug 模式由环境变量 PERSEUS_APP_DEBUG 控制，此文件中的设置不生效
 
 [gunicorn]
 # Worker 进程数，建议 2-4 x CPU 核心数
 workers = 4
 # Worker 类
-worker_class = "gunicorn_worker.LanGitUvicornWorker"
+worker_class = "gunicorn_worker.PerseusUvicornWorker"
 # 每个 worker 的线程数（仅 sync worker 有效）
 threads = 1
 # 最大并发连接数
@@ -79,7 +79,7 @@ max_file_size = 104857600
 enable_lfs = true
 
 [security]
-# JWT 密钥由环境变量 LANGIT_SECURITY_SECRET_KEY 注入，不写入配置文件
+# JWT 密钥由环境变量 PERSEUS_SECURITY_SECRET_KEY 注入，不写入配置文件
 # 访问令牌过期时间（分钟）
 access_token_expire_minutes = 30
 # 刷新令牌过期时间（天）
@@ -122,7 +122,7 @@ wal_temp_store = "MEMORY"
 # PostgreSQL 专用配置
 pg_ssl_mode = "prefer"
 pg_connect_timeout = 10
-pg_application_name = "langit"
+pg_application_name = "perseus"
 
 rate_limit.default_limits = { mode = "minute", value = 200 }
 rate_limit.strict = { mode = "minute", value = 5 }
@@ -136,11 +136,11 @@ rate_limit.download = { mode = "minute", value = 20 }
 #
 # 必需的环境变量:
 #   DATABASE_URL                   数据库连接 URL
-#     SQLite:  sqlite:///./langit.db
+#     SQLite:  sqlite:///./perseus.db
 #     PostgreSQL: postgresql://user:pass@host:5432/dbname
-#   LANGIT_SECURITY_SECRET_KEY     JWT 签名密钥（必需）
+#   PERSEUS_SECURITY_SECRET_KEY     JWT 签名密钥（必需）
 #
 # 可选的环境变量:
-#   LANGIT_APP_DEBUG               true/false，调试模式
-#   LANGIT_STRESS_TEST             true/false，压力测试模式
+#   PERSEUS_APP_DEBUG               true/false，调试模式
+#   PERSEUS_STRESS_TEST             true/false，压力测试模式
 # =============================================================================

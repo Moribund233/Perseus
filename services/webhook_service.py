@@ -359,7 +359,7 @@ async def test_webhook(
             "id": user_id,
             "username": "test-user"
         },
-        "message": "This is a test event from LanGit"
+        "message": "This is a test event from Perseus"
     }
 
     # 发送测试请求
@@ -473,9 +473,9 @@ async def _deliver_webhook(
 
     # 准备请求头
     headers = {
-        "User-Agent": "LanGit-WebHook/1.0",
+        "User-Agent": "Perseus-WebHook/1.0",
         "X-GitHub-Event": event,  # 兼容 GitHub 格式
-        "X-LanGit-Event": event,
+        "X-Perseus-Event": event,
         "X-Webhook-ID": str(webhook.id),
         "Content-Type": webhook.content_type
     }

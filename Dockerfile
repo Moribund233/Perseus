@@ -1,8 +1,8 @@
 # =============================================================================
-# LanGit Docker 多阶段构建
+# Perseus Docker 多阶段构建
 #
 # 构建说明:
-#   docker build -t langit:latest .
+#   docker build -t perseus:latest .
 #
 # 开发模式:
 #   docker compose up

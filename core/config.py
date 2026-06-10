@@ -20,7 +20,7 @@ class GunicornSettings(BaseSettings):
     
     # Worker类型
     worker_class: str = Field(
-        default="gunicorn_worker.LanGitUvicornWorker",
+        default="gunicorn_worker.PerseusUvicornWorker",
         description="Worker类，使用自定义UvicornWorker支持ASGI"
     )
     
@@ -57,13 +57,13 @@ class GunicornSettings(BaseSettings):
 
 
 class AppSettings(BaseSettings):
-    """应用配置类 - 调试模式优先从环境变量 LANGIT_APP_DEBUG 读取"""
-    model_config = SettingsConfigDict(env_prefix="LANGIT_APP_")
+    """应用配置类 - 调试模式优先从环境变量 PERSEUS_APP_DEBUG 读取"""
+    model_config = SettingsConfigDict(env_prefix="PERSEUS_APP_")
     
-    title: str = Field(default="LanGit API", description="应用标题")
+    title: str = Field(default="Perseus API", description="应用标题")
     description: str = Field(default="A Git-based collaborative development tool API", description="应用描述")
     version: str = Field(default="0.1.0", description="应用版本")
-    debug: bool = Field(default=False, description="是否启用调试模式，优先从环境变量 LANGIT_APP_DEBUG 读取")
+    debug: bool = Field(default=False, description="是否启用调试模式，优先从环境变量 PERSEUS_APP_DEBUG 读取")
 
 
 class SystemSettings(BaseSettings):
@@ -107,12 +107,12 @@ class StorageSettings(BaseSettings):
 
 
 class SecuritySettings(BaseSettings):
-    """安全配置类 - JWT密钥优先从环境变量 LANGIT_SECURITY_SECRET_KEY 读取"""
-    model_config = SettingsConfigDict(env_prefix="LANGIT_SECURITY_")
+    """安全配置类 - JWT密钥优先从环境变量 PERSEUS_SECURITY_SECRET_KEY 读取"""
+    model_config = SettingsConfigDict(env_prefix="PERSEUS_SECURITY_")
 
     secret_key: str = Field(
         default="",
-        description="JWT密钥，必须通过环境变量 LANGIT_SECURITY_SECRET_KEY 设置"
+        description="JWT密钥，必须通过环境变量 PERSEUS_SECURITY_SECRET_KEY 设置"
     )
     access_token_expire_minutes: int = Field(default=30, ge=1, description="访问令牌过期时间（分钟）")
     refresh_token_expire_days: int = Field(default=7, ge=1, description="刷新令牌过期时间（天）")
@@ -177,14 +177,14 @@ class DatabaseSettings(BaseSettings):
     
     注意：DATABASE_URL 和 IS_STRESS_TEST 仅通过环境变量注入，不写入配置文件
     - DATABASE_URL: 数据库连接URL，环境变量名称为 DATABASE_URL（必需）
-    - IS_STRESS_TEST: 是否启用压力测试模式，环境变量名称为 LANGIT_STRESS_TEST（必需）
+    - IS_STRESS_TEST: 是否启用压力测试模式，环境变量名称为 PERSEUS_STRESS_TEST（必需）
     """
     # 环境变量注入的配置（不写入配置文件，无默认值，必须从环境变量读取）
     url: str = Field(
         description="数据库连接URL，必须通过环境变量 DATABASE_URL 注入"
     )
     is_stress_test: bool = Field(
-        description="是否启用压力测试模式，必须通过环境变量 LANGIT_STRESS_TEST 注入"
+        description="是否启用压力测试模式，必须通过环境变量 PERSEUS_STRESS_TEST 注入"
     )
 
     # 可写入配置文件的配置项
@@ -218,10 +218,10 @@ class DatabaseSettings(BaseSettings):
     # PostgreSQL 特定配置
     pg_ssl_mode: str = Field(default="prefer", description="PostgreSQL SSL模式")
     pg_connect_timeout: int = Field(default=10, ge=1, description="PostgreSQL连接超时时间（秒）")
-    pg_application_name: str = Field(default="langit", description="PostgreSQL应用名称")
+    pg_application_name: str = Field(default="perseus", description="PostgreSQL应用名称")
     
     model_config = SettingsConfigDict(
-        env_prefix="LANGIT_DATABASE_",
+        env_prefix="PERSEUS_DATABASE_",
         extra='ignore'  # 忽略额外的环境变量
     )
     
@@ -272,19 +272,19 @@ class DatabaseSettings(BaseSettings):
             _original_db_url = original_url
             
             if not env_url:
-                env_url = "sqlite:///./langit.db"
+                env_url = "sqlite:///./perseus.db"
             else:
                 is_valid, error_msg = self._validate_db_url_with_error(env_url)
                 if not is_valid:
                     logger.warning(f"数据库连接失败，回退到 SQLite: {error_msg}")
-                    env_url = "sqlite:///./langit.db"
+                    env_url = "sqlite:///./perseus.db"
             
             _validation_result = env_url
             _db_url_validated = True
         
         kwargs["url"] = env_url
         
-        stress_test = os.environ.get("LANGIT_STRESS_TEST")
+        stress_test = os.environ.get("PERSEUS_STRESS_TEST")
         if stress_test is None:
             stress_test = "false"
         kwargs["is_stress_test"] = stress_test.lower() in ("true", "1", "yes")

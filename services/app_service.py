@@ -314,7 +314,7 @@ class AppService:
     def get_log_content(
         self,
         date: Optional[str] = None,
-        log_name: str = "langit",
+        log_name: str = "perseus",
         lines: int = 100,
         level: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -344,7 +344,7 @@ class AppService:
         log_file = log_dir / f"{log_name}.log"
 
         if not log_file.exists():
-            log_file = log_dir / "langit.log"
+            log_file = log_dir / "perseus.log"
 
         if not log_file.exists():
             return {
