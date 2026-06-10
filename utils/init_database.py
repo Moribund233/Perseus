@@ -7,17 +7,14 @@ import hashlib
 import os
 from typing import Optional
 
-from passlib.context import CryptContext
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 # 导入模型
-from models import Base, engine, SessionLocal
+from models import Base, get_engine, SessionLocal
 from utils.logging import get_named_logger
 from utils.git_utils import init_bare_repo, get_repository_storage_path
-
-# 密码哈希上下文
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from utils.password_utils import get_password_hash
 
 logger = get_named_logger("database")
 
@@ -54,7 +51,7 @@ class DatabaseInitializer:
                 )
                 Base.metadata.create_all(bind=self._engine)
             else:
-                Base.metadata.create_all(bind=engine)
+                Base.metadata.create_all(bind=get_engine())
             return True
         except Exception as e:
             logger.error(f"数据库表创建失败: {e}")
@@ -107,7 +104,7 @@ class DatabaseInitializer:
         admin_user = User(
             username="admin",
             email="admin@example.com",
-            password=pwd_context.hash("admin123"[:72]),
+            password=get_password_hash("admin123"),
             full_name="Admin User",
             is_active=True,
             is_admin=True,
@@ -118,7 +115,7 @@ class DatabaseInitializer:
         test_user = User(
             username="test",
             email="test@example.com",
-            password=pwd_context.hash("test123"[:72]),
+            password=get_password_hash("test123"),
             full_name="Test User",
             is_active=True,
             is_admin=False,
@@ -250,6 +247,11 @@ def init_database(
     Returns:
         bool: 初始化是否成功
     """
+    from models import init_engine
+
+    # 确保数据库引擎已初始化
+    init_engine()
+
     initializer = DatabaseInitializer(db_url)
 
     if not initializer.create_tables():

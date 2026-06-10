@@ -165,16 +165,10 @@ class RateLimitSettings(BaseSettings):
     )
 
 
-# 全局标志：记录是否已进行数据库URL验证（避免重复输出日志）
-_db_url_validated = False
-_original_db_url = None
-_validation_result = None
-
-
 class DatabaseSettings(BaseSettings):
     """
     数据库配置类
-    
+
     注意：DATABASE_URL 和 IS_STRESS_TEST 仅通过环境变量注入，不写入配置文件
     - DATABASE_URL: 数据库连接URL，环境变量名称为 DATABASE_URL（必需）
     - IS_STRESS_TEST: 是否启用压力测试模式，环境变量名称为 PERSEUS_STRESS_TEST（必需）
@@ -254,41 +248,32 @@ class DatabaseSettings(BaseSettings):
     def __init__(self, **kwargs):
         """
         初始化时从环境变量读取必需配置
-        
-        如果环境变量未设置或配置无效，自动回退到 SQLite 默认值
+
+        如果环境变量未设置，自动回退到 SQLite 默认值
         """
         import logging
         logger = logging.getLogger(__name__)
-        global _db_url_validated, _original_db_url, _validation_result
 
         # 从环境变量读取 DATABASE_URL
         env_url = os.environ.get("DATABASE_URL")
 
-        original_url = env_url
-        
-        if _db_url_validated and _original_db_url == original_url:
-            env_url = _validation_result
+        if not env_url:
+            env_url = "sqlite:///./perseus.db"
+            logger.info("DATABASE_URL 未设置，使用默认 SQLite 数据库")
         else:
-            _original_db_url = original_url
-            
-            if not env_url:
-                env_url = "sqlite:///./perseus.db"
-            else:
-                is_valid, error_msg = self._validate_db_url_with_error(env_url)
-                if not is_valid:
-                    logger.warning(f"数据库连接失败，回退到 SQLite: {error_msg}")
-                    env_url = "sqlite:///./perseus.db"
-            
-            _validation_result = env_url
-            _db_url_validated = True
-        
+            # 验证 URL 格式
+            is_valid, error_msg = self._validate_db_url_with_error(env_url)
+            if not is_valid:
+                # 格式错误时明确报错，不静默回退
+                raise ValueError(f"DATABASE_URL 格式无效: {error_msg}")
+
         kwargs["url"] = env_url
-        
+
         stress_test = os.environ.get("PERSEUS_STRESS_TEST")
         if stress_test is None:
             stress_test = "false"
         kwargs["is_stress_test"] = stress_test.lower() in ("true", "1", "yes")
-        
+
         super().__init__(**kwargs)
     
     @staticmethod

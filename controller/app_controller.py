@@ -245,8 +245,11 @@ async def get_status_endpoint():
     Returns:
         StatusResponse: 应用状态信息
     """
+    from middleware.request_stats import get_request_stats
+
     app_service = get_app_service()
-    status = app_service.get_status()
+    requests_info = get_request_stats().get_stats()
+    status = app_service.get_status(requests_info=requests_info)
 
     return StatusResponse(**status)
 

@@ -215,7 +215,6 @@ class AppInitializer:
     def __init__(self, config_path: str = "config.toml"):
         self.config_path = config_path
         self.config_manager = None
-        self._utils_config_manager = None
         self._logger = None
         self._checker = EnvVarChecker()
 
@@ -250,11 +249,9 @@ class AppInitializer:
         """
         try:
             from core.config import ConfigManager
-            from utils.config_utils import get_config_manager
             from utils.logging import init_logging, get_logger
-            
+
             self.config_manager = ConfigManager(self.config_path)
-            self._utils_config_manager = get_config_manager(self.config_path)
             self._logger = get_logger("init")
             return True
         except ValueError as e:

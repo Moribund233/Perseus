@@ -7,15 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.repository_member import RepositoryMember
 from core.exception import ValidationException, NotFoundException, ConflictException, AuthorizationException
-
-# 常量定义
-VALID_ROLES = ["owner", "admin", "developer", "readonly"]
-ROLE_PRIORITY = {
-    "owner": 4,
-    "admin": 3,
-    "developer": 2,
-    "readonly": 1
-}
+from core.constants import ROLE_PRIORITY, VALID_ROLES
 
 
 async def get_repository_members(repo_id: int, db: AsyncSession):

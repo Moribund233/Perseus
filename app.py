@@ -58,12 +58,7 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
 
     # 添加请求超时中间件（防止请求无限期挂起）
     from middleware.timeout import TimeoutMiddleware
-    # 根据数据库类型调整超时时间
-    if config.database.is_sqlite:
-        timeout_seconds = 30.0  # SQLite 可能需要更长时间
-    else:
-        timeout_seconds = 30.0  # 正常超时
-    app.add_middleware(TimeoutMiddleware, timeout_seconds=timeout_seconds)
+    app.add_middleware(TimeoutMiddleware, timeout_seconds=30.0)
 
     from middleware.security_headers import SecurityHeadersMiddleware
     enable_hsts = not config.app.debug

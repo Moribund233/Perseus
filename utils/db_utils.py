@@ -5,7 +5,7 @@
 """
 from typing import Optional, List, Type, TypeVar, Any
 from sqlalchemy.orm import joinedload
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exception import NotFoundException
@@ -104,6 +104,7 @@ async def paginate(
     offset = (page - 1) * limit
 
     # 获取总数
+    from sqlalchemy import func
     count_stmt = select(func.count()).select_from(stmt.subquery())
     count_result = await db.execute(count_stmt)
     total = count_result.scalar()
@@ -134,6 +135,7 @@ async def get_next_sequence_number(
     Returns:
         int: 下一个序列编号
     """
+    from sqlalchemy import func
     stmt = select(func.max(getattr(model, field_name)))
 
     if filters:
@@ -201,3 +203,81 @@ async def get_list_with_count(
         stmt = stmt.order_by(order_by)
 
     return await paginate(db, stmt, page, limit)
+
+
+async def get_issue_or_404(
+    db: AsyncSession,
+    repository_id: int,
+    issue_number: int
+):
+    """
+    获取 Issue，不存在则抛出404异常
+
+    Args:
+        db: 异步数据库会话
+        repository_id: 仓库ID
+        issue_number: Issue 编号
+
+    Returns:
+        Issue 模型实例
+
+    Raises:
+        NotFoundException: Issue 不存在时抛出
+    """
+    from sqlalchemy.orm import selectinload
+    from models.issue import Issue
+
+    result = await db.execute(
+        select(Issue)
+        .filter(
+            Issue.repository_id == repository_id,
+            Issue.issue_number == issue_number
+        )
+        .options(
+            selectinload(Issue.author),
+            selectinload(Issue.assignee),
+            selectinload(Issue.labels),
+            selectinload(Issue.closer)
+        )
+    )
+    issue = result.scalar_one_or_none()
+
+    if not issue:
+        raise NotFoundException(detail=f"Issue #{issue_number} not found")
+
+    return issue
+
+
+async def get_pull_request_or_404(
+    db: AsyncSession,
+    repository_id: int,
+    pr_number: int
+):
+    """
+    获取 Pull Request，不存在则抛出404异常
+
+    Args:
+        db: 异步数据库会话
+        repository_id: 仓库ID
+        pr_number: PR 编号
+
+    Returns:
+        PullRequest 模型实例
+
+    Raises:
+        NotFoundException: PR 不存在时抛出
+    """
+    from models.pull_request import PullRequest
+
+    result = await db.execute(
+        select(PullRequest).filter(
+            PullRequest.repository_id == repository_id,
+            PullRequest.pr_number == pr_number
+        )
+    )
+    pr = result.scalar_one_or_none()
+
+    if not pr:
+        raise NotFoundException(detail=f"Pull Request #{pr_number} not found")
+
+    return pr

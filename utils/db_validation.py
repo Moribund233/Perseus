@@ -148,30 +148,16 @@ def test_database_connection(url: str, db_type: str, timeout: int = 10, auto_cre
     except SQLAlchemyError as e:
         error_msg = str(e)
 
-        # 检查是否是数据库不存在的错误，并尝试自动创建
+        # 检查是否是数据库不存在的错误
         if auto_create_db and db_type == "postgresql":
             db_not_exist_keywords = [
                 "unknown database",
                 "database.*does not exist",
             ]
             if any(re.search(keyword, error_msg, re.IGNORECASE) for keyword in db_not_exist_keywords):
-                logger.info(f"数据库不存在，尝试自动创建: {url}")
-                from utils.migration.connection import create_database_if_not_exists
-                from utils.migration.dialect import DbType
-                db_type_enum = DbType(db_type)
-                created, create_error = create_database_if_not_exists(url, db_type_enum)
-                if created:
-                    # 重新尝试连接
-                    try:
-                        engine = create_engine(test_url, connect_args={"connect_timeout": timeout}, pool_pre_ping=True)
-                        with engine.connect() as conn:
-                            conn.execute(text("SELECT 1"))
-                        engine.dispose()
-                        return True, None
-                    except Exception as e2:
-                        return False, f"数据库已创建但连接失败: {str(e2)}"
-                else:
-                    return False, f"数据库不存在且自动创建失败: {create_error}"
+                # 注意：自动创建数据库功能已移除，请手动创建数据库
+                logger.warning(f"数据库不存在，请手动创建: {url}")
+                return False, f"数据库不存在，请手动创建: {error_msg}"
 
         if "password" in error_msg.lower() or "authentication" in error_msg.lower():
             return False, f"Authentication failed: {error_msg}"

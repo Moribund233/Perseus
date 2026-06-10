@@ -19,17 +19,10 @@ from core.exception import ValidationException, NotFoundException, ConflictExcep
 from utils.git_utils import init_bare_repo, get_repository_storage_path, repo_exists_async, GitError
 from utils.response_builder import build_repo_response
 from utils.db_utils import exists
+from core.constants import ROLE_PRIORITY
 
 # 日志记录器
 logger = logging.getLogger(__name__)
-
-# 常量定义
-ROLE_PRIORITY = {
-    "owner": 4,
-    "admin": 3,
-    "developer": 2,
-    "readonly": 1
-}
 
 # 物理仓库存在状态缓存（仓库ID -> (存在状态, 缓存时间)）
 # 缓存有效期30秒，减少频繁的磁盘IO检查
@@ -315,6 +308,7 @@ async def delete_repository(repo_id: int, db: AsyncSession):
         raise NotFoundException(detail="Repository not found")
 
     # 获取物理仓库路径
+    physical_path = None
     try:
         physical_path = get_repository_storage_path(db_repo.path)
         if os.path.exists(physical_path):
@@ -322,7 +316,8 @@ async def delete_repository(repo_id: int, db: AsyncSession):
             logger.info(f"物理仓库已删除: {physical_path}")
     except Exception as e:
         # 物理仓库删除失败，记录错误但不阻止数据库删除
-        logger.warning(f"Failed to delete physical repository at {physical_path}: {e}")
+        path_info = physical_path if physical_path else "unknown"
+        logger.warning(f"Failed to delete physical repository at {path_info}: {e}")
 
     await db.delete(db_repo)
     await db.commit()

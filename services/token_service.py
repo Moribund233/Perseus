@@ -6,7 +6,6 @@ Token 认证服务
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 import logging
 
 from sqlalchemy import select
@@ -14,23 +13,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.user import User
 from core.config import get_config
-
-# 获取配置
-_config = get_config()
-_security_config = _config.security
-
-# 配置 - 从环境变量读取（由 Client 注入）
-# 注意：SECRET_KEY 必须通过环境变量 PERSEUS_SECURITY_SECRET_KEY 设置
-SECRET_KEY = _security_config.secret_key
-ALGORITHM = _security_config.algorithm
-ACCESS_TOKEN_EXPIRE_MINUTES = _security_config.access_token_expire_minutes
-REFRESH_TOKEN_EXPIRE_DAYS = _security_config.refresh_token_expire_days
-
-# 密码上下文
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from utils.password_utils import verify_password, get_password_hash
 
 # 日志记录器
 logger = logging.getLogger(__name__)
+
+
+def _get_security_config():
+    """获取安全配置（运行时读取，支持密钥轮换）"""
+    config = get_config()
+    return config.security
 
 
 class TokenData:
@@ -55,12 +47,13 @@ def create_access_token(
     Returns:
         str: JWT 令牌
     """
+    security_config = _get_security_config()
     to_encode = data.copy()
 
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=security_config.access_token_expire_minutes)
 
     to_encode.update({
         "exp": expire,
@@ -68,7 +61,7 @@ def create_access_token(
         "type": "access"
     })
 
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, security_config.secret_key, algorithm=security_config.algorithm)
     return encoded_jwt
 
 
@@ -86,12 +79,13 @@ def create_refresh_token(
     Returns:
         str: JWT 刷新令牌
     """
+    security_config = _get_security_config()
     to_encode = data.copy()
 
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        expire = datetime.now(timezone.utc) + timedelta(days=security_config.refresh_token_expire_days)
 
     to_encode.update({
         "exp": expire,
@@ -99,7 +93,7 @@ def create_refresh_token(
         "type": "refresh"
     })
 
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, security_config.secret_key, algorithm=security_config.algorithm)
     return encoded_jwt
 
 
@@ -169,7 +163,8 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
         return None
 
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        security_config = _get_security_config()
+        payload = jwt.decode(token, security_config.secret_key, algorithms=[security_config.algorithm])
 
         # 检查令牌类型
         if payload.get("type") != token_type:
@@ -248,130 +243,3 @@ def revoke_token(token: str) -> bool:
     return True
 
 
-async def get_user_by_username(db: AsyncSession, username: str) -> Optional[User]:
-    """
-    根据用户名获取用户
-
-    Args:
-        db: 异步数据库会话
-        username: 用户名
-
-    Returns:
-        User: 用户对象，不存在返回 None
-    """
-    result = await db.execute(select(User).filter(User.username == username))
-    return result.scalar_one_or_none()
-
-
-async def authenticate_user(
-    db: AsyncSession,
-    username: str,
-    password: str
-) -> Optional[User]:
-    """
-    认证用户
-
-    验证用户名和密码是否匹配
-
-    Args:
-        db: 异步数据库会话
-        username: 用户名
-        password: 密码
-
-    Returns:
-        User: 认证成功的用户对象，失败返回 None
-
-    Raises:
-        AuthenticationException: 认证失败时抛出
-    """
-    from core.exception import AuthenticationException
-
-    user = await get_user_by_username(db, username)
-
-    if not user:
-        raise AuthenticationException(detail="Invalid username or password")
-
-    if not user.is_active:
-        raise AuthenticationException(detail="User account is disabled")
-
-    if not pwd_context.verify(password, user.password):
-        raise AuthenticationException(detail="Invalid username or password")
-
-    return user
-
-
-async def get_current_user(
-    db: AsyncSession,
-    token: str
-) -> User:
-    """
-    从令牌获取当前用户
-
-    验证令牌并返回对应的用户对象
-
-    Args:
-        db: 异步数据库会话
-        token: JWT 令牌
-
-    Returns:
-        User: 当前用户对象
-
-    Raises:
-        AuthenticationException: 令牌无效或用户不存在时抛出
-    """
-    from core.exception import AuthenticationException
-
-    token_data = verify_token(token, token_type="access")
-
-    if not token_data:
-        raise AuthenticationException(detail="Invalid or expired token")
-
-    result = await db.execute(select(User).filter(User.id == token_data.user_id))
-    user = result.scalar_one_or_none()
-
-    if not user:
-        raise AuthenticationException(detail="User not found")
-
-    if not user.is_active:
-        raise AuthenticationException(detail="User account is disabled")
-
-    return user
-
-
-async def validate_token(
-    db: AsyncSession,
-    token: str
-) -> TokenData:
-    """
-    验证令牌
-
-    验证令牌的有效性并返回令牌数据
-
-    Args:
-        db: 异步数据库会话
-        token: JWT 令牌
-
-    Returns:
-        TokenData: 令牌数据
-
-    Raises:
-        AuthenticationException: 令牌无效时抛出
-    """
-    from core.exception import AuthenticationException
-
-    token_data = verify_token(token, token_type="access")
-
-    if not token_data:
-        raise AuthenticationException(detail="Invalid or expired token")
-
-    # 验证用户是否存在且活跃
-    result = await db.execute(select(User).filter(User.id == token_data.user_id))
-    user = result.scalar_one_or_none()
-
-    if not user:
-        raise AuthenticationException(detail="User not found")
-
-    if not user.is_active:
-        raise AuthenticationException(detail="User account is disabled")
-
-    return token_data

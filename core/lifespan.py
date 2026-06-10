@@ -17,7 +17,7 @@ from typing import AsyncGenerator, Dict, Any, Optional
 
 from fastapi import FastAPI
 
-from models import engine
+from models import init_engine, get_engine
 from api.websocket.manager import manager as websocket_manager
 
 logger = logging.getLogger(__name__)
@@ -40,14 +40,23 @@ class AppLifecycleManager:
         应用启动时执行的初始化操作
 
         包括：
+        - 初始化数据库引擎
         - 验证数据库连接
         - 初始化 WebSocket 心跳检查
+
+        Raises:
+            Exception: 数据库引擎初始化或连接验证失败时抛出异常，
+                       阻止应用在不健康状态下启动
         """
+        # 初始化数据库引擎（延迟加载） — 致命错误，必须阻止启动
+        init_engine()
+        await self._verify_database_connection()
+
+        # 初始化 WebSocket 心跳检查 — 非致命错误，打日志即可
         try:
-            await self._verify_database_connection()
             await self._init_websocket_manager()
         except Exception as e:
-            logger.error(f"启动初始化失败: {e}")
+            logger.warning(f"WebSocket 管理器初始化失败（不影响服务启动）: {e}")
 
     async def shutdown(self) -> None:
         """
@@ -67,14 +76,11 @@ class AppLifecycleManager:
 
     async def _verify_database_connection(self) -> None:
         """验证数据库连接是否正常"""
-        try:
-            from sqlalchemy import text
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-                conn.commit()
-        except Exception as e:
-            logger.error(f"数据库连接验证失败: {e}")
-            # 不抛出异常，允许应用继续启动
+        from sqlalchemy import text
+        engine = get_engine()
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+            conn.commit()
 
     async def _init_websocket_manager(self) -> None:
         """初始化 WebSocket 管理器"""
@@ -116,6 +122,7 @@ class AppLifecycleManager:
     async def _dispose_database_engine(self) -> None:
         """释放数据库连接池"""
         try:
+            engine = get_engine()
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, engine.dispose)
         except Exception as e:

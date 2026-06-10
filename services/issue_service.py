@@ -11,14 +11,13 @@ from sqlalchemy import select, func
 from models import Issue, Label, IssueComment
 from core.exception import ValidationException, NotFoundException
 from utils.permission_utils import check_resource_author_or_admin
-from utils.query_utils import get_issue_or_404
 from utils.response_builder import (
     build_issue_response,
     build_issue_comment_response,
     build_label_response,
     build_pagination_response
 )
-from utils.db_utils import paginate, get_next_sequence_number
+from utils.db_utils import paginate, get_next_sequence_number, get_issue_or_404
 
 
 async def list_issues(
@@ -599,7 +598,6 @@ async def add_label_to_issue(
         ValidationException: 标签已存在时抛出
     """
     from utils.permission_utils import check_resource_author_or_admin
-    from utils.query_utils import get_issue_or_404
     from sqlalchemy.orm import selectinload
 
     # 获取 Issue
@@ -671,7 +669,6 @@ async def remove_label_from_issue(
         ValidationException: 标签不存在于 Issue 时抛出
     """
     from utils.permission_utils import check_resource_author_or_admin
-    from utils.query_utils import get_issue_or_404
     from sqlalchemy.orm import selectinload
 
     # 获取 Issue

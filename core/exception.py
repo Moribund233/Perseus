@@ -197,8 +197,12 @@ class RepositoryNotFoundException(RepositoryBrowserException):
         Args:
             detail: 错误详情
         """
-        super().__init__(detail=detail)
-        self.status_code = status.HTTP_404_NOT_FOUND
+        # 直接调用 BaseException，传入正确的状态码
+        BaseException.__init__(
+            self,
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=detail
+        )
 
 class PathNotFoundException(RepositoryBrowserException):
     """
@@ -213,8 +217,12 @@ class PathNotFoundException(RepositoryBrowserException):
         Args:
             detail: 错误详情
         """
-        super().__init__(detail=detail)
-        self.status_code = status.HTTP_404_NOT_FOUND
+        # 直接调用 BaseException，传入正确的状态码
+        BaseException.__init__(
+            self,
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=detail
+        )
 
 class InvalidPathException(RepositoryBrowserException):
     """
@@ -229,8 +237,12 @@ class InvalidPathException(RepositoryBrowserException):
         Args:
             detail: 错误详情
         """
-        super().__init__(detail=detail)
-        self.status_code = status.HTTP_400_BAD_REQUEST
+        # 直接调用 BaseException，传入正确的状态码
+        BaseException.__init__(
+            self,
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=detail
+        )
 
 class AppServiceException(BaseException):
     """
@@ -264,5 +276,9 @@ class ConfigValidationException(AppServiceException):
         Args:
             detail: 错误详情
         """
-        super().__init__(detail=detail)
-        self.status_code = status.HTTP_400_BAD_REQUEST
+        # 直接调用 BaseException，传入正确的状态码
+        BaseException.__init__(
+            self,
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=detail
+        )

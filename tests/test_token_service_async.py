@@ -40,10 +40,11 @@ async def db():
 @pytest_asyncio.fixture
 async def test_user(db: AsyncSession):
     """创建测试用户"""
+    from utils.password_utils import get_password_hash
     user = User(
         username="testuser",
         email="test@example.com",
-        password=token_service.pwd_context.hash("testpassword"),
+        password=get_password_hash("testpassword"),
         full_name="Test User",
         is_active=True
     )
@@ -56,10 +57,11 @@ async def test_user(db: AsyncSession):
 @pytest_asyncio.fixture
 async def inactive_user(db: AsyncSession):
     """创建未激活测试用户"""
+    from utils.password_utils import get_password_hash
     user = User(
         username="inactiveuser",
         email="inactive@example.com",
-        password=token_service.pwd_context.hash("testpassword"),
+        password=get_password_hash("testpassword"),
         full_name="Inactive User",
         is_active=False
     )
@@ -95,9 +97,10 @@ def test_create_refresh_token():
 
 def test_verify_password():
     """测试验证密码"""
-    hashed = token_service.pwd_context.hash("testpassword")
-    assert token_service.pwd_context.verify("testpassword", hashed) is True
-    assert token_service.pwd_context.verify("wrongpassword", hashed) is False
+    from utils.password_utils import get_password_hash, verify_password
+    hashed = get_password_hash("testpassword")
+    assert verify_password("testpassword", hashed) is True
+    assert verify_password("wrongpassword", hashed) is False
 
 
 def test_verify_token_valid():

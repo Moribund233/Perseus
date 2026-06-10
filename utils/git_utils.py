@@ -408,9 +408,9 @@ def get_repository_storage_path(repo_path: str, repo_root: Optional[str] = None)
     """
     if repo_root is None:
         # 从配置读取
-        from utils.config_utils import get_config_manager
-        config_manager = get_config_manager()
-        repo_root = config_manager.get("storage.repo_root", "./repositories")
+        from core.config import get_config
+        config = get_config()
+        repo_root = config.storage.repo_root if hasattr(config, 'storage') else "./repositories"
 
     # 将 repo_path 中的 / 转换为系统路径分隔符，并移除开头的分隔符
     normalized_path = os.path.normpath(repo_path)
@@ -430,9 +430,9 @@ def ensure_repository_root(repo_root: Optional[str] = None) -> str:
     """
     if repo_root is None:
         # 从配置读取
-        from utils.config_utils import get_config_manager
-        config_manager = get_config_manager()
-        repo_root = config_manager.get("storage.repo_root", "./repositories")
+        from core.config import get_config
+        config = get_config()
+        repo_root = config.storage.repo_root if hasattr(config, 'storage') else "./repositories"
 
     # 转换为绝对路径
     repo_root = os.path.abspath(repo_root)

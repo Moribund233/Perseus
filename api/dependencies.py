@@ -14,7 +14,6 @@ from services.token_service import verify_token
 
 # 使用 HTTPBearer 从 Authorization 头中提取 token
 security = HTTPBearer(auto_error=False)
-security_strict = HTTPBearer(auto_error=True)
 
 
 async def get_current_user(
@@ -70,21 +69,6 @@ async def get_current_user(
         )
 
     return user
-
-
-async def get_current_active_user(
-    current_user: User = Depends(get_current_user)
-) -> User:
-    """
-    获取当前活跃用户
-
-    Args:
-        current_user: 当前认证用户
-
-    Returns:
-        User: 当前活跃用户对象
-    """
-    return current_user
 
 
 async def get_current_admin_user(

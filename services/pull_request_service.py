@@ -12,14 +12,13 @@ from sqlalchemy import select
 from models import PullRequest, PRComment, PRReview, User
 from core.exception import ValidationException, NotFoundException, AuthorizationException
 from utils.permission_utils import check_resource_author_or_admin, check_repository_permission
-from utils.query_utils import get_pull_request_or_404
 from utils.response_builder import (
     build_pr_response,
     build_pr_comment_response,
     build_pr_review_response,
     build_pagination_response
 )
-from utils.db_utils import paginate, get_next_sequence_number
+from utils.db_utils import paginate, get_next_sequence_number, get_pull_request_or_404
 from utils.git_utils import GitService
 
 

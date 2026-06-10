@@ -210,26 +210,3 @@ async def close_async_engine():
         _async_engine = None
         _async_session_maker = None
         logger.info("异步数据库引擎已关闭")
-
-
-async def init_async_db():
-    """
-    初始化异步数据库
-    
-    创建所有表（如果不存在）
-    """
-    engine = get_async_engine()
-    if engine is None:
-        logger.error("异步数据库初始化失败：数据库引擎未创建")
-        return
-    
-    # 导入所有模型以确保表被创建
-    from models import Base
-    
-    async with engine.begin() as conn:
-        # 注意：生产环境应该使用 Alembic 进行迁移
-        # 这里仅用于开发和测试
-        # await conn.run_sync(Base.metadata.create_all)
-        pass
-    
-    logger.info("异步数据库初始化完成")

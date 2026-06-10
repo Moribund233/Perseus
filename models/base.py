@@ -17,5 +17,5 @@ class BaseModel(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     """创建时间，默认值为当前时间"""
     
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    """更新时间，默认值为None，更新时自动设置为当前时间"""
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    """更新时间，默认值为当前时间，更新时自动设置为当前时间"""

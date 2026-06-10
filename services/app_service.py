@@ -192,9 +192,14 @@ class AppService:
 
         return True
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self, requests_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         获取应用状态
+
+        请求统计信息由调用方传入，避免服务层直接依赖中间件。
+
+        Args:
+            requests_info: 可选的请求统计信息，由控制器层传入
 
         Returns:
             Dict[str, Any]: 应用状态信息
@@ -205,7 +210,6 @@ class AppService:
         uptime_seconds = int(uptime.total_seconds())
 
         process_info = self._get_process_info()
-        requests_info = self._get_requests_info()
         git_info = self._get_git_operations_info()
 
         return {
@@ -216,7 +220,7 @@ class AppService:
             "version": "1.0.0",
             "server_time": datetime.now().isoformat(),
             "process": process_info,
-            "requests": requests_info,
+            "requests": requests_info or self._get_default_requests_info(),
             "git_operations": git_info,
         }
 
@@ -270,15 +274,19 @@ class AppService:
 
         return "".join(parts)
 
-    def _get_requests_info(self) -> Dict[str, Any]:
+    def _get_default_requests_info(self) -> Dict[str, Any]:
         """
-        获取请求统计信息
+        获取默认请求统计信息（当调用方未传入数据时使用）
 
         Returns:
-            Dict[str, Any]: 请求统计信息
+            Dict[str, Any]: 空请求统计信息
         """
-        from middleware.request_stats import get_request_stats
-        return get_request_stats().get_stats()
+        return {
+            "total_requests": 0,
+            "active_requests": 0,
+            "requests_per_second": 0,
+            "average_response_time": 0,
+        }
 
     def _get_git_operations_info(self) -> Dict[str, Any]:
         """

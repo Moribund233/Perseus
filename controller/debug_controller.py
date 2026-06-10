@@ -16,15 +16,13 @@ import gc
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import HTTPAuthorizationCredentials
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from core.config import get_config, ConfigManager, reset_module_config_manager
-from api.dependencies import security
+from api.dependencies import get_current_user
 from models.user import User
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
 
 from utils.init_database import DatabaseInitializer
 from utils.logging import get_named_logger
@@ -92,71 +90,29 @@ async def require_debug_mode():
 
 
 async def require_admin(
-    request: Request,
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    current_user: User = Depends(get_current_user)
 ) -> User:
     """
     要求 JWT 管理员权限
 
+    复用 api/dependencies.py 的 get_current_user 进行基础认证，
+    然后额外检查管理员权限。
+
     Args:
-        request: FastAPI 请求对象
-        credentials: HTTP 认证凭证
+        current_user: 当前认证用户（由 get_current_user 注入）
 
     Returns:
         User: 认证通过的管理员用户
 
     Raises:
-        HTTPException: 权限不足时抛出 401/403 错误
+        HTTPException: 权限不足时抛出 403 错误
     """
-    from services.token_service import verify_token
-    from models.async_db import get_async_db
-    from sqlalchemy import select
-
-    if not credentials:
+    if not current_user.is_admin:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required",
-            headers={"WWW-Authenticate": "Bearer"},
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin permission required",
         )
-
-    token = credentials.credentials
-    token_data = verify_token(token, token_type="access")
-
-    if token_data is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    async for db in get_async_db():
-        try:
-            result = await db.execute(select(User).filter(User.id == token_data.user_id))
-            user = result.scalar_one_or_none()
-
-            if user is None:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="User not found",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-
-            if not user.is_active:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="User is inactive",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-
-            if not user.is_admin:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Admin permission required",
-                )
-
-            return user
-        finally:
-            await db.close()
+    return current_user
 
 
 # ============== 数据库操作辅助函数 ==============
@@ -186,17 +142,37 @@ def _drop_all_tables_postgresql(engine):
     with engine.connect() as conn:
         # 获取所有表
         result = conn.execute(text("""
-            SELECT tablename FROM pg_tables 
+            SELECT tablename FROM pg_tables
             WHERE schemaname = 'public'
         """))
         tables = [row[0] for row in result.fetchall()]
-        
-        # 删除每个表
+
+        # 删除每个表（使用参数化查询防止 SQL 注入）
         for table in tables:
+            # 验证表名只包含合法字符
+            if not _is_valid_table_name(table):
+                logger.warning(f"跳过非法表名: {table}")
+                continue
             conn.execute(text(f'DROP TABLE IF EXISTS "{table}" CASCADE'))
-        
+
         conn.commit()
         logger.info(f"已删除 PostgreSQL 数据库中的 {len(tables)} 个表")
+
+
+def _is_valid_table_name(table_name: str) -> bool:
+    """
+    验证表名是否合法（只包含字母、数字、下划线）
+
+    Args:
+        table_name: 表名
+
+    Returns:
+        bool: 是否合法
+    """
+    if not table_name or not isinstance(table_name, str):
+        return False
+    # 只允许字母、数字、下划线
+    return all(c.isalnum() or c == '_' for c in table_name)
 
 
 # ============== API 端点 ==============
@@ -237,15 +213,15 @@ async def debug_status(
     # 检查是否处于压力测试模式
     stress_test_mode = os.environ.get('PERSEUS_STRESS_TEST', 'false').lower() == 'true'
 
-    # 获取限流配置
-    rate_limit_config = getattr(config, 'rate_limit', None)
+    # 获取限流配置（由 Nginx 处理，此处仅展示配置值）
+    rl = config.rate_limit
     rate_limit_info = RateLimitInfo(
-        default_limits=getattr(rate_limit_config, 'default_limits', ["200 per minute", "1000 per hour"]) if rate_limit_config else ["200 per minute", "1000 per hour"],
-        strict=getattr(rate_limit_config, 'strict', ["5 per minute", "20 per hour"]) if rate_limit_config else ["5 per minute", "20 per hour"],
-        standard=getattr(rate_limit_config, 'standard', ["30 per minute", "500 per hour"]) if rate_limit_config else ["30 per minute", "500 per hour"],
-        generous=getattr(rate_limit_config, 'generous', ["100 per minute", "2000 per hour"]) if rate_limit_config else ["100 per minute", "2000 per hour"],
-        git_operations=getattr(rate_limit_config, 'git_operations', ["10 per minute", "100 per hour"]) if rate_limit_config else ["10 per minute", "100 per hour"],
-        download=getattr(rate_limit_config, 'download', ["20 per minute", "200 per hour"]) if rate_limit_config else ["20 per minute", "200 per hour"]
+        default_limits=[rl.default_limits.to_limit_string()],
+        strict=[rl.strict.to_limit_string()],
+        standard=[rl.standard.to_limit_string()],
+        generous=[rl.generous.to_limit_string()],
+        git_operations=[rl.git_operations.to_limit_string()],
+        download=[rl.download.to_limit_string()]
     )
 
     return DebugStatusResponse(
@@ -299,7 +275,8 @@ async def init_database(
         
         # 关闭现有的同步引擎（如果存在）
         try:
-            from models import engine as sync_engine
+            from models import get_engine
+            sync_engine = get_engine()
             if sync_engine:
                 sync_engine.dispose()
         except Exception as e:

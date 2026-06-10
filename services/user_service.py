@@ -8,20 +8,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from models import User
 from core.exception import ValidationException, NotFoundException, ConflictException, AuthenticationException
-from passlib.context import CryptContext
 from services.token_service import create_token_pair
+from utils.password_utils import verify_password, get_password_hash
 
 # 日志记录器
 logger = logging.getLogger(__name__)
-
-# 密码哈希上下文
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto"
-)
-
-# 常量定义
-MAX_PASSWORD_LENGTH = 72  # bcrypt 最大支持长度
 
 
 def user_to_dict(user: User) -> dict:
@@ -44,43 +35,6 @@ def user_to_dict(user: User) -> dict:
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "updated_at": user.updated_at.isoformat() if user.updated_at else None
     }
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """
-    验证密码是否匹配
-
-    Args:
-        plain_password: 明文密码
-        hashed_password: 哈希密码
-
-    Returns:
-        bool: 密码是否匹配
-    """
-    try:
-        # 限制密码长度，避免bcrypt错误
-        return pwd_context.verify(plain_password[:MAX_PASSWORD_LENGTH], hashed_password)
-    except Exception as e:
-        logger.warning(f"密码验证失败: {e}")
-        return False
-
-
-def get_password_hash(password: str) -> str:
-    """
-    获取密码的哈希值
-
-    Args:
-        password: 明文密码
-
-    Returns:
-        str: 哈希后的密码
-    """
-    try:
-        # 限制密码长度，避免bcrypt错误
-        return pwd_context.hash(password[:MAX_PASSWORD_LENGTH])
-    except Exception as e:
-        logger.error(f"密码哈希生成失败: {e}")
-        raise
 
 
 async def get_users(db: AsyncSession):
@@ -287,6 +241,8 @@ async def authenticate_user(username: str, password: str, db: AsyncSession) -> U
     Returns:
         User | None: 认证成功返回用户对象，失败返回 None
     """
+    from utils.password_utils import verify_password
+
     # 查找用户（异步）
     result = await db.execute(select(User).filter(User.username == username))
     user = result.scalar_one_or_none()
@@ -295,11 +251,7 @@ async def authenticate_user(username: str, password: str, db: AsyncSession) -> U
         return None
 
     # 验证密码
-    try:
-        # 限制密码长度，避免bcrypt错误
-        if pwd_context.verify(password[:MAX_PASSWORD_LENGTH], user.password):
-            return user
-    except Exception:
-        pass
+    if verify_password(password, user.password):
+        return user
 
     return None

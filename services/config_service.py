@@ -8,7 +8,7 @@
 """
 from typing import Any, Dict, List, Optional, Tuple
 
-from utils.config_utils import ConfigManager, get_config_manager
+from core.config import ConfigManager, get_config as get_core_config
 from core.exception import ValidationException, AuthorizationException
 
 
@@ -19,7 +19,7 @@ class ConfigService:
     提供配置管理功能
     """
 
-    ALLOWED_CONFIG_SECTIONS = {"server", "gunicorn", "proxy", "rate_limit", "cors", "database"}
+    ALLOWED_CONFIG_SECTIONS = {"server", "gunicorn", "proxy", "cors", "database"}
     PROTECTED_CONFIG_SECTIONS = {"storage", "security", "app", "logging", "system"}
     RESTART_REQUIRED_CONFIGS = {
         "server": {"host", "port", "log_level"},
@@ -31,7 +31,6 @@ class ConfigService:
         },
         "proxy": {"proxy"},
         "cors": {"allow_origins", "allow_credentials", "allow_methods", "allow_headers", "max_age"},
-        "rate_limit": {"default_limits", "strict", "standard", "generous", "git_operations", "download"},
         "database": {
             "pool_size", "max_overflow", "pool_timeout", "pool_recycle", "echo",
             "sqlite_timeout", "sqlite_check_same_thread", "sqlite_isolation_level",
@@ -41,21 +40,6 @@ class ConfigService:
             "pg_ssl_mode", "pg_connect_timeout", "pg_application_name",
         },
     }
-
-    def __init__(self):
-        """初始化配置服务"""
-        self._config_manager: Optional[ConfigManager] = None
-
-    def _get_config_manager(self) -> ConfigManager:
-        """
-        获取配置管理器实例
-
-        Returns:
-            ConfigManager: 配置管理器实例
-        """
-        if self._config_manager is None:
-            self._config_manager = get_config_manager()
-        return self._config_manager
 
     def _check_permission(self, is_debug: bool, is_admin: bool) -> None:
         """
@@ -70,7 +54,7 @@ class ConfigService:
         """
         if not is_debug and not is_admin:
             raise AuthorizationException(
-                detail="该操作需要本地认证或调试模式"
+                detail="该操作需要调试模式或管理员权限"
             )
 
     def get_config(self, section: Optional[str] = None) -> Dict[str, Any]:
@@ -83,12 +67,12 @@ class ConfigService:
         Returns:
             Dict[str, Any]: 配置数据
         """
-        config_manager = self._get_config_manager()
-        config = config_manager.load_config()
+        config = get_core_config()
+        config_dict = config.model_dump()
 
         if section:
-            return config.get(section, {})
-        return config
+            return config_dict.get(section, {})
+        return config_dict
 
     def update_config(self, config_data: Dict[str, Any], is_debug: bool = False, is_admin: bool = False) -> Tuple[bool, List[str], List[str]]:
         """
@@ -108,20 +92,14 @@ class ConfigService:
         """
         self._check_permission(is_debug, is_admin)
 
-        config_manager = self._get_config_manager()
-
         is_valid, errors = self._validate_config_data(config_data)
         if not is_valid:
             raise ValidationException(detail=f"配置验证失败: {'; '.join(errors)}")
 
         restart_required, restart_items = self._check_restart_required(config_data)
 
-        current_config = config_manager.load_config()
-        merged_config = self._merge_config(current_config, config_data)
-
-        success = config_manager.save_config(merged_config)
-        if not success:
-            return False, ["保存配置失败"], []
+        config_manager = ConfigManager()
+        config_manager.update_config(config_data)
 
         restart_hints = []
         if restart_required:
@@ -152,12 +130,14 @@ class ConfigService:
         except FileNotFoundError:
             return False, ["config.example.toml 不存在，无法重置"]
 
-        config_manager = self._get_config_manager()
-        success = config_manager.save_config(example_config)
-        if not success:
-            return False, ["重置配置失败"]
+        config_manager = ConfigManager()
 
-        return True, []
+        # 使用 update_config 方法重置配置
+        try:
+            config_manager.update_config(example_config)
+            return True, []
+        except Exception as e:
+            return False, [f"重置配置失败: {str(e)}"]
 
     def validate_config(self, config_data: Optional[Dict[str, Any]] = None) -> Tuple[bool, List[str]]:
         """
@@ -170,8 +150,7 @@ class ConfigService:
             Tuple[bool, List[str]]: (是否有效, 错误信息列表)
         """
         if config_data is None:
-            config_manager = self._get_config_manager()
-            config_data = config_manager.load_config()
+            config_data = self.get_config()
 
         return self._validate_config_data(config_data)
 
@@ -198,27 +177,6 @@ class ConfigService:
                     restart_items.append(f"{section}.{field}")
 
         return len(restart_items) > 0, restart_items
-
-    def _merge_config(self, current: Dict[str, Any], updates: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        合并配置（深度合并）
-
-        Args:
-            current: 当前配置
-            updates: 更新的配置
-
-        Returns:
-            Dict[str, Any]: 合并后的配置
-        """
-        result = current.copy()
-
-        for section, values in updates.items():
-            if section in result and isinstance(result[section], dict) and isinstance(values, dict):
-                result[section] = {**result[section], **values}
-            else:
-                result[section] = values
-
-        return result
 
     def _validate_config_data(self, config_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
         """
@@ -250,9 +208,6 @@ class ConfigService:
 
         if "proxy" in config_data:
             errors.extend(self._validate_proxy_config(config_data["proxy"]))
-
-        if "rate_limit" in config_data:
-            errors.extend(self._validate_rate_limit_config(config_data["rate_limit"]))
 
         if "cors" in config_data:
             errors.extend(self._validate_cors_config(config_data["cors"]))
@@ -301,91 +256,27 @@ class ConfigService:
         return errors
 
     def _validate_gunicorn_config(self, gunicorn: Any) -> List[str]:
-        """验证Gunicorn配置"""
+        """验证 Gunicorn 配置"""
         errors = []
         if not isinstance(gunicorn, dict):
             errors.append("gunicorn 配置必须是对象")
             return errors
 
-        # 验证workers
-        if "workers" in gunicorn:
-            try:
-                workers = int(gunicorn["workers"])
-                if workers < 1 or workers > 32:
-                    errors.append("Gunicorn workers 必须是1-32之间的整数")
-            except (ValueError, TypeError):
-                errors.append("Gunicorn workers 必须是1-32之间的整数")
-
-        # 验证worker_class
-        if "worker_class" in gunicorn:
-            if not isinstance(gunicorn["worker_class"], str) or not gunicorn["worker_class"]:
-                errors.append("Gunicorn worker_class 不能为空")
-
-        # 验证threads
-        if "threads" in gunicorn:
-            try:
-                threads = int(gunicorn["threads"])
-                if threads < 1:
-                    errors.append("Gunicorn threads 必须是正整数")
-            except (ValueError, TypeError):
-                errors.append("Gunicorn threads 必须是正整数")
-
-        # 验证worker_connections
-        if "worker_connections" in gunicorn:
-            try:
-                conn = int(gunicorn["worker_connections"])
-                if conn < 100:
-                    errors.append("Gunicorn worker_connections 必须至少为100")
-            except (ValueError, TypeError):
-                errors.append("Gunicorn worker_connections 必须是整数")
-
-        # 验证backlog
-        if "backlog" in gunicorn:
-            try:
-                backlog = int(gunicorn["backlog"])
-                if backlog < 128:
-                    errors.append("Gunicorn backlog 必须至少为128")
-            except (ValueError, TypeError):
-                errors.append("Gunicorn backlog 必须是整数")
-
-        # 验证超时配置
-        for timeout_field in ["timeout", "graceful_timeout", "keepalive"]:
-            if timeout_field in gunicorn:
+        int_fields = ["workers", "threads", "worker_connections", "backlog", "timeout",
+                      "graceful_timeout", "keepalive", "max_requests", "max_requests_jitter"]
+        for field in int_fields:
+            if field in gunicorn:
                 try:
-                    val = int(gunicorn[timeout_field])
-                    if val < 1:
-                        errors.append(f"Gunicorn {timeout_field} 必须是正整数")
+                    value = int(gunicorn[field])
+                    if value < 0:
+                        errors.append(f"gunicorn.{field} 必须是非负整数")
                 except (ValueError, TypeError):
-                    errors.append(f"Gunicorn {timeout_field} 必须是正整数")
+                    errors.append(f"gunicorn.{field} 必须是整数")
 
-        # 验证max_requests
-        if "max_requests" in gunicorn:
-            try:
-                max_req = int(gunicorn["max_requests"])
-                if max_req < 1000:
-                    errors.append("Gunicorn max_requests 必须至少为1000")
-            except (ValueError, TypeError):
-                errors.append("Gunicorn max_requests 必须是整数")
-
-        # 验证max_requests_jitter
-        if "max_requests_jitter" in gunicorn:
-            try:
-                jitter = int(gunicorn["max_requests_jitter"])
-                if jitter < 0:
-                    errors.append("Gunicorn max_requests_jitter 必须是非负整数")
-            except (ValueError, TypeError):
-                errors.append("Gunicorn max_requests_jitter 必须是非负整数")
-
-        # 验证布尔值配置
-        for bool_field in ["preload_app", "daemon", "access_log", "capture_output", "enable_reuse_port"]:
-            if bool_field in gunicorn:
-                if not isinstance(gunicorn[bool_field], bool):
-                    errors.append(f"Gunicorn {bool_field} 必须是布尔值")
-
-        # 验证access_log_format
-        if "access_log_format" in gunicorn:
-            if not isinstance(gunicorn["access_log_format"], str):
-                errors.append("Gunicorn access_log_format 必须是字符串")
+        bool_fields = ["preload_app", "daemon", "access_log", "capture_output", "enable_reuse_port"]
+        for field in bool_fields:
+            if field in gunicorn and not isinstance(gunicorn[field], bool):
+                errors.append(f"gunicorn.{field} 必须是布尔值")
 
         return errors
 
@@ -396,50 +287,8 @@ class ConfigService:
             errors.append("proxy 配置必须是对象")
             return errors
 
-        if "proxy" in proxy:
-            if not isinstance(proxy["proxy"], bool):
-                errors.append("proxy.proxy 必须是布尔值")
-
-        return errors
-
-    def _validate_rate_limit_config(self, rate_limit: Any) -> List[str]:
-        """验证速率限制配置"""
-        errors = []
-        if not isinstance(rate_limit, dict):
-            errors.append("rate_limit 配置必须是对象")
-            return errors
-
-        valid_limit_types = {"default_limits", "strict", "standard", "generous", "git_operations", "download"}
-        valid_modes = {"minute", "hour"}
-
-        for key in rate_limit.keys():
-            if key not in valid_limit_types:
-                errors.append(f"rate_limit 不支持 '{key}'，支持的类型: {', '.join(valid_limit_types)}")
-                continue
-
-            item = rate_limit[key]
-            # 支持新的对象格式: { mode: "minute|hour", value: number }
-            if isinstance(item, dict):
-                if "mode" not in item:
-                    errors.append(f"rate_limit.{key}.mode 是必填项")
-                elif item["mode"] not in valid_modes:
-                    errors.append(f"rate_limit.{key}.mode 必须是 'minute' 或 'hour'")
-
-                if "value" not in item:
-                    errors.append(f"rate_limit.{key}.value 是必填项")
-                else:
-                    try:
-                        value = int(item["value"])
-                        if value < 1:
-                            errors.append(f"rate_limit.{key}.value 必须是正整数")
-                    except (ValueError, TypeError):
-                        errors.append(f"rate_limit.{key}.value 必须是正整数")
-            # 向后兼容：支持旧的字符串数组格式
-            elif isinstance(item, list):
-                # 旧格式验证通过，但给出警告
-                pass
-            else:
-                errors.append(f"rate_limit.{key} 必须是对象 {{mode, value}} 或字符串数组")
+        if "proxy" in proxy and not isinstance(proxy["proxy"], bool):
+            errors.append("proxy.proxy 必须是布尔值")
 
         return errors
 
@@ -451,48 +300,36 @@ class ConfigService:
             return errors
 
         if "allow_origins" in cors:
-            if not isinstance(cors["allow_origins"], list):
-                errors.append("cors.allow_origins 必须是字符串数组")
-            else:
-                for origin in cors["allow_origins"]:
-                    if not isinstance(origin, str):
-                        errors.append("cors.allow_origins 中的所有项必须是字符串")
-                        break
-                    if origin == "*":
-                        errors.append("生产环境不允许使用通配符 '*'，请配置具体的允许域名")
-
-        if "allow_credentials" in cors:
-            if not isinstance(cors["allow_credentials"], bool):
-                errors.append("cors.allow_credentials 必须是布尔值")
+            origins = cors["allow_origins"]
+            if not isinstance(origins, list):
+                errors.append("cors.allow_origins 必须是数组")
+            elif not all(isinstance(o, str) for o in origins):
+                errors.append("cors.allow_origins 中的所有元素必须是字符串")
 
         if "allow_methods" in cors:
-            if not isinstance(cors["allow_methods"], list):
-                errors.append("cors.allow_methods 必须是字符串数组")
-            else:
-                valid_methods = {"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"}
-                for method in cors["allow_methods"]:
-                    if not isinstance(method, str):
-                        errors.append("cors.allow_methods 中的所有项必须是字符串")
-                        break
-                    if method.upper() not in valid_methods:
-                        errors.append(f"cors.allow_methods 包含无效的 HTTP 方法: {method}")
+            methods = cors["allow_methods"]
+            if not isinstance(methods, list):
+                errors.append("cors.allow_methods 必须是数组")
+            elif not all(isinstance(m, str) for m in methods):
+                errors.append("cors.allow_methods 中的所有元素必须是字符串")
 
         if "allow_headers" in cors:
-            if not isinstance(cors["allow_headers"], list):
-                errors.append("cors.allow_headers 必须是字符串数组")
-            else:
-                for header in cors["allow_headers"]:
-                    if not isinstance(header, str):
-                        errors.append("cors.allow_headers 中的所有项必须是字符串")
-                        break
+            headers = cors["allow_headers"]
+            if not isinstance(headers, list):
+                errors.append("cors.allow_headers 必须是数组")
+            elif not all(isinstance(h, str) for h in headers):
+                errors.append("cors.allow_headers 中的所有元素必须是字符串")
+
+        if "allow_credentials" in cors and not isinstance(cors["allow_credentials"], bool):
+            errors.append("cors.allow_credentials 必须是布尔值")
 
         if "max_age" in cors:
             try:
                 max_age = int(cors["max_age"])
-                if max_age < 0 or max_age > 86400:
-                    errors.append("cors.max_age 必须在 0-86400 秒之间")
+                if max_age < 0:
+                    errors.append("cors.max_age 必须是非负整数")
             except (ValueError, TypeError):
-                errors.append("cors.max_age 必须是整数（秒）")
+                errors.append("cors.max_age 必须是整数")
 
         return errors
 
@@ -503,78 +340,33 @@ class ConfigService:
             errors.append("database 配置必须是对象")
             return errors
 
-        pool_int_fields = ["pool_size", "max_overflow", "pool_timeout", "pool_recycle"]
-        for field in pool_int_fields:
+        # 检查是否尝试修改只读配置
+        readonly_fields = ["url", "is_stress_test"]
+        for field in readonly_fields:
+            if field in database:
+                errors.append(f"database.{field} 不允许修改（通过环境变量注入）")
+
+        int_fields = ["pool_size", "max_overflow", "pool_timeout", "pool_recycle",
+                      "sqlite_timeout", "wal_cache_size", "pg_connect_timeout"]
+        for field in int_fields:
             if field in database:
                 try:
                     value = int(database[field])
-                    if value < 1:
-                        errors.append(f"database.{field} 必须是正整数")
+                    if value < 0:
+                        errors.append(f"database.{field} 必须是非负整数")
                 except (ValueError, TypeError):
-                    errors.append(f"database.{field} 必须是正整数")
+                    errors.append(f"database.{field} 必须是整数")
 
-        bool_fields = ["echo", "sqlite_check_same_thread", "enable_wal", "stress_echo"]
+        bool_fields = ["echo", "sqlite_check_same_thread", "enable_wal"]
         for field in bool_fields:
-            if field in database:
-                if not isinstance(database[field], bool):
-                    errors.append(f"database.{field} 必须是布尔值")
-
-        if "sqlite_timeout" in database:
-            try:
-                value = int(database["sqlite_timeout"])
-                if value < 1:
-                    errors.append("database.sqlite_timeout 必须是正整数")
-            except (ValueError, TypeError):
-                errors.append("database.sqlite_timeout 必须是正整数")
-
-        if "wal_synchronous" in database:
-            valid_modes = ["OFF", "NORMAL", "FULL", "EXTRA"]
-            if database["wal_synchronous"] not in valid_modes:
-                errors.append(f"database.wal_synchronous 必须是以下之一: {', '.join(valid_modes)}")
-
-        if "wal_cache_size" in database:
-            try:
-                value = int(database["wal_cache_size"])
-                if value < 0:
-                    errors.append("database.wal_cache_size 必须是非负整数")
-            except (ValueError, TypeError):
-                errors.append("database.wal_cache_size 必须是非负整数")
-
-        if "wal_temp_store" in database:
-            valid_stores = ["DEFAULT", "FILE", "MEMORY"]
-            if database["wal_temp_store"] not in valid_stores:
-                errors.append(f"database.wal_temp_store 必须是以下之一: {', '.join(valid_stores)}")
-
-        stress_int_fields = [
-            "stress_pool_size", "stress_max_overflow", "stress_pool_timeout",
-            "stress_pool_recycle", "stress_sqlite_timeout"
-        ]
-        for field in stress_int_fields:
-            if field in database:
-                try:
-                    value = int(database[field])
-                    if value < 1:
-                        errors.append(f"database.{field} 必须是正整数")
-                except (ValueError, TypeError):
-                    errors.append(f"database.{field} 必须是正整数")
-
-        if "pg_ssl_mode" in database:
-            valid_ssl_modes = ["disable", "allow", "prefer", "require", "verify-ca", "verify-full"]
-            if database["pg_ssl_mode"] not in valid_ssl_modes:
-                errors.append(f"database.pg_ssl_mode 必须是以下之一: {', '.join(valid_ssl_modes)}")
-
-        if "pg_connect_timeout" in database:
-            try:
-                value = int(database["pg_connect_timeout"])
-                if value < 1:
-                    errors.append("database.pg_connect_timeout 必须是正整数")
-            except (ValueError, TypeError):
-                errors.append("database.pg_connect_timeout 必须是正整数")
+            if field in database and not isinstance(database[field], bool):
+                errors.append(f"database.{field} 必须是布尔值")
 
         return errors
 
 
-_config_service: Optional[ConfigService] = None
+# 全局配置服务实例
+_config_service_instance: Optional[ConfigService] = None
 
 
 def get_config_service() -> ConfigService:
@@ -584,7 +376,7 @@ def get_config_service() -> ConfigService:
     Returns:
         ConfigService: 配置服务实例
     """
-    global _config_service
-    if _config_service is None:
-        _config_service = ConfigService()
-    return _config_service
+    global _config_service_instance
+    if _config_service_instance is None:
+        _config_service_instance = ConfigService()
+    return _config_service_instance
