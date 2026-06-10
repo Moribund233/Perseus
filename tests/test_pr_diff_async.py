@@ -8,10 +8,8 @@ import pytest_asyncio
 import os
 import tempfile
 import subprocess
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import BaseModel
 from models.pull_request import PullRequest
 from models.repository import Repository
 from models.user import User
@@ -21,44 +19,6 @@ from utils.git_utils import (
     DiffFileStatus, init_bare_repo, GitError
 )
 from core.exception import NotFoundException, ValidationException
-
-# 使用内存数据库进行测试
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
-
-
-@pytest_asyncio.fixture
-async def db():
-    """创建测试数据库会话"""
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-    async with engine.begin() as conn:
-        await conn.run_sync(BaseModel.metadata.create_all)
-
-    async_session = sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
-
-    async with async_session() as session:
-        yield session
-
-    async with engine.begin() as conn:
-        await conn.run_sync(BaseModel.metadata.drop_all)
-    await engine.dispose()
-
-
-@pytest_asyncio.fixture
-async def test_user(db: AsyncSession):
-    """创建测试用户"""
-    user = User(
-        username="testuser",
-        email="test@example.com",
-        password="hashed_password",
-        full_name="Test User",
-        is_active=True
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    return user
 
 
 @pytest.fixture
@@ -282,7 +242,7 @@ async def test_get_file_diff_nonexistent(temp_repo):
 
 
 @pytest.mark.asyncio
-async def test_service_get_pr_diff(db: AsyncSession, temp_repo, test_user):
+async def test_service_get_pr_diff(async_db: AsyncSession, temp_repo, async_test_user):
     """测试服务层获取 PR diff - 使用底层工具函数测试"""
     # 测试底层工具函数能够正常工作
     diff = get_pr_diff(
@@ -307,7 +267,7 @@ async def test_service_get_pr_diff(db: AsyncSession, temp_repo, test_user):
 
 
 @pytest.mark.asyncio
-async def test_service_get_pr_file_diff(db: AsyncSession, temp_repo, test_user):
+async def test_service_get_pr_file_diff(async_db: AsyncSession, temp_repo, async_test_user):
     """测试服务层获取单个文件 diff - 使用底层工具函数测试"""
     # 测试底层工具函数
     diff = get_file_diff(
@@ -322,7 +282,7 @@ async def test_service_get_pr_file_diff(db: AsyncSession, temp_repo, test_user):
 
 
 @pytest.mark.asyncio
-async def test_service_get_pr_diff_not_found(db: AsyncSession):
+async def test_service_get_pr_diff_not_found(async_db: AsyncSession):
     """测试获取不存在 PR 的 diff"""
     with pytest.raises(NotFoundException):
-        await pull_request_service.get_pr_diff(db, 999, 999)
+        await pull_request_service.get_pr_diff(async_db, 999, 999)

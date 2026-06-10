@@ -72,95 +72,64 @@ def _get_postgresql_url_with_driver(url: str) -> str:
     return url
 
 
-def _create_sqlite_engine(db_config, app_config):
-    """创建 SQLite 引擎"""
+def _resolve_pool_config(db_config):
+    """
+    统一解析池配置
+
+    Args:
+        db_config: 数据库配置对象
+
+    Returns:
+        dict: 包含 pool_size, max_overflow, pool_timeout, pool_recycle, echo 的字典
+    """
     if db_config.is_stress_test:
-        return create_engine(
-            db_config.url,
-            connect_args=_get_sqlite_connect_args(db_config),
-            poolclass=QueuePool,
-            pool_size=db_config.stress_pool_size,
-            max_overflow=db_config.stress_max_overflow,
-            pool_timeout=db_config.stress_pool_timeout,
-            pool_recycle=db_config.stress_pool_recycle,
-            pool_pre_ping=True,
-            echo=db_config.stress_echo,
-        )
-    elif app_config.debug:
-        return create_engine(
-            db_config.url,
-            connect_args=_get_sqlite_connect_args(db_config),
-            poolclass=QueuePool,
-            pool_size=db_config.pool_size,
-            max_overflow=db_config.max_overflow,
-            pool_timeout=db_config.pool_timeout,
-            pool_recycle=db_config.pool_recycle,
-            pool_pre_ping=True,
-            echo=db_config.echo,
-        )
-    else:
-        return create_engine(
-            db_config.url,
-            connect_args=_get_sqlite_connect_args(db_config),
-            poolclass=QueuePool,
-            pool_size=db_config.pool_size,
-            max_overflow=db_config.max_overflow,
-            pool_timeout=db_config.pool_timeout,
-            pool_recycle=db_config.pool_recycle,
-            pool_pre_ping=True,
-            echo=db_config.echo,
-        )
+        return {
+            "pool_size": db_config.stress_pool_size,
+            "max_overflow": db_config.stress_max_overflow,
+            "pool_timeout": db_config.stress_pool_timeout,
+            "pool_recycle": db_config.stress_pool_recycle,
+            "echo": db_config.stress_echo,
+        }
+    return {
+        "pool_size": db_config.pool_size,
+        "max_overflow": db_config.max_overflow,
+        "pool_timeout": db_config.pool_timeout,
+        "pool_recycle": db_config.pool_recycle,
+        "echo": db_config.echo,
+    }
 
 
-def _create_postgresql_engine(db_config, app_config):
+def _create_sqlite_engine(db_config):
+    """创建 SQLite 引擎"""
+    pool_config = _resolve_pool_config(db_config)
+    return create_engine(
+        db_config.url,
+        connect_args=_get_sqlite_connect_args(db_config),
+        poolclass=QueuePool,
+        pool_pre_ping=True,
+        **pool_config
+    )
+
+
+def _create_postgresql_engine(db_config):
     """创建 PostgreSQL 引擎"""
     url_with_driver = _get_postgresql_url_with_driver(db_config.url)
-
-    if db_config.is_stress_test:
-        return create_engine(
-            url_with_driver,
-            connect_args=_get_postgresql_connect_args(db_config),
-            poolclass=QueuePool,
-            pool_size=db_config.stress_pool_size,
-            max_overflow=db_config.stress_max_overflow,
-            pool_timeout=db_config.stress_pool_timeout,
-            pool_recycle=db_config.stress_pool_recycle,
-            pool_pre_ping=True,
-            echo=db_config.stress_echo,
-        )
-    elif app_config.debug:
-        return create_engine(
-            url_with_driver,
-            connect_args=_get_postgresql_connect_args(db_config),
-            poolclass=QueuePool,
-            pool_size=db_config.pool_size,
-            max_overflow=db_config.max_overflow,
-            pool_timeout=db_config.pool_timeout,
-            pool_recycle=db_config.pool_recycle,
-            pool_pre_ping=True,
-            echo=db_config.echo,
-        )
-    else:
-        return create_engine(
-            url_with_driver,
-            connect_args=_get_postgresql_connect_args(db_config),
-            poolclass=QueuePool,
-            pool_size=db_config.pool_size,
-            max_overflow=db_config.max_overflow,
-            pool_timeout=db_config.pool_timeout,
-            pool_recycle=db_config.pool_recycle,
-            pool_pre_ping=True,
-            echo=db_config.echo,
-        )
+    pool_config = _resolve_pool_config(db_config)
+    return create_engine(
+        url_with_driver,
+        connect_args=_get_postgresql_connect_args(db_config),
+        poolclass=QueuePool,
+        pool_pre_ping=True,
+        **pool_config
+    )
 
 
-def _create_engine_with_config(db_config, app_config):
+def _create_engine_with_config(db_config):
     """
     根据配置创建数据库引擎
 
     Args:
         db_config: 数据库配置
-        app_config: 应用配置
 
     Returns:
         Engine: SQLAlchemy引擎实例
@@ -168,9 +137,9 @@ def _create_engine_with_config(db_config, app_config):
     db_type = db_config.db_type
 
     if db_type == "sqlite":
-        return _create_sqlite_engine(db_config, app_config)
+        return _create_sqlite_engine(db_config)
     elif db_type == "postgresql":
-        return _create_postgresql_engine(db_config, app_config)
+        return _create_postgresql_engine(db_config)
     else:
         raise ValueError(f"不支持的数据库类型: {db_type}")
 
@@ -215,7 +184,7 @@ def init_engine():
         logger.warning(warning)
 
     # 创建引擎
-    _engine = _create_engine_with_config(db_config, app_config)
+    _engine = _create_engine_with_config(db_config)
 
     # 设置事件监听
     _setup_engine_events(_engine, db_config)

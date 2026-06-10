@@ -7,11 +7,12 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.routes_config import get_route_prefix
 from models.async_db import get_async_db
 from services.user_service import login_user as service_login_user
 
 # 创建路由实例
-router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+router = APIRouter(prefix=get_route_prefix("auth"), tags=["auth"])
 
 
 class LoginRequest(BaseModel):

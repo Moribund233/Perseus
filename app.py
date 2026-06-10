@@ -112,7 +112,7 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
         logger.info(f"CORS配置: allow_origins={allow_origins}")
 
     # 包含所有 API v1 路由（包括根路由、健康检查、应用管理等）
-    from api.api_v1 import api_v1_router
+    from api.routes_config import api_v1_router
     app.include_router(api_v1_router)
 
     # 注意：Git HTTP Smart Protocol 由 Nginx + git-http-backend 处理

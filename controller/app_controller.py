@@ -16,6 +16,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, Query, Body
 from pydantic import BaseModel, Field
 
+from api.routes_config import get_route_prefix
 from core.config import get_config
 from services.app_service import get_app_service
 from services.config_service import get_config_service
@@ -23,8 +24,8 @@ from api.dependencies import get_current_user
 from models.user import User
 from core.exception import AuthorizationException
 
-# 创建路由实例
-router = APIRouter(tags=["app-management"])
+# 创建路由实例 - 根路由无前缀
+router = APIRouter(prefix=get_route_prefix("root"), tags=["app-management"])
 
 
 # ============== 根路由和健康检查 ==============
@@ -248,7 +249,7 @@ async def get_status_endpoint():
     from middleware.request_stats import get_request_stats
 
     app_service = get_app_service()
-    requests_info = get_request_stats().get_stats()
+    requests_info = await get_request_stats().get_stats()
     status = app_service.get_status(requests_info=requests_info)
 
     return StatusResponse(**status)

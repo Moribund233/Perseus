@@ -89,6 +89,32 @@ async def _check_physical_repo_exists_async(repo: Repository) -> bool:
         return False
 
 
+async def _enrich_repos_with_physical_status(repos: list) -> list[dict]:
+    """
+    为仓库列表添加物理存在状态
+
+    并行检查所有仓库的物理存在状态（异步IO优化）
+
+    Args:
+        repos: Repository 模型对象列表
+
+    Returns:
+        list[dict]: 包含物理状态的仓库响应列表
+    """
+    if not repos:
+        return []
+
+    physical_checks = await asyncio.gather(
+        *[_check_physical_repo_exists_async(repo) for repo in repos],
+        return_exceptions=True
+    )
+
+    return [
+        build_repo_response(repo, check if not isinstance(check, Exception) else False)
+        for repo, check in zip(repos, physical_checks)
+    ]
+
+
 async def get_repositories(db: AsyncSession, limit: int = 100):
     """
     获取所有仓库
@@ -107,16 +133,7 @@ async def get_repositories(db: AsyncSession, limit: int = 100):
     )
     repos = result.scalars().all()
 
-    # 并行检查所有仓库的物理存在状态（异步IO优化）
-    physical_checks = await asyncio.gather(
-        *[_check_physical_repo_exists_async(repo) for repo in repos],
-        return_exceptions=True
-    )
-
-    return [
-        build_repo_response(repo, check if not isinstance(check, Exception) else False)
-        for repo, check in zip(repos, physical_checks)
-    ]
+    return await _enrich_repos_with_physical_status(list(repos))
 
 
 async def get_repository_by_id(repo_id: int, db: AsyncSession):
@@ -167,16 +184,7 @@ async def get_repositories_by_user(user_id: int, db: AsyncSession):
     # 合并结果，去重
     all_repos = list(set(list(owned_repos) + list(member_repos)))
 
-    # 并行检查所有仓库的物理存在状态（异步IO优化）
-    physical_checks = await asyncio.gather(
-        *[_check_physical_repo_exists_async(repo) for repo in all_repos],
-        return_exceptions=True
-    )
-
-    return [
-        build_repo_response(repo, check if not isinstance(check, Exception) else False)
-        for repo, check in zip(all_repos, physical_checks)
-    ]
+    return await _enrich_repos_with_physical_status(all_repos)
 
 
 async def create_repository(repo_data: dict, db: AsyncSession):
@@ -338,16 +346,7 @@ async def get_public_repositories(db: AsyncSession):
     result = await db.execute(select(Repository).filter(Repository.is_public == True))
     repos = result.scalars().all()
 
-    # 并行检查所有仓库的物理存在状态（异步IO优化）
-    physical_checks = await asyncio.gather(
-        *[_check_physical_repo_exists_async(repo) for repo in repos],
-        return_exceptions=True
-    )
-
-    return [
-        build_repo_response(repo, check if not isinstance(check, Exception) else False)
-        for repo, check in zip(repos, physical_checks)
-    ]
+    return await _enrich_repos_with_physical_status(list(repos))
 
 
 async def check_repository_access(repo_id: int, user_id: int, db: AsyncSession, required_role: str = None):

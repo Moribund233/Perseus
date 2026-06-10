@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
 
+from api.routes_config import get_route_prefix
 from models.async_db import get_async_db
 from models import Repository
 from services.repository_browser_service import (
@@ -24,7 +25,7 @@ from utils.git_utils import get_repository_storage_path
 from core.exception import NotFoundException
 
 # 创建路由实例
-router = APIRouter(prefix="/api/v1/repositories", tags=["repository-browser"])
+router = APIRouter(prefix=get_route_prefix("repository_browser"), tags=["repository-browser"])
 
 
 async def _get_repo_path(repo_id: int, db: AsyncSession) -> str:

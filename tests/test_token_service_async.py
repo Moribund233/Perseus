@@ -6,39 +6,15 @@ Token Service 异步测试
 import pytest
 import pytest_asyncio
 from datetime import datetime, timedelta, timezone
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import BaseModel
 from models.user import User
 from services import token_service
 from core.exception import AuthenticationException
 
-# 使用内存数据库进行测试
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
-
 
 @pytest_asyncio.fixture
-async def db():
-    """创建测试数据库会话"""
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-    async with engine.begin() as conn:
-        await conn.run_sync(BaseModel.metadata.create_all)
-
-    async_session = sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
-
-    async with async_session() as session:
-        yield session
-
-    async with engine.begin() as conn:
-        await conn.run_sync(BaseModel.metadata.drop_all)
-    await engine.dispose()
-
-
-@pytest_asyncio.fixture
-async def test_user(db: AsyncSession):
+async def test_user(async_db: AsyncSession):
     """创建测试用户"""
     from utils.password_utils import get_password_hash
     user = User(
@@ -48,14 +24,14 @@ async def test_user(db: AsyncSession):
         full_name="Test User",
         is_active=True
     )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    async_db.add(user)
+    await async_db.commit()
+    await async_db.refresh(user)
     return user
 
 
 @pytest_asyncio.fixture
-async def inactive_user(db: AsyncSession):
+async def inactive_user(async_db: AsyncSession):
     """创建未激活测试用户"""
     from utils.password_utils import get_password_hash
     user = User(
@@ -65,9 +41,9 @@ async def inactive_user(db: AsyncSession):
         full_name="Inactive User",
         is_active=False
     )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    async_db.add(user)
+    await async_db.commit()
+    await async_db.refresh(user)
     return user
 
 

@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import NullPool
 
 from core.config import get_config
+from models import _resolve_pool_config
 
 logger = logging.getLogger(__name__)
 
@@ -54,39 +55,25 @@ def _get_async_url(sync_url: str) -> str:
 def _create_async_engine_with_config() -> AsyncEngine:
     """
     根据配置创建异步数据库引擎
-    
+
     Returns:
         AsyncEngine: SQLAlchemy 异步引擎实例
     """
     config = get_config()
     db_config = config.database
-    
+
     async_url = _get_async_url(db_config.url)
-    
-    if db_config.is_stress_test:
-        pool_size = db_config.stress_pool_size
-        max_overflow = db_config.stress_max_overflow
-        pool_timeout = db_config.stress_pool_timeout
-        pool_recycle = db_config.stress_pool_recycle
-    else:
-        pool_size = db_config.pool_size
-        max_overflow = db_config.max_overflow
-        pool_timeout = db_config.pool_timeout
-        pool_recycle = db_config.pool_recycle
-    
+    pool_config = _resolve_pool_config(db_config)
+
     engine = create_async_engine(
         async_url,
-        pool_size=pool_size,
-        max_overflow=max_overflow,
-        pool_timeout=pool_timeout,
-        pool_recycle=pool_recycle,
         pool_pre_ping=True,
-        echo=db_config.echo,
         future=True,
+        **pool_config
     )
-    
-    logger.debug(f"异步引擎创建: pool_size={pool_size}, max_overflow={max_overflow}")
-    
+
+    logger.debug(f"异步引擎创建: pool_size={pool_config['pool_size']}, max_overflow={pool_config['max_overflow']}")
+
     return engine
 
 

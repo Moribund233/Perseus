@@ -12,7 +12,6 @@
 """
 import os
 import shutil
-import gc
 from datetime import datetime
 from typing import Optional
 
@@ -22,9 +21,7 @@ from pydantic import BaseModel, Field
 from core.config import get_config, ConfigManager, reset_module_config_manager
 from api.dependencies import get_current_user
 from models.user import User
-from sqlalchemy import create_engine, text
-
-from utils.init_database import DatabaseInitializer
+from services.database_manager import DatabaseResetManager
 from utils.logging import get_named_logger
 
 router = APIRouter(prefix="/api/v1/debug", tags=["debug"])
@@ -77,7 +74,7 @@ class DebugStatusResponse(BaseModel):
 async def require_debug_mode():
     """
     检查是否处于调试模式
-    
+
     Raises:
         HTTPException: 非调试模式下抛出 403 错误
     """
@@ -113,66 +110,6 @@ async def require_admin(
             detail="Admin permission required",
         )
     return current_user
-
-
-# ============== 数据库操作辅助函数 ==============
-
-def _get_sync_engine_with_url(url: str):
-    """
-    根据数据库 URL 创建同步引擎
-    
-    Args:
-        url: 数据库连接 URL
-        
-    Returns:
-        Engine: SQLAlchemy 同步引擎
-    """
-    from sqlalchemy import create_engine
-    
-    # 转换 URL 为带驱动的格式
-    url_lower = url.lower()
-    if url_lower.startswith("postgresql://") and not url_lower.startswith("postgresql+psycopg2://"):
-        url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
-
-    return create_engine(url, connect_args={"connect_timeout": 10}, pool_pre_ping=True)
-
-
-def _drop_all_tables_postgresql(engine):
-    """删除 PostgreSQL 数据库中的所有表"""
-    with engine.connect() as conn:
-        # 获取所有表
-        result = conn.execute(text("""
-            SELECT tablename FROM pg_tables
-            WHERE schemaname = 'public'
-        """))
-        tables = [row[0] for row in result.fetchall()]
-
-        # 删除每个表（使用参数化查询防止 SQL 注入）
-        for table in tables:
-            # 验证表名只包含合法字符
-            if not _is_valid_table_name(table):
-                logger.warning(f"跳过非法表名: {table}")
-                continue
-            conn.execute(text(f'DROP TABLE IF EXISTS "{table}" CASCADE'))
-
-        conn.commit()
-        logger.info(f"已删除 PostgreSQL 数据库中的 {len(tables)} 个表")
-
-
-def _is_valid_table_name(table_name: str) -> bool:
-    """
-    验证表名是否合法（只包含字母、数字、下划线）
-
-    Args:
-        table_name: 表名
-
-    Returns:
-        bool: 是否合法
-    """
-    if not table_name or not isinstance(table_name, str):
-        return False
-    # 只允许字母、数字、下划线
-    return all(c.isalnum() or c == '_' for c in table_name)
 
 
 # ============== API 端点 ==============
@@ -258,78 +195,20 @@ async def init_database(
     Raises:
         HTTPException: 非调试模式或权限不足时
     """
-    config = get_config()
-    start_time = datetime.now()
-    
     try:
-        # 获取数据库类型和 URL
-        db_type = config.database.db_type
-        db_url = config.database.url
-        
-        # 关闭现有的异步引擎（如果存在）
-        try:
-            from models.async_db import close_async_engine
-            await close_async_engine()
-        except Exception as e:
-            logger.warning(f"关闭异步引擎时出错: {e}")
-        
-        # 关闭现有的同步引擎（如果存在）
-        try:
-            from models import get_engine
-            sync_engine = get_engine()
-            if sync_engine:
-                sync_engine.dispose()
-        except Exception as e:
-            logger.warning(f"关闭同步引擎时出错: {e}")
-        
-        # 强制垃圾回收
-        gc.collect()
-        
-        # 对于 SQLite，删除数据库文件
-        if db_type == "sqlite":
-            db_path = db_url.replace("sqlite:///", "")
-            if os.path.exists(db_path):
-                os.remove(db_path)
-                logger.info(f"已删除 SQLite 数据库文件: {db_path}")
-        
-        # 对于 PostgreSQL，删除所有表
-        else:
-            # 创建临时引擎用于删除表
-            temp_engine = _get_sync_engine_with_url(db_url)
-            try:
-                if db_type == "postgresql":
-                    _drop_all_tables_postgresql(temp_engine)
-            finally:
-                temp_engine.dispose()
-        
-        # 重新创建表
-        initializer = DatabaseInitializer()
-        success = initializer.create_tables()
-        
-        if not success:
-            raise Exception("创建表失败")
-        
-        # 创建测试数据
-        test_data_info = {}
-        if create_test_data:
-            initializer.create_test_data()
-            test_data_info["test_data_created"] = True
-        
-        elapsed = (datetime.now() - start_time).total_seconds()
-        
-        logger.info(f"数据库重置完成，耗时 {elapsed:.2f} 秒")
-        
+        # 使用 DatabaseResetManager 执行重置
+        manager = DatabaseResetManager()
+        result = await manager.reset_database(
+            create_test_data=create_test_data,
+            preserve_config=True
+        )
+
         return InitDbResponse(
             success=True,
-            message=f"数据库重置成功 ({db_type})",
-            details={
-                "database_type": db_type,
-                "elapsed_seconds": round(elapsed, 2),
-                "test_data_created": create_test_data,
-                **test_data_info
-            }
+            message=f"数据库重置成功 ({result['database_type']})",
+            details=result
         )
-        
+
     except Exception as e:
         logger.error(f"数据库重置失败: {e}")
         raise HTTPException(
@@ -353,16 +232,16 @@ async def init_config(
     Args:
         force: 是否强制重置（跳过确认提示，始终为 true）
         backup: 是否备份原配置文件
-        
+
     Returns:
         InitConfResponse: 操作结果
-        
+
     Raises:
         HTTPException: 非调试模式或权限不足时
     """
     config_path = "config.toml"
     backup_path = None
-    
+
     try:
         # 如果配置文件存在，进行备份
         if os.path.exists(config_path) and backup:
@@ -370,27 +249,27 @@ async def init_config(
             backup_path = f"config.toml.backup.{timestamp}"
             shutil.copy2(config_path, backup_path)
             logger.info(f"配置文件已备份到: {backup_path}")
-        
+
         # 删除原配置文件
         if os.path.exists(config_path):
             os.remove(config_path)
             logger.info(f"已删除原配置文件: {config_path}")
-        
+
         # 重置配置管理器单例
         reset_module_config_manager()
-        
+
         # 重新初始化配置管理器（会自动生成默认配置）
-        config_manager = ConfigManager(config_path)
-        
+        ConfigManager(config_path)
+
         logger.info("配置文件已重置为默认值")
-        
+
         return InitConfResponse(
             success=True,
             message="配置文件重置成功",
             config_path=config_path,
             backup_path=backup_path
         )
-        
+
     except Exception as e:
         logger.error(f"配置文件重置失败: {e}")
         raise HTTPException(

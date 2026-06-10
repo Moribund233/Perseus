@@ -10,6 +10,7 @@ from models import User
 from core.exception import ValidationException, NotFoundException, ConflictException, AuthenticationException
 from services.token_service import create_token_pair
 from utils.password_utils import verify_password, get_password_hash
+from utils.response_builder import build_user_response
 
 # 日志记录器
 logger = logging.getLogger(__name__)
@@ -19,22 +20,15 @@ def user_to_dict(user: User) -> dict:
     """
     将用户对象转换为字典（排除敏感字段）
 
+    使用 response_builder.build_user_response 统一构建响应。
+
     Args:
         user: User 模型对象
 
     Returns:
         dict: 用户数据字典（不包含密码）
     """
-    return {
-        "id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "full_name": user.full_name,
-        "is_active": user.is_active,
-        "is_admin": user.is_admin,
-        "created_at": user.created_at.isoformat() if user.created_at else None,
-        "updated_at": user.updated_at.isoformat() if user.updated_at else None
-    }
+    return build_user_response(user)
 
 
 async def get_users(db: AsyncSession):

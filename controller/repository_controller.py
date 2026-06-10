@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Request, status, HTTPException
 from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.routes_config import get_route_prefix
 from models.async_db import get_async_db
 from models.user import User
 from api.dependencies import get_current_user, get_current_admin_user
@@ -28,7 +29,7 @@ from services.repository_service import (
 )
 
 # 创建路由实例
-router = APIRouter(prefix="/api/v1/repositories", tags=["repositories"])
+router = APIRouter(prefix=get_route_prefix("repositories"), tags=["repositories"])
 
 # 安全方案
 security = HTTPBearer(auto_error=False)

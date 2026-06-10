@@ -124,11 +124,7 @@ class ConnectionManager:
         
         # 消息处理器注册表: message_type -> handler function
         self._message_handlers: Dict[str, Callable] = {}
-        
-        # 后台任务
-        self._cleanup_task: Optional[asyncio.Task] = None
-        self._running: bool = False
-        
+
         ConnectionManager._initialized = True
     
     def _generate_connection_id(self) -> str:
@@ -150,12 +146,9 @@ class ConnectionManager:
         connection_id = self._generate_connection_id()
         connection = Connection(websocket, connection_id)
         self._connections[connection_id] = connection
-        
+
         logger.debug(f"WebSocket连接: {connection_id}, 当前: {len(self._connections)}")
-        
-        if not self._running:
-            self._start_background_tasks()
-        
+
         return connection
     
     def disconnect(self, connection: Connection) -> None:
@@ -378,24 +371,13 @@ class ConnectionManager:
     
     # ==================== 后台任务 ====================
     
-    def _start_background_tasks(self) -> None:
-        """启动后台任务"""
-        self._running = True
-        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
-
-    def stop_background_tasks(self) -> None:
-        """停止后台任务"""
-        self._running = False
-        if self._cleanup_task:
-            self._cleanup_task.cancel()
-
     async def heartbeat_checker(self) -> None:
         """
         心跳检测任务
         
         由 lifespan 管理器启动，用于监控连接健康状态
         """
-        while self._running:
+        while True:
             try:
                 await asyncio.sleep(30)
                 await self._cleanup_timeout_connections()
@@ -414,16 +396,6 @@ class ConnectionManager:
         """获取用户连接索引"""
         return self._user_index
     
-    async def _cleanup_loop(self) -> None:
-        """清理循环，定期移除超时连接"""
-        while self._running:
-            try:
-                await asyncio.sleep(60)  # 每分钟检查一次
-                await self._cleanup_timeout_connections()
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error(f"清理任务异常: {e}")
     
     async def _cleanup_timeout_connections(self) -> None:
         """清理超时连接"""

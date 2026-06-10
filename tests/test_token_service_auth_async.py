@@ -6,42 +6,18 @@ Token Service 认证功能异步测试
 import pytest
 import pytest_asyncio
 from datetime import timedelta
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from models import BaseModel
 from models.user import User
 from services import token_service
 from services.user_service import authenticate_user
 from api.dependencies import get_current_user
 from core.exception import AuthenticationException
 
-# 使用内存数据库进行测试
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
-
 
 @pytest_asyncio.fixture
-async def db():
-    """创建测试数据库会话"""
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-    async with engine.begin() as conn:
-        await conn.run_sync(BaseModel.metadata.create_all)
-
-    async_session = sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
-
-    async with async_session() as session:
-        yield session
-
-    async with engine.begin() as conn:
-        await conn.run_sync(BaseModel.metadata.drop_all)
-    await engine.dispose()
-
-
-@pytest_asyncio.fixture
-async def test_user(db: AsyncSession):
+async def test_user(async_db: AsyncSession):
     """创建测试用户"""
     from utils.password_utils import get_password_hash
     user = User(
@@ -51,14 +27,14 @@ async def test_user(db: AsyncSession):
         full_name="Test User",
         is_active=True
     )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    async_db.add(user)
+    await async_db.commit()
+    await async_db.refresh(user)
     return user
 
 
 @pytest_asyncio.fixture
-async def inactive_user(db: AsyncSession):
+async def inactive_user(async_db: AsyncSession):
     """创建未激活测试用户"""
     from utils.password_utils import get_password_hash
     user = User(
@@ -68,68 +44,68 @@ async def inactive_user(db: AsyncSession):
         full_name="Inactive User",
         is_active=False
     )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    async_db.add(user)
+    await async_db.commit()
+    await async_db.refresh(user)
     return user
 
 
-async def get_user_by_username(db: AsyncSession, username: str) -> User | None:
+async def get_user_by_username(async_db: AsyncSession, username: str) -> User | None:
     """根据用户名获取用户（辅助函数）"""
-    result = await db.execute(select(User).filter(User.username == username))
+    result = await async_db.execute(select(User).filter(User.username == username))
     return result.scalar_one_or_none()
 
 
 @pytest.mark.asyncio
-async def test_get_user_by_username_success(db: AsyncSession, test_user: User):
+async def test_get_user_by_username_success(async_db: AsyncSession, test_user: User):
     """测试成功根据用户名获取用户"""
-    user = await get_user_by_username(db, "testuser")
+    user = await get_user_by_username(async_db, "testuser")
     assert user is not None
     assert user.username == "testuser"
     assert user.id == test_user.id
 
 
 @pytest.mark.asyncio
-async def test_get_user_by_username_not_found(db: AsyncSession):
+async def test_get_user_by_username_not_found(async_db: AsyncSession):
     """测试获取不存在的用户"""
-    user = await get_user_by_username(db, "nonexistent")
+    user = await get_user_by_username(async_db, "nonexistent")
     assert user is None
 
 
 @pytest.mark.asyncio
-async def test_authenticate_user_success(db: AsyncSession, test_user: User):
+async def test_authenticate_user_success(async_db: AsyncSession, test_user: User):
     """测试成功认证用户"""
-    user = await authenticate_user("testuser", "testpassword", db)
+    user = await authenticate_user("testuser", "testpassword", async_db)
     assert user is not None
     assert user.username == "testuser"
 
 
 @pytest.mark.asyncio
-async def test_authenticate_user_wrong_password(db: AsyncSession, test_user: User):
+async def test_authenticate_user_wrong_password(async_db: AsyncSession, test_user: User):
     """测试错误密码认证"""
-    user = await authenticate_user("testuser", "wrongpassword", db)
+    user = await authenticate_user("testuser", "wrongpassword", async_db)
     assert user is None
 
 
 @pytest.mark.asyncio
-async def test_authenticate_user_not_found(db: AsyncSession):
+async def test_authenticate_user_not_found(async_db: AsyncSession):
     """测试认证不存在的用户"""
-    user = await authenticate_user("nonexistent", "password", db)
+    user = await authenticate_user("nonexistent", "password", async_db)
     assert user is None
 
 
 @pytest.mark.asyncio
-async def test_authenticate_user_inactive(db: AsyncSession, inactive_user: User):
+async def test_authenticate_user_inactive(async_db: AsyncSession, inactive_user: User):
     """测试认证未激活用户"""
     # authenticate_user 只验证密码，不检查是否激活
-    user = await authenticate_user("inactiveuser", "testpassword", db)
+    user = await authenticate_user("inactiveuser", "testpassword", async_db)
     # 函数返回用户对象，激活状态检查由调用方处理
     assert user is not None
     assert user.username == "inactiveuser"
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_success(db: AsyncSession, test_user: User):
+async def test_get_current_user_success(async_db: AsyncSession, test_user: User):
     """测试成功从令牌获取当前用户"""
     token = token_service.create_access_token({
         "sub": str(test_user.id),
@@ -143,14 +119,14 @@ async def test_get_current_user_success(db: AsyncSession, test_user: User):
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_invalid_token(db: AsyncSession):
+async def test_get_current_user_invalid_token(async_db: AsyncSession):
     """测试无效令牌"""
     token_data = token_service.verify_token("invalid_token")
     assert token_data is None
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_expired_token(db: AsyncSession, test_user: User):
+async def test_get_current_user_expired_token(async_db: AsyncSession, test_user: User):
     """测试过期令牌"""
     token = token_service.create_access_token(
         {"sub": str(test_user.id), "username": test_user.username},
@@ -161,7 +137,7 @@ async def test_get_current_user_expired_token(db: AsyncSession, test_user: User)
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_user_not_found(db: AsyncSession, test_user: User):
+async def test_get_current_user_user_not_found(async_db: AsyncSession, test_user: User):
     """测试令牌有效但用户不存在"""
     # 创建一个指向不存在用户的令牌
     token = token_service.create_access_token({
@@ -175,7 +151,7 @@ async def test_get_current_user_user_not_found(db: AsyncSession, test_user: User
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_inactive_user(db: AsyncSession, inactive_user: User):
+async def test_get_current_user_inactive_user(async_db: AsyncSession, inactive_user: User):
     """测试令牌有效但用户未激活"""
     token = token_service.create_access_token({
         "sub": str(inactive_user.id),
@@ -188,7 +164,7 @@ async def test_get_current_user_inactive_user(db: AsyncSession, inactive_user: U
 
 
 @pytest.mark.asyncio
-async def test_validate_token_success(db: AsyncSession, test_user: User):
+async def test_validate_token_success(async_db: AsyncSession, test_user: User):
     """测试成功验证令牌"""
     token = token_service.create_access_token({
         "sub": str(test_user.id),
@@ -201,14 +177,14 @@ async def test_validate_token_success(db: AsyncSession, test_user: User):
 
 
 @pytest.mark.asyncio
-async def test_validate_token_invalid(db: AsyncSession):
+async def test_validate_token_invalid(async_db: AsyncSession):
     """测试无效令牌验证"""
     token_data = token_service.verify_token("invalid_token")
     assert token_data is None
 
 
 @pytest.mark.asyncio
-async def test_validate_token_inactive_user(db: AsyncSession, inactive_user: User):
+async def test_validate_token_inactive_user(async_db: AsyncSession, inactive_user: User):
     """测试验证未激活用户的令牌"""
     token = token_service.create_access_token({
         "sub": str(inactive_user.id),

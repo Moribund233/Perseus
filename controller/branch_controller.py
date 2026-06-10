@@ -5,6 +5,8 @@
 """
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from api.routes_config import get_route_prefix
 from models.async_db import get_async_db
 from models.user import User
 from api.dependencies import get_current_user
@@ -22,7 +24,7 @@ from services.branch_service import (
 )
 
 # 创建路由实例
-router = APIRouter(prefix="/api/v1/repositories", tags=["branches"])
+router = APIRouter(prefix=get_route_prefix("branches"), tags=["branches"])
 
 
 @router.get("/{repo_id}/branches")

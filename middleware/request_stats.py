@@ -3,8 +3,8 @@
 
 统计 HTTP 请求的数量、响应时间、成功率等指标
 """
+import asyncio
 import time
-import threading
 from typing import Dict, Any, Optional
 from collections import deque
 from datetime import datetime, timedelta
@@ -14,11 +14,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 
 class RequestStats:
-    """请求统计类（线程安全）"""
-    
+    """请求统计类（异步安全）"""
+
     def __init__(self, window_minutes: int = 5):
         self.window_minutes = window_minutes
-        self._lock = threading.Lock()
+        self._lock = asyncio.Lock()
         self._total = 0
         self._success = 0
         self._failed = 0
@@ -26,22 +26,22 @@ class RequestStats:
         self._requests_per_minute = deque(maxlen=window_minutes)  # 每分钟请求数
         self._last_minute = datetime.now()
         self._current_minute_count = 0
-    
-    def record_request(self, response_time_ms: float, success: bool):
+
+    async def record_request(self, response_time_ms: float, success: bool):
         """记录一个请求"""
-        with self._lock:
+        async with self._lock:
             self._total += 1
             if success:
                 self._success += 1
             else:
                 self._failed += 1
-            
+
             self._response_times.append(response_time_ms)
-            
+
             # 更新每分钟请求数
             now = datetime.now()
             current_minute = now.replace(second=0, microsecond=0)
-            
+
             if current_minute > self._last_minute:
                 # 新分钟，保存上一分钟的数据
                 self._requests_per_minute.append({
@@ -50,23 +50,23 @@ class RequestStats:
                 })
                 self._current_minute_count = 0
                 self._last_minute = current_minute
-            
+
             self._current_minute_count += 1
-    
-    def get_stats(self) -> Dict[str, Any]:
+
+    async def get_stats(self) -> Dict[str, Any]:
         """获取统计信息"""
-        with self._lock:
+        async with self._lock:
             avg_response_time = 0.0
             if self._response_times:
                 avg_response_time = sum(self._response_times) / len(self._response_times)
-            
+
             # 计算每分钟请求数
             rpm = 0
             if self._requests_per_minute:
                 rpm = sum(r["count"] for r in self._requests_per_minute) / len(self._requests_per_minute)
             elif self._current_minute_count > 0:
                 rpm = self._current_minute_count
-            
+
             return {
                 "total": self._total,
                 "success": self._success,
@@ -74,10 +74,10 @@ class RequestStats:
                 "avg_response_time_ms": round(avg_response_time, 2),
                 "requests_per_minute": round(rpm, 2)
             }
-    
-    def reset(self):
+
+    async def reset(self):
         """重置统计"""
-        with self._lock:
+        async with self._lock:
             self._total = 0
             self._success = 0
             self._failed = 0
@@ -121,22 +121,22 @@ class RequestStatsMiddleware(BaseHTTPMiddleware):
         """处理请求"""
         if not self._should_record(request.url.path):
             return await call_next(request)
-        
+
         start_time = time.time()
-        
+
         try:
             response = await call_next(request)
-            
+
             # 计算响应时间（毫秒）
             response_time_ms = (time.time() - start_time) * 1000
-            
+
             # 记录请求（2xx 和 3xx 视为成功）
             success = 200 <= response.status_code < 400
-            self.stats.record_request(response_time_ms, success)
-            
+            await self.stats.record_request(response_time_ms, success)
+
             return response
         except Exception as e:
             # 记录失败的请求
             response_time_ms = (time.time() - start_time) * 1000
-            self.stats.record_request(response_time_ms, False)
+            await self.stats.record_request(response_time_ms, False)
             raise

@@ -1,20 +1,20 @@
 """
 数据库初始化工具模块
 
-提供数据库表创建和测试数据初始化功能
+提供数据库表创建和测试数据初始化功能。
+使用 service 层函数创建数据，确保业务逻辑一致性。
 """
 import hashlib
 import os
 from typing import Optional
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 
 # 导入模型
-from models import Base, get_engine, SessionLocal
+from models import Base, get_engine
 from utils.logging import get_named_logger
 from utils.git_utils import init_bare_repo, get_repository_storage_path
-from utils.password_utils import get_password_hash
 
 logger = get_named_logger("database")
 
@@ -23,7 +23,8 @@ class DatabaseInitializer:
     """
     数据库初始化器
 
-    负责初始化SQLite数据库，包括创建表结构和可选的测试数据
+    负责初始化数据库表结构，不直接处理业务数据创建。
+    业务数据创建应通过 service 层函数进行。
     """
 
     def __init__(self, db_url: Optional[str] = None):
@@ -59,20 +60,20 @@ class DatabaseInitializer:
 
     def create_test_data(self) -> bool:
         """
-        创建测试数据
+        创建测试数据（同步版本，用于初始化脚本）
 
-        仅在开发环境下使用，创建默认用户、仓库、分支和提交数据
+        注意：此方法直接操作数据库，用于命令行初始化脚本。
+        应用运行时应使用 service 层的异步函数。
 
         Returns:
             bool: 创建是否成功
         """
-        session = SessionLocal() if self._SessionLocal is None else self._SessionLocal()
+        session = self._get_session()
 
         try:
-            user_count = self._create_test_users(session)
-            repo_count, branch_count, commit_count = self._create_test_repositories(session)
+            user_count = self._create_test_users_sync(session)
+            repo_count, branch_count, commit_count = self._create_test_repositories_sync(session)
 
-            # 合并输出一条日志
             if user_count > 0 or repo_count > 0:
                 logger.info(f"测试数据创建完成: {user_count}用户, {repo_count}仓库, {branch_count}分支, {commit_count}提交")
 
@@ -84,9 +85,19 @@ class DatabaseInitializer:
         finally:
             session.close()
 
-    def _create_test_users(self, session) -> int:
+    def _get_session(self) -> Session:
+        """获取数据库会话"""
+        if self._SessionLocal is None:
+            if self.db_url:
+                engine = create_engine(self.db_url, connect_args={"check_same_thread": False})
+                self._SessionLocal = sessionmaker(bind=engine)
+            else:
+                self._SessionLocal = sessionmaker(bind=get_engine())
+        return self._SessionLocal()
+
+    def _create_test_users_sync(self, session: Session) -> int:
         """
-        创建测试用户数据
+        同步方式创建测试用户（用于初始化脚本）
 
         Args:
             session: 数据库会话
@@ -95,6 +106,7 @@ class DatabaseInitializer:
             int: 创建的用户数量
         """
         from models.user import User
+        from utils.password_utils import get_password_hash
 
         user_count = session.query(User).count()
         if user_count > 0:
@@ -125,9 +137,9 @@ class DatabaseInitializer:
         session.commit()
         return 2
 
-    def _create_test_repositories(self, session) -> tuple[int, int, int]:
+    def _create_test_repositories_sync(self, session: Session) -> tuple[int, int, int]:
         """
-        创建测试仓库、分支和提交数据
+        同步方式创建测试仓库数据（用于初始化脚本）
 
         Args:
             session: 数据库会话
@@ -150,7 +162,6 @@ class DatabaseInitializer:
             return 0, 0, 0
 
         # 创建测试仓库
-        # 使用新的 URL 格式: /{username}/{repo_name}
         test_repos = [
             Repository(
                 name="test-repo-1",
@@ -175,7 +186,7 @@ class DatabaseInitializer:
 
         session.commit()
 
-        # 创建物理 Git 仓库（空仓库）- 使用 debug 级别日志
+        # 创建物理 Git 仓库
         for repo in test_repos:
             try:
                 physical_path = get_repository_storage_path(repo.path)

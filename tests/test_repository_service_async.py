@@ -6,60 +6,16 @@
 import pytest
 import pytest_asyncio
 import asyncio
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-
-import sys
-import os
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
 
 from models.repository import Repository
 from models.user import User
 from models.branch import Branch
 from models.repository_member import RepositoryMember
-from models.base import BaseModel
 from services import repository_service
 from services import user_service
 from core.exception import NotFoundException, ConflictException, ValidationException
-
-
-# 使用内存中的 SQLite 进行测试
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
-
-
-@pytest_asyncio.fixture
-async def async_db():
-    """
-    创建异步数据库会话用于测试
-    """
-    engine = create_async_engine(
-        TEST_DATABASE_URL,
-        echo=False,
-        future=True
-    )
-    
-    async_session = async_sessionmaker(
-        engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-        autocommit=False,
-        autoflush=False
-    )
-    
-    # 创建所有表
-    async with engine.begin() as conn:
-        await conn.run_sync(BaseModel.metadata.create_all)
-    
-    async with async_session() as session:
-        yield session
-    
-    # 清理
-    async with engine.begin() as conn:
-        await conn.run_sync(BaseModel.metadata.drop_all)
-    
-    await engine.dispose()
 
 
 @pytest_asyncio.fixture

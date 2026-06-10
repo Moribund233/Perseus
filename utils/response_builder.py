@@ -9,7 +9,7 @@ from datetime import datetime
 
 def build_user_info(user, fields: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
     """
-    构建用户信息字典
+    构建用户信息字典（精简版，用于嵌套在其他响应中）
 
     Args:
         user: 用户模型对象
@@ -29,6 +29,28 @@ def build_user_info(user, fields: Optional[List[str]] = None) -> Optional[Dict[s
         if hasattr(user, field):
             result[field] = getattr(user, field)
     return result
+
+
+def build_user_response(user) -> Dict[str, Any]:
+    """
+    构建完整用户响应数据
+
+    Args:
+        user: User 模型对象
+
+    Returns:
+        dict: 完整用户数据（不包含敏感字段如密码）
+    """
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "full_name": user.full_name,
+        "is_active": user.is_active,
+        "is_admin": user.is_admin,
+        "created_at": format_datetime(user.created_at),
+        "updated_at": format_datetime(user.updated_at)
+    }
 
 
 def format_datetime(dt: Optional[datetime]) -> Optional[str]:
@@ -265,3 +287,26 @@ def build_list_response(
         list: 响应数据列表
     """
     return [builder_func(item) for item in items]
+
+
+def build_branch_response(branch) -> Dict[str, Any]:
+    """
+    构建分支响应数据
+
+    Args:
+        branch: Branch 模型对象
+
+    Returns:
+        dict: 分支数据
+    """
+    return {
+        "id": branch.id,
+        "name": branch.name,
+        "repository_id": branch.repository_id,
+        "is_protected": branch.is_protected,
+        "is_default": branch.is_default,
+        "require_code_review": branch.require_code_review,
+        "require_status_checks": branch.require_status_checks,
+        "created_at": format_datetime(branch.created_at),
+        "updated_at": format_datetime(branch.updated_at)
+    }

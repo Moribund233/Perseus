@@ -7,6 +7,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from api.routes_config import get_route_prefix
 from models.async_db import get_async_db
 from models.user import User
 from api.dependencies import get_current_user
@@ -23,7 +25,7 @@ from services.pull_request_service import (
 )
 
 # 创建路由实例
-router = APIRouter(prefix="/api/v1/repositories", tags=["pull-requests"])
+router = APIRouter(prefix=get_route_prefix("pull_requests"), tags=["pull-requests"])
 
 
 class PRCreateRequest(BaseModel):
