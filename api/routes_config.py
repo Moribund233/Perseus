@@ -119,11 +119,11 @@ ROUTES = {
     # 调试接口
     "debug": f"{API_V1_PREFIX}/debug",
 
-    # WebSocket
-    "websocket": f"{API_V1_PREFIX}",
+    # WebSocket（独立的 /ws 前缀，不由 API_V1 统一管理，避免循环依赖）
+    "websocket": "/ws",
 
     # 错误处理
-    "error": f"{API_V1_PREFIX}",
+    "error": f"{API_V1_PREFIX}/errors",
 }
 
 

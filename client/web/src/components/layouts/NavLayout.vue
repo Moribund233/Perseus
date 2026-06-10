@@ -13,8 +13,8 @@ const isMobileMenuOpen = ref(false)
 
 const navItems = [
   { path: '/explore', label: '探索' },
-  { path: '/pricing', label: '价格' },
-  { path: '/docs', label: '文档' },
+  { path: '/blog', label: '博客' },
+  { path: '/about', label: '关于' },
 ]
 
 const isActive = (path: string) => route.path === path
@@ -60,8 +60,12 @@ const isActive = (path: string) => route.path === path
 
         <!-- 右侧操作区 -->
         <div class="nav-actions">
-          <el-button type="primary" class="sign-in-btn">登录</el-button>
-          <el-button class="sign-up-btn">注册</el-button>
+          <router-link to="/auth?tab=login">
+            <el-button type="primary" class="sign-in-btn">登录</el-button>
+          </router-link>
+          <router-link to="/auth?tab=register">
+            <el-button class="sign-up-btn">注册</el-button>
+          </router-link>
         </div>
 
         <!-- 移动端菜单按钮 -->
@@ -95,8 +99,12 @@ const isActive = (path: string) => route.path === path
         </router-link>
       </nav>
       <div class="mobile-actions">
-        <el-button type="primary" class="w-full">登录</el-button>
-        <el-button class="w-full">注册</el-button>
+        <router-link to="/auth?tab=login" class="w-full">
+          <el-button type="primary" class="w-full">登录</el-button>
+        </router-link>
+        <router-link to="/auth?tab=register" class="w-full">
+          <el-button class="w-full">注册</el-button>
+        </router-link>
       </div>
     </div>
 
@@ -208,6 +216,7 @@ const isActive = (path: string) => route.path === path
   display: flex;
   align-items: center;
   gap: var(--perseus-space-3);
+  margin-left: auto;
 }
 
 .sign-in-btn {

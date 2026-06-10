@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -43,17 +44,11 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
 
     # 添加并发限制中间件（最先添加，保护服务免受过多并发请求影响）
     from middleware.concurrency import ConcurrencyMiddleware
-    # 根据是否压力测试调整并发限制
-    if config.database.is_stress_test:
-        max_concurrent = 200  # 压力测试模式允许更多并发
-        max_wait_time = 10.0
-    else:
-        max_concurrent = 100  # 正常模式限制并发
-        max_wait_time = 5.0
+    conc = config.concurrency
     app.add_middleware(
         ConcurrencyMiddleware,
-        max_concurrent=max_concurrent,
-        max_wait_time=max_wait_time
+        max_concurrent=conc.max_concurrent,
+        max_wait_time=conc.max_wait_time
     )
 
     # 添加请求超时中间件（防止请求无限期挂起）
@@ -125,58 +120,50 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     return app
 
 
-class AppSingleton:
+class AppCache:
     """
-    FastAPI应用实例的单例管理器
-    用于替代全局变量，更适合测试
+    FastAPI应用实例缓存
+
+    缓存已创建的应用实例，避免重复初始化。
+    使用模块级缓存而非手动单例模式，降低复杂度。
     """
-    _instance = None
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(AppSingleton, cls).__new__(cls)
-            cls._instance._app = None
-            cls._instance._config_path = None
-        return cls._instance
-    
-    def get_app(self, config_path: str = "config.toml") -> FastAPI:
+    _app: Optional[FastAPI] = None
+    _config_path: Optional[str] = None
+
+    @classmethod
+    def get_app(cls, config_path: str = "config.toml") -> FastAPI:
         """
-        获取FastAPI应用实例
-        
+        获取FastAPI应用实例（缓存）
+
         Args:
             config_path: 配置文件路径
-            
+
         Returns:
             FastAPI: FastAPI应用实例
         """
-        if self._app is None or self._config_path != config_path:
-            self._app = create_app(config_path)
-            self._config_path = config_path
-        return self._app
-    
-    def reset(self):
-        """
-        重置单例实例，用于测试
-        """
-        self._app = None
-        self._config_path = None
+        if cls._app is None or cls._config_path != config_path:
+            cls._app = create_app(config_path)
+            cls._config_path = config_path
+        return cls._app
 
-
-# 创建单例管理器实例
-app_singleton = AppSingleton()
+    @classmethod
+    def reset(cls):
+        """重置缓存（用于测试）"""
+        cls._app = None
+        cls._config_path = None
 
 
 def get_app(config_path: str = "config.toml") -> FastAPI:
     """
-    获取FastAPI应用实例（单例模式）
-    
+    获取FastAPI应用实例（缓存）
+
     Args:
         config_path: 配置文件路径
-        
+
     Returns:
         FastAPI: FastAPI应用实例
     """
-    return app_singleton.get_app(config_path)
+    return AppCache.get_app(config_path)
 
 
 def start_server():

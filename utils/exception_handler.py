@@ -3,24 +3,10 @@
 
 提供统一的异常处理机制，用于捕获和处理应用中的各种异常
 """
-import logging
 import traceback
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from core.exception import (
-    BaseException,
-    ValidationException,
-    AuthenticationException,
-    AuthorizationException,
-    NotFoundException,
-    ConflictException,
-    DatabaseException,
-    FileException,
-    RepositoryBrowserException,
-    RepositoryNotFoundException,
-    PathNotFoundException,
-    InvalidPathException
-)
+from core.exception import BaseException
 from utils.logging import get_named_logger
 
 # 创建异常日志记录器
@@ -41,48 +27,33 @@ def _log_exception(exc: Exception, is_debug: bool = False):
     """
     记录异常信息
 
-    所有模式（调试/生产）：
-    - error.log：记录简化信息 + 完整堆栈跟踪
-    - 控制台：只输出简化信息，避免堆栈跟踪刷屏
+    记录完整堆栈跟踪。日志系统通过处理器分离：
+    - app.log (INFO 及以下): 含简化信息
+    - error.log (WARNING 及以上): 含完整堆栈跟踪
     """
     exc_type = exc.__class__.__name__
     exc_msg = str(exc) if str(exc) else "Unknown error"
 
-    # 获取完整堆栈跟踪
-    tb_str = traceback.format_exc()
-
-    # 记录简化信息（写入 error.log）
-    logger.error(f"{exc_type}: {exc_msg}")
-
-    # 将堆栈跟踪记录到 error.log（所有模式都记录，便于排查问题）
-    for handler in logger.handlers:
-        if isinstance(handler, logging.FileHandler):
-            # 只记录到 error 日志文件（通过检查文件名）
-            if "error" in handler.baseFilename.lower():
-                handler.emit(logging.LogRecord(
-                    name=logger.name,
-                    level=logging.ERROR,
-                    pathname="",
-                    lineno=0,
-                    msg=f"Stack trace:\n{tb_str}",
-                    args=(),
-                    exc_info=None
-                ))
-            # 注意：异步日志不需要手动 flush，QueueListener 会自动处理
+    # 简化信息 + 完整堆栈跟踪（均以 ERROR 级别记录）
+    # error.log（WARNING 及以上）会自动接收，app.log 的过滤器会跳过
+    logger.error(f"{exc_type}: {exc_msg}\n{traceback.format_exc()}")
 
 
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """
     全局异常处理器
 
-    捕获并处理应用中所有未被捕获的异常
+    捕获并处理应用中所有未被捕获的异常。
+
+    自定义异常（继承自 BaseException）已在其 __init__ 中设置了正确的
+    status_code，因此无需按子类分别映射状态码。
     """
     is_debug = _is_debug_mode()
 
     # 记录异常
     _log_exception(exc, is_debug)
 
-    # 如果是自定义异常，直接返回
+    # 如果是自定义异常，直接使用异常中设定的 HTTP 状态码返回
     if isinstance(exc, BaseException):
         return JSONResponse(
             status_code=exc.status_code,
@@ -95,10 +66,6 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
                 }
             }
         )
-
-    # 处理仓库浏览器异常
-    if isinstance(exc, RepositoryBrowserException):
-        return _handle_browser_error(exc, is_debug)
 
     # 处理其他类型的异常
     if is_debug:
@@ -116,33 +83,6 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
                 "code": 500,
                 "message": error_msg if is_debug else "Internal Server Error",
                 "type": error_type if is_debug else "InternalServerError"
-            }
-        }
-    )
-
-
-def _handle_browser_error(exc: RepositoryBrowserException, is_debug: bool = False) -> JSONResponse:
-    """处理仓库浏览器异常"""
-    if isinstance(exc, RepositoryNotFoundException):
-        status_code = 404
-    elif isinstance(exc, PathNotFoundException):
-        status_code = 404
-    elif isinstance(exc, InvalidPathException):
-        status_code = 400
-    else:
-        status_code = 500
-
-    error_msg = str(exc)
-    error_type = exc.__class__.__name__ if is_debug else "RepositoryBrowserException"
-
-    return JSONResponse(
-        status_code=status_code,
-        content={
-            "detail": error_msg,
-            "error": {
-                "code": status_code,
-                "message": error_msg,
-                "type": error_type
             }
         }
     )
@@ -248,7 +188,11 @@ async def builtin_exception_handler(request: Request, exc: Exception) -> JSONRes
 
 
 def setup_exception_handlers(app):
-    """设置异常处理器"""
+    """设置异常处理器
+
+    FastAPI 的异常处理器按继承链自动匹配：
+    注册 BaseException 即可覆盖所有继承自它的子类，无需逐一注册。
+    """
     # 注册 Python 内置异常处理器（最先注册，确保能捕获这些常见异常）
     app.add_exception_handler(ValueError, builtin_exception_handler)
     app.add_exception_handler(AttributeError, builtin_exception_handler)
@@ -256,21 +200,10 @@ def setup_exception_handlers(app):
     app.add_exception_handler(KeyError, builtin_exception_handler)
     app.add_exception_handler(ZeroDivisionError, builtin_exception_handler)
 
-    # 注册自定义异常处理器
+    # 注册自定义异常根处理器
+    # 所有继承自 BaseException 的子类（含 RepositoryBrowserException 体系）
+    # 会自动由此处理器处理，无需为每个子类单独注册。
     app.add_exception_handler(BaseException, global_exception_handler)
-    app.add_exception_handler(ValidationException, global_exception_handler)
-    app.add_exception_handler(AuthenticationException, global_exception_handler)
-    app.add_exception_handler(AuthorizationException, global_exception_handler)
-    app.add_exception_handler(NotFoundException, global_exception_handler)
-    app.add_exception_handler(ConflictException, global_exception_handler)
-    app.add_exception_handler(DatabaseException, global_exception_handler)
-    app.add_exception_handler(FileException, global_exception_handler)
-
-    # 注册仓库浏览器异常处理器
-    app.add_exception_handler(RepositoryBrowserException, global_exception_handler)
-    app.add_exception_handler(RepositoryNotFoundException, global_exception_handler)
-    app.add_exception_handler(PathNotFoundException, global_exception_handler)
-    app.add_exception_handler(InvalidPathException, global_exception_handler)
 
     # 注册FastAPI内置异常处理器
     from fastapi import HTTPException as FastAPIHTTPException

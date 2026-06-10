@@ -56,12 +56,27 @@ services:
     restart: unless-stopped
 
   # =============================================
-  # Nginx + git-http-backend
+  # git-http-backend CGI 容器
+  # =============================================
+  git-cgi:
+    build:
+      context: ./docker/git-cgi
+    volumes:
+      - repos:/data/repositories
+    environment:
+      FCGI_PORT: "9000"
+      GIT_PROJECT_ROOT: /data/repositories
+      GIT_HTTP_EXPORT_ALL: "1"
+    restart: unless-stopped
+
+  # =============================================
+  # Nginx (反向代理 + Git HTTP 协议路由)
   # =============================================
   nginx:
     image: nginx:alpine
     depends_on:
       - app
+      - git-cgi
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - repos:/data/repositories:ro

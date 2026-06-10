@@ -24,7 +24,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app import create_app, AppSingleton
+from app import create_app, AppCache
 from core.config import reset_module_config_manager
 from models import Base
 from services.token_service import create_access_token
@@ -68,15 +68,20 @@ def test_engine():
     # 清理：删除所有表
     Base.metadata.drop_all(bind=engine)
 
-    # 清理测试数据库文件
+    # 清理测试数据库文件（Windows 下 SQLite 文件锁可能导致删除失败，忽略即可）
     if os.path.exists("./test_perseus.db"):
-        os.remove("./test_perseus.db")
+        try:
+            os.remove("./test_perseus.db")
+        except PermissionError:
+            pass  # Windows 文件锁释放延迟，下次运行会自动覆盖
 
 
 @pytest.fixture
 def db(test_engine):
     """
     创建同步数据库会话
+
+    每次测试后自动清理数据，确保测试隔离。
 
     Args:
         test_engine: 测试数据库引擎
@@ -90,6 +95,12 @@ def db(test_engine):
     try:
         yield session
     finally:
+        session.rollback()
+        # 清理：使用同一会话删除所有表中的数据
+        from models import Base
+        for table in reversed(Base.metadata.sorted_tables):
+            session.execute(table.delete())
+        session.commit()
         session.close()
 
 
@@ -99,6 +110,7 @@ async def async_db(test_engine):
     创建异步数据库会话
 
     使用与同步测试相同的数据库文件，确保数据一致性。
+    每次测试后自动清理数据，确保测试隔离。
 
     Args:
         test_engine: 测试数据库引擎
@@ -125,6 +137,14 @@ async def async_db(test_engine):
 
     async with async_session() as session:
         yield session
+        # 回滚任何未提交的更改
+        await session.rollback()
+
+        # 清理：使用同一会话删除所有表中的数据，确保测试隔离
+        from models import Base
+        for table in reversed(Base.metadata.sorted_tables):
+            await session.execute(table.delete())
+        await session.commit()
 
     await async_engine.dispose()
 
@@ -140,9 +160,8 @@ def test_client(test_engine):
     Yields:
         TestClient: FastAPI测试客户端
     """
-    # 重置应用单例和配置管理器
-    app_singleton = AppSingleton()
-    app_singleton.reset()
+    # 重置应用缓存和配置管理器
+    AppCache.reset()
     reset_module_config_manager()
 
     # 创建应用和测试客户端
@@ -248,6 +267,42 @@ async def async_test_user(async_db):
         email="async_test@example.com",
         password="hashed_password",
         full_name="Async Test User",
+        is_active=True
+    )
+    async_db.add(user)
+    await async_db.commit()
+    await async_db.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def async_test_user2(async_db):
+    """创建第二个异步测试用户"""
+    from models.user import User
+
+    user = User(
+        username="async_testuser2",
+        email="async_test2@example.com",
+        password="hashed_password",
+        full_name="Async Test User 2",
+        is_active=True
+    )
+    async_db.add(user)
+    await async_db.commit()
+    await async_db.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def async_another_user(async_db):
+    """创建另一个异步测试用户（用于权限测试）"""
+    from models.user import User
+
+    user = User(
+        username="async_another",
+        email="async_another@example.com",
+        password="hashed_password",
+        full_name="Another User",
         is_active=True
     )
     async_db.add(user)

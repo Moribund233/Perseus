@@ -41,22 +41,52 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/repositories',
     name: 'repositories',
-    redirect: '/explore',
+    component: () => import('@/views/RepositoriesView.vue'),
+    meta: {
+      title: '仓库 - Perseus',
+      requiresAuth: true,
+    },
   },
   {
     path: '/settings',
     name: 'settings',
-    component: () => import('@/views/DashboardView.vue'), // 临时使用 Dashboard
+    component: () => import('@/views/SettingsView.vue'),
     meta: {
       title: '设置 - Perseus',
+      requiresAuth: true,
     },
   },
   {
     path: '/profile',
     name: 'profile',
-    component: () => import('@/views/DashboardView.vue'), // 临时使用 Dashboard
+    component: () => import('@/views/ProfileView.vue'),
     meta: {
       title: '个人资料 - Perseus',
+    },
+  },
+  {
+    path: '/blog',
+    name: 'blog',
+    component: () => import('@/views/BlogView.vue'),
+    meta: {
+      title: '博客 - Perseus',
+    },
+  },
+  {
+    path: '/about',
+    name: 'about',
+    component: () => import('@/views/AboutView.vue'),
+    meta: {
+      title: '关于 - Perseus',
+    },
+  },
+  {
+    path: '/auth',
+    name: 'auth',
+    component: () => import('@/views/AuthView.vue'),
+    meta: {
+      title: '登录 / 注册 - Perseus',
+      guestOnly: true,
     },
   },
 ]
@@ -70,12 +100,11 @@ const router = createRouter({
 })
 
 // 路由守卫 - 设置页面标题
-router.beforeEach((to, from, next) => {
+router.beforeEach((to) => {
   const title = to.meta.title as string
   if (title) {
     document.title = title
   }
-  next()
 })
 
 export default router

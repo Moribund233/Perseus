@@ -3,7 +3,7 @@
  * 落地页
  * 参考原型: landing.html
  */
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import NavLayout from '@/components/layouts/NavLayout.vue'
 import {
   Connection,
@@ -14,7 +14,7 @@ import {
   Check,
 } from '@element-plus/icons-vue'
 
-const features = ref([
+const features = shallowRef([
   {
     icon: Connection,
     title: 'Git 原生支持',

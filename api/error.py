@@ -10,10 +10,11 @@ from pydantic import BaseModel
 
 from core.config import get_config
 from api.dependencies import get_current_user, get_current_admin_user
+from api.routes_config import get_route_prefix
 from models.user import User
 
 # 创建路由实例
-router = APIRouter(prefix="/api/errors", tags=["errors"])
+router = APIRouter(prefix=get_route_prefix("error"), tags=["errors"])
 
 
 class ErrorInfoResponse(BaseModel):

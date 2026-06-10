@@ -124,12 +124,8 @@ pg_ssl_mode = "prefer"
 pg_connect_timeout = 10
 pg_application_name = "perseus"
 
-rate_limit.default_limits = { mode = "minute", value = 200 }
-rate_limit.strict = { mode = "minute", value = 5 }
-rate_limit.standard = { mode = "minute", value = 30 }
-rate_limit.generous = { mode = "hour", value = 2000 }
-rate_limit.git_operations = { mode = "minute", value = 10 }
-rate_limit.download = { mode = "minute", value = 20 }
+# 限流配置已移至 Nginx（参见 docker/nginx/nginx.conf）
+# Python 端不再处理速率限制
 
 # =============================================================================
 # 以下配置仅通过环境变量注入，在此文件中设置无效

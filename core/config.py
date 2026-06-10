@@ -120,48 +120,6 @@ class LoggingSettings(BaseSettings):
     audit_log_enabled: bool = Field(default=True, description="是否启用审计日志")
 
 
-class RateLimitItem(BaseSettings):
-    """单个限流配置项"""
-    mode: str = Field(
-        default="minute",
-        description="限流模式",
-        pattern="^(minute|hour)$"
-    )
-    value: int = Field(default=200, ge=1, description="限流值")
-
-    def to_limit_string(self) -> str:
-        """转换为 slowapi 兼容的限流字符串"""
-        return f"{self.value} per {self.mode}"
-
-
-class RateLimitSettings(BaseSettings):
-    """速率限制配置类"""
-    default_limits: RateLimitItem = Field(
-        default_factory=lambda: RateLimitItem(mode="minute", value=200),
-        description="默认速率限制"
-    )
-    strict: RateLimitItem = Field(
-        default_factory=lambda: RateLimitItem(mode="minute", value=5),
-        description="严格限制"
-    )
-    standard: RateLimitItem = Field(
-        default_factory=lambda: RateLimitItem(mode="minute", value=30),
-        description="标准限制"
-    )
-    generous: RateLimitItem = Field(
-        default_factory=lambda: RateLimitItem(mode="hour", value=2000),
-        description="宽松限制"
-    )
-    git_operations: RateLimitItem = Field(
-        default_factory=lambda: RateLimitItem(mode="minute", value=10),
-        description="Git操作限制"
-    )
-    download: RateLimitItem = Field(
-        default_factory=lambda: RateLimitItem(mode="minute", value=20),
-        description="下载限制"
-    )
-
-
 class DatabaseSettings(BaseSettings):
     """
     数据库配置类
@@ -315,6 +273,19 @@ class DatabaseSettings(BaseSettings):
         return True, ""
 
 
+class ConcurrencySettings(BaseSettings):
+    """并发控制配置类（派生自数据库压力测试模式）"""
+    max_concurrent: int = Field(default=100, description="最大并发请求数")
+    max_wait_time: float = Field(default=5.0, description="最大等待时间（秒）")
+
+    @classmethod
+    def from_stress_test(cls, is_stress_test: bool) -> "ConcurrencySettings":
+        """根据是否压力测试创建并发配置"""
+        if is_stress_test:
+            return cls(max_concurrent=200, max_wait_time=10.0)
+        return cls()
+
+
 class Config(BaseSettings):
     """配置主类"""
     server: ServerSettings = Field(default_factory=ServerSettings)
@@ -325,8 +296,12 @@ class Config(BaseSettings):
     storage: StorageSettings = Field(default_factory=StorageSettings)
     security: SecuritySettings = Field(default_factory=SecuritySettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
-    rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
+
+    @property
+    def concurrency(self) -> ConcurrencySettings:
+        """获取并发配置（根据压力测试模式自适应）"""
+        return ConcurrencySettings.from_stress_test(self.database.is_stress_test)
 
 
 class ConfigManager:
@@ -342,19 +317,117 @@ class ConfigManager:
         return cls._instance
 
     def _load_config(self):
-        """加载配置"""
-        # Pydantic 会自动从环境变量读取配置
+        """
+        加载配置（TOML 文件 + 环境变量合并）
+
+        优先级（从低到高）:
+        1. Pydantic Field 默认值
+        2. TOML 配置文件中的值（仅当没有对应环境变量时生效）
+        3. 环境变量（最高优先级）
+
+        TOML 文件与 env_prefix 的对应关系:
+        - TOML [server] → env SERVER_*（无前缀，一般不设环境变量）
+        - TOML [app] → env PERSEUS_APP_*
+        - TOML [database] → env PERSEUS_DATABASE_*（以及 DATABASE_URL / PERSEUS_STRESS_TEST 特殊项）
+        - TOML [security] → env PERSEUS_SECURITY_*
+        """
+        # 1. 先创建基础配置（从环境变量和 Field 默认值读取）
         self._config = Config()
 
-        # 如果配置文件存在，从文件加载额外配置
-        if os.path.exists(self._config_path):
-            try:
-                with open(self._config_path, "r", encoding="utf-8") as f:
-                    file_config = toml.load(f)
-                    # 这里可以添加从文件覆盖配置的逻辑
-                    logger.info(f"配置文件已加载: {self._config_path}")
-            except Exception as e:
-                logger.warning(f"加载配置文件失败: {e}")
+        # 2. 加载 TOML 配置文件，选择性合并
+        if not os.path.exists(self._config_path):
+            return
+
+        toml_config = {}
+        try:
+            with open(self._config_path, "r", encoding="utf-8") as f:
+                toml_config = toml.load(f)
+        except Exception as e:
+            logger.warning(f"加载配置文件失败: {e}")
+            return
+
+        # 3. 逐节合并 TOML 值：仅当该节下没有对应环境变量时才应用
+        for section, section_data in toml_config.items():
+            if not isinstance(section_data, dict):
+                continue
+
+            sub_model = getattr(self._config, section, None)
+            if sub_model is None:
+                continue
+
+            # 获取本节对应的 env_prefix（从 Pydantic model_config）
+            sub_cls = sub_model.__class__
+            env_prefix = ""
+            if hasattr(sub_cls, 'model_config'):
+                mc = sub_cls.model_config
+                if isinstance(mc, dict):
+                    env_prefix = mc.get('env_prefix', '') or ''
+                elif hasattr(mc, 'get'):
+                    env_prefix = mc.get('env_prefix', '') or ''
+
+            # 特殊 env 检查：有些字段通过 field_validator 读取自定义环境变量
+            extra_env_checks = self._get_extra_env_checks(section)
+
+            # 收集在当前节中未设置环境变量的字段
+            toml_updates: Dict[str, Any] = {}
+            for key, value in section_data.items():
+                # 跳过嵌套子模型（如 rate_limit.xxx，它们没有 env_prefix）
+                if isinstance(value, dict):
+                    self._merge_nested_sub_model(sub_model, key, value)
+                    continue
+
+                # 检查标准 env_prefix + 字段名
+                env_name = f"{env_prefix}{key.upper()}"
+                if os.environ.get(env_name) is not None:
+                    continue
+
+                # 检查特殊 env 名
+                if key in extra_env_checks:
+                    if os.environ.get(extra_env_checks[key]) is not None:
+                        continue
+
+                toml_updates[key] = value
+
+            if toml_updates:
+                updated = sub_model.model_copy(update=toml_updates)
+                setattr(self._config, section, updated)
+
+        logger.info(f"配置文件已加载: {self._config_path}")
+
+    @staticmethod
+    def _get_extra_env_checks(section: str) -> Dict[str, str]:
+        """
+        获取特殊字段的自定义环境变量名映射
+
+        某些字段（如 database.url）通过 field_validator 读取非标准 env 名，
+        需要额外检查这些环境变量。
+        """
+        extra = {
+            "database": {
+                "url": "DATABASE_URL",
+                "is_stress_test": "PERSEUS_STRESS_TEST",
+            },
+        }
+        return extra.get(section, {})
+
+    @staticmethod
+    def _merge_nested_sub_model(parent: Any, field: str, data: dict) -> None:
+        """
+        合并嵌套子模型（如 rate_limit 下的 default_limits、strict 等）
+
+        Args:
+            parent: 父模型实例
+            field: 字段名
+            data: TOML 中该字段的字典值
+        """
+        nested = getattr(parent, field, None)
+        if nested is None:
+            return
+        try:
+            updated = nested.model_copy(update=data)
+            setattr(parent, field, updated)
+        except Exception:
+            logger.debug(f"跳过嵌套模型更新 {field}: 类型不匹配")
 
     @property
     def config(self) -> Config:
@@ -366,9 +439,16 @@ class ConfigManager:
         self._load_config()
 
 
-def get_config() -> Config:
-    """获取配置对象的便捷函数"""
-    return ConfigManager().config
+def get_config(config_path: str = "config.toml") -> Config:
+    """获取配置对象的便捷函数
+
+    Args:
+        config_path: 配置文件路径，仅首次调用时生效（单例缓存）
+
+    Returns:
+        Config: 全局配置对象
+    """
+    return ConfigManager(config_path).config
 
 
 def reset_module_config_manager():

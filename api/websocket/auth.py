@@ -90,59 +90,50 @@ async def verify_token(token: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-async def authenticate_websocket(websocket: WebSocket) -> Optional[Dict[str, Any]]:
+async def authenticate_websocket(
+    websocket: WebSocket,
+    required: bool = True,
+) -> Optional[Dict[str, Any]]:
     """
     认证WebSocket连接
-    
+
     完整的认证流程：
     1. 从query参数提取token
     2. 验证token有效性
     3. 返回用户信息
-    
+
     Args:
         websocket: FastAPI WebSocket对象
-        
+        required: 是否强制要求认证。
+            - True（默认）: 认证失败抛出 WebSocketAuthError
+            - False: 认证失败时返回 None（匿名连接）
+
     Returns:
-        Optional[Dict]: 用户信息，认证失败返回None
-        
+        Optional[Dict]: 用户信息字典，匿名连接返回 None
+
     Raises:
-        WebSocketAuthError: 认证失败时抛出
-    """
-    token = await extract_token_from_query(websocket)
-    
-    if not token:
-        logger.warning("WebSocket连接缺少token")
-        raise WebSocketAuthError("Missing authentication token", code=1008)
-    
-    user_info = await verify_token(token)
-    
-    if not user_info:
-        logger.warning(f"WebSocket连接token验证失败: {token[:20]}...")
-        raise WebSocketAuthError("Invalid authentication token", code=1008)
-    
-    if not user_info.get("is_active", True):
-        logger.warning(f"WebSocket连接用户未激活: user_id={user_info.get('user_id')}")
-        raise WebSocketAuthError("User account is inactive", code=1008)
-    
-    logger.info(f"WebSocket认证成功: user_id={user_info.get('user_id')}, username={user_info.get('username')}")
-    return user_info
-
-
-async def authenticate_websocket_optional(websocket: WebSocket) -> Optional[Dict[str, Any]]:
-    """
-    可选认证（允许匿名连接）
-    
-    用于某些不需要强制登录的场景，如公开仓库的只读通知
-    
-    Args:
-        websocket: FastAPI WebSocket对象
-        
-    Returns:
-        Optional[Dict]: 用户信息，未提供token或验证失败返回None
+        WebSocketAuthError: required=True 且认证失败时抛出
     """
     try:
-        return await authenticate_websocket(websocket)
+        token = await extract_token_from_query(websocket)
+
+        if not token:
+            raise WebSocketAuthError("Missing authentication token", code=1008)
+
+        user_info = await verify_token(token)
+
+        if not user_info:
+            raise WebSocketAuthError("Invalid authentication token", code=1008)
+
+        if not user_info.get("is_active", True):
+            raise WebSocketAuthError("User account is inactive", code=1008)
+
+        logger.info(f"WebSocket认证成功: user_id={user_info.get('user_id')}, username={user_info.get('username')}")
+        return user_info
+
     except WebSocketAuthError:
+        if required:
+            raise
         return None
 
 

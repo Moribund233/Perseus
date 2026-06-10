@@ -30,9 +30,10 @@ RUN poetry config virtualenvs.create false \
 FROM python:3.12-slim AS runtime
 
 # 安装运行时系统依赖
+# git: 用于程序化 Git 操作（创建 bare repo、分支管理等）
+# fcgiwrap 已移至 docker/git-cgi/ 容器，不再需要在此安装
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
-    fcgiwrap \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 

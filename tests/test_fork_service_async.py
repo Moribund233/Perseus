@@ -59,8 +59,8 @@ async def test_fork_repository_success(async_db: AsyncSession, async_test_user, 
         repo_root=temp_repo_dir
     )
 
-    assert forked["name"] == "test-repo"
-    assert forked["path"] == "testuser/test-repo"
+    assert forked["name"] == "async-test-repo"
+    assert forked["path"] == "async_testuser/async-test-repo"
     assert forked["is_fork"] is True
     assert forked["forked_from_id"] == async_test_repo.id
     assert "source" in forked
@@ -81,7 +81,7 @@ async def test_fork_repository_with_custom_name(async_db: AsyncSession, async_te
     )
 
     assert forked["name"] == "my-fork"
-    assert forked["path"] == "testuser/my-fork"
+    assert forked["path"] == "async_testuser/my-fork"
 
 
 @pytest.mark.asyncio
@@ -163,13 +163,13 @@ async def test_fork_repository_path_conflict(async_db: AsyncSession, async_test_
     async_test_repo.path = "source/testuser/test-repo"
     await async_db.commit()
 
-    # 创建一个同名仓库
+    # 创建一个同名仓库（路径与 fork 默认路径冲突）
     existing_repo = Repository(
-        name="test-repo",
+        name="async-test-repo",
         description="Existing repo",
         owner_id=async_test_user.id,
         is_public=True,
-        path="testuser/test-repo"
+        path="async_testuser/async-test-repo"
     )
     async_db.add(existing_repo)
     await async_db.commit()
@@ -298,7 +298,7 @@ async def test_get_fork_source(async_db: AsyncSession, async_test_user, async_te
 
     assert source is not None
     assert source["id"] == async_test_repo.id
-    assert source["name"] == "test-repo"
+    assert source["name"] == "async-test-repo"
 
 
 @pytest.mark.asyncio

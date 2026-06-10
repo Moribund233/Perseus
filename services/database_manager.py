@@ -169,22 +169,20 @@ class DatabaseResetManager:
 
     async def _create_test_data(self) -> dict:
         """创建测试数据"""
+        import asyncio
         from utils.init_database import DatabaseInitializer
 
         initializer = DatabaseInitializer()
-        initializer.create_test_data()
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, initializer.create_test_data)
 
         return {"test_data_created": True}
 
     def _create_temp_engine(self) -> Engine:
         """创建临时引擎用于删除操作"""
-        url = self.db_url
+        from models import _get_postgresql_url_with_driver as _convert_url
 
-        # 转换 URL 为带驱动的格式
-        url_lower = url.lower()
-        if url_lower.startswith("postgresql://") and not url_lower.startswith("postgresql+psycopg2://"):
-            url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
-
+        url = _convert_url(self.db_url)
         return create_engine(
             url,
             connect_args={"connect_timeout": 10},

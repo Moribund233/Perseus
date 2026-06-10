@@ -18,7 +18,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from core.config import get_config, ConfigManager, reset_module_config_manager
+from core.config import get_config
 from api.dependencies import get_current_user
 from models.user import User
 from services.database_manager import DatabaseResetManager
@@ -46,16 +46,6 @@ class InitConfResponse(BaseModel):
     backup_path: Optional[str] = None
 
 
-class RateLimitInfo(BaseModel):
-    """限流配置信息"""
-    default_limits: list = Field(default_factory=list, description="默认限流规则")
-    strict: list = Field(default_factory=list, description="严格限流规则")
-    standard: list = Field(default_factory=list, description="标准限流规则")
-    generous: list = Field(default_factory=list, description="宽松限流规则")
-    git_operations: list = Field(default_factory=list, description="Git操作限流规则")
-    download: list = Field(default_factory=list, description="下载限流规则")
-
-
 class DebugStatusResponse(BaseModel):
     """调试状态响应模型"""
     debug_mode: bool
@@ -65,7 +55,6 @@ class DebugStatusResponse(BaseModel):
     database_type: str
     environment: dict = Field(default_factory=dict, description="环境变量信息")
     stress_test_mode: bool = Field(default=False, description="是否处于压力测试模式")
-    rate_limit: RateLimitInfo = Field(default_factory=RateLimitInfo, description="限流配置信息")
 
 
 # ============== 依赖函数 ==============
@@ -150,17 +139,6 @@ async def debug_status(
     # 检查是否处于压力测试模式
     stress_test_mode = os.environ.get('PERSEUS_STRESS_TEST', 'false').lower() == 'true'
 
-    # 获取限流配置（由 Nginx 处理，此处仅展示配置值）
-    rl = config.rate_limit
-    rate_limit_info = RateLimitInfo(
-        default_limits=[rl.default_limits.to_limit_string()],
-        strict=[rl.strict.to_limit_string()],
-        standard=[rl.standard.to_limit_string()],
-        generous=[rl.generous.to_limit_string()],
-        git_operations=[rl.git_operations.to_limit_string()],
-        download=[rl.download.to_limit_string()]
-    )
-
     return DebugStatusResponse(
         debug_mode=config.app.debug,
         config_path=config_path,
@@ -168,8 +146,7 @@ async def debug_status(
         database_url=config.database._mask_url(config.database.url),
         database_type=config.database.db_type,
         environment=env_info,
-        stress_test_mode=stress_test_mode,
-        rate_limit=rate_limit_info
+        stress_test_mode=stress_test_mode
     )
 
 

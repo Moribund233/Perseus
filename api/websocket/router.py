@@ -8,15 +8,23 @@ from typing import Optional
 import logging
 
 from api.websocket.manager import manager, Connection
-from api.websocket.auth import authenticate_websocket, authenticate_websocket_optional, WebSocketAuthError
+from api.websocket.auth import authenticate_websocket
 from api.websocket.handlers import register_all_handlers
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ws", tags=["websocket"])
 
-# 注册所有消息处理器
-register_all_handlers()
+# 消息处理器注册标志（延迟到首次连接时注册，避免模块导入级副作用）
+_handlers_registered = False
+
+
+def _ensure_handlers_registered() -> None:
+    """确保消息处理器已注册（首次调用时注册）"""
+    global _handlers_registered
+    if not _handlers_registered:
+        register_all_handlers()
+        _handlers_registered = True
 
 
 @router.websocket("/logs")
@@ -53,42 +61,37 @@ async def logs_websocket(
         "message": "Git operation failed"
     }
     """
+    _ensure_handlers_registered()
     connection: Optional[Connection] = None
 
     try:
         # 接受连接
         connection = await manager.connect(websocket)
 
-        # 尝试认证（可选）
-        try:
-            user_info = await authenticate_websocket_optional(websocket)
-            if user_info:
-                manager.bind_user(
-                    connection,
-                    user_id=user_info["user_id"],
-                    username=user_info["username"]
-                )
+        # 可选认证
+        user_info = await authenticate_websocket(websocket, required=False)
+        if user_info:
+            manager.bind_user(
+                connection,
+                user_id=user_info["user_id"],
+                username=user_info["username"]
+            )
 
-                await connection.send({
-                    "type": "connected",
-                    "connection_id": connection.connection_id,
-                    "authenticated": True,
-                    "channel": "logs",
-                    "message": "日志通道已连接"
-                })
-            else:
-                await connection.send({
-                    "type": "connected",
-                    "connection_id": connection.connection_id,
-                    "authenticated": False,
-                    "channel": "logs",
-                    "message": "日志通道已连接（匿名模式）"
-                })
-        except WebSocketAuthError as e:
-            await websocket.close(code=e.code, reason=e.message)
-            if connection:
-                manager.disconnect(connection)
-            return
+            await connection.send({
+                "type": "connected",
+                "connection_id": connection.connection_id,
+                "authenticated": True,
+                "channel": "logs",
+                "message": "日志通道已连接"
+            })
+        else:
+            await connection.send({
+                "type": "connected",
+                "connection_id": connection.connection_id,
+                "authenticated": False,
+                "channel": "logs",
+                "message": "日志通道已连接（匿名模式）"
+            })
 
         # 主消息循环
         while connection.is_alive:
@@ -148,53 +151,46 @@ async def websocket_endpoint(
         ...
     }
     """
+    _ensure_handlers_registered()
     connection: Optional[Connection] = None
-    
+
     try:
         # 接受WebSocket连接
         connection = await manager.connect(websocket)
         logger.info(f"WebSocket连接已建立: {connection.connection_id}")
         
-        # 尝试认证（可选）
-        try:
-            user_info = await authenticate_websocket_optional(websocket)
-            if user_info:
-                # 绑定用户到连接
-                manager.bind_user(
-                    connection,
-                    user_id=user_info["user_id"],
-                    username=user_info["username"]
-                )
-                # 存储用户权限信息
-                connection.metadata["is_admin"] = user_info.get("is_admin", False)
-                
-                # 发送认证成功消息
-                await connection.send({
-                    "type": "connected",
-                    "connection_id": connection.connection_id,
-                    "authenticated": True,
-                    "user": {
-                        "id": user_info["user_id"],
-                        "username": user_info["username"],
-                        "is_admin": user_info.get("is_admin", False)
-                    },
-                    "message": "连接成功，已认证"
-                })
-            else:
-                # 匿名连接
-                await connection.send({
-                    "type": "connected",
-                    "connection_id": connection.connection_id,
-                    "authenticated": False,
-                    "message": "连接成功，匿名模式（部分功能受限）"
-                })
-        except WebSocketAuthError as e:
-            # 认证失败，发送错误后关闭连接
-            logger.warning(f"WebSocket认证失败: {e.message}")
-            await websocket.close(code=e.code, reason=e.message)
-            if connection:
-                manager.disconnect(connection)
-            return
+        # 可选认证
+        user_info = await authenticate_websocket(websocket, required=False)
+        if user_info:
+            # 绑定用户到连接
+            manager.bind_user(
+                connection,
+                user_id=user_info["user_id"],
+                username=user_info["username"]
+            )
+            # 存储用户权限信息
+            connection.metadata["is_admin"] = user_info.get("is_admin", False)
+
+            # 发送认证成功消息
+            await connection.send({
+                "type": "connected",
+                "connection_id": connection.connection_id,
+                "authenticated": True,
+                "user": {
+                    "id": user_info["user_id"],
+                    "username": user_info["username"],
+                    "is_admin": user_info.get("is_admin", False)
+                },
+                "message": "连接成功，已认证"
+            })
+        else:
+            # 匿名连接
+            await connection.send({
+                "type": "connected",
+                "connection_id": connection.connection_id,
+                "authenticated": False,
+                "message": "连接成功，匿名模式（部分功能受限）"
+            })
         
         # 主消息循环
         while connection.is_alive:
@@ -242,8 +238,9 @@ async def notifications_websocket(
     
     此端点仅用于接收通知，自动订阅用户通知频道
     """
+    _ensure_handlers_registered()
     connection: Optional[Connection] = None
-    
+
     try:
         # 必须先认证
         try:
@@ -306,23 +303,21 @@ async def repository_websocket(
     
     连接后自动订阅指定仓库的消息
     """
+    _ensure_handlers_registered()
     connection: Optional[Connection] = None
-    
+
     try:
         # 接受连接
         connection = await manager.connect(websocket)
         
-        # 尝试认证
-        try:
-            user_info = await authenticate_websocket_optional(websocket)
-            if user_info:
-                manager.bind_user(
-                    connection,
-                    user_id=user_info["user_id"],
-                    username=user_info["username"]
-                )
-        except WebSocketAuthError:
-            pass  # 允许匿名连接
+        # 可选认证（允许匿名连接公开仓库）
+        user_info = await authenticate_websocket(websocket, required=False)
+        if user_info:
+            manager.bind_user(
+                connection,
+                user_id=user_info["user_id"],
+                username=user_info["username"]
+            )
         
         # 自动订阅仓库
         manager.subscribe_repository(connection, repository_id)
