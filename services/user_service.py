@@ -219,7 +219,8 @@ async def login_user(credentials: dict, db: AsyncSession):
         "full_name": user.full_name,
         "is_active": user.is_active,
         "is_admin": user.is_admin,
-        "token": tokens["access_token"]
+        "token": tokens["access_token"],
+        "refresh_token": tokens["refresh_token"]
     }
 
 

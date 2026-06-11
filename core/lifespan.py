@@ -17,7 +17,7 @@ from typing import AsyncGenerator, Dict, Any, Optional
 
 from fastapi import FastAPI
 
-from models import init_engine, get_engine
+from models.async_db import get_async_engine
 from api.websocket.manager import manager as websocket_manager
 
 logger = logging.getLogger(__name__)
@@ -48,8 +48,8 @@ class AppLifecycleManager:
             Exception: 数据库引擎初始化或连接验证失败时抛出异常，
                        阻止应用在不健康状态下启动
         """
-        # 初始化数据库引擎（延迟加载） — 致命错误，必须阻止启动
-        init_engine()
+        # 初始化异步数据库引擎（延迟加载） — 致命错误，必须阻止启动
+        await self._init_async_database()
         await self._verify_database_connection()
 
         # 初始化 WebSocket 心跳检查 — 非致命错误，打日志即可
@@ -57,6 +57,13 @@ class AppLifecycleManager:
             await self._init_websocket_manager()
         except Exception as e:
             logger.warning(f"WebSocket 管理器初始化失败（不影响服务启动）: {e}")
+
+    async def _init_async_database(self) -> None:
+        """初始化异步数据库引擎"""
+        from models.async_db import get_async_engine
+        engine = get_async_engine()
+        if engine is None:
+            raise Exception("异步数据库引擎初始化失败")
 
     async def shutdown(self) -> None:
         """
@@ -77,10 +84,13 @@ class AppLifecycleManager:
     async def _verify_database_connection(self) -> None:
         """验证数据库连接是否正常"""
         from sqlalchemy import text
-        engine = get_engine()
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-            conn.commit()
+        from models.async_db import get_async_engine
+        engine = get_async_engine()
+        if engine is None:
+            raise Exception("异步数据库引擎未初始化")
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+            await conn.commit()
 
     async def _init_websocket_manager(self) -> None:
         """初始化 WebSocket 管理器"""
@@ -121,13 +131,6 @@ class AppLifecycleManager:
 
     async def _dispose_database_engine(self) -> None:
         """释放数据库连接池"""
-        try:
-            engine = get_engine()
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, engine.dispose)
-        except Exception as e:
-            logger.error(f"释放数据库连接池时出错: {e}")
-
         try:
             from models.async_db import close_async_engine
             await close_async_engine()

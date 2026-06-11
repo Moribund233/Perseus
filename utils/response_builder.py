@@ -235,6 +235,7 @@ def build_repo_response(repo, physical_exists: bool = False) -> Dict[str, Any]:
         "default_branch": repo.default_branch,
         "created_at": repo.created_at,
         "updated_at": repo.updated_at,
+        "physical_exists": physical_exists,
         "status": {
             "initialized": physical_exists
         }

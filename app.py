@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 from core.init import init_app
 
@@ -14,6 +13,9 @@ from core.init import init_app
 def create_app(config_path: str = "config.toml") -> FastAPI:
     """
     创建FastAPI应用实例
+
+    注意：CORS 由 Nginx 反向代理统一处理，不在应用层配置。
+    无论是开发环境还是生产环境，都通过 Nginx 处理跨域。
 
     Args:
         config_path: 配置文件路径
@@ -51,19 +53,20 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
         max_wait_time=conc.max_wait_time
     )
 
-    # 添加请求超时中间件（防止请求无限期挂起）
-    from middleware.timeout import TimeoutMiddleware
-    app.add_middleware(TimeoutMiddleware, timeout_seconds=30.0)
+    # 添加请求耗时日志中间件（记录慢请求）
+    from middleware.timeout import RequestTimeLoggerMiddleware
+    app.add_middleware(RequestTimeLoggerMiddleware, threshold_seconds=30.0)
 
+    # 添加安全响应头中间件
+    # 注意：CORS 由 Nginx 处理，应用层只添加其他安全头
     from middleware.security_headers import SecurityHeadersMiddleware
     enable_hsts = not config.app.debug
-    add_security_headers = not config.proxy.proxy
     app.add_middleware(
         SecurityHeadersMiddleware,
         enable_hsts=enable_hsts,
         hsts_max_age=31536000,
         allow_iframe=False,
-        add_security_headers=add_security_headers
+        add_security_headers=True
     )
 
     # 添加审计日志中间件
@@ -74,37 +77,10 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     from middleware.request_stats import RequestStatsMiddleware
     app.add_middleware(RequestStatsMiddleware, exclude_paths=["/health", "/docs", "/openapi.json"])
 
-    # 根据是否启用反向代理来决定是否启用CORS中间件
-    if not config.proxy.proxy:
-        # 未启用反向代理，启用FastAPI的CORS中间件
-        # 使用配置文件中的CORS设置
-        cors_config = config.cors
-
-        # 生产环境安全检查
-        if not config.app.debug:
-            # 生产环境不允许使用通配符
-            if "*" in cors_config.allow_origins:
-                logger.warning(
-                    "生产环境检测到CORS allow_origins包含通配符'*'，"
-                    "这会带来安全风险。建议配置具体的允许域名。"
-                )
-                # 生产环境强制使用安全的默认值
-                allow_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
-            else:
-                allow_origins = cors_config.allow_origins
-        else:
-            allow_origins = cors_config.allow_origins
-
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=allow_origins,
-            allow_credentials=cors_config.allow_credentials,
-            allow_methods=cors_config.allow_methods,
-            allow_headers=cors_config.allow_headers,
-            max_age=cors_config.max_age,
-        )
-
-        logger.info(f"CORS配置: allow_origins={allow_origins}")
+    # 注意：CORS 由 Nginx 反向代理统一处理
+    # 开发环境: docker-compose.dev.yml 中的 Nginx 处理
+    # 生产环境: docker-compose.yml 中的 Nginx 处理
+    logger.info("CORS 由 Nginx 反向代理处理")
 
     # 包含所有 API v1 路由（包括根路由、健康检查、应用管理等）
     from api.routes_config import api_v1_router
@@ -198,75 +174,3 @@ def start_server():
             workers=1,
             reload_excludes=["frontend/**"]
         )
-    else:
-        # 生产模式优先尝试 Gunicorn
-        try:
-            import gunicorn.app.base
-            from gunicorn.config import Config
-
-            class PerseusGunicornApp(gunicorn.app.base.BaseApplication):
-                """
-                Perseus 自定义 Gunicorn 应用
-                """
-                def __init__(self, app, options=None):
-                    self.options = options or {}
-                    self.application = app
-                    super().__init__()
-
-                def init(self, parser, opts, args):
-                    pass
-
-                def load_config(self):
-                    for key, value in self.options.items():
-                        if key in self.cfg.settings and value is not None:
-                            self.cfg.set(key.lower(), value)
-
-                def load(self):
-                    return self.application
-
-            gunicorn_cfg = config.gunicorn
-            options = {
-                "bind": f"{config.server.host}:{config.server.port}",
-                "workers": gunicorn_cfg.workers,
-                "worker_class": gunicorn_cfg.worker_class,
-                "threads": gunicorn_cfg.threads,
-                "worker_connections": gunicorn_cfg.worker_connections,
-                "backlog": gunicorn_cfg.backlog,
-                "timeout": gunicorn_cfg.timeout,
-                "graceful_timeout": gunicorn_cfg.graceful_timeout,
-                "keepalive": gunicorn_cfg.keepalive,
-                "max_requests": gunicorn_cfg.max_requests,
-                "max_requests_jitter": gunicorn_cfg.max_requests_jitter,
-                "preload_app": gunicorn_cfg.preload_app,
-                "daemon": gunicorn_cfg.daemon,
-                "loglevel": config.server.log_level,
-                "accesslog": "-" if gunicorn_cfg.access_log else None,
-                "errorlog": "-",
-                "capture_output": gunicorn_cfg.capture_output,
-                "proc_name": "perseus",
-            }
-
-            PerseusGunicornApp(app, options).run()
-            return
-        except ImportError:
-            logger.info("Gunicorn 未安装，使用 Uvicorn 作为替代")
-        except Exception as e:
-            logger.warning(f"Gunicorn 启动失败: {e}，回退到 Uvicorn")
-
-        # 回退到 Uvicorn
-        uvicorn.run(
-            app,
-            host=config.server.host,
-            port=config.server.port,
-            log_level=config.server.log_level,
-            workers=1
-        )
-
-
-if __name__ == "__main__":
-    """主函数入口"""
-    # 初始化应用，如果失败则退出
-    if not init_app():
-        import sys
-        sys.exit(1)
-    start_server()

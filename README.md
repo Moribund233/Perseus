@@ -7,10 +7,10 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                      Perseus Platform                        │
-├─────────────────┬─────────────────┬─────────────────────────┤
-│  Desktop Client │   Web Frontend  │      Backend API        │
-│   (Tauri+Rust)  │   (Vue 3+TS)    │    (FastAPI+Python)     │
-└─────────────────┴─────────────────┴─────────────────────────┘
+├─────────────────────────────────┬───────────────────────────┤
+│          Web Frontend           │       Backend API         │
+│         (Vue 3 + TS)            │    (FastAPI + Python)     │
+└─────────────────────────────────┴───────────────────────────┘
 ```
 
 ## 技术栈
@@ -22,9 +22,11 @@
 | Web框架 | FastAPI | 高性能异步API框架 |
 | ASGI服务器 | Uvicorn / Gunicorn | 开发/生产环境 |
 | ORM | SQLAlchemy 2.0 | 异步数据库操作 |
+| 数据库迁移 | Alembic | 数据库版本管理 |
 | Git引擎 | pygit2 | libgit2的Python绑定 |
 | 认证 | python-jose | JWT令牌认证 |
 | 密码加密 | passlib + bcrypt | 安全密码哈希 |
+| 包管理 | UV | 高性能Python包管理器 |
 
 ### 前端应用
 
@@ -35,23 +37,23 @@
 | 状态管理 | Pinia | 响应式状态存储 |
 | 路由 | Vue Router 4 | SPA路由管理 |
 | 构建工具 | Vite 6 | 快速构建 |
-
-### 桌面客户端
-
-| 组件 | 技术 | 说明 |
-|------|------|------|
-| 框架 | Tauri 2.x | 轻量级跨平台桌面应用 |
-| 后端 | Rust | 高性能系统编程 |
-| HTTP客户端 | reqwest | 异步HTTP请求 |
-| 加密 | aes-gcm | 配置加密存储 |
+| UI组件 | Element Plus | 企业级UI组件库 |
 
 ### 数据库支持
 
 | 数据库 | 同步驱动 | 异步驱动 |
 |--------|----------|----------|
 | SQLite | 内置 | aiosqlite |
-| PostgreSQL | pg8000 / psycopg2 | asyncpg |
-| MySQL | pymysql | aiomysql |
+| PostgreSQL | psycopg2 | asyncpg |
+
+### 基础设施
+
+| 组件 | 技术 | 说明 |
+|------|------|------|
+| 容器化 | Docker | 应用容器化部署 |
+| 编排 | Docker Compose | 多服务编排 |
+| 反向代理 | Nginx | 负载均衡、静态资源 |
+| Git HTTP | git-http-backend + fcgiwrap | Git Smart HTTP 协议 |
 
 ## 核心功能
 
@@ -74,7 +76,7 @@
 - 支持 `git clone`、`git push`、`git pull` 等操作
 
 ### 系统管理
-- 多数据库迁移支持
+- 多数据库迁移支持 (SQLite/PostgreSQL)
 - 实时日志推送 (WebSocket)
 - 审计日志记录
 - 请求速率限制
@@ -101,14 +103,19 @@ Perseus/
 │   ├── git_utils.py       # Git操作封装
 │   ├── security_utils.py  # 安全工具
 │   └── migration/         # 数据库迁移
-├── frontend/              # Web前端
-├── client/                # 桌面客户端
-│   ├── src/               # Vue前端代码
-│   └── src-tauri/         # Rust后端代码
+├── client/                # Web前端
+│   └── web/               # Vue前端代码
 ├── tests/                 # 测试用例
+├── docker/                # Docker配置
+│   ├── dev/               # 开发环境配置
+│   ├── git-cgi/           # Git CGI服务
+│   └── nginx/             # Nginx配置
+├── docs/                  # 文档
 ├── config.py              # 配置管理
 ├── app.py                 # 应用入口
-└── lifespan.py            # 生命周期管理
+├── lifespan.py            # 生命周期管理
+├── pyproject.toml         # 项目配置与依赖
+└── README.md              # 项目说明
 ```
 
 ## 快速开始
@@ -117,52 +124,98 @@ Perseus/
 
 - Python 3.12+
 - Node.js 20+
-- Rust 1.77+ (桌面客户端)
 - Git
+- Docker & Docker Compose (可选，用于容器化部署)
 
-### 后端启动
+### 方式一：本地开发
+
+#### 后端启动
 
 ```bash
-# 安装依赖
-poetry install
+# 安装 UV (如果未安装)
+pip install uv
 
-# 配置环境变量 -推荐使用.env文件配置
-- `DATABASE_URL`: 数据库连接URL
-- `PERSEUS_SECURITY_SECRET_KEY`: JWT密钥
-- `PERSEUS_APP_DEBUG`: 调试模式
-- `PERSEUS_STRESS_TEST`: 压力测试模式
+# 创建虚拟环境并安装依赖
+uv venv
+uv pip install -e ".[dev]"
 
+# 配置环境变量
+cp .env.dev .env
+# 编辑 .env 设置 PERSEUS_SECURITY_SECRET_KEY
 
 # 启动服务
-python app.py
+uvicorn app:app --reload
 ```
 
-### Web前端启动
+#### Web前端启动
 
 ```bash
-cd frontend
+cd client/web
 npm install
 npm run dev
 ```
 
-### 桌面客户端启动
+### 方式二：Docker 开发环境
 
 ```bash
-cd client
-npm install
-npm run tauri dev
+# 1. 配置环境变量
+cp .env.dev .env
+# 编辑 .env 设置 PERSEUS_SECURITY_SECRET_KEY
+
+# 2. 启动后端服务 (Docker)
+docker compose -f docker-compose.dev.yml up -d
+
+# 3. 启动前端开发服务器 (本地)
+cd client/web
+npm run dev
+```
+
+### 方式三：生产部署
+
+```bash
+# 1. 配置环境变量
+cp .env.dev .env
+# 编辑 .env 设置生产环境配置
+
+# 2. 构建并启动
+docker compose -f docker-compose.yml up -d
+
+# 3. 查看状态
+docker compose -f docker-compose.yml ps
 ```
 
 ## 配置说明
 
-配置通过 `config.toml` 文件和环境变量管理：
+配置通过环境变量管理（支持 `.env` 文件）：
 
-| 配置项 | 环境变量 | 说明 |
-|--------|----------|------|
-| 数据库连接 | `DATABASE_URL` | 数据库连接URL |
-| JWT密钥 | `PERSEUS_SECURITY_SECRET_KEY` | 令牌加密密钥 |
-| 调试模式 | `PERSEUS_APP_DEBUG` | 开启调试模式 |
-| 压力测试 | `PERSEUS_STRESS_TEST` | 压力测试模式 |
+| 配置项 | 环境变量 | 说明 | 默认值 |
+|--------|----------|------|--------|
+| 数据库连接 | `DATABASE_URL` | 数据库连接URL | sqlite+aiosqlite:///./perseus.db |
+| JWT密钥 | `PERSEUS_SECURITY_SECRET_KEY` | 令牌加密密钥 | **必需设置** |
+| 调试模式 | `PERSEUS_APP_DEBUG` | 开启调试模式 | false |
+| 压力测试 | `PERSEUS_STRESS_TEST` | 压力测试模式 | false |
+| 日志级别 | `LOG_LEVEL` | 日志级别 | info |
+
+## Docker 构建
+
+### 开发镜像
+
+```bash
+# 构建开发镜像
+docker build -f docker/dev/Dockerfile.backend -t perseus-backend:dev .
+
+# 使用国内镜像源加速构建
+# 已配置阿里云镜像源，无需额外设置
+```
+
+### 生产镜像
+
+```bash
+# 构建生产镜像
+docker build -t perseus:latest .
+
+# 多阶段构建，自动优化镜像体积
+```
 
 ## 安全特性
 
@@ -173,6 +226,38 @@ npm run tauri dev
 - 安全响应头 (CSP, HSTS, X-Frame-Options)
 - 审计日志记录
 - SQL 注入防护 (ORM)
+- 非 root 用户运行容器
+
+## 开发指南
+
+### 代码规范
+
+- 使用 Black 进行代码格式化
+- 使用 isort 管理导入排序
+- 使用 flake8 进行代码检查
+
+### 测试
+
+```bash
+# 运行测试
+pytest
+
+# 运行测试并生成覆盖率报告
+pytest --cov=.
+```
+
+### 数据库迁移
+
+```bash
+# 创建迁移
+alembic revision --autogenerate -m "描述"
+
+# 应用迁移
+alembic upgrade head
+
+# 回滚迁移
+alembic downgrade -1
+```
 
 ## License
 

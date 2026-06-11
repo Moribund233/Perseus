@@ -39,7 +39,13 @@ def _get_async_url(sync_url: str) -> str:
     """
     url_lower = sync_url.lower()
 
-    if url_lower.startswith("sqlite"):
+    # 如果已经是异步 URL，直接返回
+    if url_lower.startswith("sqlite+aiosqlite://"):
+        return sync_url
+    if url_lower.startswith("postgresql+asyncpg://"):
+        return sync_url
+
+    if url_lower.startswith("sqlite://"):
         # SQLite: sqlite:///path -> sqlite+aiosqlite:///path
         return sync_url.replace("sqlite://", "sqlite+aiosqlite://", 1)
     elif url_lower.startswith("postgresql+psycopg2://"):
@@ -63,16 +69,25 @@ def _create_async_engine_with_config() -> AsyncEngine:
     db_config = config.database
 
     async_url = _get_async_url(db_config.url)
-    pool_config = _resolve_pool_config(db_config)
 
-    engine = create_async_engine(
-        async_url,
-        pool_pre_ping=True,
-        future=True,
-        **pool_config
-    )
-
-    logger.debug(f"异步引擎创建: pool_size={pool_config['pool_size']}, max_overflow={pool_config['max_overflow']}")
+    # SQLite 异步引擎使用 NullPool，PostgreSQL 使用连接池
+    if async_url.startswith("sqlite"):
+        engine = create_async_engine(
+            async_url,
+            poolclass=NullPool,
+            future=True,
+            echo=db_config.echo
+        )
+        logger.debug("异步 SQLite 引擎创建 (NullPool)")
+    else:
+        pool_config = _resolve_pool_config(db_config)
+        engine = create_async_engine(
+            async_url,
+            pool_pre_ping=True,
+            future=True,
+            **pool_config
+        )
+        logger.debug(f"异步 PostgreSQL 引擎创建: pool_size={pool_config['pool_size']}, max_overflow={pool_config['max_overflow']}")
 
     return engine
 

@@ -314,10 +314,17 @@ async def merge_pull_request(
             detail="Merge conflicts detected. Please resolve conflicts before merging."
         )
 
+    # 验证合并方式
+    if merge_method not in ["merge", "squash", "rebase"]:
+        raise ValidationException(detail=f"Invalid merge method: {merge_method}")
+
     # 构建合并提交信息
-    merge_message = f"Merge pull request #{pr_number}\n\n{pr.title}"
-    if pr.description:
-        merge_message += f"\n\n{pr.description}"
+    if merge_method == "squash":
+        merge_message = f"{pr.title}\n\n{pr.description or ''}".strip()
+    else:
+        merge_message = f"Merge pull request #{pr_number}\n\n{pr.title}"
+        if pr.description:
+            merge_message += f"\n\n{pr.description}"
 
     # 执行实际合并
     try:
@@ -325,12 +332,28 @@ async def merge_pull_request(
             merger.full_name or merger.username,
             merger.email or f"{merger.username}@localhost"
         )
-        merged_commit_hash = git_service.merge_branches(
-            pr.source_branch,
-            pr.target_branch,
-            signature,
-            merge_message
-        )
+
+        if merge_method == "merge":
+            merged_commit_hash = git_service.merge_branches(
+                pr.source_branch,
+                pr.target_branch,
+                signature,
+                merge_message
+            )
+        elif merge_method == "squash":
+            merged_commit_hash = git_service.squash_branches(
+                pr.source_branch,
+                pr.target_branch,
+                signature,
+                merge_message
+            )
+        else:  # rebase
+            merged_commit_hash = git_service.rebase_branches(
+                pr.source_branch,
+                pr.target_branch,
+                signature
+            )
+
     except ValidationException:
         raise
     except Exception as e:

@@ -1,0 +1,125 @@
+# =============================================================================
+# Perseus 开发环境 Docker Compose 配置（精简版）
+#
+# 适用场景：
+#   外部已运行 PostgreSQL、Redis、Nginx/OpenResty（如 1Panel 管理的服务）
+#   只需启动 Perseus 相关的自定义服务
+#
+# 架构:
+#   本地 Vite (localhost:5173) → 前端开发服务器
+#   外部 Nginx/OpenResty → git-http-backend (CGI) — Git HTTP Smart Protocol
+#   外部 Nginx/OpenResty → FastAPI (proxy)       — API / WebSocket
+#   FastAPI → 外部 PostgreSQL                    — 数据库
+#   FastAPI → 外部 Redis                         — 缓存
+#
+# 前置条件:
+#   1. PostgreSQL 已运行，端口 5432 可访问
+#   2. Redis 已运行，端口 6379 可访问
+#   3. Nginx/OpenResty 已配置反向代理
+#
+# 使用方式:
+#   1. 复制环境变量模板: cp .env.dev .env
+#   2. 修改 .env 中的配置（特别是 JWT 密钥和数据库连接）
+#   3. 启动服务: docker compose -f docker-compose.dev.yml up -d
+#
+# 服务访问地址:
+#   - 前端: http://localhost:5173
+#   - API: 通过外部 Nginx 代理（如 http://localhost:8080/api）
+#   - WebSocket: 通过外部 Nginx 代理（如 ws://localhost:8080/ws）
+#   - Git HTTP: 通过外部 Nginx 代理（如 http://localhost:8080/username/repo.git）
+#
+# 常用命令:
+#   docker compose -f docker-compose.dev.yml logs -f app      # 查看后端日志
+#   docker compose -f docker-compose.dev.yml exec app bash    # 进入后端容器
+#   docker compose -f docker-compose.dev.yml down             # 停止服务
+#   docker compose -f docker-compose.dev.yml down -v          # 停止并清除数据
+# =============================================================================
+
+services:
+  # =============================================
+  # FastAPI 后端 (开发模式，支持热重载)
+  # =============================================
+  app:
+    build:
+      context: .
+      dockerfile: docker/dev/Dockerfile.backend
+    container_name: perseus-backend-dev
+    environment:
+      # 数据库连接（SQLite 开发环境）
+      DATABASE_URL: ${DATABASE_URL:-sqlite+aiosqlite:///app/perseus_dev.db}
+      # Redis 连接（可选）
+      # REDIS_URL: ${REDIS_URL:-redis://host.docker.internal:6379/0}
+      # JWT 密钥（必需修改！）
+      PERSEUS_SECURITY_SECRET_KEY: ${PERSEUS_SECURITY_SECRET_KEY:?错误：请设置 JWT 密钥到 .env 文件}
+      # 调试模式
+      PERSEUS_APP_DEBUG: "true"
+      PERSEUS_STRESS_TEST: "false"
+      # 日志级别
+      LOG_LEVEL: debug
+      # 时区
+      TZ: Asia/Shanghai
+    volumes:
+      # 代码挂载（支持热重载）
+      - .:/app
+      # 仓库数据持久化
+      - repos_dev:/data/repositories
+      # 日志目录
+      - ./logs:/app/logs
+    ports:
+      # 暴露后端端口（供外部 Nginx 反向代理）
+      - "127.0.0.1:8000:8000"
+    # 开发模式不设置 restart，方便调试
+    restart: "no"
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    # 启用交互式终端（方便调试）
+    stdin_open: true
+    tty: true
+    # 使用 host.docker.internal 访问宿主机上的外部服务
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # =============================================
+  # git-http-backend CGI 容器
+  # =============================================
+  git-cgi:
+    build:
+      context: ./docker/git-cgi
+      # 针对国内网络环境优化
+      args:
+        - ALPINE_MIRROR=mirrors.aliyun.com
+    container_name: perseus-git-cgi-dev
+    volumes:
+      - repos_dev:/data/repositories
+    environment:
+      FCGI_PORT: "9000"
+      GIT_PROJECT_ROOT: /data/repositories
+      GIT_HTTP_EXPORT_ALL: "1"
+    ports:
+      # 暴露 FCGI 端口（供外部 Nginx 连接）
+      - "127.0.0.1:9000:9000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+# =============================================
+# 数据卷定义
+# =============================================
+volumes:
+  repos_dev:
+    driver: local
+
+# =============================================
+# 网络配置
+# =============================================
+networks:
+  default:
+    name: perseus-dev-network
+    driver: bridge

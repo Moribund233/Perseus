@@ -29,7 +29,11 @@ config = context.config
 # 从环境变量读取 DATABASE_URL（与应用保持一致）
 db_url = os.environ.get("DATABASE_URL")
 if db_url:
-    config.set_main_option("sqlalchemy.url", db_url)
+    # Alembic 需要同步驱动，将异步驱动转换为同步驱动
+    # sqlite+aiosqlite -> sqlite
+    # postgresql+asyncpg -> postgresql
+    sync_url = db_url.replace("sqlite+aiosqlite://", "sqlite://").replace("postgresql+asyncpg://", "postgresql://")
+    config.set_main_option("sqlalchemy.url", sync_url)
 
 # 日志配置
 if config.config_file_name is not None:

@@ -113,8 +113,17 @@ class GitService:
             # 创建临时索引进行合并测试
             index = self.repo.merge_commits(target_commit, source_commit)
 
-            # 检查是否有冲突
-            return index.has_conflicts
+            # 检查是否有冲突 - pygit2 Index 对象通过 conflicts 属性检查
+            # 如果存在冲突，index.conflicts 会包含冲突条目
+            try:
+                # 尝试访问冲突，如果有冲突会返回冲突迭代器
+                if index.conflicts is None:
+                    return False
+                conflicts = list(index.conflicts)
+                return len(conflicts) > 0
+            except (AttributeError, KeyError, TypeError):
+                # 如果没有冲突属性或 KeyError，说明没有冲突
+                return False
 
         except Exception as e:
             raise ValidationException(detail=f"Failed to check merge conflicts: {str(e)}")
@@ -152,7 +161,16 @@ class GitService:
             # 执行合并
             index = self.repo.merge_commits(target_commit, source_commit)
 
-            if index.has_conflicts:
+            # 检查是否有冲突
+            has_conflicts = False
+            try:
+                if index.conflicts is not None:
+                    conflicts = list(index.conflicts)
+                    has_conflicts = len(conflicts) > 0
+            except (AttributeError, KeyError, TypeError):
+                has_conflicts = False
+
+            if has_conflicts:
                 raise ValidationException(detail="Merge conflicts detected")
 
             # 写入树对象
@@ -175,6 +193,150 @@ class GitService:
             raise
         except Exception as e:
             raise ValidationException(detail=f"Merge failed: {str(e)}")
+
+    def squash_branches(
+        self,
+        source_branch: str,
+        target_branch: str,
+        signature: pygit2.Signature,
+        message: str
+    ) -> str:
+        """
+        执行 squash 合并
+
+        将源分支的所有提交压缩为单个提交合并到目标分支。
+        与 merge 不同，squash 不会保留源分支的提交历史。
+
+        Args:
+            source_branch: 源分支名称
+            target_branch: 目标分支名称
+            signature: Git 签名
+            message: 提交信息
+
+        Returns:
+            str: 新提交的哈希
+
+        Raises:
+            ValidationException: 合并失败或有冲突
+        """
+        try:
+            source_ref_name = f"refs/heads/{source_branch}"
+            target_ref_name = f"refs/heads/{target_branch}"
+
+            source_commit = self.repo.references[source_ref_name].peel(pygit2.Commit)
+            target_commit = self.repo.references[target_ref_name].peel(pygit2.Commit)
+
+            # 执行合并获取合并后的树
+            index = self.repo.merge_commits(target_commit, source_commit)
+
+            # 检查是否有冲突
+            has_conflicts = False
+            try:
+                if index.conflicts is not None:
+                    conflicts = list(index.conflicts)
+                    has_conflicts = len(conflicts) > 0
+            except (AttributeError, KeyError, TypeError):
+                has_conflicts = False
+
+            if has_conflicts:
+                raise ValidationException(detail="Merge conflicts detected")
+
+            # 写入树对象
+            tree_oid = index.write_tree(self.repo)
+
+            # 创建单个提交（只有一个父提交）
+            parents = [target_commit.id]  # 只有目标分支作为父提交
+            commit_oid = self.repo.create_commit(
+                target_ref_name,  # 更新目标分支
+                signature,  # 作者
+                signature,  # 提交者
+                message,
+                tree_oid,
+                parents
+            )
+
+            return str(commit_oid)
+
+        except ValidationException:
+            raise
+        except Exception as e:
+            raise ValidationException(detail=f"Squash merge failed: {str(e)}")
+
+    def rebase_branches(
+        self,
+        source_branch: str,
+        target_branch: str,
+        signature: pygit2.Signature
+    ) -> str:
+        """
+        执行 rebase 合并
+
+        将源分支的提交逐个重放到目标分支的最新提交之上。
+        这会重写提交历史，使提交历史保持线性。
+
+        Args:
+            source_branch: 源分支名称
+            target_branch: 目标分支名称
+            signature: Git 签名（用于重写提交）
+
+        Returns:
+            str: 最后一个新提交的哈希
+
+        Raises:
+            ValidationException: rebase 失败或有冲突
+        """
+        try:
+            source_ref_name = f"refs/heads/{source_branch}"
+            target_ref_name = f"refs/heads/{target_branch}"
+
+            source_commit = self.repo.references[source_ref_name].peel(pygit2.Commit)
+            target_commit = self.repo.references[target_ref_name].peel(pygit2.Commit)
+
+            # 找到源分支和目标分支的共同祖先
+            merge_base = self.repo.merge_base(target_commit.id, source_commit.id)
+            if not merge_base:
+                raise ValidationException(detail="Cannot find merge base for rebase")
+
+            # 获取源分支上需要重放的提交列表（从旧到新）
+            commits_to_replay = []
+            current = source_commit
+            while current.id != merge_base:
+                commits_to_replay.insert(0, current)  # 插入到开头，保持顺序
+                if len(current.parents) == 0:
+                    break
+                # parents[0] 返回的是 Commit 对象，需要获取其 id
+                parent_commit = current.parents[0]
+                current = self.repo.get(parent_commit.id)
+
+            if not commits_to_replay:
+                # 没有需要重放的提交，直接返回目标分支
+                return str(target_commit.id)
+
+            # 逐个重放提交
+            parent_commit = target_commit
+            last_commit_oid = None
+
+            for commit in commits_to_replay:
+                # 创建新的提交，父提交是当前目标分支的最新提交
+                # 使用 commit.tree_id 获取树对象的 OID
+                commit_oid = self.repo.create_commit(
+                    target_ref_name,  # 更新目标分支引用
+                    commit.author,    # 保留原作者
+                    signature,        # 使用新的提交者
+                    commit.message,   # 保留原提交信息
+                    commit.tree_id,   # 使用提交中的树 ID
+                    [parent_commit.id]
+                )
+
+                last_commit_oid = commit_oid
+                parent_commit = self.repo.get(commit_oid)
+
+            return str(last_commit_oid)
+
+        except ValidationException:
+            raise
+        except Exception as e:
+            raise ValidationException(detail=f"Rebase merge failed: {str(e)}")
 
     def get_branch_commit(self, branch_name: str) -> Optional[pygit2.Commit]:
         """

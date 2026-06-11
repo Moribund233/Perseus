@@ -233,6 +233,7 @@ from models.pull_request import PullRequest, PRComment, PRReview
 from models.issue import Issue, Label, IssueComment
 from models.release import Release, ReleaseAsset
 from models.webhook import WebHook, WebHookDelivery
+from models.ssh_key import SSHKey
 
 __all__ = [
     "Base", "SessionLocal", "BaseModel",
@@ -241,4 +242,5 @@ __all__ = [
     "PullRequest", "PRComment", "PRReview", "Issue", "Label", "IssueComment",
     "Release", "ReleaseAsset",
     "WebHook", "WebHookDelivery",
+    "SSHKey",
 ]

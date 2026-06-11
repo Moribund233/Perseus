@@ -1,0 +1,125 @@
+# =============================================================================
+# Perseus 后端开发环境 Dockerfile
+#
+# 特性:
+#   - 支持代码热重载 (uvicorn --reload)
+#   - 包含所有开发依赖 (pytest, ruff)
+#   - 使用非 root 用户运行
+#   - 针对 WSL2 优化文件监听
+#   - 针对国内网络环境优化 (使用镜像源)
+#   - 使用 UV 替代 Poetry (更快的依赖安装)
+#
+# 构建命令:
+#   docker build -f docker/dev/Dockerfile.backend -t perseus-backend:dev .
+#
+# 注意:
+#   - 前端目录 client/ 已被 .dockerignore 排除
+#   - 需要 pyproject.toml 和 README.md 来安装依赖
+# =============================================================================
+
+FROM python:3.12-slim
+
+# 设置环境变量
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONFAULTHANDLER=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    UV_NO_CACHE=1 \
+    # 启用文件轮询模式 (WSL2 推荐)
+    CHOKIDAR_USEPOLLING=true \
+    WATCHPACK_POLLING=true
+
+# =============================================================================
+# 针对国内网络环境优化: 配置镜像源 (必须在 apt-get 之前)
+# =============================================================================
+
+# 配置阿里云 Debian 镜像源
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || \
+    echo "deb http://mirrors.aliyun.com/debian trixie main contrib non-free" > /etc/apt/sources.list
+
+# 配置阿里云 PyPI 镜像
+ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+ENV PIP_TRUSTED_HOST=mirrors.aliyun.com
+
+# 安装系统依赖
+# git: Git 操作必需
+# gcc: pygit2 编译需要
+# libffi-dev: 加密库需要
+# libpq-dev: PostgreSQL 开发库（psycopg2 编译需要）
+# netcat-traditional: 等待数据库用
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    gcc \
+    g++ \
+    libffi-dev \
+    libgit2-dev \
+    libpq-dev \
+    pkg-config \
+    ca-certificates \
+    curl \
+    netcat-traditional \
+    && rm -rf /var/lib/apt/lists/*
+
+# =============================================================================
+# 安装 UV (高性能 Python 包管理器)
+# =============================================================================
+
+# 使用国内镜像安装 UV
+RUN pip install uv -i https://mirrors.aliyun.com/pypi/simple/ \
+    && uv --version
+
+# 配置 UV 使用国内镜像
+ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+
+# 设置工作目录
+WORKDIR /app
+
+# =============================================================================
+# 使用 UV 基于 pyproject.toml 安装依赖
+# =============================================================================
+
+# 先复制依赖定义文件以利用 Docker 缓存层
+# 这些文件变更较少，可以缓存这一层
+COPY pyproject.toml README.md ./
+
+# 使用 UV 从 pyproject.toml 安装所有依赖（包括开发依赖）
+# --system: 安装到系统 Python（不使用虚拟环境）
+# --all-extras: 安装所有额外依赖
+RUN uv pip install --system -e . && \
+    uv pip install --system pytest pytest-asyncio httpx black isort flake8
+
+# =============================================================================
+# 创建非 root 用户和启动脚本
+# =============================================================================
+
+# 创建非 root 用户
+RUN groupadd -r perseus && useradd -r -g perseus perseus \
+    && mkdir -p /data/repositories /app/logs \
+    && chown -R perseus:perseus /app /data/repositories /app/logs
+
+# 创建启动脚本 (SQLite 版本 - 无需等待数据库)
+RUN echo '#!/bin/bash\n\
+echo "Initializing database..."\n\
+\n\
+# 创建数据目录并确保权限正确\n\
+mkdir -p /data/repositories\n\
+chown -R perseus:perseus /data/repositories 2>/dev/null || true\n\
+chmod 755 /data/repositories\n\
+\n\
+echo "Running database migrations..."\n\
+alembic upgrade head\n\
+\n\
+echo "Starting development server with hot reload..."\n\
+exec uvicorn app:create_app --host 0.0.0.0 --port 8000 --reload --reload-dir /app --log-level debug\n\
+' > /entrypoint.sh && chmod +x /entrypoint.sh
+
+# 切换到非 root 用户
+USER perseus
+
+# 暴露端口
+EXPOSE 8000
+
+# 启动命令
+ENTRYPOINT ["/entrypoint.sh"]

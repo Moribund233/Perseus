@@ -215,3 +215,405 @@ async def test_list_pr_comments(async_db: AsyncSession, async_test_repo, test_pr
 
     comments = await pull_request_service.list_pr_comments(async_db, async_test_repo.id, test_pr.pr_number)
     assert len(comments) == 2
+
+
+# =============================================================================
+# F-013: git merge 操作测试
+# =============================================================================
+
+@pytest_asyncio.fixture
+async def test_repo_with_git(async_db: AsyncSession, async_test_user):
+    """
+    创建带有物理 Git 仓库的测试仓库
+
+    创建一个实际的 bare 仓库，用于测试 git merge 操作
+    """
+    import tempfile
+    import os
+    import subprocess
+
+    from models.repository import Repository
+
+    # 创建临时目录作为仓库根目录
+    temp_dir = tempfile.mkdtemp()
+
+    # 创建仓库记录
+    repo = Repository(
+        name="test-merge-repo",
+        description="Test repository for merge",
+        owner_id=async_test_user.id,
+        is_public=True,
+        path=f"{async_test_user.username}/test-merge-repo"
+    )
+    async_db.add(repo)
+    await async_db.commit()
+    await async_db.refresh(repo)
+
+    # 创建物理 bare 仓库
+    repo_path = os.path.join(temp_dir, f"{async_test_user.username}", "test-merge-repo.git")
+    os.makedirs(repo_path, exist_ok=True)
+
+    # 初始化 bare 仓库，使用 main 作为默认分支
+    subprocess.run(
+        ["git", "init", "--bare", "--initial-branch=main", repo_path],
+        check=True, capture_output=True
+    )
+
+    # 创建一个非 bare 的克隆用于添加提交
+    clone_path = os.path.join(temp_dir, "clone")
+    subprocess.run(
+        ["git", "clone", repo_path, clone_path],
+        check=True, capture_output=True
+    )
+
+    # 配置 git
+    subprocess.run(
+        ["git", "-C", clone_path, "config", "user.email", "test@example.com"],
+        check=True, capture_output=True
+    )
+    subprocess.run(
+        ["git", "-C", clone_path, "config", "user.name", "Test User"],
+        check=True, capture_output=True
+    )
+
+    # 创建初始提交到 main 分支
+    with open(os.path.join(clone_path, "README.md"), "w") as f:
+        f.write("# Test Repository\n")
+    subprocess.run(["git", "-C", clone_path, "add", "."], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", clone_path, "commit", "-m", "Initial commit"],
+        check=True, capture_output=True
+    )
+    subprocess.run(["git", "-C", clone_path, "push", "origin", "main"], check=True, capture_output=True)
+
+    # 创建 feature 分支并添加提交
+    subprocess.run(
+        ["git", "-C", clone_path, "checkout", "-b", "feature"],
+        check=True, capture_output=True
+    )
+    with open(os.path.join(clone_path, "feature.txt"), "w") as f:
+        f.write("Feature content\n")
+    subprocess.run(["git", "-C", clone_path, "add", "."], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", clone_path, "commit", "-m", "Add feature"],
+        check=True, capture_output=True
+    )
+    subprocess.run(["git", "-C", clone_path, "push", "origin", "feature"], check=True, capture_output=True)
+
+    # 更新仓库路径指向临时目录
+    repo.path = repo_path
+
+    yield repo
+
+    # 清理临时目录
+    import shutil
+    shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+@pytest.mark.asyncio
+async def test_merge_pr_performs_git_merge(async_db: AsyncSession, test_repo_with_git, async_test_user):
+    """
+    测试 PR 合并执行实际的 git merge 操作
+
+    验证点：
+    1. PR 合并后状态变为 merged
+    2. 目标分支包含源分支的提交
+    3. 合并提交被正确创建
+    4. PR 记录包含合并提交哈希
+    """
+    import tempfile
+    import os
+    import subprocess
+
+    from services import pull_request_service
+    from utils.git_utils import GitService
+
+    repo = test_repo_with_git
+
+    # 创建 PR
+    pr = await pull_request_service.create_pull_request(
+        async_db, repo.id, async_test_user.id,
+        title="Test Merge PR",
+        description="This PR should be merged",
+        source_branch="feature",
+        target_branch="main"
+    )
+    assert pr["status"] == "open"
+    pr_number = pr["pr_number"]
+
+    # 使用 GitService 检查合并前的状态
+    git_service = GitService(repo.path)
+
+    # 验证 feature 分支存在且有提交
+    assert git_service.branch_exists("feature"), "feature 分支应该存在"
+    assert git_service.branch_exists("main"), "main 分支应该存在"
+
+    # 获取合并前的 main 分支提交数
+    main_commit_before = git_service.get_branch_commit("main")
+    assert main_commit_before is not None, "main 分支应该有提交"
+
+    # 执行 PR 合并
+    merged_pr = await pull_request_service.merge_pull_request(
+        async_db, repo.id, pr_number, async_test_user.id, merge_method="merge"
+    )
+
+    # 验证 PR 状态
+    assert merged_pr["status"] == "merged", "PR 状态应该变为 merged"
+    # merged_by 可能是用户对象或 ID
+    merged_by_id = merged_pr["merged_by"]["id"] if isinstance(merged_pr["merged_by"], dict) else merged_pr["merged_by"]
+    assert merged_by_id == async_test_user.id, "merged_by 应该设置为合并者"
+    assert merged_pr["merged_commit_hash"] is not None, "应该有合并提交哈希"
+
+    # 验证目标分支现在包含源分支的更改
+    # 重新加载 GitService（因为仓库已更改）
+    git_service = GitService(repo.path)
+    main_commit_after = git_service.get_branch_commit("main")
+
+    # main 分支应该有新的提交（合并提交）
+    assert str(main_commit_after.id) != str(main_commit_before.id), \
+        "main 分支应该有新的提交"
+
+    # 验证合并提交有两个父提交（合并提交的特征）
+    assert len(main_commit_after.parents) == 2, \
+        "合并提交应该有两个父提交"
+
+    print("✓ test_merge_pr_performs_git_merge 通过")
+
+
+@pytest.mark.asyncio
+async def test_squash_merge_creates_single_commit(async_db: AsyncSession, test_repo_with_git, async_test_user):
+    """
+    测试 squash merge 创建单个提交
+
+    验证点：
+    1. 使用 squash 方式合并 PR
+    2. 目标分支只有一个新的提交（而不是多个）
+    3. 新的提交只有一个父提交（不是合并提交）
+    4. PR 状态正确更新
+    """
+    from services import pull_request_service
+    from utils.git_utils import GitService
+
+    repo = test_repo_with_git
+
+    # 创建 PR
+    pr = await pull_request_service.create_pull_request(
+        async_db, repo.id, async_test_user.id,
+        title="Test Squash Merge PR",
+        description="This PR should be squash merged",
+        source_branch="feature",
+        target_branch="main"
+    )
+    assert pr["status"] == "open"
+    pr_number = pr["pr_number"]
+
+    # 使用 GitService 检查合并前的状态
+    git_service = GitService(repo.path)
+
+    # 获取合并前的 main 分支提交
+    main_commit_before = git_service.get_branch_commit("main")
+    assert main_commit_before is not None, "main 分支应该有提交"
+
+    # 执行 squash merge
+    merged_pr = await pull_request_service.merge_pull_request(
+        async_db, repo.id, pr_number, async_test_user.id, merge_method="squash"
+    )
+
+    # 验证 PR 状态
+    assert merged_pr["status"] == "merged", "PR 状态应该变为 merged"
+    assert merged_pr["merged_commit_hash"] is not None, "应该有合并提交哈希"
+
+    # 验证目标分支有新的提交
+    git_service = GitService(repo.path)
+    main_commit_after = git_service.get_branch_commit("main")
+
+    # main 分支应该有新的提交
+    assert str(main_commit_after.id) != str(main_commit_before.id), \
+        "main 分支应该有新的提交"
+
+    # 验证 squash 提交只有一个父提交（不是合并提交）
+    assert len(main_commit_after.parents) == 1, \
+        "squash 提交应该只有一个父提交"
+
+    # 验证提交信息包含 PR 信息
+    assert "Test Squash Merge PR" in main_commit_after.message, \
+        "squash 提交信息应该包含 PR 标题"
+
+    print("✓ test_squash_merge_creates_single_commit 通过")
+
+
+@pytest.mark.asyncio
+async def test_rebase_merge_replays_commits(async_db: AsyncSession, test_repo_with_git, async_test_user):
+    """
+    测试 rebase merge 重放提交
+
+    验证点：
+    1. 使用 rebase 方式合并 PR
+    2. 源分支的提交被逐个重放到目标分支
+    3. 每个提交的父提交是目标分支的前一个提交
+    4. PR 状态正确更新
+    """
+    from services import pull_request_service
+    from utils.git_utils import GitService
+
+    repo = test_repo_with_git
+
+    # 创建 PR
+    pr = await pull_request_service.create_pull_request(
+        async_db, repo.id, async_test_user.id,
+        title="Test Rebase Merge PR",
+        description="This PR should be rebase merged",
+        source_branch="feature",
+        target_branch="main"
+    )
+    assert pr["status"] == "open"
+    pr_number = pr["pr_number"]
+
+    # 使用 GitService 检查合并前的状态
+    git_service = GitService(repo.path)
+
+    # 获取合并前的 main 分支提交
+    main_commit_before = git_service.get_branch_commit("main")
+    assert main_commit_before is not None, "main 分支应该有提交"
+
+    # 执行 rebase merge
+    merged_pr = await pull_request_service.merge_pull_request(
+        async_db, repo.id, pr_number, async_test_user.id, merge_method="rebase"
+    )
+
+    # 验证 PR 状态
+    assert merged_pr["status"] == "merged", "PR 状态应该变为 merged"
+    assert merged_pr["merged_commit_hash"] is not None, "应该有合并提交哈希"
+
+    # 验证目标分支有新的提交
+    git_service = GitService(repo.path)
+    main_commit_after = git_service.get_branch_commit("main")
+
+    # main 分支应该有新的提交
+    assert str(main_commit_after.id) != str(main_commit_before.id), \
+        "main 分支应该有新的提交"
+
+    # 验证 rebase 后的提交只有一个父提交（不是合并提交）
+    assert len(main_commit_after.parents) == 1, \
+        "rebase 后的提交应该只有一个父提交"
+
+    # 验证提交信息是源分支的提交信息（不是合并提交信息）
+    assert "Add feature" in main_commit_after.message, \
+        "rebase 提交信息应该是源分支的提交信息"
+
+    print("✓ test_rebase_merge_replays_commits 通过")
+
+
+@pytest_asyncio.fixture
+async def test_repo_with_conflict(async_db: AsyncSession, async_test_user):
+    """创建带有合并冲突的测试仓库"""
+    import tempfile
+    import os
+    import subprocess
+    from models.repository import Repository
+
+    temp_dir = tempfile.mkdtemp()
+
+    # 创建仓库记录
+    repo = Repository(
+        name="test-conflict-repo",
+        description="Test repository for merge conflicts",
+        owner_id=async_test_user.id,
+        is_public=True,
+        path=f"{async_test_user.username}/test-conflict-repo"
+    )
+    async_db.add(repo)
+    await async_db.commit()
+    await async_db.refresh(repo)
+
+    # 创建物理 bare 仓库
+    repo_path = os.path.join(temp_dir, f"{async_test_user.username}", "test-conflict-repo.git")
+    os.makedirs(repo_path, exist_ok=True)
+
+    # 初始化 bare 仓库
+    subprocess.run(
+        ["git", "init", "--bare", "--initial-branch=main", repo_path],
+        check=True, capture_output=True
+    )
+
+    # 创建克隆
+    clone_path = os.path.join(temp_dir, "clone")
+    subprocess.run(["git", "clone", repo_path, clone_path], check=True, capture_output=True)
+
+    # 配置用户
+    subprocess.run(["git", "-C", clone_path, "config", "user.email", "test@example.com"], check=True)
+    subprocess.run(["git", "-C", clone_path, "config", "user.name", "Test User"], check=True)
+
+    # 创建初始文件并提交
+    with open(os.path.join(clone_path, "README.md"), "w") as f:
+        f.write("# Test Repository\n\nInitial content\n")
+    subprocess.run(["git", "-C", clone_path, "add", "."], check=True)
+    subprocess.run(["git", "-C", clone_path, "commit", "-m", "Initial commit"], check=True)
+    subprocess.run(["git", "-C", clone_path, "push", "origin", "main"], check=True)
+
+    # 创建 feature 分支并修改同一文件
+    subprocess.run(["git", "-C", clone_path, "checkout", "-b", "feature"], check=True)
+    with open(os.path.join(clone_path, "README.md"), "w") as f:
+        f.write("# Test Repository\n\nFeature branch content\n")  # 修改同一行
+    subprocess.run(["git", "-C", clone_path, "add", "."], check=True)
+    subprocess.run(["git", "-C", clone_path, "commit", "-m", "Feature change"], check=True)
+    subprocess.run(["git", "-C", clone_path, "push", "origin", "feature"], check=True)
+
+    # 回到 main 分支并修改同一文件（制造冲突）
+    subprocess.run(["git", "-C", clone_path, "checkout", "main"], check=True)
+    with open(os.path.join(clone_path, "README.md"), "w") as f:
+        f.write("# Test Repository\n\nMain branch content\n")  # 修改同一行
+    subprocess.run(["git", "-C", clone_path, "add", "."], check=True)
+    subprocess.run(["git", "-C", clone_path, "commit", "-m", "Main change"], check=True)
+    subprocess.run(["git", "-C", clone_path, "push", "origin", "main"], check=True)
+
+    repo.path = repo_path
+    yield repo
+
+    # 清理
+    import shutil
+    shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+@pytest.mark.asyncio
+async def test_detect_merge_conflict(async_db: AsyncSession, test_repo_with_conflict, async_test_user):
+    """
+    测试合并冲突检测
+
+    验证点：
+    1. 创建有冲突的 PR
+    2. 尝试合并时应该检测到冲突
+    3. 抛出 ValidationException 并提示冲突
+    4. PR 状态保持 open
+    """
+    from services import pull_request_service
+    from core.exception import ValidationException
+
+    repo = test_repo_with_conflict
+
+    # 创建 PR
+    pr = await pull_request_service.create_pull_request(
+        async_db, repo.id, async_test_user.id,
+        title="Test Conflict PR",
+        description="This PR has conflicts",
+        source_branch="feature",
+        target_branch="main"
+    )
+    assert pr["status"] == "open"
+    pr_number = pr["pr_number"]
+
+    # 尝试合并应该抛出冲突异常
+    with pytest.raises(ValidationException) as exc_info:
+        await pull_request_service.merge_pull_request(
+            async_db, repo.id, pr_number, async_test_user.id, merge_method="merge"
+        )
+
+    # 验证错误信息包含冲突提示
+    assert "conflict" in str(exc_info.value).lower(), \
+        "错误信息应该包含冲突提示"
+
+    # 验证 PR 状态仍然是 open
+    pr_after = await pull_request_service.get_pull_request(async_db, repo.id, pr_number)
+    assert pr_after["status"] == "open", "PR 状态应该保持 open"
+
+    print("✓ test_detect_merge_conflict 通过")

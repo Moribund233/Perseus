@@ -63,23 +63,18 @@ class AppSettings(BaseSettings):
 
 
 class CORSSettings(BaseSettings):
-    """CORS跨域配置类"""
-    allow_origins: list = Field(default=["*"], description="允许的源列表")
-    allow_credentials: bool = Field(default=True, description="是否允许携带凭证")
+    """CORS跨域配置类 (仅用于文档说明，实际CORS由Nginx处理)"""
+    allow_origins: list = Field(default=["*"], description="允许的源列表（由Nginx处理）")
+    allow_credentials: bool = Field(default=True, description="是否允许携带凭证（由Nginx处理）")
     allow_methods: list = Field(
         default=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        description="允许的HTTP方法"
+        description="允许的HTTP方法（由Nginx处理）"
     )
     allow_headers: list = Field(
         default=["Content-Type", "Authorization", "X-Requested-With"],
-        description="允许的请求头"
+        description="允许的请求头（由Nginx处理）"
     )
-    max_age: int = Field(default=600, description="预检请求缓存时间（秒）")
-
-
-class ProxySettings(BaseSettings):
-    """代理配置类"""
-    proxy: bool = Field(default=True, description="是否启用反向代理")
+    max_age: int = Field(default=600, description="预检请求缓存时间（秒）（由Nginx处理）")
 
 
 class StorageSettings(BaseSettings):
@@ -202,7 +197,7 @@ class DatabaseSettings(BaseSettings):
             raise ValueError("数据库URL不能为空")
 
         url_lower = v.lower()
-        valid_prefixes = ("sqlite://", "postgresql://", "postgres://", "postgresql+psycopg2://")
+        valid_prefixes = ("sqlite://", "sqlite+aiosqlite://", "postgresql://", "postgres://", "postgresql+psycopg2://", "postgresql+asyncpg://")
         if not any(url_lower.startswith(prefix) for prefix in valid_prefixes):
             raise ValueError(f"不支持的数据库协议类型: {v}")
 
@@ -266,7 +261,7 @@ class DatabaseSettings(BaseSettings):
             return False, f"URL 编码错误: {str(e)}"
 
         url_lower = url.lower()
-        valid_prefixes = ("sqlite://", "postgresql://", "postgres://", "postgresql+psycopg2://")
+        valid_prefixes = ("sqlite://", "sqlite+aiosqlite://", "postgresql://", "postgres://", "postgresql+psycopg2://", "postgresql+asyncpg://")
         if not any(url_lower.startswith(prefix) for prefix in valid_prefixes):
             return False, f"不支持的协议类型"
 
@@ -292,7 +287,6 @@ class Config(BaseSettings):
     gunicorn: GunicornSettings = Field(default_factory=GunicornSettings)
     app: AppSettings = Field(default_factory=AppSettings)
     cors: CORSSettings = Field(default_factory=CORSSettings)
-    proxy: ProxySettings = Field(default_factory=ProxySettings)
     storage: StorageSettings = Field(default_factory=StorageSettings)
     security: SecuritySettings = Field(default_factory=SecuritySettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)

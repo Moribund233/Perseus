@@ -68,7 +68,11 @@ def create_api_router() -> APIRouter:
     from controller.issue_controller import router as issue_router
     api_v1_router.include_router(issue_router)
 
-    # 11. Debug 路由（仅在调试模式下可用）
+    # 11. SSH Key 管理路由
+    from controller.key_controller import router as key_router
+    api_v1_router.include_router(key_router)
+
+    # 12. Debug 路由（仅在调试模式下可用）
     from controller.debug_controller import router as debug_router
     api_v1_router.include_router(debug_router)
 
@@ -115,6 +119,9 @@ ROUTES = {
 
     # 仓库成员
     "repository_members": f"{API_V1_PREFIX}/repositories",
+
+    # SSH Key 管理
+    "keys": f"{API_V1_PREFIX}/keys",
 
     # 调试接口
     "debug": f"{API_V1_PREFIX}/debug",

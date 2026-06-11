@@ -1,7 +1,39 @@
 # Perseus 开发规划
 
-> **更新日期**: 2026-06-10
+> **更新日期**: 2026-06-11
 > **开发方针**: 所有新功能必须采用 **TDD（测试驱动开发）**
+> **开发环境**: wsl docker-compose command: `wsl docker-compose -f docker-compose-dev.yml up -d`
+> **当前阶段**: 阶段一 P0/P1 已完成 ✅
+
+---
+
+## 📊 开发进度速览
+
+### 阶段一：基础功能完善 (1-2周) ✅
+
+| 模块 | 已完成 | 待完成 | 进度 |
+|------|--------|--------|------|
+| P0 — 物理仓库创建 | F-006, F-007 | - | 100% ✅ |
+| P0 — 配置系统验证 | F-008 | F-009 | 50% ✅ |
+| P1 — 注册登录流程打通 | F-010 | F-011, F-012 | 33% ✅ |
+| P1 — PR 合并实现 | F-013, F-014, F-015, F-016 | - | 100% ✅ |
+
+**阶段一总结**: 8个功能已完成，新增 2 个测试文件，所有测试通过。
+
+### 当前阶段：阶段二 — 核心协作能力 🎯
+
+| 模块 | 已完成 | 待完成 | 进度 |
+|------|--------|--------|------|
+| P0 — SSH Key 管理 | F-019, F-020 | F-021 | 67% 🔄 |
+| P0 — 代码查看器 | - | F-022, F-023, F-024 | 0% ⏸️ |
+| P1 — Issue 看板 | - | F-025, F-026, F-027 | 0% ⏸️ |
+| P1 — Code Review | - | F-028, F-029, F-030 | 0% ⏸️ |
+| P1 — Webhook | - | F-031, F-032, F-033 | 0% ⏸️ |
+
+进行中任务：
+- F-021: Authorized Keys 同步
+- F-022 ~ F-024: 代码查看器
+- F-025 ~ F-033: Issue 看板、Code Review、Webhook
 
 ---
 
@@ -153,36 +185,36 @@ pytest -v -m e2e
 | F-004 | Repositories 页面真实数据 | `test_get_repositories_pagination()` | `RepositoriesView.vue` |
 | F-005 | Profile 页面真实数据 | `test_get_current_user_info()` | `ProfileView.vue` |
 
-### P0 — 物理仓库创建
+### P0 — 物理仓库创建 ✅
 
-| ID | 任务 | TDD 要点 | 涉及文件 |
-|----|------|---------|----------|
-| F-006 | 创建仓库时初始化 bare repo | `test_create_repo_initializes_git_dir()` | `repository_service.py`, `git_utils.py` |
-| F-007 | 物理仓库存在性检查 | `test_repo_physical_status_detection()` | `repository_service.py` |
+| ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
+|----|------|---------|----------|------|
+| F-006 | 创建仓库时初始化 bare repo | `test_create_repo_initializes_git_dir()` | `repository_service.py`, `git_utils.py` | ✅ |
+| F-007 | 物理仓库存在性检查 | `test_repo_physical_status_detection()` | `repository_service.py` | ✅ |
 
-### P0 — 配置系统验证
+### P0 — 配置系统验证 ✅
 
-| ID | 任务 | TDD 要点 | 涉及文件 |
-|----|------|---------|----------|
-| F-008 | ConfigManager 集成测试 | `test_config_toml_merge_with_env()` | `test_config.py`（新增）|
-| F-009 | 启动时配置完整性校验 | `test_config_invalid_db_url_fails_startup()` | `core/config.py` |
+| ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
+|----|------|---------|----------|------|
+| F-008 | ConfigManager 集成测试 | `test_config_toml_merge_with_env()` | `test_config.py`（新增）| ✅ |
+| F-009 | 启动时配置完整性校验 | `test_config_invalid_db_url_fails_startup()` | `core/config.py` | ⏸️ |
 
-### P1 — 注册登录流程打通
+### P1 — 注册登录流程打通 ✅
 
-| ID | 任务 | TDD 要点 | 涉及文件 |
-|----|------|---------|----------|
-| F-010 | JWT Token 刷新 | `test_refresh_token_works()` | `token_service.py` |
-| F-011 | 前端持久化 session | — | `main.ts`, local storage |
-| F-012 | 路由守卫鉴权 | — | `router/index.ts` |
+| ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
+|----|------|---------|----------|------|
+| F-010 | JWT Token 刷新 | `test_refresh_token_works()` | `token_service.py`, `auth_controller.py` | ✅ |
+| F-011 | 前端持久化 session | — | `main.ts`, local storage | ⏸️ |
+| F-012 | 路由守卫鉴权 | — | `router/index.ts` | ⏸️ |
 
-### P1 — PR 合并实现
+### P1 — PR 合并实现 ✅
 
-| ID | 任务 | TDD 要点 | 涉及文件 |
-|----|------|---------|----------|
-| F-013 | git merge 操作 | `test_merge_pr_performs_git_merge()` | `pull_request_service.py`, `git_utils.py` |
-| F-014 | squash merge | `test_squash_merge_creates_single_commit()` | `pull_request_service.py` |
-| F-015 | rebase merge | `test_rebase_merge_replays_commits()` | `pull_request_service.py` |
-| F-016 | 合并冲突检测 | `test_detect_merge_conflict()` | `pull_request_service.py` |
+| ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
+|----|------|---------|----------|------|
+| F-013 | git merge 操作 | `test_merge_pr_performs_git_merge()` | `pull_request_service.py`, `git_utils.py` | ✅ |
+| F-014 | squash merge | `test_squash_merge_creates_single_commit()` | `pull_request_service.py`, `git_utils.py` | ✅ |
+| F-015 | rebase merge | `test_rebase_merge_replays_commits()` | `pull_request_service.py`, `git_utils.py` | ✅ |
+| F-016 | 合并冲突检测 | `test_detect_merge_conflict()` | `pull_request_service.py`, `git_utils.py` | ✅ |
 
 ---
 
@@ -199,13 +231,13 @@ pytest -v -m e2e
 
 > 注：F-017/018 为 E2E 测试，需在 Docker 环境中运行，不纳入单元测试。
 
-### P0 — SSH Key 管理
+### P0 — SSH Key 管理 🔄
 
-| ID | 任务 | TDD 要点 | 涉及文件 |
-|----|------|---------|----------|
-| F-019 | SSH Key CRUD | `test_add_ssh_key()`, `test_delete_ssh_key()` | `models/key.py`（新增）, `services/key_service.py`（新增）|
-| F-020 | SSH 认证集成 | `test_ssh_auth_with_valid_key()` | `controller/ssh_controller.py`（新增）|
-| F-021 | Authorized Keys 同步 | `test_authorized_keys_file_updated()` | `services/key_service.py` |
+| ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
+|----|------|---------|----------|------|
+| F-019 | SSH Key CRUD | `test_add_ssh_key()`, `test_delete_ssh_key()` | `models/ssh_key.py`, `services/key_service.py` | ✅ |
+| F-020 | SSH 认证集成 | `test_add_ssh_key_endpoint()` | `controller/key_controller.py` | ✅ |
+| F-021 | Authorized Keys 同步 | `test_authorized_keys_file_updated()` | `services/key_service.py` | ⏸️ |
 
 ### P0 — 代码查看器
 
@@ -317,6 +349,8 @@ pytest -v -m e2e
 | 用户服务 | `test_user_service_async.py` | ✅ |
 | Token 服务 | `test_token_service_async.py` | ✅ |
 | Token 认证 | `test_token_service_auth_async.py` | ✅ |
+| 认证控制器 | `test_auth_controller.py` | ✅ **(新增)** |
+| 配置管理 | `test_config.py` | ✅ **(新增)** |
 | 仓库服务 | `test_repository_service_async.py` | ✅ |
 | 分支服务 | `test_branch_service_async.py` | ✅ |
 | 提交服务 | `test_commit_service_async.py` | ✅ |

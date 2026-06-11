@@ -42,3 +42,6 @@ test_*.py
 # 操作系统文件
 Thumbs.db
 .DS_Store
+
+# 客户端目录
+client/
