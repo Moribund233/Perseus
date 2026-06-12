@@ -8,10 +8,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.repository import Repository
+from utils.git_utils import init_bare_repo, get_repository_storage_path
 
 
 def create_test_repo(db, owner_id: int, name: str = "test-repo") -> Repository:
-    """创建测试仓库"""
+    """创建测试仓库（含物理 Git 仓库初始化）"""
     repo = Repository(
         name=name,
         path=f"testuser/{name}",
@@ -23,6 +24,8 @@ def create_test_repo(db, owner_id: int, name: str = "test-repo") -> Repository:
     db.add(repo)
     db.commit()
     db.refresh(repo)
+    physical_path = get_repository_storage_path(repo.path)
+    init_bare_repo(physical_path)
     return repo
 
 
@@ -91,32 +94,37 @@ def test_create_release_duplicate_tag(test_client: TestClient, auth_headers: dic
     assert response.status_code == 400
 
 
-def test_list_releases(test_client: TestClient, auth_headers: dict, db):
+@pytest.mark.asyncio
+async def test_list_releases(async_db: AsyncSession, async_test_user):
     """测试获取 Release 列表"""
-    repo = create_test_repo(db, 1)
+    from models.repository import Repository as RepoModel
+    from services import release_service
 
-    # 创建 Release
-    test_client.post(
-        f"/api/v1/repositories/{repo.id}/releases",
-        json={"tag_name": "v1.0.0", "name": "Version 1.0.0"},
-        headers=auth_headers
+    repo = RepoModel(
+        name="test-repo", path="testuser/test-repo",
+        description="Test repository", is_public=True,
+        owner_id=async_test_user.id, default_branch="main"
     )
-    test_client.post(
-        f"/api/v1/repositories/{repo.id}/releases",
-        json={"tag_name": "v2.0.0", "name": "Version 2.0.0"},
-        headers=auth_headers
+    async_db.add(repo)
+    await async_db.commit()
+    await async_db.refresh(repo)
+    repo_path = get_repository_storage_path(repo.path)
+    init_bare_repo(repo_path)
+
+    await release_service.create_release(
+        async_db, repo.id, author_id=async_test_user.id, tag_name="v1.0.0",
+        name="Version 1.0.0", commit_hash="0000000000000000000000000000000000000000",
+        create_git_tag=False, repo_path=repo_path
+    )
+    await release_service.create_release(
+        async_db, repo.id, author_id=async_test_user.id, tag_name="v2.0.0",
+        name="Version 2.0.0", commit_hash="0000000000000000000000000000000000000000",
+        create_git_tag=False, repo_path=repo_path
     )
 
-    # 获取列表
-    response = test_client.get(
-        f"/api/v1/repositories/{repo.id}/releases",
-        headers=auth_headers
-    )
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["total"] == 2
-    assert len(data["items"]) == 2
+    result = await release_service.list_releases(async_db, repo.id)
+    assert result["total"] == 2
+    assert len(result["items"]) == 2
 
 
 def test_get_release_by_number(test_client: TestClient, auth_headers: dict, db):

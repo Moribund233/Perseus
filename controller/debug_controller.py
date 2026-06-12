@@ -153,18 +153,16 @@ async def debug_status(
 @router.post("/initdb", response_model=InitDbResponse)
 async def init_database(
     force: bool = False,
-    create_test_data: bool = True,
     _: None = Depends(require_debug_mode),
     current_user: User = Depends(require_admin)
 ):
     """
     重置数据库
 
-    删除所有表并重新创建，可选创建测试数据
+    删除所有表并重新建立，启动时自动引导管理员用户。
 
     Args:
         force: 是否强制重置（跳过确认提示，始终为 true）
-        create_test_data: 是否创建测试数据
 
     Returns:
         InitDbResponse: 操作结果
@@ -173,12 +171,8 @@ async def init_database(
         HTTPException: 非调试模式或权限不足时
     """
     try:
-        # 使用 DatabaseResetManager 执行重置
         manager = DatabaseResetManager()
-        result = await manager.reset_database(
-            create_test_data=create_test_data,
-            preserve_config=True
-        )
+        result = await manager.reset_database(preserve_config=True)
 
         return InitDbResponse(
             success=True,

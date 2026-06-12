@@ -7,10 +7,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from models.repository import Repository
+from utils.git_utils import init_bare_repo, get_repository_storage_path
 
 
 def create_test_repo(db, owner_id: int, name: str = "source-repo") -> Repository:
-    """创建测试仓库"""
+    """创建测试仓库（含物理 Git 仓库初始化）"""
     repo = Repository(
         name=name,
         path=f"testuser/{name}",
@@ -22,6 +23,8 @@ def create_test_repo(db, owner_id: int, name: str = "source-repo") -> Repository
     db.add(repo)
     db.commit()
     db.refresh(repo)
+    physical_path = get_repository_storage_path(repo.path)
+    init_bare_repo(physical_path)
     return repo
 
 

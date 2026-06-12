@@ -25,8 +25,7 @@ class DatabaseResetManager:
     统一管理数据库的生命周期操作，包括：
     - 关闭现有连接
     - 删除数据（文件或表）
-    - 重新创建表结构
-    - 初始化测试数据
+    - 重新创建表结构（自动引导管理员）
     """
 
     def __init__(self):
@@ -36,7 +35,6 @@ class DatabaseResetManager:
 
     async def reset_database(
         self,
-        create_test_data: bool = False,
         preserve_config: bool = True
     ) -> dict:
         """
@@ -46,10 +44,9 @@ class DatabaseResetManager:
         1. 关闭所有现有连接
         2. 删除现有数据
         3. 重新创建表
-        4. 可选创建测试数据
+        4. 自动引导管理员用户
 
         Args:
-            create_test_data: 是否创建测试数据
             preserve_config: 是否保留配置（用于区分调试/测试场景）
 
         Returns:
@@ -68,10 +65,8 @@ class DatabaseResetManager:
             # 步骤3: 重新创建表
             self._create_tables()
 
-            # 步骤4: 可选创建测试数据
-            test_data_info = {}
-            if create_test_data:
-                test_data_info = await self._create_test_data()
+            # 步骤4: 自动引导管理员用户
+            admin_created = self._bootstrap_admin()
 
             elapsed = time.time() - start_time
 
@@ -81,8 +76,7 @@ class DatabaseResetManager:
                 "success": True,
                 "database_type": self.db_type,
                 "elapsed_seconds": round(elapsed, 2),
-                "test_data_created": create_test_data,
-                **test_data_info
+                "admin_bootstrapped": admin_created,
             }
 
         except Exception as e:
@@ -167,16 +161,13 @@ class DatabaseResetManager:
 
         logger.info("数据库表已重新创建")
 
-    async def _create_test_data(self) -> dict:
-        """创建测试数据"""
-        import asyncio
-        from utils.init_database import DatabaseInitializer
-
+    def _bootstrap_admin(self) -> bool:
+        """重置后自动引导管理员用户"""
         initializer = DatabaseInitializer()
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, initializer.create_test_data)
-
-        return {"test_data_created": True}
+        result = initializer.autobootstrap_admin()
+        if result:
+            logger.info("管理员用户引导完成")
+        return result
 
     def _create_temp_engine(self) -> Engine:
         """创建临时引擎用于删除操作"""

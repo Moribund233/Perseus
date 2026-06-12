@@ -11,8 +11,7 @@ import os
 import sys
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import create_engine, pool
 
 from alembic import context
 
@@ -26,13 +25,28 @@ target_metadata = Base.metadata
 # Alembic Config 对象
 config = context.config
 
+
+
+def _to_sync_database_url(db_url: str) -> str:
+    """将异步 DATABASE_URL 转为 Alembic 可用的同步 SQLAlchemy URL。"""
+    if db_url.startswith('postgresql+asyncpg://'):
+        return db_url.replace('postgresql+asyncpg://', 'postgresql://', 1)
+    if db_url.startswith('sqlite+aiosqlite://'):
+        path = db_url.removeprefix('sqlite+aiosqlite://')
+        if path.startswith('/') and not path.startswith('/.'):
+            # 绝对路径需要 4 个斜杠: sqlite:////absolute/path
+            return f'sqlite:///{path}'
+        # 相对路径: sqlite:///./file.db
+        return f'sqlite:///{path.lstrip("/")}'
+    return db_url
+
 # 从环境变量读取 DATABASE_URL（与应用保持一致）
 db_url = os.environ.get("DATABASE_URL")
 if db_url:
     # Alembic 需要同步驱动，将异步驱动转换为同步驱动
     # sqlite+aiosqlite -> sqlite
     # postgresql+asyncpg -> postgresql
-    sync_url = db_url.replace("sqlite+aiosqlite://", "sqlite://").replace("postgresql+asyncpg://", "postgresql://")
+    sync_url = _to_sync_database_url(db_url)
     config.set_main_option("sqlalchemy.url", sync_url)
 
 # 日志配置
@@ -56,11 +70,13 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """在线模式运行迁移（直接连接数据库执行）"""
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    url = config.get_main_option("sqlalchemy.url")
+    if not url:
+        raise RuntimeError(
+            "Database URL not configured. Set DATABASE_URL or sqlalchemy.url in alembic.ini."
+        )
+
+    connectable = create_engine(url, poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
         context.configure(

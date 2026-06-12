@@ -31,7 +31,7 @@ class UserCreateRequest(BaseModel):
     password: str = Field(..., min_length=6, max_length=128, description="密码")
     full_name: Optional[str] = Field(None, max_length=100, description="全名")
     is_active: bool = Field(default=True, description="是否激活")
-    is_admin: bool = Field(default=False, description="是否管理员")
+    # is_admin 不由注册接口设置；管理员只能通过环境变量 PERSEUS_ADMIN_* 引导创建
 
 
 class UserUpdateRequest(BaseModel):

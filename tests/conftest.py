@@ -102,6 +102,11 @@ def db(test_engine):
             session.execute(table.delete())
         session.commit()
         session.close()
+        # 清理物理仓库目录（测试间隔离）
+        import shutil
+        repo_root = os.path.join(project_root, "repositories")
+        if os.path.exists(repo_root):
+            shutil.rmtree(repo_root)
 
 
 @pytest_asyncio.fixture

@@ -83,7 +83,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY . /app/
 
 # 创建非 root 用户
-RUN groupadd -r perseus && useradd -r -g perseus perseus \
+RUN groupadd -g 1000 perseus && useradd -u 1000 -g perseus perseus \
     && mkdir -p /data/repositories /app/logs \
     && chown -R perseus:perseus /app /data/repositories /app/logs
 

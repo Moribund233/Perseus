@@ -286,7 +286,7 @@ class AppInitializer:
             return False
 
         try:
-            self.config_manager.get_config(force_reload=True)
+            self.config_manager.reload()
             return True
         except Exception as e:
             self._logger.error(f"配置文件加载失败: {e}")
@@ -332,14 +332,11 @@ class AppInitializer:
             )
             return False
 
-    def _init_database(self, create_test_data: bool = False) -> bool:
-        """初始化数据库"""
+    def _init_database(self) -> bool:
+        """初始化数据库（创建表 + 自动引导管理员）"""
         from utils.init_database import init_database
-        
-        config = self.config_manager.get_config()
-        should_create_test_data = create_test_data or config.app.debug
 
-        if init_database(create_test_data=should_create_test_data):
+        if init_database():
             return True
         else:
             self._logger.error("数据库初始化失败")
@@ -378,7 +375,6 @@ class AppInitializer:
     def initialize(
         self,
         init_db: bool = True,
-        create_test_data: bool = False,
     ) -> bool:
         """
         执行完整初始化流程
@@ -389,12 +385,11 @@ class AppInitializer:
         3. 配置文件初始化
         4. 日志系统初始化
         5. 安全密钥检查
-        6. 数据库初始化
+        6. 数据库初始化（创建表 + 自动引导管理员）
         7. 仓库目录初始化
 
         Args:
             init_db: 是否初始化数据库
-            create_test_data: 是否创建测试数据（仅开发环境）
 
         Returns:
             bool: 初始化是否全部成功
@@ -425,7 +420,7 @@ class AppInitializer:
 
         # ========== 阶段 6: 数据库 ==========
         if init_db:
-            if not self._init_database(create_test_data=create_test_data):
+            if not self._init_database():
                 return False
 
         # ========== 阶段 7: 仓库目录 ==========
@@ -454,21 +449,18 @@ initializer = AppInitializer()
 
 def init_app(
     init_db: bool = True,
-    create_test_data: bool = False,
 ) -> bool:
     """
     初始化应用的便捷函数
 
     Args:
         init_db: 是否初始化数据库
-        create_test_data: 是否创建测试数据
 
     Returns:
         bool: 初始化是否成功
     """
     return initializer.initialize(
         init_db=init_db,
-        create_test_data=create_test_data,
     )
 
 

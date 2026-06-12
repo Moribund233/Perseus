@@ -46,7 +46,7 @@ services:
     container_name: perseus-backend-dev
     environment:
       # 数据库连接（SQLite 开发环境）
-      DATABASE_URL: ${DATABASE_URL:-sqlite+aiosqlite:///app/perseus_dev.db}
+      DATABASE_URL: ${DATABASE_URL:-sqlite+aiosqlite:///./perseus_dev.db}
       # Redis 连接（可选）
       # REDIS_URL: ${REDIS_URL:-redis://host.docker.internal:6379/0}
       # JWT 密钥（必需修改！）
@@ -58,6 +58,10 @@ services:
       LOG_LEVEL: debug
       # 时区
       TZ: Asia/Shanghai
+      # 首次运行管理员引导（通过 .env 文件配置）
+      PERSEUS_ADMIN_USERNAME: ${PERSEUS_ADMIN_USERNAME:-admin}
+      PERSEUS_ADMIN_PASSWORD: ${PERSEUS_ADMIN_PASSWORD}
+      PERSEUS_ADMIN_EMAIL: ${PERSEUS_ADMIN_EMAIL:-admin@example.com}
     volumes:
       # 代码挂载（支持热重载）
       - .:/app
@@ -93,7 +97,7 @@ services:
       dockerfile: docker/dev/Dockerfile.backend
     container_name: perseus-test-runner
     environment:
-      DATABASE_URL: sqlite+aiosqlite:///app/test_perseus.db
+      DATABASE_URL: sqlite+aiosqlite:///./test_perseus.db
       PERSEUS_SECURITY_SECRET_KEY: test-secret-key-for-testing
       PERSEUS_APP_DEBUG: "true"
       PERSEUS_STRESS_TEST: "false"

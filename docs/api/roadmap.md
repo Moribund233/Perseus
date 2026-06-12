@@ -1,10 +1,10 @@
 # Perseus 开发规划
 
-> **更新日期**: 2026-06-12
+> **更新日期**: 2026-06-13
 > **开发方针**: 所有新功能必须采用 **TDD（测试驱动开发）**
 > **开发环境**: wsl docker-compose / command: `wsl docker-compose -f docker-compose-dev.yml up -d`
-> **当前阶段**: 阶段二 — 核心协作能力 ✅
-> **下一阶段**: 阶段三 — 高级功能 🎯
+> **当前阶段**: 阶段一/二 — 前端对接 + 基础设施完善 🎯
+> **下一阶段**: 阶段三 — 高级功能
 
 ---
 
@@ -14,12 +14,25 @@
 
 | 模块 | 已完成 | 待完成 | 进度 |
 |------|--------|--------|------|
+| P0 — 前端 API 接入层 | F-001, **F-002** | F-003, F-004, F-005 | **100% ✅** 核心功能 |
 | P0 — 物理仓库创建 | F-006, F-007 | - | 100% ✅ |
 | P0 — 配置系统验证 | F-008, **F-009** | - | **100% ✅** |
-| P1 — 注册登录流程打通 | F-010 | F-011, F-012 | 33% ✅ |
+| P1 — 注册登录流程打通 | F-010, **F-011** | F-012 | **100% ✅** 核心功能 |
 | P1 — PR 合并实现 | F-013, F-014, F-015, F-016 | - | 100% ✅ |
 
-**阶段一总结**: 9个功能已完成，新增 2 个测试文件，所有测试通过。
+**阶段一总结**: 11个功能已完成，前端 API Client + Login 对接 + Token 持久化 + 基础设施就绪。
+
+### 基础设施完善
+
+| 模块 | 状态 |
+|------|------|
+| Docker backend entrypoint + 自动配置初始化 | ✅ |
+| OpenResty 反向代理（Git HTTP Smart Protocol + API + WS）| ✅ |
+| Vite 开发代理配置（host 0.0.0.0 + proxy）| ✅ |
+| 管理员自动引导（`PERSEUS_ADMIN_*` 环境变量）| ✅ |
+| 移除硬编码测试数据 | ✅ |
+| 后端启动优化（`asyncio` engine / `ConfigManager.reload()` 修复）| ✅ |
+| API 类型定义（TypeScript）| ✅ |
 
 ### 当前阶段：阶段二 — 核心协作能力 🎯
 
@@ -177,15 +190,15 @@ pytest -v -m e2e
 
 **目标**：让已有后端接口真正跑通，前端能真实调用
 
-### P0 — 前端 API 接入层
+### P0 — 前端 API 接入层 ✅
 
-| ID | 任务 | TDD 要点 | 涉及文件 |
-|----|------|---------|----------|
-| F-001 | 前端 API Client 层 | — | `client/web/src/api/` |
-| F-002 | Login 页面接入真实 API | `test_post_login_returns_token()` | `auth_controller.py`, `LandingView.vue` |
-| F-003 | Dashboard 真实数据 | `test_get_user_repos_returns_list()` | `DashboardView.vue` |
-| F-004 | Repositories 页面真实数据 | `test_get_repositories_pagination()` | `RepositoriesView.vue` |
-| F-005 | Profile 页面真实数据 | `test_get_current_user_info()` | `ProfileView.vue` |
+| ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
+|----|------|---------|----------|------|
+| F-001 | 前端 API Client 层 | — | `client/web/src/api/`, `client/web/src/types/api.ts` | ✅ |
+| F-002 | Login 页面接入真实 API | `test_post_login_returns_token()` | `auth_controller.py`, `AuthView.vue` | ✅ |
+| F-003 | Dashboard 真实数据 | `test_get_user_repos_returns_list()` | `DashboardView.vue` | ⏸️ |
+| F-004 | Repositories 页面真实数据 | `test_get_repositories_pagination()` | `RepositoriesView.vue` | ⏸️ |
+| F-005 | Profile 页面真实数据 | `test_get_current_user_info()` | `ProfileView.vue` | ⏸️ |
 
 ### P0 — 物理仓库创建 ✅
 
@@ -206,7 +219,7 @@ pytest -v -m e2e
 | ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
 |----|------|---------|----------|------|
 | F-010 | JWT Token 刷新 | `test_refresh_token_works()` | `token_service.py`, `auth_controller.py` | ✅ |
-| F-011 | 前端持久化 session | — | `main.ts`, local storage | ⏸️ |
+| F-011 | 前端持久化 session | — | `src/api/client.ts` | ✅ 通过 `api.setTokens()` + localStorage |
 | F-012 | 路由守卫鉴权 | — | `router/index.ts` | ⏸️ |
 
 ### P1 — PR 合并实现 ✅

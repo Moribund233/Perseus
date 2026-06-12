@@ -95,11 +95,12 @@ RUN uv pip install --system -e . && \
 # =============================================================================
 
 # 创建非 root 用户
-RUN groupadd -r perseus && useradd -r -g perseus perseus \
+RUN groupadd -g 1000 perseus && useradd -u 1000 -m -g perseus perseus \
     && mkdir -p /data/repositories /app/logs \
     && chown -R perseus:perseus /app /data/repositories /app/logs
 
 # 创建启动脚本 (SQLite 版本 - 无需等待数据库)
+# 以 root 运行初始化（修复挂载卷权限），然后降权到 perseus 用户启动服务
 # 包含 uvicorn 崩溃自动重启机制，解决 --reload 模式下 reload 失败导致容器退出的问题
 RUN echo '#!/bin/bash\n\
 set -e\n\
@@ -108,26 +109,33 @@ init_app() {\n\
     echo "Initializing database..."\n\
     mkdir -p /data/repositories\n\
     chmod 755 /data/repositories\n\
-    echo "Running database migrations..."\n\
-    alembic upgrade head\n\
+    mkdir -p /app/logs\n\
+    chown -R perseus:perseus /app /data/repositories /app/logs\n\
+    if [ ! -f /app/config.toml ] && [ -f /app/config.example.toml ]; then\n\
+        cp /app/config.example.toml /app/config.toml\n\
+        echo "Created config.toml from config.example.toml"\n\
+    fi\n\
+    echo "Running app initialization (tables + admin bootstrap)..."\n\
+    su perseus -c "cd /app && python -c \"from core.init import init_app; init_app(init_db=True)\""\n\
 }\n\
+\n\
+# 如果传入了命令参数（如 pytest），则执行自定义命令\n\
+if [ $# -gt 0 ]; then\n\
+    init_app\n\
+    echo "Executing: $@"\n\
+    exec su perseus -c "cd /app && $*"\n\
+fi\n\
 \n\
 start_server() {\n\
     echo "Starting development server with hot reload..."\n\
-    # --factory: 明确指定 app:create_app 是工厂函数而非 ASGI 实例\n\
-    # --reload: 文件变更时自动重启 worker\n\
-    # 注意：不使用 exec，这样 uvicorn 作为子进程运行，崩溃后可以被外层 while 捕获\n\
-    uvicorn app:create_app --factory \\\n\
+    su -p perseus -c "cd /app && uvicorn app:create_app --factory \\\n\
         --host 0.0.0.0 --port 8000 \\\n\
         --reload --reload-dir /app \\\n\
-        --log-level debug\n\
+        --log-level debug"\n\
 }\n\
 \n\
-# 首次运行初始化（后续由 hot-reload 自动触发）\n\
 init_app\n\
 \n\
-# 启动服务器，外层 while 兜底 reloader 崩溃\n\
-# 最多重试 3 次，避免无限重启掩盖真正的启动错误\n\
 MAX_RETRIES=3\n\
 RETRY_COUNT=0\n\
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do\n\
@@ -141,8 +149,7 @@ echo "[entrypoint] Server failed after $MAX_RETRIES attempts, giving up."\n\
 exit 1\n\
 ' > /entrypoint.sh && chmod +x /entrypoint.sh
 
-# 切换到非 root 用户
-USER perseus
+# 保持 root 用户（entrypoint 需要 root 权限修复挂载卷权限）
 
 # 暴露端口
 EXPOSE 8000

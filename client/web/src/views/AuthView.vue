@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   Check,
 } from '@element-plus/icons-vue'
+import { authApi, api, ApiClientError } from '@/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -32,7 +33,7 @@ const activeTab = computed({
  * 登录表单数据
  */
 const loginForm = ref({
-  email: '',
+  username: '',
   password: '',
   rememberMe: false,
 })
@@ -69,9 +70,8 @@ const registerFormRef = ref()
  * 登录表单验证规则
  */
 const loginRules = {
-  email: [
-    { required: true, message: '请输入邮箱地址', trigger: 'blur' },
-    { type: 'email', message: '请输入有效的邮箱地址', trigger: 'blur' },
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
@@ -142,16 +142,23 @@ const handleLogin = async () => {
     await loginFormRef.value.validate()
     loginLoading.value = true
 
-    // TODO: 调用登录 API
-    console.log('登录:', loginForm.value)
-
-    // 模拟登录成功
-    setTimeout(() => {
-      loginLoading.value = false
-      router.push('/dashboard')
-    }, 1000)
+    const res = await authApi.login({
+      username: loginForm.value.username,
+      password: loginForm.value.password,
+    })
+    api.setTokens(res.access_token, res.refresh_token)
+    ElMessage.success('登录成功')
+    router.push('/dashboard')
   } catch (error) {
-    console.error('登录验证失败:', error)
+    if (error instanceof ApiClientError) {
+      ElMessage.error(error.message)
+    } else if (error instanceof Error) {
+      ElMessage.error('登录失败：' + error.message)
+    } else {
+      ElMessage.error('登录失败，请重试')
+    }
+  } finally {
+    loginLoading.value = false
   }
 }
 
@@ -165,25 +172,30 @@ const handleRegister = async () => {
     await registerFormRef.value.validate()
     registerLoading.value = true
 
-    // TODO: 调用注册 API
-    console.log('注册:', registerForm.value)
-
-    // 模拟注册成功
-    setTimeout(() => {
-      registerLoading.value = false
-      // 切换到登录页
-      activeTab.value = 'login'
-      // 清空注册表单
-      registerForm.value = {
-        username: '',
-        email: '',
-        password: '',
-        confirmPassword: '',
-        agreeTerms: false,
-      }
-    }, 1000)
+    await authApi.register({
+      username: registerForm.value.username,
+      email: registerForm.value.email,
+      password: registerForm.value.password,
+    })
+    ElMessage.success('注册成功，请登录')
+    activeTab.value = 'login'
+    registerForm.value = {
+      username: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      agreeTerms: false,
+    }
   } catch (error) {
-    console.error('注册验证失败:', error)
+    if (error instanceof ApiClientError) {
+      ElMessage.error(error.message)
+    } else if (error instanceof Error) {
+      ElMessage.error('注册失败：' + error.message)
+    } else {
+      ElMessage.error('注册失败，请重试')
+    }
+  } finally {
+    registerLoading.value = false
   }
 }
 
@@ -278,11 +290,11 @@ const handleOAuth = (provider: string) => {
               class="auth-form"
               @keyup.enter="handleLogin"
             >
-              <el-form-item prop="email">
+              <el-form-item prop="username">
                 <el-input
-                  v-model="loginForm.email"
-                  placeholder="邮箱地址"
-                  :prefix-icon="Message"
+                  v-model="loginForm.username"
+                  placeholder="用户名"
+                  :prefix-icon="User"
                   size="large"
                 />
               </el-form-item>
@@ -311,9 +323,9 @@ const handleOAuth = (provider: string) => {
                 <el-checkbox v-model="loginForm.rememberMe">
                   记住我
                 </el-checkbox>
-                <router-link to="/forgot-password" class="forgot-link">
+                <span class="forgot-link disabled">
                   忘记密码？
-                </router-link>
+                </span>
               </div>
 
               <el-button
@@ -415,9 +427,9 @@ const handleOAuth = (provider: string) => {
               <el-form-item prop="agreeTerms">
                 <el-checkbox v-model="registerForm.agreeTerms">
                   我已阅读并同意
-                  <router-link to="/terms" class="terms-link">服务条款</router-link>
+                  <span class="terms-link disabled">服务条款</span>
                   和
-                  <router-link to="/privacy" class="terms-link">隐私政策</router-link>
+                  <span class="terms-link disabled">隐私政策</span>
                 </el-checkbox>
               </el-form-item>
 
@@ -657,6 +669,11 @@ const handleOAuth = (provider: string) => {
   text-decoration: underline;
 }
 
+.forgot-link.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .terms-link {
   color: var(--perseus-accent);
   text-decoration: none;
@@ -664,6 +681,11 @@ const handleOAuth = (provider: string) => {
 
 .terms-link:hover {
   text-decoration: underline;
+}
+
+.terms-link.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .submit-btn {
