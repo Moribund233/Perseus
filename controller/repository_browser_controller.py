@@ -19,7 +19,10 @@ from services.repository_browser_service import (
     get_tree_entries,
     get_blob_content,
     get_commits,
-    get_diff
+    get_diff,
+    get_readme_content,
+    get_file_symbols,
+    detect_file_language
 )
 from utils.git_utils import get_repository_storage_path
 from core.exception import NotFoundException
@@ -158,3 +161,100 @@ async def get_repository_diff(
     """
     repo_path = await _get_repo_path(repo_id, db)
     return get_diff(repo_path, base=base, head=head, path=path)
+
+
+@router.get("/{repo_id}/readme")
+async def get_repository_readme(
+    repo_id: int,
+    ref: str = Query("HEAD", description="分支名或提交SHA"),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    获取 README 文件内容
+
+    自动查找 README.md, README.rst, README.txt, README 等常见 README 文件
+
+    Args:
+        repo_id: 仓库ID
+        ref: 分支名或提交SHA，默认 HEAD
+        db: 数据库会话
+
+    Returns:
+        dict: README 文件信息
+        {
+            "found": bool,
+            "filename": str or None,
+            "content": str or None,
+            "language": str,
+            "encoding": str
+        }
+    """
+    repo_path = await _get_repo_path(repo_id, db)
+    return await get_readme_content(repo_path, ref=ref)
+
+
+@router.get("/{repo_id}/symbols")
+async def get_repository_file_symbols(
+    repo_id: int,
+    path: str = Query(..., description="文件路径"),
+    ref: str = Query("HEAD", description="分支名或提交SHA"),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    获取文件符号（函数、类、变量等）
+
+    目前支持 Python 文件的符号提取，其他语言返回空列表
+
+    Args:
+        repo_id: 仓库ID
+        path: 文件路径（必填）
+        ref: 分支名或提交SHA，默认 HEAD
+        db: 数据库会话
+
+    Returns:
+        dict: 符号列表
+        {
+            "path": str,
+            "language": str,
+            "symbols": [
+                {
+                    "name": str,
+                    "type": str,
+                    "line": int
+                }
+            ]
+        }
+    """
+    repo_path = await _get_repo_path(repo_id, db)
+    return await get_file_symbols(repo_path, ref=ref, path=path)
+
+
+@router.get("/{repo_id}/language")
+async def detect_repository_file_language(
+    repo_id: int,
+    path: str = Query(..., description="文件路径"),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    检测文件语言类型
+
+    Args:
+        repo_id: 仓库ID
+        path: 文件路径（必填）
+        db: 数据库会话
+
+    Returns:
+        dict: 语言信息
+        {
+            "path": str,
+            "language": str
+        }
+    """
+    # 验证仓库存在
+    await _get_repo_path(repo_id, db)
+
+    language = detect_file_language(path)
+    return {
+        "path": path,
+        "language": language
+    }

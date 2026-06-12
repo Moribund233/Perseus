@@ -100,19 +100,45 @@ RUN groupadd -r perseus && useradd -r -g perseus perseus \
     && chown -R perseus:perseus /app /data/repositories /app/logs
 
 # 创建启动脚本 (SQLite 版本 - 无需等待数据库)
+# 包含 uvicorn 崩溃自动重启机制，解决 --reload 模式下 reload 失败导致容器退出的问题
 RUN echo '#!/bin/bash\n\
-echo "Initializing database..."\n\
+set -e\n\
 \n\
-# 创建数据目录并确保权限正确\n\
-mkdir -p /data/repositories\n\
-chown -R perseus:perseus /data/repositories 2>/dev/null || true\n\
-chmod 755 /data/repositories\n\
+init_app() {\n\
+    echo "Initializing database..."\n\
+    mkdir -p /data/repositories\n\
+    chmod 755 /data/repositories\n\
+    echo "Running database migrations..."\n\
+    alembic upgrade head\n\
+}\n\
 \n\
-echo "Running database migrations..."\n\
-alembic upgrade head\n\
+start_server() {\n\
+    echo "Starting development server with hot reload..."\n\
+    # --factory: 明确指定 app:create_app 是工厂函数而非 ASGI 实例\n\
+    # --reload: 文件变更时自动重启 worker\n\
+    # 注意：不使用 exec，这样 uvicorn 作为子进程运行，崩溃后可以被外层 while 捕获\n\
+    uvicorn app:create_app --factory \\\n\
+        --host 0.0.0.0 --port 8000 \\\n\
+        --reload --reload-dir /app \\\n\
+        --log-level debug\n\
+}\n\
 \n\
-echo "Starting development server with hot reload..."\n\
-exec uvicorn app:create_app --host 0.0.0.0 --port 8000 --reload --reload-dir /app --log-level debug\n\
+# 首次运行初始化（后续由 hot-reload 自动触发）\n\
+init_app\n\
+\n\
+# 启动服务器，外层 while 兜底 reloader 崩溃\n\
+# 最多重试 3 次，避免无限重启掩盖真正的启动错误\n\
+MAX_RETRIES=3\n\
+RETRY_COUNT=0\n\
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do\n\
+    start_server || true\n\
+    RETRY_COUNT=$((RETRY_COUNT + 1))\n\
+    echo "[entrypoint] Server exited (attempt $RETRY_COUNT/$MAX_RETRIES), restarting in 2s..."\n\
+    sleep 2\n\
+done\n\
+\n\
+echo "[entrypoint] Server failed after $MAX_RETRIES attempts, giving up."\n\
+exit 1\n\
 ' > /entrypoint.sh && chmod +x /entrypoint.sh
 
 # 切换到非 root 用户

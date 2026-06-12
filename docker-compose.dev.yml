@@ -68,8 +68,8 @@ services:
     ports:
       # 暴露后端端口（供外部 Nginx 反向代理）
       - "127.0.0.1:8000:8000"
-    # 开发模式不设置 restart，方便调试
-    restart: "no"
+    # 使用 unless-stopped 而非 "no"，确保 reloader 崩溃后自动重启
+    restart: unless-stopped
     # 资源限制
     deploy:
       resources:
@@ -83,6 +83,33 @@ services:
     # 使用 host.docker.internal 访问宿主机上的外部服务
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  # =============================================
+  # 一次性测试容器（运行后自动退出）
+  # =============================================
+  test:
+    build:
+      context: .
+      dockerfile: docker/dev/Dockerfile.backend
+    container_name: perseus-test-runner
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:///app/test_perseus.db
+      PERSEUS_SECURITY_SECRET_KEY: test-secret-key-for-testing
+      PERSEUS_APP_DEBUG: "true"
+      PERSEUS_STRESS_TEST: "false"
+      LOG_LEVEL: error
+      TZ: Asia/Shanghai
+    volumes:
+      - .:/app
+      - repos_dev:/data/repositories
+    # 默认命令是跑测试，但可以通过命令行覆盖
+    command: ["python", "-m", "pytest", "tests/", "-v"]
+    # 不自动重启（一次性任务）
+    restart: "no"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
 
   # =============================================
   # git-http-backend CGI 容器

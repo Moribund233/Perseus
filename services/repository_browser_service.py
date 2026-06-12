@@ -37,12 +37,12 @@ def _get_repo(repo_path: str) -> pygit2.Repository:
         RepositoryNotFoundException: 仓库不存在或无法打开
     """
     if not repo_exists(repo_path):
-        raise RepositoryNotFoundException(f"Repository not found: {repo_path}")
+        raise RepositoryNotFoundException(detail=f"Repository not found: {repo_path}")
 
     try:
         return pygit2.Repository(repo_path)
     except Exception as e:
-        raise RepositoryNotFoundException(f"Failed to open repository: {e}")
+        raise RepositoryNotFoundException(detail=f"Failed to open repository: {e}")
 
 
 def _resolve_ref(repo: pygit2.Repository, ref: str) -> Optional[pygit2.Commit]:
@@ -70,7 +70,7 @@ def _resolve_ref(repo: pygit2.Repository, ref: str) -> Optional[pygit2.Commit]:
             # 检查仓库是否为空（没有提交）
             if repo.is_empty:
                 return None
-            raise PathNotFoundException(f"Ref not found: {ref}")
+            raise PathNotFoundException(detail=f"Ref not found: {ref}")
 
 
 def _get_tree(repo: pygit2.Repository, commit: pygit2.Commit, path: str = "") -> pygit2.Tree:
@@ -97,9 +97,9 @@ def _get_tree(repo: pygit2.Repository, commit: pygit2.Commit, path: str = "") ->
         if entry.type == pygit2.GIT_OBJECT_TREE:
             return repo[entry.id]
         else:
-            raise InvalidPathException(f"'{path}' is not a directory")
+            raise InvalidPathException(detail=f"'{path}' is not a directory")
     except KeyError:
-        raise PathNotFoundException(f"Path not found: {path}")
+        raise PathNotFoundException(detail=f"Path not found: {path}")
 
 
 async def get_tree_entries(
@@ -195,21 +195,21 @@ async def get_blob_content(
         InvalidPathException: 路径是目录或不是有效文件
     """
     if not path:
-        raise InvalidPathException("Path is required")
-    
+        raise InvalidPathException(detail="Path is required")
+
     repo = _get_repo(repo_path)
     commit = _resolve_ref(repo, ref)
-    
+
     try:
         entry = commit.tree[path]
     except KeyError:
-        raise PathNotFoundException(f"File not found: {path}")
+        raise PathNotFoundException(detail=f"File not found: {path}")
 
     if entry.type == pygit2.GIT_OBJECT_TREE:
-        raise InvalidPathException(f"'{path}' is a directory, not a file")
+        raise InvalidPathException(detail=f"'{path}' is a directory, not a file")
 
     if entry.type != pygit2.GIT_OBJECT_BLOB:
-        raise InvalidPathException(f"'{path}' is not a valid file")
+        raise InvalidPathException(detail=f"'{path}' is not a valid file")
     
     blob = repo[entry.id]
     
@@ -221,6 +221,11 @@ async def get_blob_content(
         content = blob.data.hex()
         is_binary = True
     
+    # 检测文件语言
+    language = detect_file_language(path)
+    if is_binary:
+        language = "binary"
+
     return {
         "name": os.path.basename(path),
         "path": path,
@@ -229,7 +234,8 @@ async def get_blob_content(
         "content": content,
         "size": blob.size,
         "encoding": "utf-8" if not is_binary else "hex",
-        "is_binary": is_binary
+        "is_binary": is_binary,
+        "language": language
     }
 
 
@@ -337,22 +343,22 @@ async def get_diff(
         InvalidPathException: 无效的提交
     """
     if not head:
-        raise InvalidPathException("Head commit is required")
-    
+        raise InvalidPathException(detail="Head commit is required")
+
     repo = _get_repo(repo_path)
-    
+
     # 获取提交对象
     head_commit = _resolve_ref(repo, head)
-    
+
     # 检查空仓库
     if head_commit is None:
-        raise PathNotFoundException(f"Ref not found: {head} (empty repository)")
-    
+        raise PathNotFoundException(detail=f"Ref not found: {head} (empty repository)")
+
     if base:
         base_commit = _resolve_ref(repo, base)
         # 检查 base 提交是否存在
         if base_commit is None:
-            raise PathNotFoundException(f"Base ref not found: {base}")
+            raise PathNotFoundException(detail=f"Base ref not found: {base}")
         # 使用树对象进行比较，避免在裸仓库中使用repo.diff
         diff = base_commit.tree.diff_to_tree(head_commit.tree)
     else:
@@ -405,4 +411,411 @@ async def get_diff(
             "additions": sum(f["additions"] for f in files),
             "deletions": sum(f["deletions"] for f in files)
         }
+    }
+
+
+# ============ F-023: 文件语言检测 ============
+
+# 文件扩展名到语言映射
+LANGUAGE_MAP = {
+    # Python
+    ".py": "python",
+    ".pyw": "python",
+    ".pyi": "python",
+    # JavaScript
+    ".js": "javascript",
+    ".mjs": "javascript",
+    ".jsx": "javascript",
+    # TypeScript
+    ".ts": "typescript",
+    ".tsx": "typescript",
+    # HTML
+    ".html": "html",
+    ".htm": "html",
+    ".xhtml": "html",
+    # CSS
+    ".css": "css",
+    ".scss": "scss",
+    ".sass": "sass",
+    ".less": "less",
+    # Go
+    ".go": "go",
+    # Rust
+    ".rs": "rust",
+    # Java
+    ".java": "java",
+    # JSON
+    ".json": "json",
+    ".jsonc": "json",
+    # Markdown
+    ".md": "markdown",
+    ".markdown": "markdown",
+    ".mdown": "markdown",
+    ".mkd": "markdown",
+    # YAML
+    ".yml": "yaml",
+    ".yaml": "yaml",
+    # XML
+    ".xml": "xml",
+    # Shell
+    ".sh": "bash",
+    ".bash": "bash",
+    ".zsh": "bash",
+    # PowerShell
+    ".ps1": "powershell",
+    ".psm1": "powershell",
+    # C/C++
+    ".c": "c",
+    ".h": "c",
+    ".cpp": "cpp",
+    ".hpp": "cpp",
+    ".cc": "cpp",
+    ".cxx": "cpp",
+    # C#
+    ".cs": "csharp",
+    # Ruby
+    ".rb": "ruby",
+    # PHP
+    ".php": "php",
+    # Swift
+    ".swift": "swift",
+    # Kotlin
+    ".kt": "kotlin",
+    ".kts": "kotlin",
+    # Scala
+    ".scala": "scala",
+    # R
+    ".r": "r",
+    ".R": "r",
+    # SQL
+    ".sql": "sql",
+    # Dockerfile
+    ".dockerfile": "dockerfile",
+    # Makefile (无扩展名，特殊处理)
+    # Vue
+    ".vue": "vue",
+    # Svelte
+    ".svelte": "svelte",
+    # GraphQL
+    ".graphql": "graphql",
+    ".gql": "graphql",
+    # TOML
+    ".toml": "toml",
+    # INI/Config
+    ".ini": "ini",
+    ".cfg": "ini",
+    ".conf": "ini",
+    # Lua
+    ".lua": "lua",
+    # Perl
+    ".pl": "perl",
+    ".pm": "perl",
+    # Haskell
+    ".hs": "haskell",
+    # Erlang
+    ".erl": "erlang",
+    # Elixir
+    ".ex": "elixir",
+    ".exs": "elixir",
+    # Dart
+    ".dart": "dart",
+    # Julia
+    ".jl": "julia",
+    # Clojure
+    ".clj": "clojure",
+    ".cljs": "clojure",
+    # F#
+    ".fs": "fsharp",
+    ".fsx": "fsharp",
+    # OCaml
+    ".ml": "ocaml",
+    ".mli": "ocaml",
+    # Groovy
+    ".groovy": "groovy",
+    # Objective-C
+    ".m": "objectivec",
+    ".mm": "objectivec",
+    # Assembly
+    ".asm": "asm",
+    ".s": "asm",
+    # Vim
+    ".vim": "vim",
+    # Emacs Lisp
+    ".el": "elisp",
+    ".elc": "elisp",
+}
+
+# 特殊文件名到语言映射
+SPECIAL_FILENAMES = {
+    "dockerfile": "dockerfile",
+    "dockerfile.dev": "dockerfile",
+    "dockerfile.prod": "dockerfile",
+    "makefile": "makefile",
+    "gnumakefile": "makefile",
+    "cmakelists.txt": "cmake",
+    "readme": "text",
+    "license": "text",
+    "copying": "text",
+    "authors": "text",
+    "contributors": "text",
+    "changelog": "text",
+    "changes": "text",
+    "news": "text",
+    "todo": "text",
+    ".gitignore": "gitignore",
+    ".gitattributes": "gitattributes",
+    ".dockerignore": "dockerignore",
+    ".editorconfig": "editorconfig",
+    ".eslintignore": "gitignore",
+    ".prettierignore": "gitignore",
+}
+
+# 二进制文件扩展名
+BINARY_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".webp", ".svg",
+    ".mp3", ".mp4", ".wav", ".ogg", ".flac", ".aac",
+    ".avi", ".mov", ".wmv", ".flv", ".mkv",
+    ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz",
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+    ".exe", ".dll", ".so", ".dylib", ".bin",
+    ".ttf", ".otf", ".woff", ".woff2", ".eot",
+    ".sqlite", ".db", ".mdb",
+    ".class", ".jar", ".war", ".ear",
+    ".o", ".obj", ".a", ".lib",
+    ".pyc", ".pyo",
+    ".min.js", ".min.css",
+}
+
+
+def detect_file_language(filename: str) -> str:
+    """
+    检测文件语言类型（用于语法高亮）
+
+    Args:
+        filename: 文件名
+
+    Returns:
+        str: 语言标识符，如 "python", "javascript" 等
+             未知类型返回 "text" 或 "binary"
+    """
+    if not filename:
+        return "text"
+
+    # 转换为小写进行匹配
+    filename_lower = filename.lower()
+
+    # 检查是否是二进制文件
+    for ext in BINARY_EXTENSIONS:
+        if filename_lower.endswith(ext):
+            return "binary"
+
+    # 检查特殊文件名（无扩展名或完整匹配）
+    basename = os.path.basename(filename_lower)
+    if basename in SPECIAL_FILENAMES:
+        return SPECIAL_FILENAMES[basename]
+
+    # 移除可能的后缀（如 .min.js）
+    for suffix in [".min"]:
+        if basename.endswith(suffix):
+            basename = basename[:-len(suffix)]
+
+    # 检查扩展名
+    _, ext = os.path.splitext(basename)
+    if ext in LANGUAGE_MAP:
+        return LANGUAGE_MAP[ext]
+
+    # 无扩展名文件
+    if not ext:
+        return "text"
+
+    return "text"
+
+
+# ============ F-024: README 内容获取 ============
+
+async def get_readme_content(
+    repo_path: str,
+    ref: str = "HEAD"
+) -> Dict[str, Any]:
+    """
+    获取 README 文件内容
+
+    自动查找常见的 README 文件名：README.md, README.rst, README.txt, README
+
+    Args:
+        repo_path: 仓库物理路径
+        ref: 分支名或提交SHA，默认 HEAD
+
+    Returns:
+        dict: 包含 README 信息的字典
+        {
+            "found": bool,
+            "filename": str or None,
+            "content": str or None,
+            "language": str,
+            "encoding": str
+        }
+    """
+    repo = _get_repo(repo_path)
+    commit = _resolve_ref(repo, ref)
+
+    # 空仓库处理
+    if commit is None:
+        return {
+            "found": False,
+            "filename": None,
+            "content": None,
+            "language": "text",
+            "encoding": "utf-8"
+        }
+
+    # 常见的 README 文件名（按优先级排序）
+    readme_names = [
+        "README.md", "readme.md", "Readme.md",
+        "README.rst", "readme.rst",
+        "README.txt", "readme.txt",
+        "README", "readme", "Readme",
+        "README.markdown", "readme.markdown",
+        "README.mdown", "readme.mdown",
+    ]
+
+    tree = commit.tree
+
+    for name in readme_names:
+        try:
+            entry = tree[name]
+            if entry.type == pygit2.GIT_OBJECT_BLOB:
+                blob = repo[entry.id]
+
+                # 尝试解码为文本
+                try:
+                    content = blob.data.decode('utf-8')
+                    encoding = "utf-8"
+                except UnicodeDecodeError:
+                    content = blob.data.hex()
+                    encoding = "hex"
+
+                return {
+                    "found": True,
+                    "filename": name,
+                    "content": content,
+                    "language": detect_file_language(name),
+                    "encoding": encoding
+                }
+        except KeyError:
+            continue
+
+    # 未找到 README
+    return {
+        "found": False,
+        "filename": None,
+        "content": None,
+        "language": "text",
+        "encoding": "utf-8"
+    }
+
+
+# ============ F-024: 文件符号提取 ============
+
+async def get_file_symbols(
+    repo_path: str,
+    ref: str = "HEAD",
+    path: str = None
+) -> Dict[str, Any]:
+    """
+    获取文件中的符号（函数、类、变量等）
+
+    目前支持：Python（简单正则提取）
+    未来可扩展：Tree-sitter 等更精确的解析
+
+    Args:
+        repo_path: 仓库物理路径
+        ref: 分支名或提交SHA，默认 HEAD
+        path: 文件路径（必填）
+
+    Returns:
+        dict: 包含符号列表的字典
+        {
+            "path": str,
+            "language": str,
+            "symbols": [
+                {
+                    "name": str,
+                    "type": str,  # "function", "class", "variable"
+                    "line": int
+                }
+            ]
+        }
+
+    Raises:
+        PathNotFoundException: 文件不存在
+        InvalidPathException: 路径是目录或无效
+    """
+    if not path:
+        raise InvalidPathException(detail="Path is required")
+
+    # 获取文件内容
+    blob_info = await get_blob_content(repo_path, ref=ref, path=path)
+
+    language = blob_info.get("language", "text")
+    content = blob_info.get("content", "")
+    is_binary = blob_info.get("is_binary", False)
+
+    symbols = []
+
+    # 二进制文件不解析
+    if is_binary or language == "binary":
+        return {
+            "path": path,
+            "language": "binary",
+            "symbols": []
+        }
+
+    # Python 简单符号提取（基于正则）
+    if language == "python" and not is_binary:
+        import re
+
+        lines = content.split('\n')
+
+        # 匹配函数定义：def function_name(
+        func_pattern = re.compile(r'^def\s+(\w+)\s*\(')
+        # 匹配类定义：class ClassName(
+        class_pattern = re.compile(r'^class\s+(\w+)\s*[\(:\(]')
+        # 匹配变量赋值（顶级）
+        var_pattern = re.compile(r'^(\w+)\s*=')
+
+        for line_no, line in enumerate(lines, 1):
+            stripped = line.strip()
+
+            # 跳过注释和空行
+            if not stripped or stripped.startswith('#'):
+                continue
+
+            # 检查函数定义
+            func_match = func_pattern.match(stripped)
+            if func_match:
+                symbols.append({
+                    "name": func_match.group(1),
+                    "type": "function",
+                    "line": line_no
+                })
+                continue
+
+            # 检查类定义
+            class_match = class_pattern.match(stripped)
+            if class_match:
+                symbols.append({
+                    "name": class_match.group(1),
+                    "type": "class",
+                    "line": line_no
+                })
+                continue
+
+    # TODO: 支持更多语言（JavaScript, Go, Rust, Java 等）
+    # 未来可使用 Tree-sitter 实现更精确的解析
+
+    return {
+        "path": path,
+        "language": language,
+        "symbols": symbols
     }

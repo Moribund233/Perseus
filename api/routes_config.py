@@ -52,6 +52,10 @@ def create_api_router() -> APIRouter:
     from controller.repository_member_controller import router as repository_member_router
     api_v1_router.include_router(repository_member_router)
 
+    # 6b. Fork 管理路由（需在仓库路由之后，分支路由之前）
+    from controller.fork_controller import router as fork_router
+    api_v1_router.include_router(fork_router)
+
     # 7. 分支管理路由
     from controller.branch_controller import router as branch_router
     api_v1_router.include_router(branch_router)
@@ -64,6 +68,10 @@ def create_api_router() -> APIRouter:
     from controller.pull_request_controller import router as pull_request_router
     api_v1_router.include_router(pull_request_router)
 
+    # 9b. Release 管理路由（需在 Pull Request 之后）
+    from controller.release_controller import router as release_router
+    api_v1_router.include_router(release_router)
+
     # 10. Issue 管理路由
     from controller.issue_controller import router as issue_router
     api_v1_router.include_router(issue_router)
@@ -71,6 +79,10 @@ def create_api_router() -> APIRouter:
     # 11. SSH Key 管理路由
     from controller.key_controller import router as key_router
     api_v1_router.include_router(key_router)
+
+    # 11b. Webhook 管理路由
+    from controller.webhook_controller import router as webhook_router
+    api_v1_router.include_router(webhook_router)
 
     # 12. Debug 路由（仅在调试模式下可用）
     from controller.debug_controller import router as debug_router
@@ -122,6 +134,9 @@ ROUTES = {
 
     # SSH Key 管理
     "keys": f"{API_V1_PREFIX}/keys",
+
+    # Webhook 管理（需要仓库ID前缀）
+    "webhooks": f"{API_V1_PREFIX}/repositories",
 
     # 调试接口
     "debug": f"{API_V1_PREFIX}/debug",

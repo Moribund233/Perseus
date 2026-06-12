@@ -197,7 +197,9 @@ class RepositoryNotFoundException(RepositoryBrowserException):
         Args:
             detail: 错误详情
         """
-        super().__init__(
+        # 直接调用 BaseException 的 __init__，避免 RepositoryBrowserException 的参数问题
+        BaseException.__init__(
+            self,
             status_code=status.HTTP_404_NOT_FOUND,
             detail=detail
         )
@@ -215,7 +217,9 @@ class PathNotFoundException(RepositoryBrowserException):
         Args:
             detail: 错误详情
         """
-        super().__init__(
+        # 直接调用 BaseException 的 __init__，避免 RepositoryBrowserException 的参数问题
+        BaseException.__init__(
+            self,
             status_code=status.HTTP_404_NOT_FOUND,
             detail=detail
         )
@@ -233,7 +237,9 @@ class InvalidPathException(RepositoryBrowserException):
         Args:
             detail: 错误详情
         """
-        super().__init__(
+        # 直接调用 BaseException 的 __init__，避免 RepositoryBrowserException 的参数问题
+        BaseException.__init__(
+            self,
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=detail
         )

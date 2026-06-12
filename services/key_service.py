@@ -2,10 +2,13 @@
 SSH Key 服务
 
 F-019: SSH Key 管理
+F-021: Authorized Keys 同步
 """
 
 import hashlib
 import base64
+import os
+import logging
 from typing import List, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -13,6 +16,12 @@ from sqlalchemy import select
 from models.ssh_key import SSHKey
 from models.user import User
 from core.exception import ValidationException, NotFoundException, AuthorizationException
+
+logger = logging.getLogger(__name__)
+
+# authorized_keys 文件标记
+PERSEUS_KEY_MARKER_START = "# Perseus managed keys - BEGIN"
+PERSEUS_KEY_MARKER_END = "# Perseus managed keys - END"
 
 
 def _calculate_fingerprint(public_key: str) -> str:
@@ -123,6 +132,12 @@ async def add_ssh_key(
     await db.commit()
     await db.refresh(ssh_key)
 
+    # F-021: 同步到 authorized_keys
+    try:
+        await sync_authorized_keys(db)
+    except Exception as e:
+        logger.warning(f"Failed to sync authorized_keys after adding key: {e}")
+
     return ssh_key.to_dict()
 
 
@@ -175,6 +190,12 @@ async def delete_ssh_key(
     await db.delete(key)
     await db.commit()
 
+    # F-021: 同步到 authorized_keys
+    try:
+        await sync_authorized_keys(db)
+    except Exception as e:
+        logger.warning(f"Failed to sync authorized_keys after deleting key: {e}")
+
 
 async def get_ssh_key_by_fingerprint(
     db: AsyncSession,
@@ -202,3 +223,119 @@ async def get_ssh_key_by_fingerprint(
         raise NotFoundException(detail="SSH key not found")
 
     return key
+
+
+def get_authorized_keys_path() -> str:
+    """
+    获取 authorized_keys 文件路径
+
+    Returns:
+        str: authorized_keys 文件的完整路径
+              默认返回 ~/.ssh/authorized_keys
+    """
+    # 获取用户主目录
+    home_dir = os.path.expanduser("~")
+    ssh_dir = os.path.join(home_dir, ".ssh")
+    auth_keys_path = os.path.join(ssh_dir, "authorized_keys")
+    return auth_keys_path
+
+
+async def sync_authorized_keys(db: AsyncSession, auth_keys_path: str = None) -> None:
+    """
+    同步所有 SSH Key 到 authorized_keys 文件
+
+    将数据库中所有 SSH Key 写入 authorized_keys 文件，同时保留
+    文件中非 Perseus 管理的 key。
+
+    Args:
+        db: 异步数据库会话
+        auth_keys_path: 可选，自定义 authorized_keys 文件路径
+                       默认为 ~/.ssh/authorized_keys
+
+    Raises:
+        OSError: 文件操作失败
+    """
+    if auth_keys_path is None:
+        auth_keys_path = get_authorized_keys_path()
+
+    # 获取所有 SSH Keys
+    result = await db.execute(select(SSHKey))
+    all_keys = result.scalars().all()
+
+    # 构建 Perseus 管理的 keys 内容
+    perseus_keys_content = []
+    perseus_keys_content.append(PERSEUS_KEY_MARKER_START)
+    perseus_keys_content.append("")
+    for key in all_keys:
+        perseus_keys_content.append(f"# {key.name} (User ID: {key.user_id})")
+        perseus_keys_content.append(key.public_key)
+    perseus_keys_content.append("")
+    perseus_keys_content.append(PERSEUS_KEY_MARKER_END)
+
+    # 读取现有文件内容（保留非 Perseus 管理的 keys）
+    non_perseus_lines = []
+    if os.path.exists(auth_keys_path):
+        try:
+            with open(auth_keys_path, 'r') as f:
+                lines = f.readlines()
+
+            # 提取非 Perseus 管理的内容
+            in_perseus_section = False
+            for line in lines:
+                stripped = line.strip()
+                if stripped == PERSEUS_KEY_MARKER_START:
+                    in_perseus_section = True
+                    continue
+                if stripped == PERSEUS_KEY_MARKER_END:
+                    in_perseus_section = False
+                    continue
+                if not in_perseus_section:
+                    non_perseus_lines.append(line.rstrip())
+        except Exception as e:
+            logger.warning(f"Failed to read existing authorized_keys: {e}")
+
+    # 清理空行
+    while non_perseus_lines and non_perseus_lines[-1] == "":
+        non_perseus_lines.pop()
+
+    # 构建新文件内容
+    new_content_lines = []
+
+    # 添加 Perseus 管理的 keys
+    if perseus_keys_content:
+        new_content_lines.extend(perseus_keys_content)
+
+    # 添加非 Perseus 管理的 keys
+    if non_perseus_lines:
+        if new_content_lines:
+            new_content_lines.append("")
+        new_content_lines.extend(non_perseus_lines)
+
+    # 确保文件以换行符结尾
+    if new_content_lines and new_content_lines[-1] != "":
+        new_content_lines.append("")
+
+    # 创建 .ssh 目录（如果不存在）
+    ssh_dir = os.path.dirname(auth_keys_path)
+    if not os.path.exists(ssh_dir):
+        try:
+            os.makedirs(ssh_dir, mode=0o700)
+            logger.info(f"Created SSH directory: {ssh_dir}")
+        except Exception as e:
+            logger.error(f"Failed to create SSH directory: {e}")
+            raise
+
+    # 写入文件
+    content = "\n".join(new_content_lines)
+    try:
+        with open(auth_keys_path, 'w') as f:
+            f.write(content)
+
+        # 设置文件权限（仅在 Unix 系统上）
+        if os.name != 'nt':
+            os.chmod(auth_keys_path, 0o600)
+
+        logger.info(f"Synchronized {len(all_keys)} SSH keys to {auth_keys_path}")
+    except Exception as e:
+        logger.error(f"Failed to write authorized_keys: {e}")
+        raise

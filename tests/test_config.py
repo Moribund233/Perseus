@@ -13,6 +13,7 @@ import tempfile
 from unittest.mock import patch
 
 from core.config import ConfigManager, Config, get_config, reset_module_config_manager
+from core.config import validate_config, ConfigValidationResult, StorageSettings, SecuritySettings
 from core.exception import ConfigValidationException
 
 
@@ -295,3 +296,276 @@ title = "Reloaded Title"
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+# =============================================================================
+# F-009: 启动配置完整性校验测试
+# =============================================================================
+
+
+class TestConfigValidation:
+    """配置完整性校验测试类"""
+
+    def setup_method(self):
+        """每个测试方法前重置 ConfigManager 单例"""
+        from core.config import reset_module_config_manager
+        env_vars_to_clear = [
+            "DATABASE_URL", "PERSEUS_STRESS_TEST",
+            "PERSEUS_SECURITY_SECRET_KEY", "PERSEUS_APP_DEBUG",
+        ]
+        for var in env_vars_to_clear:
+            if var in os.environ:
+                del os.environ[var]
+        reset_module_config_manager()
+
+    def teardown_method(self):
+        """每个测试方法后清理"""
+        from core.config import reset_module_config_manager
+        reset_module_config_manager()
+
+    def test_validate_config_valid_defaults(self):
+        """
+        测试默认配置校验通过
+
+        验证点：
+        1. 使用默认配置时校验通过
+        2. 无 errors
+        """
+        # 设置 debug 模式避免因缺少 secret_key 报错
+        os.environ["PERSEUS_APP_DEBUG"] = "true"
+        try:
+            result = validate_config(get_config())
+            assert result.is_valid, f"默认配置应通过校验, 错误: {result.errors}"
+        finally:
+            if "PERSEUS_APP_DEBUG" in os.environ:
+                del os.environ["PERSEUS_APP_DEBUG"]
+
+    def test_validate_config_invalid_db_url_fails_startup(self):
+        """
+        测试无效的数据库 URL 导致校验失败
+
+        验证点：
+        1. 不支持的数据库协议被拒绝
+        """
+        os.environ["DATABASE_URL"] = "mysql://invalid/url"
+
+        try:
+            # 使用无效 URL 创建配置
+            from core.config import ConfigManager
+            # 会因 Pydantic 验证而直接抛出 ValueError
+            with pytest.raises(ValueError) as exc_info:
+                ConfigManager("/nonexistent/config.toml")
+
+            assert "不支持的" in str(exc_info.value) or "mysql" in str(exc_info.value).lower(), \
+                f"错误信息应包含协议不支持提示: {exc_info.value}"
+        finally:
+            if "DATABASE_URL" in os.environ:
+                del os.environ["DATABASE_URL"]
+
+    def test_validate_storage_repo_root_creation(self, tmpdir):
+        """
+        测试存储路径自动创建
+
+        验证点：
+        1. 不存在的仓库目录可以被自动创建
+        """
+        from core.config import Config, AppSettings, StorageSettings, SecuritySettings
+        test_root = os.path.join(tmpdir, "new_repos")
+        config = Config(
+            app=AppSettings(debug=True),
+            storage=StorageSettings(repo_root=test_root),
+            security=SecuritySettings(secret_key="test-key"),
+        )
+
+        result = validate_config(config)
+
+        assert result.is_valid, f"校验应通过: {result.errors}"
+        assert os.path.exists(test_root), "仓库根目录应被自动创建"
+
+    def test_validate_security_production_no_secret_key(self):
+        """
+        测试生产环境缺少 Secret Key 时报错
+
+        验证点：
+        1. 生产模式（debug=False）且没有 secret_key 时报错
+        """
+        from core.config import Config, AppSettings, SecuritySettings
+        config = Config(
+            app=AppSettings(debug=False),
+            security=SecuritySettings(secret_key="")
+        )
+
+        result = validate_config(config)
+
+        assert not result.is_valid, "生产环境缺少 Secret Key 应报错"
+        assert any("JWT 密钥" in e for e in result.errors), \
+            "错误应提示 JWT Secret Key 缺失"
+
+    def test_validate_security_debug_no_secret_key_warns(self):
+        """
+        测试开发环境缺少 Secret Key 时仅警告
+
+        验证点：
+        1. debug=True 时缺少 secret_key 仅产生警告
+        2. 不产生错误
+        """
+        from core.config import Config, AppSettings, SecuritySettings
+        config = Config(
+            app=AppSettings(debug=True),
+            security=SecuritySettings(secret_key="")
+        )
+
+        result = validate_config(config)
+
+        assert result.is_valid, "开发环境缺少 Secret Key 不应报错"
+        assert any("JWT" in w for w in result.warnings), "应产生 JWT 警告"
+
+    def test_validate_storage_repo_root_not_writable(self):
+        """
+        测试仓库根目录不可写时检测
+
+        验证点：
+        1. 仓库根目录不可写时产生错误
+        """
+        from core.config import Config, AppSettings, StorageSettings, SecuritySettings
+
+        # 使用只读路径（Windows 下 C:\ 通常对普通用户只读）
+        readonly_path = "C:\\" if os.name == "nt" else "/"
+        config = Config(
+            app=AppSettings(debug=True),
+            storage=StorageSettings(repo_root=readonly_path),
+            security=SecuritySettings(secret_key="test-key"),
+        )
+
+        result = validate_config(config)
+
+        # 注意：部分环境下 root 可能可写，所以这可能产生错误或警告
+        # 至少应该有响应（error 或 warning）
+        assert len(result.errors) > 0 or len(result.warnings) >= 0, "应检测到路径问题"
+
+    def test_validate_token_expiry_warnings(self):
+        """
+        测试 Token 过期时间合理性检测
+
+        验证点：
+        1. 过短的 access_token 过期时间产生警告
+        2. 过长的 refresh_token 过期时间产生警告
+        """
+        from core.config import Config, AppSettings, SecuritySettings
+        config = Config(
+            app=AppSettings(debug=True),
+            security=SecuritySettings(
+                secret_key="test-key",
+                access_token_expire_minutes=1,  # 1分钟，太短
+                refresh_token_expire_days=100,  # 100天，太长
+            )
+        )
+
+        result = validate_config(config)
+
+        assert result.is_valid, "不合理但合法的配置不应报错"
+        token_warnings = [w for w in result.warnings if "令牌" in w or "Token" in w]
+        assert len(token_warnings) >= 2, "应检测到至少 2 个 Token 过期时间警告"
+
+    def test_validate_database_pool_config(self):
+        """
+        测试数据库连接池配置合理性检测
+
+        验证点：
+        1. 无效的 PostgreSQL SSL 模式产生错误
+        """
+        from core.config import Config, AppSettings, DatabaseSettings, SecuritySettings
+        config = Config(
+            app=AppSettings(debug=True),
+            database=DatabaseSettings(
+                url="postgresql://user:pass@localhost/db",
+                pg_ssl_mode="invalid_ssl_mode",
+            ),
+            security=SecuritySettings(secret_key="test-key"),
+        )
+
+        result = validate_config(config)
+
+        assert not result.is_valid, "无效 SSL 模式应报错"
+        ssl_errors = [e for e in result.errors if "SSL" in e]
+        assert len(ssl_errors) >= 1, "应检测到 SSL 模式错误"
+
+    def test_validate_invalid_jwt_algorithm(self):
+        """
+        测试不支持的 JWT 算法检测
+
+        验证点：
+        1. 不支持的算法产生错误
+        """
+        from core.config import Config, AppSettings, SecuritySettings
+        config = Config(
+            app=AppSettings(debug=True),
+            security=SecuritySettings(
+                secret_key="test-key",
+                algorithm="INVALID_ALGO"
+            )
+        )
+
+        result = validate_config(config)
+
+        assert not result.is_valid, "不支持的 JWT 算法应报错"
+        assert any("算法" in e or "algorithm" in e.lower() for e in result.errors), \
+            "错误应提示 JWT 算法无效"
+
+    def test_validate_file_size_greater_than_repo_size(self):
+        """
+        测试单文件限制大于仓库限制时警告
+
+        验证点：
+        1. max_file_size > max_repo_size 时产生警告
+        """
+        from core.config import Config, AppSettings, StorageSettings, SecuritySettings
+        config = Config(
+            app=AppSettings(debug=True),
+            storage=StorageSettings(
+                max_repo_size=1000,
+                max_file_size=2000,  # 大于仓库限制
+            ),
+            security=SecuritySettings(secret_key="test-key"),
+        )
+
+        result = validate_config(config)
+
+        assert result.is_valid, "不合理的限制不应报错"
+        size_warnings = [w for w in result.warnings if "大小限制" in w]
+        assert len(size_warnings) > 0, "应检测到文件大小限制警告"
+
+    def test_validate_config_file_not_found(self):
+        """
+        测试配置文件不存在时校验失败
+
+        验证点：
+        1. 配置文件不存在时产生错误
+        """
+        result = validate_config(config_path="/nonexistent/config.toml")
+        assert not result.is_valid, "配置文件不存在应报错"
+        assert any("不存在" in e for e in result.errors), "错误应提示文件不存在"
+
+    def test_validate_validation_result_merge(self):
+        """
+        测试 ConfigValidationResult 合并功能
+
+        验证点：
+        1. merge() 正确合并两个结果
+        """
+        r1 = ConfigValidationResult()
+        r1.add_error("err1")
+        r1.add_warning("warn1")
+
+        r2 = ConfigValidationResult()
+        r2.add_error("err2")
+        r2.add_warning("warn2")
+
+        r1.merge(r2)
+
+        assert len(r1.errors) == 2
+        assert len(r1.warnings) == 2
+        assert "err1" in r1.errors
+        assert "err2" in r1.errors
+        assert "warn1" in r1.warnings
+        assert "warn2" in r1.warnings

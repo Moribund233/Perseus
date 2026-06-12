@@ -193,6 +193,407 @@ async def create_issue(
     return build_issue_response(issue)
 
 
+# ==================== F-025: Issue 高级筛选 ====================
+
+async def filter_issues(
+    db: AsyncSession,
+    repository_id: int,
+    filters: Optional[Dict[str, Any]] = None,
+    sort_by: str = "created_at",
+    sort_order: str = "desc",
+    page: int = 1,
+    per_page: int = 20,
+    label_match_all: bool = False
+) -> Dict[str, Any]:
+    """
+    高级筛选 Issue
+
+    Args:
+        db: 异步数据库会话
+        repository_id: 仓库ID
+        filters: 筛选条件字典
+            - statuses: List[str] - 状态列表
+            - priorities: List[str] - 优先级列表
+            - assignee_ids: List[int] - 指派人ID列表
+            - author_ids: List[int] - 作者ID列表
+            - label_ids: List[int] - 标签ID列表
+            - search: str - 搜索关键词（标题和描述）
+        sort_by: 排序字段 (created_at, updated_at, priority)
+        sort_order: 排序方向 (asc, desc)
+        page: 页码
+        per_page: 每页数量
+        label_match_all: 标签匹配模式（True=AND, False=OR）
+
+    Returns:
+        dict: 包含 Issue 列表和分页信息
+    """
+    from sqlalchemy import or_, and_
+
+    filters = filters or {}
+
+    # 基础查询
+    stmt = select(Issue).filter(Issue.repository_id == repository_id)
+
+    # 预加载关联数据
+    stmt = stmt.options(
+        selectinload(Issue.author),
+        selectinload(Issue.assignee),
+        selectinload(Issue.labels),
+        selectinload(Issue.closer)
+    )
+
+    # 状态筛选
+    if filters.get("statuses"):
+        stmt = stmt.filter(Issue.status.in_(filters["statuses"]))
+
+    # 优先级筛选
+    if filters.get("priorities"):
+        stmt = stmt.filter(Issue.priority.in_(filters["priorities"]))
+
+    # 指派人筛选
+    if filters.get("assignee_ids"):
+        stmt = stmt.filter(Issue.assignee_id.in_(filters["assignee_ids"]))
+
+    # 作者筛选
+    if filters.get("author_ids"):
+        stmt = stmt.filter(Issue.author_id.in_(filters["author_ids"]))
+
+    # 标签筛选
+    if filters.get("label_ids"):
+        if label_match_all:
+            # AND 模式：Issue 必须包含所有指定标签
+            for label_id in filters["label_ids"]:
+                stmt = stmt.filter(Issue.labels.any(Label.id == label_id))
+        else:
+            # OR 模式：Issue 包含任意一个指定标签
+            stmt = stmt.join(Issue.labels).filter(Label.id.in_(filters["label_ids"])).distinct()
+
+    # 搜索关键词
+    if filters.get("search"):
+        search_term = f"%{filters['search']}%"
+        stmt = stmt.filter(
+            or_(
+                Issue.title.ilike(search_term),
+                Issue.description.ilike(search_term)
+            )
+        )
+
+    # 排序
+    if sort_by == "priority":
+        # 优先级排序需要自定义顺序
+        priority_order = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+        from sqlalchemy import case
+        stmt = stmt.order_by(
+            case(priority_order, value=Issue.priority).desc() if sort_order == "desc"
+            else case(priority_order, value=Issue.priority).asc()
+        )
+    elif sort_by == "updated_at":
+        stmt = stmt.order_by(Issue.updated_at.desc() if sort_order == "desc" else Issue.updated_at.asc())
+    else:  # 默认按创建时间
+        stmt = stmt.order_by(Issue.created_at.desc() if sort_order == "desc" else Issue.created_at.asc())
+
+    # 分页
+    issues, total = await paginate(db, stmt, page, per_page)
+
+    return build_pagination_response(
+        items=[build_issue_response(issue) for issue in issues],
+        total=total,
+        page=page,
+        limit=per_page
+    )
+
+
+# ==================== F-027: Issue 批量操作 ====================
+
+async def batch_update_issues(
+    db: AsyncSession,
+    repository_id: int,
+    user_id: int,
+    issue_numbers: List[int],
+    updates: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    批量更新 Issue
+
+    Args:
+        db: 异步数据库会话
+        repository_id: 仓库ID
+        user_id: 当前用户ID
+        issue_numbers: Issue 编号列表
+        updates: 更新字段字典
+            - status: str - 状态
+            - priority: str - 优先级
+            - assignee_id: int - 指派人ID
+            - label_ids: List[int] - 标签ID列表
+
+    Returns:
+        dict: 操作结果统计
+    """
+    updated_count = 0
+    failed_count = 0
+    errors = []
+
+    for issue_number in issue_numbers:
+        try:
+            # 获取 Issue
+            issue = await get_issue_or_404(db, repository_id, issue_number)
+
+            # 检查权限
+            await check_resource_author_or_admin(
+                db, issue.author_id, user_id, repository_id, f"update issue #{issue_number}"
+            )
+
+            # 更新字段
+            if "status" in updates:
+                issue.status = updates["status"]
+                if updates["status"] == "closed" and issue.status != "closed":
+                    issue.closed_by = user_id
+                elif updates["status"] == "open":
+                    issue.closed_by = None
+
+            if "priority" in updates:
+                if updates["priority"] not in ["low", "medium", "high", "critical"]:
+                    raise ValidationException(detail=f"Invalid priority: {updates['priority']}")
+                issue.priority = updates["priority"]
+
+            if "assignee_id" in updates:
+                issue.assignee_id = updates["assignee_id"]
+
+            if "label_ids" in updates:
+                result = await db.execute(select(Label).filter(Label.id.in_(updates["label_ids"])))
+                labels = result.scalars().all()
+                issue.labels = labels
+
+            updated_count += 1
+
+        except (NotFoundException, ValidationException) as e:
+            failed_count += 1
+            errors.append({"issue_number": issue_number, "error": str(e)})
+        except Exception as e:
+            failed_count += 1
+            errors.append({"issue_number": issue_number, "error": str(e)})
+
+    await db.commit()
+
+    return {
+        "updated_count": updated_count,
+        "failed_count": failed_count,
+        "errors": errors if errors else None
+    }
+
+
+async def batch_close_issues(
+    db: AsyncSession,
+    repository_id: int,
+    user_id: int,
+    issue_numbers: List[int]
+) -> Dict[str, Any]:
+    """
+    批量关闭 Issue
+
+    Args:
+        db: 异步数据库会话
+        repository_id: 仓库ID
+        user_id: 当前用户ID
+        issue_numbers: Issue 编号列表
+
+    Returns:
+        dict: 操作结果统计
+    """
+    closed_count = 0
+    skipped_count = 0
+    errors = []
+
+    for issue_number in issue_numbers:
+        try:
+            issue = await get_issue_or_404(db, repository_id, issue_number)
+
+            if issue.status == "closed":
+                skipped_count += 1
+                continue
+
+            await check_resource_author_or_admin(
+                db, issue.author_id, user_id, repository_id, f"close issue #{issue_number}"
+            )
+
+            issue.status = "closed"
+            issue.closed_by = user_id
+            closed_count += 1
+
+        except Exception as e:
+            errors.append({"issue_number": issue_number, "error": str(e)})
+
+    await db.commit()
+
+    return {
+        "closed_count": closed_count,
+        "skipped_count": skipped_count,
+        "errors": errors if errors else None
+    }
+
+
+async def batch_reopen_issues(
+    db: AsyncSession,
+    repository_id: int,
+    user_id: int,
+    issue_numbers: List[int]
+) -> Dict[str, Any]:
+    """
+    批量重新打开 Issue
+
+    Args:
+        db: 异步数据库会话
+        repository_id: 仓库ID
+        user_id: 当前用户ID
+        issue_numbers: Issue 编号列表
+
+    Returns:
+        dict: 操作结果统计
+    """
+    reopened_count = 0
+    skipped_count = 0
+    errors = []
+
+    for issue_number in issue_numbers:
+        try:
+            issue = await get_issue_or_404(db, repository_id, issue_number)
+
+            if issue.status == "open":
+                skipped_count += 1
+                continue
+
+            await check_resource_author_or_admin(
+                db, issue.author_id, user_id, repository_id, f"reopen issue #{issue_number}"
+            )
+
+            issue.status = "open"
+            issue.closed_by = None
+            reopened_count += 1
+
+        except Exception as e:
+            errors.append({"issue_number": issue_number, "error": str(e)})
+
+    await db.commit()
+
+    return {
+        "reopened_count": reopened_count,
+        "skipped_count": skipped_count,
+        "errors": errors if errors else None
+    }
+
+
+async def batch_add_labels(
+    db: AsyncSession,
+    repository_id: int,
+    user_id: int,
+    issue_numbers: List[int],
+    label_ids: List[int]
+) -> Dict[str, Any]:
+    """
+    批量为 Issue 添加标签
+
+    Args:
+        db: 异步数据库会话
+        repository_id: 仓库ID
+        user_id: 当前用户ID
+        issue_numbers: Issue 编号列表
+        label_ids: 标签ID列表
+
+    Returns:
+        dict: 操作结果统计
+    """
+    updated_count = 0
+    errors = []
+
+    # 获取所有标签
+    result = await db.execute(
+        select(Label).filter(Label.id.in_(label_ids), Label.repository_id == repository_id)
+    )
+    labels = result.scalars().all()
+    label_map = {label.id: label for label in labels}
+
+    for issue_number in issue_numbers:
+        try:
+            issue = await get_issue_or_404(db, repository_id, issue_number)
+
+            await check_resource_author_or_admin(
+                db, issue.author_id, user_id, repository_id, f"modify issue #{issue_number}"
+            )
+
+            # 添加标签（避免重复）
+            for label_id in label_ids:
+                if label_id in label_map and label_map[label_id] not in issue.labels:
+                    issue.labels.append(label_map[label_id])
+
+            updated_count += 1
+
+        except Exception as e:
+            errors.append({"issue_number": issue_number, "error": str(e)})
+
+    await db.commit()
+
+    return {
+        "updated_count": updated_count,
+        "errors": errors if errors else None
+    }
+
+
+async def batch_remove_labels(
+    db: AsyncSession,
+    repository_id: int,
+    user_id: int,
+    issue_numbers: List[int],
+    label_ids: List[int]
+) -> Dict[str, Any]:
+    """
+    批量从 Issue 移除标签
+
+    Args:
+        db: 异步数据库会话
+        repository_id: 仓库ID
+        user_id: 当前用户ID
+        issue_numbers: Issue 编号列表
+        label_ids: 标签ID列表
+
+    Returns:
+        dict: 操作结果统计
+    """
+    updated_count = 0
+    errors = []
+
+    # 获取所有标签
+    result = await db.execute(
+        select(Label).filter(Label.id.in_(label_ids), Label.repository_id == repository_id)
+    )
+    labels = result.scalars().all()
+    label_map = {label.id: label for label in labels}
+
+    for issue_number in issue_numbers:
+        try:
+            issue = await get_issue_or_404(db, repository_id, issue_number)
+
+            await check_resource_author_or_admin(
+                db, issue.author_id, user_id, repository_id, f"modify issue #{issue_number}"
+            )
+
+            # 移除标签
+            for label_id in label_ids:
+                if label_id in label_map and label_map[label_id] in issue.labels:
+                    issue.labels.remove(label_map[label_id])
+
+            updated_count += 1
+
+        except Exception as e:
+            errors.append({"issue_number": issue_number, "error": str(e)})
+
+    await db.commit()
+
+    return {
+        "updated_count": updated_count,
+        "errors": errors if errors else None
+    }
+
+
 async def update_issue(
     db: AsyncSession,
     repository_id: int,

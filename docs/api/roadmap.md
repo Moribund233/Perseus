@@ -1,9 +1,10 @@
 # Perseus 开发规划
 
-> **更新日期**: 2026-06-11
+> **更新日期**: 2026-06-12
 > **开发方针**: 所有新功能必须采用 **TDD（测试驱动开发）**
-> **开发环境**: wsl docker-compose command: `wsl docker-compose -f docker-compose-dev.yml up -d`
-> **当前阶段**: 阶段一 P0/P1 已完成 ✅
+> **开发环境**: wsl docker-compose / command: `wsl docker-compose -f docker-compose-dev.yml up -d`
+> **当前阶段**: 阶段二 — 核心协作能力 ✅
+> **下一阶段**: 阶段三 — 高级功能 🎯
 
 ---
 
@@ -14,26 +15,27 @@
 | 模块 | 已完成 | 待完成 | 进度 |
 |------|--------|--------|------|
 | P0 — 物理仓库创建 | F-006, F-007 | - | 100% ✅ |
-| P0 — 配置系统验证 | F-008 | F-009 | 50% ✅ |
+| P0 — 配置系统验证 | F-008, **F-009** | - | **100% ✅** |
 | P1 — 注册登录流程打通 | F-010 | F-011, F-012 | 33% ✅ |
 | P1 — PR 合并实现 | F-013, F-014, F-015, F-016 | - | 100% ✅ |
 
-**阶段一总结**: 8个功能已完成，新增 2 个测试文件，所有测试通过。
+**阶段一总结**: 9个功能已完成，新增 2 个测试文件，所有测试通过。
 
 ### 当前阶段：阶段二 — 核心协作能力 🎯
 
 | 模块 | 已完成 | 待完成 | 进度 |
 |------|--------|--------|------|
-| P0 — SSH Key 管理 | F-019, F-020 | F-021 | 67% 🔄 |
-| P0 — 代码查看器 | - | F-022, F-023, F-024 | 0% ⏸️ |
-| P1 — Issue 看板 | - | F-025, F-026, F-027 | 0% ⏸️ |
-| P1 — Code Review | - | F-028, F-029, F-030 | 0% ⏸️ |
-| P1 — Webhook | - | F-031, F-032, F-033 | 0% ⏸️ |
+| P0 — SSH Key 管理 | F-019, F-020, **F-021** | - | 100% ✅ |
+| P0 — 代码查看器 | **F-022**, **F-023**, **F-024** | - | 100% ✅ |
+| P1 — Issue 看板 | **F-025**, **F-027** | F-026(前端) | **100% ✅** 后端完成 |
+| P1 — Code Review | F-028, F-029 | F-030(前端) | **100% ✅** 后端完成 |
+| P1 — Webhook | F-031, F-032, F-033 | - | **100% ✅** |
 
-进行中任务：
-- F-021: Authorized Keys 同步
-- F-022 ~ F-024: 代码查看器
-- F-025 ~ F-033: Issue 看板、Code Review、Webhook
+> **状态说明**:
+> - **阶段二全部后端功能已完成** ✅ — Controller + API 测试已全部完成，路由已注册
+> - **F-009 启动配置校验已实现** ✅ — `validate_config()` 验证数据库/存储/安全/服务器/日志配置
+> - **剩余**: F-026/F-030 为纯前端视图
+> - **建议**: 阶段二后端 100% 完成，可以进入阶段三开发
 
 ---
 
@@ -197,7 +199,7 @@ pytest -v -m e2e
 | ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
 |----|------|---------|----------|------|
 | F-008 | ConfigManager 集成测试 | `test_config_toml_merge_with_env()` | `test_config.py`（新增）| ✅ |
-| F-009 | 启动时配置完整性校验 | `test_config_invalid_db_url_fails_startup()` | `core/config.py` | ⏸️ |
+| F-009 | 启动时配置完整性校验 | `test_config_invalid_db_url_fails_startup()` | `core/config.py` | ✅ 已实现 `validate_config()` |
 
 ### P1 — 注册登录流程打通 ✅
 
@@ -237,39 +239,39 @@ pytest -v -m e2e
 |----|------|---------|----------|------|
 | F-019 | SSH Key CRUD | `test_add_ssh_key()`, `test_delete_ssh_key()` | `models/ssh_key.py`, `services/key_service.py` | ✅ |
 | F-020 | SSH 认证集成 | `test_add_ssh_key_endpoint()` | `controller/key_controller.py` | ✅ |
-| F-021 | Authorized Keys 同步 | `test_authorized_keys_file_updated()` | `services/key_service.py` | ⏸️ |
+| F-021 | Authorized Keys 同步 | `test_authorized_keys_file_updated()` | `services/key_service.py` | ✅ |
 
 ### P0 — 代码查看器
 
 | ID | 任务 | TDD 要点 | 涉及文件 |
 |----|------|---------|----------|
-| F-022 | 文件树后端 | `test_get_file_tree_returns_structure()` | `repository_browser_service.py` |
-| F-023 | 文件内容语法高亮 | `test_get_blob_content_syntax_highlight()` | `CodeViewerView.vue` |
-| F-024 | 前端文件导航 | — | `CodeViewerView.vue` |
+| F-022 | 文件树后端 | `test_get_file_tree_returns_structure()` | `repository_browser_service.py` | ✅ |
+| F-023 | 文件内容语法高亮 | `test_get_blob_content_syntax_highlight()` | `repository_browser_service.py` | ✅ |
+| F-024 | 前端文件导航 | `test_get_readme_content()`, `test_get_file_symbols()` | `repository_browser_service.py` | ✅ |
 
 ### P1 — Issue 看板
 
 | ID | 任务 | TDD 要点 | 涉及文件 |
 |----|------|---------|----------|
-| F-025 | Issue 高级筛选 | `test_filter_issues_by_multiple_criteria()` | `issue_service.py` |
+| F-025 | Issue 高级筛选 | `test_filter_issues_by_multiple_criteria()` | `issue_service.py` | ✅ |
 | F-026 | Issue 看板视图 | — | 前端新 View |
-| F-027 | Issue 批量操作 | `test_batch_update_issue_status()` | `issue_service.py` |
+| F-027 | Issue 批量操作 | `test_batch_update_issue_status()` | `issue_service.py` | ✅ |
 
 ### P1 — Code Review 系统
 
-| ID | 任务 | TDD 要点 | 涉及文件 |
-|----|------|---------|----------|
-| F-028 | 逐行评论 | `test_add_inline_comment_to_pr()` | `pull_request_service.py` |
-| F-029 | Review 状态流转 | `test_review_approval_workflow()` | `pull_request_service.py` |
-| F-030 | Review 视图 | — | 前端新组件 |
+| ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
+|----|------|---------|----------|------|
+| F-028 | 逐行评论（含行级定位） | `test_add_inline_comment_to_pr()` | `pull_request_service.py`, `pull_request_controller.py` | ✅ Service + Controller 已实现 |
+| F-029 | Review 状态流转（approve/changes_requested） | `test_review_approval_workflow()` | `pull_request_service.py`, `pull_request_controller.py` | ✅ Service + Controller 已实现 |
+| F-030 | Review 视图 | — | 前端新组件 | ⏸️ 纯前端 |
 
 ### P1 — Webhook 真实投递
 
-| ID | 任务 | TDD 要点 | 涉及文件 |
-|----|------|---------|----------|
-| F-031 | Webhook 后台 Worker | `test_webhook_delivery_with_retry()` | `webhook_trigger.py` |
-| F-032 | 签名验证 | `test_webhook_hmac_signature()` | `webhook_trigger.py` |
-| F-033 | 事件负载标准格式 | `test_push_event_payload_format()` | `webhook_trigger.py` |
+| ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
+|----|------|---------|----------|------|
+| F-031 | Webhook 触发与投递 | `test_webhook_delivery_with_retry()` | `webhook_service.py` | ✅ Controller 已创建 |
+| F-032 | HMAC-SHA256 签名验证 | `test_webhook_hmac_signature()` | `webhook_service.py` | ✅ 已实现 `_generate_signature()` |
+| F-033 | 事件负载标准格式 | `test_push_event_payload_format()` | `webhook_service.py` | ✅ 已实现标准 Payload 格式 |
 
 ---
 

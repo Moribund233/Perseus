@@ -292,6 +292,33 @@ class AppInitializer:
             self._logger.error(f"配置文件加载失败: {e}")
             return False
 
+    def _validate_config(self) -> bool:
+        """
+        执行配置完整性校验（F-009）
+
+        验证所有关键配置项的合理性，包括：
+        - 数据库配置
+        - 存储路径可写性
+        - 安全配置
+        - 服务器配置
+
+        Returns:
+            bool: 配置校验是否通过
+        """
+        from core.config import validate_config
+
+        result = validate_config()
+        result.print_report()
+
+        if not result.is_valid:
+            self._logger.error("配置完整性校验失败，应用无法启动")
+            return False
+
+        if result.warnings:
+            self._logger.warning(f"配置存在 {len(result.warnings)} 个警告，建议检查")
+
+        return True
+
     def _init_secret_key(self) -> bool:
         """检查 JWT Secret Key 是否已通过环境变量设置"""
         secret_key = os.environ.get("PERSEUS_SECURITY_SECRET_KEY")
@@ -384,20 +411,24 @@ class AppInitializer:
         if not self._init_config():
             return False
 
-        # ========== 阶段 3: 日志系统 ==========
+        # ========== 阶段 3: 配置完整性校验 (F-009) ==========
+        if not self._validate_config():
+            return False
+
+        # ========== 阶段 4: 日志系统 ==========
         if not self._init_logging():
             return False
 
-        # ========== 阶段 4: 安全密钥 ==========
+        # ========== 阶段 5: 安全密钥 ==========
         if not self._init_secret_key():
             return False
 
-        # ========== 阶段 5: 数据库 ==========
+        # ========== 阶段 6: 数据库 ==========
         if init_db:
             if not self._init_database(create_test_data=create_test_data):
                 return False
 
-        # ========== 阶段 6: 仓库目录 ==========
+        # ========== 阶段 7: 仓库目录 ==========
         if not self._init_repository_root():
             return False
 

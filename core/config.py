@@ -449,3 +449,224 @@ def reset_module_config_manager():
     """重置配置管理器单例（用于测试）"""
     ConfigManager._instance = None
     ConfigManager._config = None
+
+
+# =============================================================================
+# F-009: 启动配置完整性校验
+# =============================================================================
+
+
+class ConfigValidationResult:
+    """配置校验结果"""
+
+    def __init__(self):
+        self.errors: list[str] = []
+        self.warnings: list[str] = []
+
+    @property
+    def is_valid(self) -> bool:
+        """是否全部通过（无错误）"""
+        return len(self.errors) == 0
+
+    def add_error(self, message: str) -> None:
+        """添加错误"""
+        self.errors.append(message)
+
+    def add_warning(self, message: str) -> None:
+        """添加警告"""
+        self.warnings.append(message)
+
+    def merge(self, other: "ConfigValidationResult") -> None:
+        """合并另一个校验结果"""
+        self.errors.extend(other.errors)
+        self.warnings.extend(other.warnings)
+
+    def print_report(self) -> None:
+        """打印校验报告"""
+        if self.is_valid and not self.warnings:
+            logger.info("✅ 配置校验全部通过")
+            return
+
+        if self.errors:
+            logger.error("=" * 60)
+            logger.error("❌ 配置校验失败")
+            logger.error("=" * 60)
+            for err in self.errors:
+                logger.error(f"  • {err}")
+            logger.error("=" * 60)
+
+        if self.warnings:
+            for warn in self.warnings:
+                logger.warning(f"  ⚠ {warn}")
+
+
+def _validate_database_config(config: Config, result: ConfigValidationResult) -> None:
+    """校验数据库配置"""
+    db = config.database
+
+    # 1. URL 协议检查（Pydantic 层已做格式校验，这里补充运行时可达性提示）
+    if db.is_sqlite:
+        # SQLite 文件路径检查
+        sqlite_path = db.url.replace("sqlite:///", "").replace("sqlite+aiosqlite:///", "")
+        if sqlite_path:
+            db_dir = os.path.dirname(os.path.abspath(sqlite_path))
+            if not os.path.exists(db_dir):
+                try:
+                    os.makedirs(db_dir, exist_ok=True)
+                except (OSError, PermissionError) as e:
+                    result.add_error(f"数据库目录不可创建: {db_dir} ({e})")
+
+    # 2. 连接池配置合理性
+    if db.pool_size < 1:
+        result.add_error("连接池大小必须 >= 1")
+    if db.max_overflow < 0:
+        result.add_error("最大溢出连接数不能为负数")
+    if db.pool_timeout < 1:
+        result.add_error("连接超时时间必须 >= 1 秒")
+    if db.pool_recycle < 0:
+        result.add_error("连接回收时间不能为负数")
+
+    # 3. PostgreSQL SSL 模式检查
+    if db.is_postgresql:
+        valid_ssl_modes = {"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}
+        if db.pg_ssl_mode not in valid_ssl_modes:
+            result.add_error(f"无效的 PostgreSQL SSL 模式: {db.pg_ssl_mode}")
+
+
+def _validate_storage_config(config: Config, result: ConfigValidationResult) -> None:
+    """校验存储配置"""
+    storage = config.storage
+
+    # 1. 仓库根目录可写性
+    repo_root = os.path.abspath(storage.repo_root)
+    if not os.path.exists(repo_root):
+        try:
+            os.makedirs(repo_root, exist_ok=True)
+            logger.info(f"已创建仓库根目录: {repo_root}")
+        except (OSError, PermissionError) as e:
+            result.add_error(f"仓库根目录不可创建: {repo_root} ({e})")
+    elif not os.access(repo_root, os.W_OK):
+        result.add_error(f"仓库根目录不可写: {repo_root}")
+
+    # 2. 仓库大小限制
+    if storage.max_repo_size <= 0:
+        result.add_warning("仓库大小限制未设置 (max_repo_size <= 0)")
+    if storage.max_file_size <= 0:
+        result.add_warning("文件大小限制未设置 (max_file_size <= 0)")
+    if storage.max_file_size > storage.max_repo_size:
+        result.add_warning("单文件大小限制大于仓库大小限制")
+
+    # 3. LFS 存储路径
+    if storage.enable_lfs:
+        if storage.lfs_storage_path:
+            lfs_path = os.path.abspath(storage.lfs_storage_path)
+            if not os.path.exists(lfs_path):
+                try:
+                    os.makedirs(lfs_path, exist_ok=True)
+                except (OSError, PermissionError) as e:
+                    result.add_warning(f"LFS 存储路径不可创建: {lfs_path} ({e})")
+        else:
+            result.add_warning("LFS 已启用但未设置存储路径，将使用默认位置")
+
+
+def _validate_security_config(config: Config, result: ConfigValidationResult) -> None:
+    """校验安全配置"""
+    security = config.security
+
+    # 1. Secret Key 检查（生产环境必须设置）
+    if not security.secret_key:
+        if config.app.debug:
+            result.add_warning("JWT Secret Key 未设置，开发环境将使用 fallback 密钥")
+        else:
+            result.add_error("生产环境必须通过环境变量 PERSEUS_SECURITY_SECRET_KEY 设置 JWT 密钥")
+
+    # 2. Token 过期时间合理性
+    if security.access_token_expire_minutes < 5:
+        result.add_warning(f"访问令牌过期时间过短 ({security.access_token_expire_minutes} 分钟)")
+    if security.access_token_expire_minutes > 1440:
+        result.add_warning(f"访问令牌过期时间过长 ({security.access_token_expire_minutes} 分钟 > 24 小时)")
+
+    if security.refresh_token_expire_days < 1:
+        result.add_warning(f"刷新令牌过期时间过短 ({security.refresh_token_expire_days} 天)")
+    if security.refresh_token_expire_days > 90:
+        result.add_warning(f"刷新令牌过期时间过长 ({security.refresh_token_expire_days} 天 > 90 天)")
+
+    # 3. JWT 算法检查
+    valid_algorithms = {"HS256", "HS384", "HS512", "RS256", "RS384", "RS512"}
+    if security.algorithm not in valid_algorithms:
+        result.add_error(f"不支持的 JWT 算法: {security.algorithm}")
+
+
+def _validate_server_config(config: Config, result: ConfigValidationResult) -> None:
+    """校验服务器配置"""
+    server = config.server
+
+    # 1. 端口权限检查
+    if server.port < 1024:
+        result.add_warning(f"使用特权端口 ({server.port}) 可能需要 root 权限")
+
+
+def _validate_logging_config(config: Config, result: ConfigValidationResult) -> None:
+    """校验日志配置"""
+    logging_cfg = config.logging
+
+    if logging_cfg.audit_log_enabled:
+        log_path = logging_cfg.audit_log_path
+        log_dir = os.path.dirname(os.path.abspath(log_path))
+        if not os.path.exists(log_dir):
+            try:
+                os.makedirs(log_dir, exist_ok=True)
+            except (OSError, PermissionError) as e:
+                result.add_warning(f"审计日志目录不可创建: {log_dir} ({e})")
+
+
+def validate_config(config: Optional[Config] = None, config_path: str = "config.toml") -> ConfigValidationResult:
+    """
+    执行完整的配置完整性校验
+
+    检查项包括:
+    1. 数据库配置（URL 协议、连接池参数、SSL 模式）
+    2. 存储配置（仓库根目录可写性、大小限制、LFS 路径）
+    3. 安全配置（JWT 密钥、Token 过期时间、签名算法）
+    4. 服务器配置（端口权限）
+    5. 日志配置（审计日志路径可写性）
+    6. 配置文件存在性
+
+    Args:
+        config: 配置对象，为 None 时自动加载
+        config_path: 配置文件路径（config 为 None 时使用）
+
+    Returns:
+        ConfigValidationResult: 校验结果，包含 errors 和 warnings
+    """
+    result = ConfigValidationResult()
+
+    # 0. 配置文件存在性
+    if config is None and not os.path.exists(config_path):
+        result.add_error(f"配置文件不存在: {config_path}")
+        return result
+
+    # 加载配置
+    if config is None:
+        try:
+            config = get_config(config_path)
+        except Exception as e:
+            result.add_error(f"配置加载失败: {e}")
+            return result
+
+    # 1. 数据库配置
+    _validate_database_config(config, result)
+
+    # 2. 存储配置
+    _validate_storage_config(config, result)
+
+    # 3. 安全配置
+    _validate_security_config(config, result)
+
+    # 4. 服务器配置
+    _validate_server_config(config, result)
+
+    # 5. 日志配置
+    _validate_logging_config(config, result)
+
+    return result

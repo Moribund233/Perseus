@@ -31,6 +31,20 @@ def temp_repo():
             capture_output=True
         )
 
+        # 配置 bare 仓库的 git identity（创建附注标签时需要）
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True
+        )
+
         # 创建临时工作目录用于提交
         work_dir = os.path.join(tmpdir, "work")
         os.makedirs(work_dir)

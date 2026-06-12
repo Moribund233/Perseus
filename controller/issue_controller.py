@@ -3,7 +3,7 @@ Issue 控制器层
 
 处理 Issue 相关的 HTTP 请求
 """
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +25,12 @@ from services.issue_service import (
     create_label as service_create_label,
     update_label as service_update_label,
     delete_label as service_delete_label,
+    filter_issues as service_filter_issues,
+    batch_close_issues as service_batch_close_issues,
+    batch_reopen_issues as service_batch_reopen_issues,
+    batch_update_issues as service_batch_update_issues,
+    batch_add_labels as service_batch_add_labels,
+    batch_remove_labels as service_batch_remove_labels,
 )
 
 # 创建路由实例
@@ -134,6 +140,216 @@ async def create_issue(
         description=data.description,
         priority=data.priority,
         assignee_id=data.assignee_id,
+        label_ids=data.label_ids
+    )
+
+
+# ==================== F-025: Issue 高级筛选 ====================
+
+
+class IssueFilterRequest(BaseModel):
+    """Issue 筛选请求体"""
+    statuses: Optional[List[str]] = Field(None, description="状态列表")
+    priorities: Optional[List[str]] = Field(None, description="优先级列表")
+    assignee_ids: Optional[List[int]] = Field(None, description="指派人ID列表")
+    author_ids: Optional[List[int]] = Field(None, description="作者ID列表")
+    label_ids: Optional[List[int]] = Field(None, description="标签ID列表")
+    search: Optional[str] = Field(None, description="搜索关键词")
+
+
+class BatchIssueNumbersRequest(BaseModel):
+    """批量操作请求体"""
+    issue_numbers: List[int] = Field(..., description="Issue 编号列表", min_length=1)
+
+
+class BatchUpdateRequest(BaseModel):
+    """批量更新请求体"""
+    issue_numbers: List[int] = Field(..., description="Issue 编号列表", min_length=1)
+    updates: Dict[str, Any] = Field(..., description="更新字段")
+
+
+class BatchLabelsRequest(BaseModel):
+    """批量标签操作请求体"""
+    issue_numbers: List[int] = Field(..., description="Issue 编号列表", min_length=1)
+    label_ids: List[int] = Field(..., description="标签ID列表", min_length=1)
+
+
+@router.post("/{repo_id}/issues/filter")
+async def filter_issues(
+    repo_id: int,
+    data: IssueFilterRequest,
+    sort_by: str = Query("created_at", description="排序字段"),
+    sort_order: str = Query("desc", description="排序方向"),
+    page: int = Query(1, ge=1, description="页码"),
+    per_page: int = Query(20, ge=1, le=100, description="每页数量"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    高级筛选 Issue
+
+    Args:
+        repo_id: 仓库ID
+        data: 筛选条件
+        sort_by: 排序字段
+        sort_order: 排序方向
+        page: 页码
+        per_page: 每页数量
+        db: 数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        dict: 筛选结果
+    """
+    filters = data.model_dump(exclude_none=True)
+    return await service_filter_issues(
+        db=db,
+        repository_id=repo_id,
+        filters=filters,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        page=page,
+        per_page=per_page
+    )
+
+
+# ==================== F-027: Issue 批量操作 ====================
+
+
+@router.post("/{repo_id}/issues/batch/close")
+async def batch_close_issues(
+    repo_id: int,
+    data: BatchIssueNumbersRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    批量关闭 Issue
+
+    Args:
+        repo_id: 仓库ID
+        data: Issue 编号列表
+        db: 数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        dict: 操作结果统计
+    """
+    return await service_batch_close_issues(
+        db=db,
+        repository_id=repo_id,
+        user_id=current_user.id,
+        issue_numbers=data.issue_numbers
+    )
+
+
+@router.post("/{repo_id}/issues/batch/reopen")
+async def batch_reopen_issues(
+    repo_id: int,
+    data: BatchIssueNumbersRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    批量重新打开 Issue
+
+    Args:
+        repo_id: 仓库ID
+        data: Issue 编号列表
+        db: 数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        dict: 操作结果统计
+    """
+    return await service_batch_reopen_issues(
+        db=db,
+        repository_id=repo_id,
+        user_id=current_user.id,
+        issue_numbers=data.issue_numbers
+    )
+
+
+@router.patch("/{repo_id}/issues/batch")
+async def batch_update_issues(
+    repo_id: int,
+    data: BatchUpdateRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    批量更新 Issue
+
+    Args:
+        repo_id: 仓库ID
+        data: 更新数据
+        db: 数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        dict: 操作结果统计
+    """
+    return await service_batch_update_issues(
+        db=db,
+        repository_id=repo_id,
+        user_id=current_user.id,
+        issue_numbers=data.issue_numbers,
+        updates=data.updates
+    )
+
+
+@router.post("/{repo_id}/issues/batch/labels")
+async def batch_add_labels(
+    repo_id: int,
+    data: BatchLabelsRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    批量为 Issue 添加标签
+
+    Args:
+        repo_id: 仓库ID
+        data: Issue 编号和标签ID列表
+        db: 数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        dict: 操作结果统计
+    """
+    return await service_batch_add_labels(
+        db=db,
+        repository_id=repo_id,
+        user_id=current_user.id,
+        issue_numbers=data.issue_numbers,
+        label_ids=data.label_ids
+    )
+
+
+@router.delete("/{repo_id}/issues/batch/labels")
+async def batch_remove_labels(
+    repo_id: int,
+    data: BatchLabelsRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    批量从 Issue 移除标签
+
+    Args:
+        repo_id: 仓库ID
+        data: Issue 编号和标签ID列表
+        db: 数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        dict: 操作结果统计
+    """
+    return await service_batch_remove_labels(
+        db=db,
+        repository_id=repo_id,
+        user_id=current_user.id,
+        issue_numbers=data.issue_numbers,
         label_ids=data.label_ids
     )
 
