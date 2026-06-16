@@ -159,7 +159,7 @@ async def get_recent_errors(
 async def report_error(
     error_data: dict,
     request: Request,
-    current_user: Optional[dict] = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_current_user)
 ):
     """
     接收前端报告的错误
@@ -184,7 +184,7 @@ async def report_error(
         "timestamp": datetime.now().isoformat(),
         "user_agent": request.headers.get("user-agent"),
         "client_ip": request.client.host if request.client else None,
-        "user_id": current_user.get("id") if current_user else None,
+        "user_id": current_user.id if current_user else None,
         "error": error_data
     }
     

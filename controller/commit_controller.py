@@ -11,7 +11,6 @@ from models.async_db import get_async_db
 from models.user import User
 from api.dependencies import get_current_user
 from services.commit_service import (
-    get_commits as service_get_commits,
     get_commits_by_branch as service_get_commits_by_branch,
     get_commit_by_hash as service_get_commit_by_hash,
     create_commit as service_create_commit,
@@ -27,36 +26,6 @@ from services.branch_service import get_branch as service_get_branch
 
 # 创建路由实例
 router = APIRouter(prefix=get_route_prefix("commits"), tags=["commits"])
-
-
-@router.get("/{repo_id}/commits")
-async def get_commits(
-    repo_id: int,
-    limit: int = Query(100, ge=1, le=1000),
-    offset: int = Query(0, ge=0),
-    branch_name: str = None,
-    db: AsyncSession = Depends(get_async_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    获取仓库的提交记录（需要认证）
-
-    Args:
-        repo_id: 仓库ID
-        limit: 返回记录数量限制（默认100，最大1000）
-        offset: 记录偏移量（默认0）
-        branch_name: 分支名称（可选，默认获取所有分支）
-        db: 数据库会话
-        current_user: 当前认证用户
-
-    Returns:
-        list[Commit]: 提交记录列表
-    """
-    if branch_name:
-        branch = await service_get_branch(repo_id, branch_name, db)
-        return await service_get_commits_by_branch(branch.id, db, limit, offset)
-    else:
-        return await service_get_commits(repo_id, db, limit, offset)
 
 
 @router.get("/{repo_id}/commits/history")

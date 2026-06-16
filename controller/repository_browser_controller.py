@@ -132,7 +132,7 @@ async def get_repository_commits(
         HTTPException: 仓库不存在
     """
     repo_path = await _get_repo_path(repo_id, db)
-    return get_commits(repo_path, ref=ref, path=path, page=page, per_page=per_page)
+    return await get_commits(repo_path, ref=ref, path=path, page=page, per_page=per_page)
 
 
 @router.get("/{repo_id}/diff")

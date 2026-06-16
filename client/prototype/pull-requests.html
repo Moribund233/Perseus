@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pull Request · Perseus</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/perseus.css">
+  <style>
+    .pr-layout { display: grid; grid-template-columns: 1fr 340px; gap: 0; min-height: calc(100vh - 56px); }
+    .pr-main { overflow-y: auto; border-right: 1px solid var(--border-soft); }
+    .pr-list { border: 1px solid var(--border-soft); border-radius: var(--radius-card); overflow: hidden; margin-top: var(--space-5); }
+    .pr-item { display: flex; gap: var(--space-4); padding: 16px 20px; border-bottom: 1px solid var(--border-soft); cursor: pointer; transition: background var(--motion-fast) ease; }
+    .pr-item:last-child { border-bottom: none; }
+    .pr-item:hover { background: var(--surface); }
+    .pr-item.active { background: var(--surface); border-left: 3px solid var(--meta); }
+    .pr-icon { width: 36px; height: 36px; border-radius: var(--radius-pill); background: color-mix(in oklch, var(--success) 12%, transparent); color: var(--success); display: grid; place-items: center; flex-shrink: 0; }
+    .pr-icon.draft { background: color-mix(in oklch, var(--muted) 15%, transparent); color: var(--muted); }
+    .pr-icon.closed { background: color-mix(in oklch, var(--danger) 10%, transparent); color: var(--danger); }
+    .pr-body { flex: 1; }
+    .pr-body h3 { font-size: var(--text-base); font-weight: 550; }
+    .pr-body .pr-desc { font-size: var(--text-sm); color: var(--fg-2); margin-top: 2px; }
+    .pr-meta { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); font-size: 12px; color: var(--muted); }
+    .pr-labels { display: flex; gap: 6px; margin-top: var(--space-2); flex-wrap: wrap; }
+    .pr-detail { padding: var(--space-6) 0; }
+    .pr-detail-header { margin-bottom: var(--space-5); }
+    .pr-detail-header h2 { font-size: 20px; font-weight: 600; }
+    .pr-detail-meta { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-3); font-size: var(--text-sm); color: var(--fg-2); }
+    .pr-detail-meta .avatar { width: 28px; height: 28px; }
+    .pr-conversation { margin-top: var(--space-6); }
+    .pr-comment { display: flex; gap: var(--space-4); padding: var(--space-4) 0; border-bottom: 1px solid var(--border-soft); }
+    .pr-comment-body { flex: 1; }
+    .pr-comment-body .comment-header { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); margin-bottom: var(--space-2); }
+    .pr-comment-body .comment-text { font-size: var(--text-sm); color: var(--fg-2); line-height: 1.6; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-sm); padding: 12px 16px; }
+    .pr-comment-body .comment-text code { background: var(--bg); padding: 1px 5px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; }
+    .pr-code-ref { background: color-mix(in oklch, var(--meta) 6%, transparent); border: 1px solid color-mix(in oklch, var(--meta) 12%, transparent); border-radius: 6px; padding: 8px 12px; font-family: var(--font-mono); font-size: 12px; margin: 8px 0; display: flex; align-items: center; gap: var(--space-3); }
+    .detail-sidebar { padding: var(--space-6); overflow-y: auto; }
+    .detail-sidebar .info-block { margin-bottom: var(--space-6); }
+    .detail-sidebar .info-block h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; margin-bottom: var(--space-3); font-family: var(--font-mono); }
+    .detail-sidebar .info-row { display: flex; align-items: center; gap: var(--space-3); padding: 6px 0; font-size: var(--text-sm); }
+    @media (max-width: 920px) { .pr-layout { grid-template-columns: 1fr; } .detail-sidebar { display: none; } }
+  </style>
+</head>
+<body>
+
+  <nav class="perseus-nav">
+    <div class="container perseus-nav-inner">
+      <a href="index.html" class="logo">
+        <span class="logo-mark">P</span>
+        Perseus
+      </a>
+      <nav>
+        <a href="landing.html">品牌首页</a>
+        <a href="repos.html">仓库</a>
+        <a href="collab-editor.html">协作编辑</a>
+        <a href="pull-requests.html" class="active">Pull Request</a>
+        <a href="chat.html">团队聊天</a>
+      </nav>
+      <div class="nav-actions">
+        <button class="btn btn-ghost btn-icon tooltip" data-tip="搜索">⌘K</button>
+        <button class="btn btn-primary">+ 新建 PR</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container" style="padding-top: var(--space-6);">
+    <div class="page-header" style="padding: 0 0 var(--space-4); border-bottom: none;">
+      <div class="row-between">
+        <div>
+          <div class="breadcrumb">
+            <a href="repos.html">perseus-core</a>
+            <span>·</span>
+            <span>Pull Requests</span>
+          </div>
+          <h1 style="font-size: var(--text-2xl);">Pull Requests</h1>
+        </div>
+        <div class="row" style="gap: var(--space-3);">
+          <select class="input" style="width: auto; padding: 6px 12px; font-size: 13px;">
+            <option>全部状态</option>
+            <option>开放的</option>
+            <option>已合并</option>
+            <option>已关闭</option>
+          </select>
+          <select class="input" style="width: auto; padding: 6px 12px; font-size: 13px;">
+            <option>排序：最新</option>
+            <option>最多评论</option>
+            <option>最近更新</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pr-layout">
+    <div class="pr-main">
+      <div class="container" style="padding-bottom: var(--space-8);">
+        <!-- PR list -->
+        <div class="pr-list">
+          <div class="pr-item active" onclick="selectPR(this, 0)">
+            <div class="pr-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+            </div>
+            <div class="pr-body">
+              <h3>feat(collab): 实现 OT 算法 v2 并发控制</h3>
+              <div class="pr-desc">重构操作变换逻辑，支持多客户端并发编辑</div>
+              <div class="pr-meta">
+                <span>#42</span>
+                <span>由 小明 创建</span>
+                <span>2 小时前</span>
+              </div>
+              <div class="pr-labels">
+                <span class="pill pill-accent">enhancement</span>
+                <span class="pill pill-success">ready</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pr-item" onclick="selectPR(this, 1)">
+            <div class="pr-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+            </div>
+            <div class="pr-body">
+              <h3>fix: awareness 模块 cursor 批处理优化</h3>
+              <div class="pr-desc">减少 WebSocket 消息频率，批量推送光标更新</div>
+              <div class="pr-meta">
+                <span>#41</span>
+                <span>由 Bob 创建</span>
+                <span>5 小时前</span>
+              </div>
+              <div class="pr-labels">
+                <span class="pill pill-warn">bug</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pr-item" onclick="selectPR(this, 2)">
+            <div class="pr-icon draft">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </div>
+            <div class="pr-body">
+              <h3>docs: 更新 API 参考文档</h3>
+              <div class="pr-desc">补充 WebSocket API 的实时通信示例</div>
+              <div class="pr-meta">
+                <span>#40</span>
+                <span>由 小红 创建</span>
+                <span>1 天前</span>
+              </div>
+              <div class="pr-labels">
+                <span class="pill pill-meta">draft</span>
+                <span class="pill pill-accent">docs</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pr-item" onclick="selectPR(this, 3)">
+            <div class="pr-icon closed">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </div>
+            <div class="pr-body">
+              <h3>feat: 添加内嵌团队聊天模块</h3>
+              <div class="pr-desc">已合并到 main · 3 个评审通过</div>
+              <div class="pr-meta">
+                <span>#38</span>
+                <span>由 小明 创建</span>
+                <span>3 天前</span>
+                <span class="pill pill-success" style="font-size: 10px;">已合并</span>
+              </div>
+              <div class="pr-labels">
+                <span class="pill pill-accent">feature</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active PR detail (for #42) -->
+        <div class="pr-detail" id="prDetail">
+          <div class="pr-detail-header">
+            <h2>feat(collab): 实现 OT 算法 v2 并发控制</h2>
+            <div class="pr-detail-meta">
+              <span class="avatar" style="background: #6366f1; width: 28px; height: 28px; font-size: 10px;">明</span>
+              <span><strong>小明</strong> 创建了 PR #42</span>
+              <span class="pill pill-accent" style="font-size: 10px;">enhancement</span>
+            </div>
+            <div class="pr-detail-meta" style="margin-top: var(--space-2);">
+              <span class="pr-diff-stat"><span class="pr-diff-add">+89</span> <span class="pr-diff-del">-23</span></span>
+              <span>src/collab.rs · src/ot.rs</span>
+            </div>
+          </div>
+
+          <!-- Diff file header -->
+          <div class="pr-file-header">
+            <span>src/collab.rs</span>
+            <span class="pr-diff-stat"><span class="pr-diff-add">+67</span> <span class="pr-diff-del">-12</span></span>
+          </div>
+          <div style="border: 1px solid var(--border-soft); border-top: none; border-radius: 0 0 var(--radius-sm) var(--radius-sm); overflow: hidden;">
+            <div class="diff-line diff-add"><span class="diff-line-num">25</span><span class="diff-line-num">25</span><span class="diff-line-content" style="padding-left: 12px;"><span style="color: #ff79c6;">impl</span> CollaborativeDocument {</span></div>
+            <div class="diff-line diff-add"><span class="diff-line-num">26</span><span class="diff-line-num">26</span><span class="diff-line-content" style="padding-left: 12px;">&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #ff79c6;">pub fn</span> <span style="color: #50fa7b;">apply_operation</span>(&mut self, op: Operation) -> Result<(), String> {</span></div>
+            <div class="diff-line"><span class="diff-line-num">27</span><span class="diff-line-num">27</span><span class="diff-line-content" style="padding-left: 12px;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #6272a4;">// 应用 OT 转换后的操作</span></span></div>
+            <div class="diff-line diff-add"><span class="diff-line-num">28</span><span class="diff-line-num">28</span><span class="diff-line-content" style="padding-left: 12px;">+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #ff79c6;">let</span> pos = self.<span style="color: #50fa7b;">transform_position</span>(op.position, &op.user_id);</span></div>
+            <div class="diff-line diff-del"><span class="diff-line-num">28</span><span class="diff-line-num">29</span><span class="diff-line-content" style="padding-left: 12px;">-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.content.<span style="color: #50fa7b;">apply_direct</span>(op);</span></div>
+          </div>
+
+          <!-- Conversation -->
+          <div class="pr-conversation">
+            <h3 style="font-size: var(--text-base); margin-bottom: var(--space-4);">讨论 · <span style="color: var(--muted); font-weight: 400;">4 条评论</span></h3>
+
+            <!-- PR description comment -->
+            <div class="pr-comment">
+              <div class="avatar" style="background: #6366f1;">明</div>
+              <div class="pr-comment-body">
+                <div class="comment-header">
+                  <strong>小明</strong>
+                  <span style="color: var(--muted);">2 小时前</span>
+                  <span class="pill pill-accent" style="font-size: 9px;">作者</span>
+                </div>
+                <div class="comment-text">
+                  这个 PR 重构了 OT 算法的核心逻辑，改为使用 <code>transform_position</code> 方法来处理并发操作的位置映射。<br><br>
+                  主要变更：<br>
+                  • 新增 <code>transform_position</code> 方法，根据已有操作历史调整新操作的位置<br>
+                  • 删除旧有的 <code>apply_direct</code> 直接应用方式<br>
+                  • 添加 broadcast_change 通知其他客户端
+                </div>
+              </div>
+            </div>
+
+            <div class="pr-comment">
+              <div class="avatar" style="background: #10b981;">红</div>
+              <div class="pr-comment-body">
+                <div class="comment-header">
+                  <strong>小红</strong>
+                  <span style="color: var(--muted);">1 小时前</span>
+                  <span class="pill pill-warn" style="font-size: 9px;">评审中</span>
+                </div>
+                <div class="comment-text">
+                  <code>transform_position</code> 的实现看起来没问题，但我们需要处理一下边界情况：<br><br>
+                  当 <code>delete_len</code> 超出文档长度时，会有 panic 风险。建议加一个 <code>min</code> 保护：<br>
+                  <code>let delete_end = (pos + op.delete_len).min(self.content.len());</code>
+                  <div class="pr-code-ref">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                    引用 src/collab.rs:31
+                  </div>
+                </div>
+                <div style="margin-top: var(--space-3);">
+                  <button class="btn btn-ghost btn-sm" style="color: var(--success);">✓ 已解决</button>
+                  <button class="btn btn-ghost btn-sm">回复</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="pr-comment">
+              <div class="avatar" style="background: #6366f1;">明</div>
+              <div class="pr-comment-body">
+                <div class="comment-header">
+                  <strong>小明</strong>
+                  <span style="color: var(--muted);">30 分钟前</span>
+                </div>
+                <div class="comment-text">
+                  好建议，已经加上了。再看看这个 <code>broadcast_change</code> 的调用位置是否合理？
+                </div>
+              </div>
+            </div>
+
+            <div class="pr-comment" style="border-bottom: none;">
+              <div class="avatar" style="background: #f59e0b;">Bo</div>
+              <div class="pr-comment-body">
+                <div class="comment-header">
+                  <strong>Bob</strong>
+                  <span style="color: var(--muted);">15 分钟前</span>
+                </div>
+                <div class="comment-text">
+                  broadcast 放在 apply 之后是对的。不过建议在 ws 层加个节流，避免高频操作时消息风暴。
+                </div>
+                <div style="margin-top: var(--space-3);">
+                  <button class="btn btn-primary btn-sm">回复</button>
+                  <button class="btn btn-secondary btn-sm">批准</button>
+                  <button class="btn btn-ghost btn-sm" style="color: var(--danger);">请求变更</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- New comment form -->
+            <div style="display: flex; gap: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--border-soft); margin-top: var(--space-4);">
+              <div class="avatar" style="background: var(--accent);">你</div>
+              <div style="flex: 1;">
+                <textarea class="textarea" placeholder="发表评论…" style="min-height: 80px;" id="prCommentInput"></textarea>
+                <div style="display: flex; gap: var(--space-3); margin-top: var(--space-3);">
+                  <button class="btn btn-primary btn-sm" onclick="addComment()">发表评论</button>
+                  <button class="btn btn-secondary btn-sm">关闭 PR</button>
+                  <button class="btn btn-primary btn-sm" style="margin-left: auto;">合并 PR</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detail sidebar -->
+    <aside class="detail-sidebar">
+      <div class="info-block">
+        <h4>评审者</h4>
+        <div class="info-row">
+          <div class="avatar avatar-sm" style="background: #10b981;">红</div>
+          <span>小红</span>
+          <span style="margin-left: auto; color: var(--warn); font-size: 12px;">待审</span>
+        </div>
+        <div class="info-row">
+          <div class="avatar avatar-sm" style="background: #f59e0b;">Bo</div>
+          <span>Bob</span>
+          <span style="margin-left: auto; color: var(--success); font-size: 12px;">已批准</span>
+        </div>
+      </div>
+
+      <div class="info-block">
+        <h4>状态</h4>
+        <div class="info-row">
+          <span>审查</span>
+          <span style="margin-left: auto;" class="pill pill-accent" style="font-size: 10px;">进行中</span>
+        </div>
+        <div class="info-row">
+          <span>CI</span>
+          <span style="margin-left: auto;" class="pill pill-success" style="font-size: 10px;">通过 ✓</span>
+        </div>
+        <div class="info-row">
+          <span>合并</span>
+          <span style="margin-left: auto; color: var(--muted);">等待审查</span>
+        </div>
+      </div>
+
+      <div class="info-block">
+        <h4>变更文件</h4>
+        <div class="info-row">
+          <span style="font-family: var(--font-mono); font-size: 12px;">collab.rs</span>
+          <span class="pr-diff-stat" style="margin-left: auto;"><span class="pr-diff-add">+67</span> <span class="pr-diff-del">-12</span></span>
+        </div>
+        <div class="info-row">
+          <span style="font-family: var(--font-mono); font-size: 12px;">ot.rs</span>
+          <span class="pr-diff-stat" style="margin-left: auto;"><span class="pr-diff-add">+22</span> <span class="pr-diff-del">-11</span></span>
+        </div>
+      </div>
+
+      <div class="info-block">
+        <h4>活动</h4>
+        <div class="info-row" style="flex-direction: column; align-items: flex-start;">
+          <div style="font-size: 12px; color: var(--fg-2);">Bob 批准了变更</div>
+          <div style="font-size: 11px; color: var(--muted);">15 分钟前</div>
+        </div>
+        <div class="info-row" style="flex-direction: column; align-items: flex-start;">
+          <div style="font-size: 12px; color: var(--fg-2);">小红 请求变更</div>
+          <div style="font-size: 11px; color: var(--muted);">1 小时前</div>
+        </div>
+        <div class="info-row" style="flex-direction: column; align-items: flex-start;">
+          <div style="font-size: 12px; color: var(--fg-2);">小明 推送了提交</div>
+          <div style="font-size: 11px; color: var(--muted);">2 小时前</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    function selectPR(el) {
+      document.querySelectorAll('.pr-item').forEach(i => i.classList.remove('active'));
+      el.classList.add('active');
+    }
+    function addComment() {
+      const input = document.getElementById('prCommentInput');
+      const text = input.value.trim();
+      if (!text) return;
+      const container = document.querySelector('.pr-conversation');
+      const newBlock = document.createElement('div');
+      newBlock.className = 'pr-comment';
+      newBlock.style.borderBottom = '1px solid var(--border-soft)';
+      newBlock.innerHTML = '<div class="avatar" style="background: var(--accent);">你</div>' +
+        '<div class="pr-comment-body"><div class="comment-header"><strong>你</strong><span style="color:var(--muted);">刚刚</span></div>' +
+        '<div class="comment-text">' + text.replace(/</g, '&lt;') + '</div></div>';
+      container.insertBefore(newBlock, container.lastElementChild);
+      input.value = '';
+    }
+  </script>
+
+</body>
+</html>

@@ -3,7 +3,7 @@
 > **基础路径**: `/api/v1`（除非另行注明）
 > **认证方式**: JWT Bearer Token（通过 `Authorization: Bearer <token>` 请求头传递）
 > **响应格式**: JSON
-> **更新日期**: 2026-06-13
+> **更新日期**: 2026-06-14
 
 ---
 
@@ -40,14 +40,14 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 
 ### 分页参数
 
-所有列表接口支持统一分页：
+多数分页列表接口使用以下参数，但少数历史接口仍返回普通数组或使用自定义分页字段，具体以各端点说明为准。
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `page` | int | 1 | 页码 |
-| `limit` / `per_page` | int | 20 | 每页条数（最大 100）|
+| `limit` / `per_page` | int | 20 | 每页条数（最大值以具体端点为准）|
 
-分页响应格式：
+常见分页响应格式：
 
 ```json
 {
@@ -194,8 +194,7 @@ Request Body:
   "email": "new@example.com",
   "password": "securepassword",
   "full_name": "New User",
-  "is_active": true,
-  "is_admin": false
+  "is_active": true
 }
 ```
 
@@ -206,7 +205,8 @@ Request Body:
 | password | string | ✅ | 6-128 字符 |
 | full_name | string | ❌ | 最多 100 字符 |
 | is_active | bool | ❌ | 默认 true |
-| is_admin | bool | ❌ | 默认 false |
+
+> `is_admin` 不能通过注册接口设置；管理员账号由 `PERSEUS_ADMIN_*` 环境变量在应用初始化时引导创建。
 
 ### 获取当前用户
 
@@ -343,7 +343,9 @@ Request Body:
 }
 ```
 
-路径自动生成，格式为: `{username}/{repo_name}`
+路径自动生成，格式为: `{username}/{repo_name}`。
+
+> 当前实现中该端点接收通用 JSON 对象（`dict`），控制器层仅强制要求 `name` 字段；其他字段如 `description`、`is_public`、`default_branch` 由服务层处理。
 
 ### 获取仓库详情
 
@@ -684,6 +686,8 @@ POST /api/v1/repositories/{repo_id}/branches
 }
 ```
 
+> 当前实现中创建分支端点接收通用 JSON 对象（`dict`），具体字段由服务层校验。
+
 ### 获取分支详情
 
 ```
@@ -730,6 +734,8 @@ PUT /api/v1/repositories/{repo_id}/branches/{branch_name}/protect
 }
 ```
 
+> 当前实现中保护分支端点接收通用 JSON 对象（`dict`），未提供请求体时使用默认保护配置。
+
 ### 取消分支保护
 
 ```
@@ -752,17 +758,13 @@ GET /api/v1/repositories/{repo_id}/branches/{branch_name}/protection
 
 ### 获取提交列表
 
+提交列表由 [仓库浏览器](#9-仓库浏览器) 的提交历史端点提供：
+
 ```
-GET /api/v1/repositories/{repo_id}/commits?limit=100&offset=0&branch_name=
+GET /api/v1/repositories/{repo_id}/commits?ref=HEAD&path=&page=1&per_page=30
 ```
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| limit | int | 100 | 返回数量（最大 1000）|
-| offset | int | 0 | 偏移量 |
-| branch_name | string | null | 分支名称（可选，默认所有分支）|
-
-认证：✅ 需要
+> 该路径不再由提交管理控制器重复注册，避免与仓库浏览器路由冲突。提交管理控制器仍提供历史树、统计、搜索、作者查询、最新提交、详情、创建提交记录和分支提交列表等端点。
 
 ### 获取提交历史树
 
@@ -1640,7 +1642,7 @@ Response:
 ### 初始化数据库
 
 ```
-POST /api/v1/debug/initdb?force=false&create_test_data=true
+POST /api/v1/debug/initdb?force=false
 ```
 
 删除所有表并重新创建。
@@ -1648,7 +1650,8 @@ POST /api/v1/debug/initdb?force=false&create_test_data=true
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | force | bool | false | 是否强制重置 |
-| create_test_data | bool | true | 是否创建测试数据 |
+
+> 当前实现会删除并重建数据库表，同时保留配置并触发管理员引导；不支持 `create_test_data` 参数。
 
 ### 重置配置文件
 
@@ -1670,18 +1673,12 @@ POST /api/v1/debug/initconf?force=false&backup=true
 ### 获取错误码信息
 
 ```
-GET /api/v1/errors/info/{error_code}
-```
-
-认证：❌ 可选（调试模式或管理员可查看详细信息）
-
-### 获取错误码信息
-
-```
 GET /api/v1/errors/info/{error_code}?message=&error_type=&details=&request_id=
 ```
 
-认证：❌ 可选（调试模式或管理员可查看详细信息）
+认证：✅ 需要
+
+> 当前实现使用 `get_current_user` 依赖，未提供有效 JWT 时返回 401；调试模式或管理员可查看更详细的信息。
 
 ### 获取最近错误日志
 
@@ -1697,7 +1694,7 @@ GET /api/v1/errors/recent?limit=10
 POST /api/v1/errors/report
 ```
 
-认证：❌ 可选
+认证：✅ 需要
 
 ```json
 {

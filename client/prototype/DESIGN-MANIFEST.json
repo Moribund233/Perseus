@@ -1,39 +1,45 @@
 {
   "schema": "open-design.design-manifest.v1",
-  "title": "79f99b0b-cd21-4d31-b1be-773bb3762aa2",
+  "title": "27e9b057-fb3f-41e7-bc4a-7f244c5f854d",
   "entryFile": "index.html",
   "sourceFiles": {
     "all": [
-      "browse.html",
-      "code-viewer.html",
-      "dashboard.html",
+      "chat.html",
+      "collab-editor.html",
+      "css/base.css",
+      "css/perseus.css",
       "index.html",
-      "landing.html"
+      "landing.html",
+      "perseus-index.html",
+      "pull-requests.html",
+      "repo-detail.html",
+      "repos.html"
     ],
     "html": [
-      "browse.html",
-      "code-viewer.html",
-      "dashboard.html",
+      "chat.html",
+      "collab-editor.html",
       "index.html",
-      "landing.html"
+      "landing.html",
+      "perseus-index.html",
+      "pull-requests.html",
+      "repo-detail.html",
+      "repos.html"
     ],
-    "css": [],
+    "css": [
+      "css/base.css",
+      "css/perseus.css"
+    ],
     "scriptsAndComponents": [],
     "assets": []
   },
   "screens": [
     {
-      "file": "browse.html",
+      "file": "chat.html",
       "role": "screen",
       "implementationNote": "Preserve visual hierarchy, responsive behavior, and interactive states from this screen."
     },
     {
-      "file": "code-viewer.html",
-      "role": "screen",
-      "implementationNote": "Preserve visual hierarchy, responsive behavior, and interactive states from this screen."
-    },
-    {
-      "file": "dashboard.html",
+      "file": "collab-editor.html",
       "role": "product-screen",
       "implementationNote": "Preserve visual hierarchy, responsive behavior, and interactive states from this screen."
     },
@@ -45,6 +51,26 @@
     {
       "file": "landing.html",
       "role": "landing-page",
+      "implementationNote": "Preserve visual hierarchy, responsive behavior, and interactive states from this screen."
+    },
+    {
+      "file": "perseus-index.html",
+      "role": "screen",
+      "implementationNote": "Preserve visual hierarchy, responsive behavior, and interactive states from this screen."
+    },
+    {
+      "file": "pull-requests.html",
+      "role": "screen",
+      "implementationNote": "Preserve visual hierarchy, responsive behavior, and interactive states from this screen."
+    },
+    {
+      "file": "repo-detail.html",
+      "role": "screen",
+      "implementationNote": "Preserve visual hierarchy, responsive behavior, and interactive states from this screen."
+    },
+    {
+      "file": "repos.html",
+      "role": "screen",
       "implementationNote": "Preserve visual hierarchy, responsive behavior, and interactive states from this screen."
     }
   ],
@@ -79,7 +105,8 @@
   },
   "tokens": {
     "source": [
-      "index.html"
+      "css/base.css",
+      "css/perseus.css"
     ],
     "required": [
       "background",

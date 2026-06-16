@@ -3,7 +3,7 @@
 > **更新日期**: 2026-06-13
 > **开发方针**: 所有新功能必须采用 **TDD（测试驱动开发）**
 > **开发环境**: wsl docker-compose / command: `wsl docker-compose -f docker-compose-dev.yml up -d`
-> **当前阶段**: 阶段一/二 — 前端对接 + 基础设施完善 🎯
+> **当前阶段**: 阶段一/二 — 基础设施完善 🎯
 > **下一阶段**: 阶段三 — 高级功能
 
 ---
@@ -14,13 +14,12 @@
 
 | 模块 | 已完成 | 待完成 | 进度 |
 |------|--------|--------|------|
-| P0 — 前端 API 接入层 | F-001, **F-002** | F-003, F-004, F-005 | **100% ✅** 核心功能 |
 | P0 — 物理仓库创建 | F-006, F-007 | - | 100% ✅ |
 | P0 — 配置系统验证 | F-008, **F-009** | - | **100% ✅** |
-| P1 — 注册登录流程打通 | F-010, **F-011** | F-012 | **100% ✅** 核心功能 |
+| P1 — JWT Token 刷新 | F-010 | - | 100% ✅ |
 | P1 — PR 合并实现 | F-013, F-014, F-015, F-016 | - | 100% ✅ |
 
-**阶段一总结**: 11个功能已完成，前端 API Client + Login 对接 + Token 持久化 + 基础设施就绪。
+**阶段一总结**: 7个功能已完成，基础设施就绪。
 
 ### 基础设施完善
 
@@ -28,26 +27,23 @@
 |------|------|
 | Docker backend entrypoint + 自动配置初始化 | ✅ |
 | OpenResty 反向代理（Git HTTP Smart Protocol + API + WS）| ✅ |
-| Vite 开发代理配置（host 0.0.0.0 + proxy）| ✅ |
 | 管理员自动引导（`PERSEUS_ADMIN_*` 环境变量）| ✅ |
 | 移除硬编码测试数据 | ✅ |
 | 后端启动优化（`asyncio` engine / `ConfigManager.reload()` 修复）| ✅ |
-| API 类型定义（TypeScript）| ✅ |
 
-### 当前阶段：阶段二 — 核心协作能力 🎯
+### 当前阶段：阶段二 — 核心协作能力 ✅
 
-| 模块 | 已完成 | 待完成 | 进度 |
-|------|--------|--------|------|
-| P0 — SSH Key 管理 | F-019, F-020, **F-021** | - | 100% ✅ |
-| P0 — 代码查看器 | **F-022**, **F-023**, **F-024** | - | 100% ✅ |
-| P1 — Issue 看板 | **F-025**, **F-027** | F-026(前端) | **100% ✅** 后端完成 |
-| P1 — Code Review | F-028, F-029 | F-030(前端) | **100% ✅** 后端完成 |
-| P1 — Webhook | F-031, F-032, F-033 | - | **100% ✅** |
+| 模块 | 已完成 | 进度 |
+|------|--------|------|
+| P0 — SSH Key 管理 | F-019, F-020, **F-021** | 100% ✅ |
+| P0 — 代码查看器 | **F-022**, **F-023**, **F-024** | 100% ✅ |
+| P1 — Issue 看板 | **F-025**, **F-027** | 100% ✅ |
+| P1 — Code Review | F-028, F-029 | 100% ✅ |
+| P1 — Webhook | F-031, F-032, F-033 | 100% ✅ |
 
 > **状态说明**:
 > - **阶段二全部后端功能已完成** ✅ — Controller + API 测试已全部完成，路由已注册
 > - **F-009 启动配置校验已实现** ✅ — `validate_config()` 验证数据库/存储/安全/服务器/日志配置
-> - **剩余**: F-026/F-030 为纯前端视图
 > - **建议**: 阶段二后端 100% 完成，可以进入阶段三开发
 
 ---
@@ -190,16 +186,6 @@ pytest -v -m e2e
 
 **目标**：让已有后端接口真正跑通，前端能真实调用
 
-### P0 — 前端 API 接入层 ✅
-
-| ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
-|----|------|---------|----------|------|
-| F-001 | 前端 API Client 层 | — | `client/web/src/api/`, `client/web/src/types/api.ts` | ✅ |
-| F-002 | Login 页面接入真实 API | `test_post_login_returns_token()` | `auth_controller.py`, `AuthView.vue` | ✅ |
-| F-003 | Dashboard 真实数据 | `test_get_user_repos_returns_list()` | `DashboardView.vue` | ⏸️ |
-| F-004 | Repositories 页面真实数据 | `test_get_repositories_pagination()` | `RepositoriesView.vue` | ⏸️ |
-| F-005 | Profile 页面真实数据 | `test_get_current_user_info()` | `ProfileView.vue` | ⏸️ |
-
 ### P0 — 物理仓库创建 ✅
 
 | ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
@@ -214,13 +200,11 @@ pytest -v -m e2e
 | F-008 | ConfigManager 集成测试 | `test_config_toml_merge_with_env()` | `test_config.py`（新增）| ✅ |
 | F-009 | 启动时配置完整性校验 | `test_config_invalid_db_url_fails_startup()` | `core/config.py` | ✅ 已实现 `validate_config()` |
 
-### P1 — 注册登录流程打通 ✅
+### P1 — JWT Token 刷新 ✅
 
 | ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
 |----|------|---------|----------|------|
 | F-010 | JWT Token 刷新 | `test_refresh_token_works()` | `token_service.py`, `auth_controller.py` | ✅ |
-| F-011 | 前端持久化 session | — | `src/api/client.ts` | ✅ 通过 `api.setTokens()` + localStorage |
-| F-012 | 路由守卫鉴权 | — | `router/index.ts` | ⏸️ |
 
 ### P1 — PR 合并实现 ✅
 
@@ -267,16 +251,14 @@ pytest -v -m e2e
 | ID | 任务 | TDD 要点 | 涉及文件 |
 |----|------|---------|----------|
 | F-025 | Issue 高级筛选 | `test_filter_issues_by_multiple_criteria()` | `issue_service.py` | ✅ |
-| F-026 | Issue 看板视图 | — | 前端新 View |
 | F-027 | Issue 批量操作 | `test_batch_update_issue_status()` | `issue_service.py` | ✅ |
 
 ### P1 — Code Review 系统
 
 | ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
 |----|------|---------|----------|------|
-| F-028 | 逐行评论（含行级定位） | `test_add_inline_comment_to_pr()` | `pull_request_service.py`, `pull_request_controller.py` | ✅ Service + Controller 已实现 |
-| F-029 | Review 状态流转（approve/changes_requested） | `test_review_approval_workflow()` | `pull_request_service.py`, `pull_request_controller.py` | ✅ Service + Controller 已实现 |
-| F-030 | Review 视图 | — | 前端新组件 | ⏸️ 纯前端 |
+| F-028 | 逐行评论（含行级定位） | `test_add_inline_comment_to_pr()` | `pull_request_service.py`, `pull_request_controller.py` | ✅ |
+| F-029 | Review 状态流转（approve/changes_requested） | `test_review_approval_workflow()` | `pull_request_service.py`, `pull_request_controller.py` | ✅ |
 
 ### P1 — Webhook 真实投递
 

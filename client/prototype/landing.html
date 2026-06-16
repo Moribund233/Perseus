@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Perseus · 代码协作平台 — 让团队同频</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/perseus.css">
+  <style>
+    .gradient-bg {
+      position: relative;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% -20%, color-mix(in oklch, var(--meta) 8%, transparent) 0%, transparent 60%),
+        var(--bg);
+    }
+    .hero-landing { padding-block: 120px 80px; }
+    .hero-landing h1 { font-size: clamp(48px, 6vw, 72px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.08; max-width: 16ch; }
+    .hero-landing .lead { font-size: 20px; max-width: 52ch; margin-top: var(--space-5); }
+    .hero-landing .hero-cta { margin-top: var(--space-8); }
+    .hero-visual {
+      position: relative;
+    }
+    .hero-visual .code-window {
+      background: #1a1d24;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--elev-raised);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .code-window-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 16px;
+      background: #23272f;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .code-window-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .code-window-dot.red { background: #ff5f56; }
+    .code-window-dot.yellow { background: #ffbd2e; }
+    .code-window-dot.green { background: #27c93f; }
+    .code-window-body {
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.7;
+      color: #e1e4e8;
+    }
+    .code-window-body .kw { color: #ff79c6; }
+    .code-window-body .fn { color: #50fa7b; }
+    .code-window-body .str { color: #f1fa8c; }
+    .code-window-body .cm { color: #6272a4; }
+    .code-window-body .cursor-tag { position: relative; display: inline; }
+    .code-window-body .cursor-tag::after {
+      content: '';
+      position: absolute; bottom: -2px; left: 0;
+      width: 2px; height: 1.2em;
+      background: #ff79c6;
+      animation: blink-cursor 1s steps(1) infinite;
+    }
+    @keyframes blink-cursor { 50% { opacity: 0; } }
+    .cursor-badge {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+    }
+    .social-proof { display: flex; align-items: center; gap: var(--space-6); margin-top: var(--space-8); padding: var(--space-5) 0; border-top: 1px solid var(--border-soft); }
+    .social-proof .avatars { display: flex; }
+    .social-proof .avatars .avatar { width: 36px; height: 36px; border: 2px solid var(--bg); margin-left: -8px; }
+    .social-proof .avatars .avatar:first-child { margin-left: 0; }
+    .social-proof-text { font-size: var(--text-sm); color: var(--fg-2); }
+    .social-proof-text strong { color: var(--fg); }
+    .feature-deep { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap-2xl); align-items: center; padding: var(--section-y-desktop) 0; }
+    .feature-deep h2 { font-size: var(--text-2xl); font-weight: 600; letter-spacing: -0.025em; margin-bottom: var(--space-5); }
+    .feature-deep p { font-size: var(--text-base); color: var(--fg-2); line-height: 1.6; max-width: 42ch; }
+    .feature-deep ul { list-style: none; padding: 0; margin: var(--space-5) 0 0; }
+    .feature-deep ul li { display: flex; align-items: flex-start; gap: var(--space-3); padding: 8px 0; font-size: var(--text-sm); color: var(--fg-2); }
+    .feature-deep ul li svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; }
+    .feature-deep .demo-card {
+      background: var(--surface);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-card);
+      padding: var(--space-8);
+    }
+    .demo-card .chat-thread { display: flex; flex-direction: column; gap: var(--space-3); }
+    .demo-card .chat-bubble { max-width: 80%; padding: 10px 14px; border-radius: var(--radius-md); font-size: var(--text-sm); line-height: 1.5; }
+    .chat-bubble.incoming { background: var(--bg); border: 1px solid var(--border-soft); align-self: flex-start; }
+    .chat-bubble.outgoing { background: var(--accent); color: var(--accent-on); align-self: flex-end; }
+    .chat-bubble .name { font-weight: 550; font-size: 11px; margin-bottom: 3px; opacity: 0.7; }
+    .stats-section { background: var(--surface); }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-8); text-align: center; padding: var(--space-12) 0; }
+    .stat-item-num { font-size: var(--text-3xl); font-weight: 700; letter-spacing: -0.03em; color: var(--fg); }
+    .stat-item-label { font-size: var(--text-sm); color: var(--muted); margin-top: var(--space-2); }
+    .pricing-section { padding: var(--section-y-desktop) 0; }
+    .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-6); margin-top: var(--space-12); }
+    .pricing-card { background: var(--bg); border: 1px solid var(--border-soft); border-radius: var(--radius-card); padding: var(--space-8); }
+    .pricing-card.featured { border-color: var(--accent); box-shadow: var(--elev-raised); position: relative; }
+    .pricing-card.featured::before { content: '最受欢迎'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--accent); color: var(--accent-on); padding: 3px 14px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; font-family: var(--font-mono); }
+    .pricing-card h3 { font-size: 20px; font-weight: 600; margin-bottom: var(--space-2); }
+    .pricing-card .price { font-size: var(--text-3xl); font-weight: 700; letter-spacing: -0.03em; margin-bottom: var(--space-4); }
+    .pricing-card .price span { font-size: var(--text-base); font-weight: 400; color: var(--muted); }
+    .pricing-card ul { list-style: none; padding: 0; margin: var(--space-6) 0; }
+    .pricing-card ul li { padding: 6px 0; font-size: var(--text-sm); color: var(--fg-2); display: flex; align-items: center; gap: var(--space-2); }
+    .pricing-card ul li svg { width: 16px; height: 16px; color: var(--success); flex-shrink: 0; }
+    .cta-section { text-align: center; padding: var(--section-y-desktop) 0; background: linear-gradient(180deg, var(--bg) 0%, var(--surface) 100%); }
+    .cta-section h2 { font-size: var(--text-2xl); margin-bottom: var(--space-4); }
+    .cta-section .lead { max-width: 44ch; margin: 0 auto var(--space-8); }
+    @media (max-width: 920px) {
+      .hero-split { grid-template-columns: 1fr; }
+      .feature-deep { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .pricing-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="perseus-nav">
+    <div class="container perseus-nav-inner">
+      <a href="index.html" class="logo">
+        <span class="logo-mark">P</span>
+        Perseus
+      </a>
+      <nav>
+        <a href="landing.html" class="active">品牌首页</a>
+        <a href="repos.html">仓库</a>
+        <a href="collab-editor.html">协作编辑</a>
+        <a href="pull-requests.html">Pull Request</a>
+        <a href="chat.html">团队聊天</a>
+      </nav>
+      <div class="nav-actions">
+        <button class="btn btn-ghost btn-icon tooltip" data-tip="搜索">⌘K</button>
+        <button class="btn btn-primary">开始使用</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="gradient-bg">
+    <section class="section hero-landing" data-od-id="hero">
+      <div class="container hero-split">
+        <div>
+          <p class="eyebrow">Perseus · 实时协作代码平台</p>
+          <h1>和团队一起，<br>用代码创造</h1>
+          <p class="lead">告别异步推拉和割裂的代码评审。Perseus 让每位开发者都能在同一份代码上实时协作、即时讨论、快速交付。</p>
+          <div class="hero-cta">
+            <button class="btn btn-primary" style="padding: 12px 28px; font-size: 16px;">创建免费工作区 →</button>
+            <button class="btn btn-secondary" style="padding: 12px 28px; font-size: 16px;">查看 GitHub 导入指南</button>
+          </div>
+          <div class="social-proof">
+            <div class="avatars">
+              <span class="avatar" style="background: #6366f1; color: #fff;">A</span>
+              <span class="avatar" style="background: #f59e0b; color: #fff;">B</span>
+              <span class="avatar" style="background: #10b981; color: #fff;">C</span>
+              <span class="avatar" style="background: #ec4899; color: #fff;">D</span>
+              <span class="avatar" style="background: #8b5cf6; color: #fff;">E</span>
+            </div>
+            <span class="social-proof-text"><strong>2,400+</strong> 开发团队已在使用 · <strong>4.8</strong> / 5 好评</span>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <div class="code-window">
+            <div class="code-window-header">
+              <span class="code-window-dot red"></span>
+              <span class="code-window-dot yellow"></span>
+              <span class="code-window-dot green"></span>
+              <span style="margin-left: 12px; font-size: 12px; color: #8b949e; font-family: var(--font-mono);">src/collab.ts — 正在协作编辑</span>
+            </div>
+            <div class="code-window-body">
+              <span class="cm">// 多人实时编辑 · 光标同步演示</span><br>
+              <span class="kw">import</span> { <span class="fn">awareness</span> } <span class="kw">from</span> <span class="str">'@perseus/sync'</span><br>
+              <span class="kw">import</span> { <span class="fn">CollaborativeEditor</span> } <span class="kw">from</span> <span class="str">'@perseus/editor'</span><br><br>
+              <span class="kw">const</span> <span class="fn">editor</span> = <span class="kw">new</span> <span class="fn">CollaborativeEditor</span>({<br>
+              &nbsp;&nbsp;room: <span class="str">'perseus/main'</span>,<br>
+              &nbsp;&nbsp;cursor: <span class="str">'<span class="cursor-badge" style="background:#ff79c6;"></span>alice'</span><br>
+              })<br><br>
+              <span>editor.onChange(<span class="fn">syncToPeers</span>) <span class="cm">// → 3 online</span></span><br>
+              <span class="kw">const</span> [data, <span class="fn">setData</span>] = useState(initial)<br><br>
+              <span><span class="cm">// bob 正在第 42 行编辑</span></span><br>
+              <span><span class="cursor-badge" style="background:#50fa7b;"></span> bob.cursor = { line: 42, ch: 15 }</span><br>
+              <span><span class="cursor-badge" style="background:#ffbd2e;"></span> charlie.cursor = { line: 38, ch: 7 }</span><br>
+              <span class="cursor-tag">updateEditor(</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="section" data-od-id="features">
+    <div class="container stack" style="gap: 56px;">
+      <div style="text-align: center;">
+        <p class="eyebrow">从代码到交付，全程协作</p>
+        <h2>不止是代码托管</h2>
+        <p class="lead" style="margin: var(--space-4) auto 0; max-width: 48ch;">Perseus 将编辑、讨论、评审、部署整合为<br>一个无缝的实时协作体验。</p>
+      </div>
+      <div class="grid-3">
+        <div class="card card-hover">
+          <div style="width: 40px; height: 40px; border-radius: var(--radius-pill); background: color-mix(in oklch, var(--meta) 10%, transparent); display: grid; place-items: center; margin-bottom: var(--space-4);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--meta)" stroke-width="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </div>
+          <h3>实时协作编辑器</h3>
+          <p style="color: var(--fg-2); font-size: var(--text-sm); margin-top: var(--space-2); line-height: 1.6;">多人同时编辑同一份代码，毫秒级光标同步。OT 算法确保零冲突，谁在改什么一目了然。</p>
+        </div>
+        <div class="card card-hover">
+          <div style="width: 40px; height: 40px; border-radius: var(--radius-pill); background: color-mix(in oklch, var(--meta) 10%, transparent); display: grid; place-items: center; margin-bottom: var(--space-4);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--meta)" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <h3>内嵌团队聊天</h3>
+          <p style="color: var(--fg-2); font-size: var(--text-sm); margin-top: var(--space-2); line-height: 1.6;">无需切换工具。在代码旁直接讨论，@ 提及队友，分享代码片段，所有上下文自动关联。</p>
+        </div>
+        <div class="card card-hover">
+          <div style="width: 40px; height: 40px; border-radius: var(--radius-pill); background: color-mix(in oklch, var(--meta) 10%, transparent); display: grid; place-items: center; margin-bottom: var(--space-4);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--meta)" stroke-width="1.8"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+          </div>
+          <h3>实时 PR 评审</h3>
+          <p style="color: var(--fg-2); font-size: var(--text-sm); margin-top: var(--space-2); line-height: 1.6;">在差异对比上直接评论，评审人可实时看到回复。合并前自动检查，CI 状态即时推送。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" data-od-id="stats" style="background: var(--surface);">
+    <div class="container">
+      <p class="eyebrow" style="text-align: center; margin-bottom: var(--space-8);">数据见证 · 2026</p>
+      <div class="stats-grid">
+        <div>
+          <div class="stat-item-num num">3.2<span style="font-size: 0.5em; color: var(--muted);">×</span></div>
+          <p class="stat-item-label">团队交付速度提升</p>
+        </div>
+        <div>
+          <div class="stat-item-num num">2,400<span style="font-size: 0.5em; color: var(--muted);">+</span></div>
+          <p class="stat-item-label">活跃开发团队</p>
+        </div>
+        <div>
+          <div class="stat-item-num num">98<span style="font-size: 0.5em; color: var(--muted);">%</span></div>
+          <p class="stat-item-label">用户满意度</p>
+        </div>
+        <div>
+          <div class="stat-item-num num">12<span style="font-size: 0.5em; color: var(--muted);">ms</span></div>
+          <p class="stat-item-label">平均同步延迟</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" data-od-id="team-dashboard">
+    <div class="container">
+      <div class="feature-deep">
+        <div>
+          <p class="eyebrow">团队工作台</p>
+          <h2>看板 + 代码 + 聊天，<br>一个空间搞定</h2>
+          <p>每个仓库自带团队工作台。左侧是任务看板，中间是代码区，右侧是频道聊天。拖拽任务卡片直接从看板创建分支，代码讨论自动关联任务。</p>
+          <ul>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--meta)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              看板与仓库深度关联，拖拽卡片即开分支
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--meta)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              频道消息支持代码高亮、行级引用
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--meta)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              实时在线状态，@ 频道和 @ 人均可
+            </li>
+          </ul>
+          <button class="btn btn-primary btn-arrow" style="margin-top: var(--space-6);">了解团队工作台</button>
+        </div>
+        <div>
+          <div class="demo-card">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-4);">
+              <span style="font-weight: 600; font-size: var(--text-sm);"># 团队频道 · feature/auth</span>
+              <span class="pill pill-accent" style="font-family: var(--font-mono); font-size: 10px;">4 人在线</span>
+            </div>
+            <div class="chat-thread">
+              <div class="chat-bubble incoming">
+                <span class="name">小明</span>
+                auth 模块的 JWT 验证部分，谁在改？
+              </div>
+              <div class="chat-bubble outgoing">
+                <span class="name">你</span>
+                刚刚提交了一个 fix，在 src/middleware.ts 第 42 行 👆
+              </div>
+              <div class="chat-bubble incoming">
+                <span class="name">小红</span>
+                我看一下，gateway 那边的测试跑过了吗？
+              </div>
+              <div class="chat-bubble outgoing">
+                <span class="name">你</span>
+                <div style="margin-top: 4px; padding: 6px 10px; background: rgba(0,0,0,0.2); border-radius: 6px; font-family: var(--font-mono); font-size: 11px;">
+                  ✓ tests/auth/jwt.spec.ts 全部通过
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" data-od-id="pricing">
+    <div class="container">
+      <div style="text-align: center; max-width: 48ch; margin: 0 auto;">
+        <p class="eyebrow">定价</p>
+        <h2>选择适合团队的方案</h2>
+        <p class="lead" style="margin-top: var(--space-3);">每位开发者都是协作者。所有方案均含实时协作核心功能。</p>
+      </div>
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <h3>个人</h3>
+          <div class="price num">免费</div>
+          <p style="font-size: var(--text-sm); color: var(--muted);">适合个人项目和小团队起步</p>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>3 个协作仓库</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>基础实时编辑</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>团队聊天</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>社区支持</li>
+          </ul>
+          <button class="btn btn-secondary" style="width: 100%;">开始使用</button>
+        </div>
+        <div class="pricing-card featured">
+          <h3>团队</h3>
+          <div class="price num">¥39<span> / 人 / 月</span></div>
+          <p style="font-size: var(--text-sm); color: var(--muted);">中小团队的理想选择</p>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>不限协作仓库</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>高级实时同步 (OT)</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>PR 评审 + 实时评论</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>团队工作台 / 看板</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>CI/CD 状态集成</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>优先支持</li>
+          </ul>
+          <button class="btn btn-primary" style="width: 100%;">立即订阅</button>
+        </div>
+        <div class="pricing-card">
+          <h3>企业</h3>
+          <div class="price num">定制</div>
+          <p style="font-size: var(--text-sm); color: var(--muted);">规模化部署与专属支持</p>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>团队版全部功能</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>SAML / SCIM 企业 SSO</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>私有部署 / 混合云</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>审计日志 + 合规报告</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>专属客户经理</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>99.99% SLA 保障</li>
+          </ul>
+          <button class="btn btn-secondary" style="width: 100%;">联系销售</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-section" data-od-id="cta-strip">
+    <div class="container" style="max-width: 600px;">
+      <p class="eyebrow">开始协作</p>
+      <h2>你的团队需要一个<br>真正的实时协作平台</h2>
+      <p class="lead">从 GitHub 迁移只需一杯咖啡的时间。零成本试用，无需信用卡。</p>
+      <button class="btn btn-primary" style="padding: 12px 32px; font-size: 16px;">创建免费工作区 →</button>
+      <p style="margin-top: var(--space-5); font-size: var(--text-sm); color: var(--muted);">已导入 12,000+ 仓库 · 平均迁移耗时 4 分钟</p>
+    </div>
+  </section>
+
+  <footer class="perseus-foot">
+    <div class="container row-between">
+      <div class="row" style="gap: var(--space-6);">
+        <a href="index.html" style="font-weight: 600; color: var(--fg);">Perseus</a>
+        <a href="repos.html">仓库</a>
+        <a href="collab-editor.html">协作编辑</a>
+        <a href="pull-requests.html">PR</a>
+        <a href="chat.html">聊天</a>
+      </div>
+      <span class="meta">© 2026 Perseus · Code together, in real time</span>
+    </div>
+  </footer>
+
+</body>
+</html>
