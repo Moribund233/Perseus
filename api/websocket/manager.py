@@ -76,7 +76,7 @@ class Connection:
     
     def is_timeout(self, timeout_seconds: int = 120) -> bool:
         """检查连接是否超时"""
-        return (datetime.now() - self.last_ping).seconds > timeout_seconds
+        return (datetime.now() - self.last_ping).total_seconds() > timeout_seconds
     
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典表示"""
@@ -124,11 +124,14 @@ class ConnectionManager:
         
         # 消息处理器注册表: message_type -> handler function
         self._message_handlers: Dict[str, Callable] = {}
+        
+        # 并发控制锁
+        self._lock: asyncio.Lock = asyncio.Lock()
 
         ConnectionManager._initialized = True
     
     def _generate_connection_id(self) -> str:
-        """生成唯一的连接ID"""
+        """生成唯一的连接ID（调用者需持有锁）"""
         self._connection_counter += 1
         return f"conn_{self._connection_counter}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
     
@@ -143,45 +146,49 @@ class ConnectionManager:
             Connection: 创建的连接对象
         """
         await websocket.accept()
-        connection_id = self._generate_connection_id()
-        connection = Connection(websocket, connection_id)
-        self._connections[connection_id] = connection
+        async with self._lock:
+            connection_id = self._generate_connection_id()
+            connection = Connection(websocket, connection_id)
+            self._connections[connection_id] = connection
 
         logger.debug(f"WebSocket连接: {connection_id}, 当前: {len(self._connections)}")
 
         return connection
     
-    def disconnect(self, connection: Connection) -> None:
+    async def disconnect(self, connection: Connection) -> None:
         """
         断开WebSocket连接并清理资源
         
         Args:
             connection: 要断开的连接对象
         """
-        connection_id = connection.connection_id
-        
-        # 从用户索引中移除
-        if connection.user_id is not None:
-            if connection.user_id in self._user_index:
-                self._user_index[connection.user_id].discard(connection_id)
-                if not self._user_index[connection.user_id]:
-                    del self._user_index[connection.user_id]
-        
-        # 从仓库索引中移除
-        for repo_id in connection.repository_ids:
-            if repo_id in self._repository_index:
-                self._repository_index[repo_id].discard(connection_id)
-                if not self._repository_index[repo_id]:
-                    del self._repository_index[repo_id]
-        
-        # 从连接池中移除
-        if connection_id in self._connections:
-            del self._connections[connection_id]
-        
+        if not connection.is_alive:
+            return
         connection.is_alive = False
-        logger.debug(f"WebSocket断开: {connection_id}, 当前: {len(self._connections)}")
+        connection_id = connection.connection_id
+
+        async with self._lock:
+            # 从用户索引中移除
+            if connection.user_id is not None:
+                if connection.user_id in self._user_index:
+                    self._user_index[connection.user_id].discard(connection_id)
+                    if not self._user_index[connection.user_id]:
+                        del self._user_index[connection.user_id]
+            
+            # 从仓库索引中移除
+            for repo_id in list(connection.repository_ids):
+                if repo_id in self._repository_index:
+                    self._repository_index[repo_id].discard(connection_id)
+                    if not self._repository_index[repo_id]:
+                        del self._repository_index[repo_id]
+            
+            # 从连接池中移除
+            if connection_id in self._connections:
+                del self._connections[connection_id]
+
+        logger.debug(f"WebSocket断开: {connection_id}, 当前连接数: {len(self._connections)}")
     
-    def bind_user(self, connection: Connection, user_id: int, username: str) -> None:
+    async def bind_user(self, connection: Connection, user_id: int, username: str) -> None:
         """
         将连接绑定到用户
         
@@ -190,21 +197,22 @@ class ConnectionManager:
             user_id: 用户ID
             username: 用户名
         """
-        # 如果之前绑定过其他用户，先清理
-        if connection.user_id is not None and connection.user_id != user_id:
-            old_user_id = connection.user_id
-            if old_user_id in self._user_index:
-                self._user_index[old_user_id].discard(connection.connection_id)
-        
-        # 绑定新用户
-        connection.bind_user(user_id, username)
-        
-        # 更新用户索引
-        if user_id not in self._user_index:
-            self._user_index[user_id] = set()
-        self._user_index[user_id].add(connection.connection_id)
+        async with self._lock:
+            # 如果之前绑定过其他用户，先清理
+            if connection.user_id is not None and connection.user_id != user_id:
+                old_user_id = connection.user_id
+                if old_user_id in self._user_index:
+                    self._user_index[old_user_id].discard(connection.connection_id)
+            
+            # 绑定新用户
+            connection.bind_user(user_id, username)
+            
+            # 更新用户索引
+            if user_id not in self._user_index:
+                self._user_index[user_id] = set()
+            self._user_index[user_id].add(connection.connection_id)
     
-    def subscribe_repository(self, connection: Connection, repository_id: int) -> None:
+    async def subscribe_repository(self, connection: Connection, repository_id: int) -> None:
         """
         订阅仓库消息
         
@@ -212,14 +220,15 @@ class ConnectionManager:
             connection: 连接对象
             repository_id: 仓库ID
         """
-        connection.subscribe_repository(repository_id)
-        
-        # 更新仓库索引
-        if repository_id not in self._repository_index:
-            self._repository_index[repository_id] = set()
-        self._repository_index[repository_id].add(connection.connection_id)
+        async with self._lock:
+            connection.subscribe_repository(repository_id)
+            
+            # 更新仓库索引
+            if repository_id not in self._repository_index:
+                self._repository_index[repository_id] = set()
+            self._repository_index[repository_id].add(connection.connection_id)
     
-    def unsubscribe_repository(self, connection: Connection, repository_id: int) -> None:
+    async def unsubscribe_repository(self, connection: Connection, repository_id: int) -> None:
         """
         取消订阅仓库消息
         
@@ -227,13 +236,14 @@ class ConnectionManager:
             connection: 连接对象
             repository_id: 仓库ID
         """
-        connection.unsubscribe_repository(repository_id)
-        
-        # 更新仓库索引
-        if repository_id in self._repository_index:
-            self._repository_index[repository_id].discard(connection.connection_id)
-            if not self._repository_index[repository_id]:
-                del self._repository_index[repository_id]
+        async with self._lock:
+            connection.unsubscribe_repository(repository_id)
+            
+            # 更新仓库索引
+            if repository_id in self._repository_index:
+                self._repository_index[repository_id].discard(connection.connection_id)
+                if not self._repository_index[repository_id]:
+                    del self._repository_index[repository_id]
     
     # ==================== 消息发送方法 ====================
     
@@ -248,7 +258,8 @@ class ConnectionManager:
         Returns:
             bool: 发送成功返回True
         """
-        connection = self._connections.get(connection_id)
+        async with self._lock:
+            connection = self._connections.get(connection_id)
         if connection and connection.is_alive:
             return await connection.send(message)
         return False
@@ -264,10 +275,11 @@ class ConnectionManager:
         Returns:
             int: 成功发送的连接数
         """
-        connection_ids = self._user_index.get(user_id, set())
+        async with self._lock:
+            connection_ids = set(self._user_index.get(user_id, set()))
         success_count = 0
         
-        for conn_id in list(connection_ids):
+        for conn_id in connection_ids:
             if await self.send_to_connection(conn_id, message):
                 success_count += 1
         
@@ -285,11 +297,13 @@ class ConnectionManager:
         Returns:
             int: 成功发送的连接数
         """
-        connection_ids = self._repository_index.get(repository_id, set())
+        async with self._lock:
+            connection_ids = set(self._repository_index.get(repository_id, set()))
         success_count = 0
         
-        for conn_id in list(connection_ids):
-            connection = self._connections.get(conn_id)
+        for conn_id in connection_ids:
+            async with self._lock:
+                connection = self._connections.get(conn_id)
             if connection and connection.is_alive:
                 # 如果指定了排除用户，跳过该用户的连接
                 if exclude_user_id is not None and connection.user_id == exclude_user_id:
@@ -309,10 +323,13 @@ class ConnectionManager:
         Returns:
             int: 成功发送的连接数
         """
+        async with self._lock:
+            snapshot = list(self._connections.items())
+        
         success_count = 0
         dead_connections: List[str] = []
         
-        for conn_id, connection in list(self._connections.items()):
+        for conn_id, connection in snapshot:
             if connection.is_alive:
                 if await connection.send(message):
                     success_count += 1
@@ -323,8 +340,10 @@ class ConnectionManager:
         
         # 清理死连接
         for conn_id in dead_connections:
-            if conn_id in self._connections:
-                self.disconnect(self._connections[conn_id])
+            async with self._lock:
+                conn = self._connections.get(conn_id)
+            if conn:
+                await self.disconnect(conn)
         
         return success_count
     
@@ -386,6 +405,12 @@ class ConnectionManager:
             except Exception as e:
                 logger.error(f"心跳检测任务异常: {e}")
 
+    @classmethod
+    def reset_instance(cls) -> None:
+        """重置单例（仅用于测试）"""
+        cls._instance = None
+        cls._initialized = False
+
     @property
     def active_connections(self) -> Dict[str, 'Connection']:
         """获取所有活跃连接"""
@@ -399,11 +424,11 @@ class ConnectionManager:
     
     async def _cleanup_timeout_connections(self) -> None:
         """清理超时连接"""
-        timeout_connections: List[Connection] = []
-        
-        for connection in self._connections.values():
-            if connection.is_timeout():
-                timeout_connections.append(connection)
+        async with self._lock:
+            timeout_connections = [
+                conn for conn in self._connections.values()
+                if conn.is_timeout()
+            ]
         
         for connection in timeout_connections:
             logger.info(f"清理超时连接 connection_id={connection.connection_id}")
@@ -411,25 +436,26 @@ class ConnectionManager:
                 await connection.websocket.close(code=1001, reason="Connection timeout")
             except:
                 pass
-            self.disconnect(connection)
+            await self.disconnect(connection)
     
     # ==================== 统计信息 ====================
     
-    def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> Dict[str, Any]:
         """
         获取连接统计信息
         
         Returns:
             Dict: 统计信息字典
         """
-        return {
-            "total_connections": len(self._connections),
-            "active_users": len(self._user_index),
-            "subscribed_repositories": len(self._repository_index),
-            "connections": [conn.to_dict() for conn in self._connections.values()],
-        }
+        async with self._lock:
+            return {
+                "total_connections": len(self._connections),
+                "active_users": len(self._user_index),
+                "subscribed_repositories": len(self._repository_index),
+                "connections": [conn.to_dict() for conn in self._connections.values()],
+            }
     
-    def get_user_connections(self, user_id: int) -> List[Dict[str, Any]]:
+    async def get_user_connections(self, user_id: int) -> List[Dict[str, Any]]:
         """
         获取用户的所有连接信息
         
@@ -439,12 +465,13 @@ class ConnectionManager:
         Returns:
             List: 连接信息列表
         """
-        connection_ids = self._user_index.get(user_id, set())
-        return [
-            self._connections[conn_id].to_dict()
-            for conn_id in connection_ids
-            if conn_id in self._connections
-        ]
+        async with self._lock:
+            connection_ids = set(self._user_index.get(user_id, set()))
+            return [
+                self._connections[conn_id].to_dict()
+                for conn_id in connection_ids
+                if conn_id in self._connections
+            ]
 
 
 # 全局连接管理器实例

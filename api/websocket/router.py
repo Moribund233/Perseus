@@ -3,13 +3,26 @@ WebSocket路由模块
 
 定义WebSocket端点和连接处理逻辑
 """
+from datetime import datetime
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from typing import Optional
 import logging
 
+import json as _json
 from api.websocket.manager import manager, Connection
 from api.websocket.auth import authenticate_websocket
 from api.websocket.handlers import register_all_handlers
+
+# WebSocket 消息大小限制（256KB）
+MAX_WS_MESSAGE_SIZE = 262144
+
+
+async def safe_receive_json(websocket: WebSocket) -> dict:
+    """带大小限制的安全 JSON 接收"""
+    raw = await websocket.receive_text()
+    if len(raw) > MAX_WS_MESSAGE_SIZE:
+        raise ValueError(f"Message too large: {len(raw)} > {MAX_WS_MESSAGE_SIZE}")
+    return _json.loads(raw)
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +84,7 @@ async def logs_websocket(
         # 可选认证
         user_info = await authenticate_websocket(websocket, required=False)
         if user_info:
-            manager.bind_user(
+            await manager.bind_user(
                 connection,
                 user_id=user_info["user_id"],
                 username=user_info["username"]
@@ -96,7 +109,7 @@ async def logs_websocket(
         # 主消息循环
         while connection.is_alive:
             try:
-                data = await websocket.receive_json()
+                data = await safe_receive_json(websocket)
                 # 更新心跳时间，保持连接活跃
                 connection.update_ping()
                 await manager.handle_message(connection, data)
@@ -119,7 +132,7 @@ async def logs_websocket(
             from api.websocket.handlers.log_handler import get_websocket_log_handler
             handler = get_websocket_log_handler()
             await handler.subscription_manager.unsubscribe(connection)
-            manager.disconnect(connection)
+            await manager.disconnect(connection)
 
 
 @router.websocket("/")
@@ -163,7 +176,7 @@ async def websocket_endpoint(
         user_info = await authenticate_websocket(websocket, required=False)
         if user_info:
             # 绑定用户到连接
-            manager.bind_user(
+            await manager.bind_user(
                 connection,
                 user_id=user_info["user_id"],
                 username=user_info["username"]
@@ -196,7 +209,7 @@ async def websocket_endpoint(
         while connection.is_alive:
             try:
                 # 接收消息
-                data = await websocket.receive_json()
+                data = await safe_receive_json(websocket)
                 logger.debug(f"收到消息 connection_id={connection.connection_id}: {data}")
 
                 # 更新心跳时间，保持连接活跃
@@ -224,7 +237,7 @@ async def websocket_endpoint(
     finally:
         # 清理连接
         if connection:
-            manager.disconnect(connection)
+            await manager.disconnect(connection)
             logger.info(f"WebSocket连接已清理: {connection.connection_id}")
 
 
@@ -270,7 +283,7 @@ async def notifications_websocket(
         # 保持连接，处理心跳
         while connection.is_alive:
             try:
-                data = await websocket.receive_json()
+                data = await safe_receive_json(websocket)
                 
                 # 只处理ping消息
                 if data.get("type") == "ping":
@@ -278,7 +291,7 @@ async def notifications_websocket(
                     await connection.send({
                         "type": "pong",
                         "timestamp": data.get("timestamp"),
-                        "server_time": __import__('datetime').datetime.now().isoformat()
+                        "server_time": datetime.now().isoformat()
                     })
                 
             except WebSocketDisconnect:
@@ -289,7 +302,7 @@ async def notifications_websocket(
     
     finally:
         if connection:
-            manager.disconnect(connection)
+            await manager.disconnect(connection)
 
 
 @router.websocket("/repository/{repository_id}")
@@ -313,14 +326,14 @@ async def repository_websocket(
         # 可选认证（允许匿名连接公开仓库）
         user_info = await authenticate_websocket(websocket, required=False)
         if user_info:
-            manager.bind_user(
+            await manager.bind_user(
                 connection,
                 user_id=user_info["user_id"],
                 username=user_info["username"]
             )
         
         # 自动订阅仓库
-        manager.subscribe_repository(connection, repository_id)
+        await manager.subscribe_repository(connection, repository_id)
         
         await connection.send({
             "type": "connected",
@@ -333,7 +346,7 @@ async def repository_websocket(
         # 主消息循环
         while connection.is_alive:
             try:
-                data = await websocket.receive_json()
+                data = await safe_receive_json(websocket)
                 await manager.handle_message(connection, data)
                 
             except WebSocketDisconnect:
@@ -344,4 +357,4 @@ async def repository_websocket(
     
     finally:
         if connection:
-            manager.disconnect(connection)
+            await manager.disconnect(connection)

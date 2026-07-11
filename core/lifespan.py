@@ -103,7 +103,9 @@ class AppLifecycleManager:
     async def _shutdown_websocket_connections(self) -> None:
         """优雅关闭所有 WebSocket 连接"""
         try:
-            active_connections = list(self._websocket_manager.active_connections.values())
+            import copy
+            async with self._websocket_manager._lock:
+                active_connections = list(self._websocket_manager._connections.values())
 
             if not active_connections:
                 return
@@ -122,9 +124,7 @@ class AppLifecycleManager:
                     await connection.websocket.close(code=1001, reason="服务器关闭")
                 except Exception:
                     pass
-
-            self._websocket_manager.active_connections.clear()
-            self._websocket_manager.user_connections.clear()
+                await self._websocket_manager.disconnect(connection)
 
         except Exception as e:
             logger.error(f"关闭 WebSocket 连接时出错: {e}")

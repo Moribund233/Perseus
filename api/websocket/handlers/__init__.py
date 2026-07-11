@@ -30,6 +30,7 @@ def register_all_handlers():
         "sync_status": sync.handle_sync_status,
         "progress_update": progress.handle_progress_update,
         "broadcast": notification.handle_broadcast,
+        "progress_query": progress.handle_progress_query,
         "subscribe_logs": log_handler.handle_subscribe_logs,
         "unsubscribe_logs": log_handler.handle_unsubscribe_logs,
         "get_log_stats": log_handler.handle_get_log_stats,

@@ -52,11 +52,11 @@ async def handle_subscribe(connection: Connection, message: Dict[str, Any]) -> N
             await connection.send({
                 "type": "error",
                 "error": "订阅仓库需要提供repository_id",
-                "original_action": "subscribe"
+                "original_type": "subscribe"
             })
             return
         
-        manager.subscribe_repository(connection, repository_id)
+        await manager.subscribe_repository(connection, repository_id)
         
         await connection.send({
             "type": "subscribed",
@@ -99,7 +99,7 @@ async def handle_unsubscribe(connection: Connection, message: Dict[str, Any]) ->
     if channel == "repository":
         repository_id = message.get("repository_id")
         if repository_id:
-            manager.unsubscribe_repository(connection, repository_id)
+            await manager.unsubscribe_repository(connection, repository_id)
             
             await connection.send({
                 "type": "unsubscribed",

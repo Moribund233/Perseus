@@ -3,6 +3,7 @@
 
 处理操作进度推送相关的WebSocket消息
 """
+import asyncio
 from typing import Dict, Any, Optional
 from datetime import datetime
 from api.websocket.manager import Connection, manager
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 # 存储正在进行的操作进度
 _active_operations: Dict[str, Dict[str, Any]] = {}
+_lock: asyncio.Lock = asyncio.Lock()
 
 
 async def handle_progress_update(connection: Connection, message: Dict[str, Any]) -> None:
@@ -46,17 +48,17 @@ async def handle_progress_update(connection: Connection, message: Dict[str, Any]
         })
         return
     
-    # 存储操作进度
-    _active_operations[operation_id] = {
-        "operation_type": operation_type,
-        "progress": progress,
-        "status": status,
-        "message": message.get("message", ""),
-        "details": message.get("details", {}),
-        "user_id": connection.user_id,
-        "username": connection.username,
-        "updated_at": datetime.now().isoformat(),
-    }
+    async with _lock:
+        _active_operations[operation_id] = {
+            "operation_type": operation_type,
+            "progress": progress,
+            "status": status,
+            "message": message.get("message", ""),
+            "details": message.get("details", {}),
+            "user_id": connection.user_id,
+            "username": connection.username,
+            "updated_at": datetime.now().isoformat(),
+        }
     
     # 向用户推送进度更新
     progress_message = {
@@ -74,8 +76,9 @@ async def handle_progress_update(connection: Connection, message: Dict[str, Any]
     
     # 如果操作完成或失败，清理记录
     if status in ["completed", "failed"]:
-        if operation_id in _active_operations:
-            del _active_operations[operation_id]
+        async with _lock:
+            if operation_id in _active_operations:
+                del _active_operations[operation_id]
     
     logger.debug(f"进度更新 operation_id={operation_id}, progress={progress}%, status={status}")
 
@@ -99,7 +102,8 @@ async def handle_progress_query(connection: Connection, message: Dict[str, Any])
         })
         return
     
-    operation = _active_operations.get(operation_id)
+    async with _lock:
+        operation = _active_operations.get(operation_id)
     
     if operation:
         await connection.send({
@@ -152,14 +156,15 @@ async def push_progress(
     }
     
     # 更新操作记录
-    _active_operations[operation_id] = {
-        "operation_type": operation_type,
-        "progress": progress,
-        "status": progress_message["status"],
-        "message": message,
-        "details": details or {},
-        "updated_at": datetime.now().isoformat(),
-    }
+    async with _lock:
+        _active_operations[operation_id] = {
+            "operation_type": operation_type,
+            "progress": progress,
+            "status": progress_message["status"],
+            "message": message,
+            "details": details or {},
+            "updated_at": datetime.now().isoformat(),
+        }
     
     return await manager.send_to_user(user_id, progress_message)
 
@@ -231,9 +236,9 @@ async def notify_operation_completed(
         "completed_at": datetime.now().isoformat(),
     }
     
-    # 清理操作记录
-    if operation_id in _active_operations:
-        del _active_operations[operation_id]
+    async with _lock:
+        if operation_id in _active_operations:
+            del _active_operations[operation_id]
     
     return await manager.send_to_user(user_id, message)
 
@@ -267,9 +272,9 @@ async def notify_operation_failed(
         "failed_at": datetime.now().isoformat(),
     }
     
-    # 清理操作记录
-    if operation_id in _active_operations:
-        del _active_operations[operation_id]
+    async with _lock:
+        if operation_id in _active_operations:
+            del _active_operations[operation_id]
     
     return await manager.send_to_user(user_id, message)
 
