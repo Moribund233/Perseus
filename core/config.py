@@ -319,6 +319,18 @@ class SearchSettings(BaseSettings):
     max_file_size: int = Field(default=10 * 1024 * 1024, ge=0, description="最大文件大小（字节，默认 10MB）")
 
 
+class OAuthSettings(BaseSettings):
+    """OAuth2 认证配置"""
+    model_config = SettingsConfigDict(env_prefix="PERSEUS_OAUTH_")
+
+    github_client_id: str = Field(default="", description="GitHub OAuth App Client ID")
+    github_client_secret: str = Field(default="", description="GitHub OAuth App Client Secret")
+    github_redirect_uri: str = Field(default="http://localhost:5173/auth/github/callback", description="GitHub OAuth 回调地址")
+    gitlab_client_id: str = Field(default="", description="GitLab OAuth App Client ID")
+    gitlab_client_secret: str = Field(default="", description="GitLab OAuth App Client Secret")
+    gitlab_redirect_uri: str = Field(default="http://localhost:5173/auth/gitlab/callback", description="GitLab OAuth 回调地址")
+
+
 class Config(BaseSettings):
     """配置主类"""
     server: ServerSettings = Field(default_factory=ServerSettings)
@@ -332,6 +344,7 @@ class Config(BaseSettings):
     redis: RedisSettings = Field(default_factory=RedisSettings)
     lfs: LFSSettings = Field(default_factory=LFSSettings)
     search: SearchSettings = Field(default_factory=SearchSettings)
+    oauth: OAuthSettings = Field(default_factory=OAuthSettings)
 
     @property
     def concurrency(self) -> ConcurrencySettings:

@@ -97,12 +97,13 @@ def create_refresh_token(
     return encoded_jwt
 
 
-def create_token_pair(user: User) -> Dict[str, str]:
+def create_token_pair(user: User, extra_claims: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
     """
     创建访问令牌和刷新令牌对
 
     Args:
         user: 用户对象
+        extra_claims: 额外要编码到令牌中的声明（可选）
 
     Returns:
         dict: 包含 access_token 和 refresh_token 的字典
@@ -112,6 +113,8 @@ def create_token_pair(user: User) -> Dict[str, str]:
         "username": user.username,
         "is_admin": user.is_admin
     }
+    if extra_claims:
+        token_data.update(extra_claims)
 
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)

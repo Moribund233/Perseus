@@ -241,6 +241,7 @@ from models.pr_activity import PRActivity
 from models.activity import Activity
 from models.notification import Notification
 from models.notification_preference import NotificationPreference
+from models.user_oauth import UserOAuthAccount
 
 __all__ = [
     "Base", "SessionLocal", "BaseModel",
@@ -257,4 +258,5 @@ __all__ = [
     "Activity",
     "Notification",
     "NotificationPreference",
+    "UserOAuthAccount",
 ]
