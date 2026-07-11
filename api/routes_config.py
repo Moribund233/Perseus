@@ -56,6 +56,18 @@ def create_api_router() -> APIRouter:
     from controller.fork_controller import router as fork_router
     api_v1_router.include_router(fork_router)
 
+    # 6c. Star 管理路由
+    from controller.star_controller import router as star_router
+    api_v1_router.include_router(star_router)
+
+    # 6d. Repo Label 管理路由
+    from controller.label_controller import router as label_router
+    api_v1_router.include_router(label_router)
+
+    # 6e. LFS 管理路由
+    from controller.lfs_controller import router as lfs_router
+    api_v1_router.include_router(lfs_router)
+
     # 7. 分支管理路由
     from controller.branch_controller import router as branch_router
     api_v1_router.include_router(branch_router)
@@ -67,6 +79,10 @@ def create_api_router() -> APIRouter:
     # 9. Pull Request 路由
     from controller.pull_request_controller import router as pull_request_router
     api_v1_router.include_router(pull_request_router)
+
+    # 9c. PR Label 路由
+    from controller.pr_label_controller import router as pr_label_router
+    api_v1_router.include_router(pr_label_router)
 
     # 9b. Release 管理路由（需在 Pull Request 之后）
     from controller.release_controller import router as release_router
@@ -83,6 +99,22 @@ def create_api_router() -> APIRouter:
     # 11b. Webhook 管理路由
     from controller.webhook_controller import router as webhook_router
     api_v1_router.include_router(webhook_router)
+
+    # 11c. Stats 路由
+    from controller.stats_controller import router as stats_router
+    api_v1_router.include_router(stats_router)
+
+    # 11d. Activity 路由
+    from controller.activity_controller import router as activity_router
+    api_v1_router.include_router(activity_router)
+
+    # 11f. Notification 路由
+    from controller.notification_controller import router as notification_router
+    api_v1_router.include_router(notification_router)
+
+    # 11e. Search 路由
+    from controller.search_controller import router as search_router
+    api_v1_router.include_router(search_router)
 
     # 12. Debug 路由（仅在调试模式下可用）
     from controller.debug_controller import router as debug_router
@@ -137,6 +169,9 @@ ROUTES = {
 
     # Webhook 管理（需要仓库ID前缀）
     "webhooks": f"{API_V1_PREFIX}/repositories",
+
+    # 通知管理
+    "notifications": f"{API_V1_PREFIX}/notifications",
 
     # 调试接口
     "debug": f"{API_V1_PREFIX}/debug",

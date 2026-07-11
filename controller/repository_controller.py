@@ -25,7 +25,9 @@ from services.repository_service import (
     update_repository as service_update_repository,
     delete_repository as service_delete_repository,
     get_public_repositories as service_get_public_repositories,
-    check_repository_access as service_check_repository_access
+    check_repository_access as service_check_repository_access,
+    archive_repository as service_archive_repository,
+    unarchive_repository as service_unarchive_repository,
 )
 
 # 创建路由实例
@@ -239,3 +241,57 @@ async def check_repository_access(
     """
     has_access = await service_check_repository_access(repo_id, user_id, db)
     return {"has_access": has_access}
+
+
+@router.post("/{repo_id}/archive", summary="归档仓库")
+async def archive_repository(
+    repo_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    归档仓库（需要认证）
+
+    Args:
+        repo_id: 仓库ID
+        db: 数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        Repository: 归档后的仓库信息
+
+    Raises:
+        NotFoundException: 仓库不存在时抛出404异常
+        AuthorizationException: 无权限时抛出403异常
+    """
+    await require_repository_owner_or_admin(
+        db, repo_id, current_user.id, "archive this repository"
+    )
+    return await service_archive_repository(repo_id, db)
+
+
+@router.post("/{repo_id}/unarchive", summary="取消归档仓库")
+async def unarchive_repository(
+    repo_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    取消归档仓库（需要认证）
+
+    Args:
+        repo_id: 仓库ID
+        db: 数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        Repository: 取消归档后的仓库信息
+
+    Raises:
+        NotFoundException: 仓库不存在时抛出404异常
+        AuthorizationException: 无权限时抛出403异常
+    """
+    await require_repository_owner_or_admin(
+        db, repo_id, current_user.id, "unarchive this repository"
+    )
+    return await service_unarchive_repository(repo_id, db)

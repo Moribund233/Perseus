@@ -234,6 +234,13 @@ from models.issue import Issue, Label, IssueComment
 from models.release import Release, ReleaseAsset
 from models.webhook import WebHook, WebHookDelivery
 from models.ssh_key import SSHKey
+from models.stargazer import Stargazer
+from models.repo_label import RepoLabel, repo_label_association
+from models.pr_label import PRLabel, pr_label_association
+from models.pr_activity import PRActivity
+from models.activity import Activity
+from models.notification import Notification
+from models.notification_preference import NotificationPreference
 
 __all__ = [
     "Base", "SessionLocal", "BaseModel",
@@ -243,4 +250,11 @@ __all__ = [
     "Release", "ReleaseAsset",
     "WebHook", "WebHookDelivery",
     "SSHKey",
+    "Stargazer",
+    "RepoLabel", "repo_label_association",
+    "PRLabel", "pr_label_association",
+    "PRActivity",
+    "Activity",
+    "Notification",
+    "NotificationPreference",
 ]

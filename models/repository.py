@@ -35,6 +35,12 @@ class Repository(BaseModel):
     
     fork_count = Column(Integer, default=0)
     """被 Fork 的次数"""
+
+    star_count = Column(Integer, default=0)
+    """Star 数量"""
+
+    is_archived = Column(Boolean, default=False)
+    """是否已归档"""
     
     # 关系定义
     branches = relationship("Branch", back_populates="repository", cascade="all, delete-orphan")

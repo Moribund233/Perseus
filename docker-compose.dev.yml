@@ -101,6 +101,7 @@ services:
       PERSEUS_SECURITY_SECRET_KEY: test-secret-key-for-testing
       PERSEUS_APP_DEBUG: "true"
       PERSEUS_STRESS_TEST: "false"
+      PERSEUS_STORAGE_REPO_ROOT: /data/repositories
       LOG_LEVEL: error
       TZ: Asia/Shanghai
     volumes:

@@ -7,7 +7,7 @@
 import os
 import toml
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Literal, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator, ValidationInfo
 
@@ -79,11 +79,11 @@ class CORSSettings(BaseSettings):
 
 class StorageSettings(BaseSettings):
     """存储配置类"""
+    model_config = SettingsConfigDict(env_prefix="PERSEUS_STORAGE_")
+
     repo_root: str = Field(default="./repositories", description="Git仓库根目录路径")
     max_repo_size: int = Field(default=1073741824, ge=0, description="单个仓库最大大小（字节）")
     max_file_size: int = Field(default=104857600, ge=0, description="单个文件最大大小（字节）")
-    enable_lfs: bool = Field(default=True, description="是否启用Git LFS")
-    lfs_storage_path: Optional[str] = Field(default=None, description="LFS文件存储路径")
 
 
 class SecuritySettings(BaseSettings):
@@ -104,6 +104,20 @@ class SecuritySettings(BaseSettings):
         """验证密钥不为空（生产环境）"""
         # 注意：这里不强制要求，因为debug模式可能不需要
         # 实际验证在应用启动时进行
+        return v
+
+
+class RedisSettings(BaseSettings):
+    """Redis 配置类"""
+    model_config = SettingsConfigDict(env_prefix="PERSEUS_REDIS_", extra="ignore")
+
+    url: str = Field(default="", description="Redis 连接 URL，为空时不使用 Redis。优先读 PERSEUS_REDIS_URL，回退到 REDIS_URL")
+
+    @field_validator("url", mode="before")
+    @classmethod
+    def fallback_to_redis_url(cls, v: str) -> str:
+        if not v:
+            return os.environ.get("REDIS_URL", "")
         return v
 
 
@@ -281,6 +295,30 @@ class ConcurrencySettings(BaseSettings):
         return cls()
 
 
+class LFSSettings(BaseSettings):
+    """LFS 配置"""
+    model_config = SettingsConfigDict(env_prefix="PERSEUS_LFS_")
+
+    enabled: bool = Field(default=True, description="是否启用 Git LFS")
+    storage_backend: Literal["local", "s3"] = Field(default="local", description="LFS 存储后端 (local | s3)")
+    local_path: str = Field(default="/data/lfs", description="本地 LFS 文件存储路径")
+    s3_bucket: str = Field(default="perseus-lfs", description="S3 存储桶名称")
+    s3_endpoint: str = Field(default="http://minio:9000", description="S3 端点地址")
+    s3_access_key: str = Field(default="", description="S3 访问密钥")
+    s3_secret_key: str = Field(default="", description="S3 密钥")
+    s3_region: str = Field(default="us-east-1", description="S3 区域")
+    max_upload_size: int = Field(default=5 * 1024 * 1024 * 1024, ge=0, description="最大上传文件大小（字节，默认 5GB）")
+
+
+class SearchSettings(BaseSettings):
+    """搜索配置"""
+    model_config = SettingsConfigDict(env_prefix="PERSEUS_SEARCH_")
+
+    enabled: bool = Field(default=True, description="是否启用搜索功能")
+    max_results: int = Field(default=100, ge=1, description="最大搜索结果数")
+    max_file_size: int = Field(default=10 * 1024 * 1024, ge=0, description="最大文件大小（字节，默认 10MB）")
+
+
 class Config(BaseSettings):
     """配置主类"""
     server: ServerSettings = Field(default_factory=ServerSettings)
@@ -291,6 +329,9 @@ class Config(BaseSettings):
     security: SecuritySettings = Field(default_factory=SecuritySettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
+    redis: RedisSettings = Field(default_factory=RedisSettings)
+    lfs: LFSSettings = Field(default_factory=LFSSettings)
+    search: SearchSettings = Field(default_factory=SearchSettings)
 
     @property
     def concurrency(self) -> ConcurrencySettings:
@@ -557,9 +598,10 @@ def _validate_storage_config(config: Config, result: ConfigValidationResult) -> 
         result.add_warning("单文件大小限制大于仓库大小限制")
 
     # 3. LFS 存储路径
-    if storage.enable_lfs:
-        if storage.lfs_storage_path:
-            lfs_path = os.path.abspath(storage.lfs_storage_path)
+    lfs = config.lfs
+    if lfs.enabled:
+        if lfs.local_path:
+            lfs_path = os.path.abspath(lfs.local_path)
             if not os.path.exists(lfs_path):
                 try:
                     os.makedirs(lfs_path, exist_ok=True)

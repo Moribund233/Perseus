@@ -200,6 +200,21 @@ async def get_blob_content(
     repo = _get_repo(repo_path)
     commit = _resolve_ref(repo, ref)
 
+    if commit is None:
+        return {
+            "name": os.path.basename(path) if path else "",
+            "path": path,
+            "sha": "",
+            "ref": ref,
+            "content": "",
+            "size": 0,
+            "encoding": "utf-8",
+            "is_binary": False,
+            "language": None,
+            "diff_stats": None,
+            "is_empty": True
+        }
+
     try:
         entry = commit.tree[path]
     except KeyError:
@@ -235,7 +250,8 @@ async def get_blob_content(
         "size": blob.size,
         "encoding": "utf-8" if not is_binary else "hex",
         "is_binary": is_binary,
-        "language": language
+        "language": language,
+        "diff_stats": None
     }
 
 

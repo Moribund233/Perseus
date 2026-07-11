@@ -157,6 +157,8 @@ def build_pr_response(pr, include_details: bool = False) -> Dict[str, Any]:
         "target_branch": pr.target_branch,
         "status": pr.status,
         "repository_id": pr.repository_id,
+        "is_draft": pr.is_draft,
+        "diff_stats": None,
         "author": build_user_info(pr.author),
         "created_at": format_datetime(pr.created_at),
         "updated_at": format_datetime(pr.updated_at),
@@ -235,6 +237,8 @@ def build_repo_response(repo, physical_exists: bool = False) -> Dict[str, Any]:
         "default_branch": repo.default_branch,
         "created_at": repo.created_at,
         "updated_at": repo.updated_at,
+        "is_archived": repo.is_archived,
+        "star_count": repo.star_count,
         "physical_exists": physical_exists,
         "status": {
             "initialized": physical_exists

@@ -124,11 +124,11 @@ async def test_get_repositories(async_db: AsyncSession, test_user):
         await repository_service.create_repository(data, async_db)
     
     # 获取所有仓库
-    repos = await repository_service.get_repositories(async_db)
+    result = await repository_service.get_repositories(async_db)
     
     # 验证结果
-    assert len(repos) == 3
-    paths = [r["path"] for r in repos]
+    assert len(result["items"]) == 3
+    paths = [r["path"] for r in result["items"]]
     assert "repo1" in paths
     assert "repo2" in paths
     assert "repo3" in paths

@@ -76,7 +76,7 @@ async def get_repository_tree(
         HTTPException: 仓库或路径不存在
     """
     repo_path = await _get_repo_path(repo_id, db)
-    return get_tree_entries(repo_path, ref=ref, path=path)
+    return await get_tree_entries(repo_path, ref=ref, path=path)
 
 
 @router.get("/{repo_id}/blob")
@@ -102,7 +102,7 @@ async def get_repository_blob(
         HTTPException: 文件不存在或是目录
     """
     repo_path = await _get_repo_path(repo_id, db)
-    return get_blob_content(repo_path, ref=ref, path=path)
+    return await get_blob_content(repo_path, ref=ref, path=path)
 
 
 @router.get("/{repo_id}/commits")
@@ -160,7 +160,7 @@ async def get_repository_diff(
         HTTPException: 提交不存在
     """
     repo_path = await _get_repo_path(repo_id, db)
-    return get_diff(repo_path, base=base, head=head, path=path)
+    return await get_diff(repo_path, base=base, head=head, path=path)
 
 
 @router.get("/{repo_id}/readme")

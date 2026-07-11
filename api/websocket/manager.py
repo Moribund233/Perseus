@@ -76,6 +76,8 @@ class Connection:
     
     def is_timeout(self, timeout_seconds: int = 120) -> bool:
         """检查连接是否超时"""
+        if timeout_seconds <= 0:
+            return False
         return (datetime.now() - self.last_ping).total_seconds() > timeout_seconds
     
     def to_dict(self) -> Dict[str, Any]:

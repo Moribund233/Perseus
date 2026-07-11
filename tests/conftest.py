@@ -28,6 +28,7 @@ from app import create_app, AppCache
 from core.config import reset_module_config_manager
 from models import Base
 from services.token_service import create_access_token
+from services.repository_service import _repo_exists_cache
 
 
 # 统一测试数据库URL - 使用文件型 SQLite，同步和异步共享
@@ -104,9 +105,17 @@ def db(test_engine):
         session.close()
         # 清理物理仓库目录（测试间隔离）
         import shutil
-        repo_root = os.path.join(project_root, "repositories")
-        if os.path.exists(repo_root):
-            shutil.rmtree(repo_root)
+        from utils.git_utils import get_repository_storage_path
+        repo_root = get_repository_storage_path("")
+        if repo_root and os.path.exists(repo_root):
+            for item in os.listdir(repo_root):
+                item_path = os.path.join(repo_root, item)
+                if os.path.isdir(item_path):
+                    shutil.rmtree(item_path)
+                else:
+                    os.remove(item_path)
+        # 清理物理仓库存在状态缓存
+        _repo_exists_cache.clear()
 
 
 @pytest_asyncio.fixture
@@ -152,6 +161,21 @@ async def async_db(test_engine):
         await session.commit()
 
     await async_engine.dispose()
+
+    # 清理物理仓库目录（测试间隔离）
+    import shutil
+    from utils.git_utils import get_repository_storage_path
+    repo_root = get_repository_storage_path("")
+    if repo_root and os.path.exists(repo_root):
+        for item in os.listdir(repo_root):
+            item_path = os.path.join(repo_root, item)
+            if os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+            else:
+                os.remove(item_path)
+
+    # 清理物理仓库存在状态缓存
+    _repo_exists_cache.clear()
 
 
 @pytest.fixture

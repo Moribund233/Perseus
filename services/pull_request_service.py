@@ -103,7 +103,7 @@ async def get_pull_request(
         )
 
     result = await db.execute(stmt)
-    pr = result.scalar_one_or_none()
+    pr = result.unique().scalar_one_or_none()
 
     if not pr:
         raise NotFoundException(detail="Pull request not found")
@@ -166,6 +166,22 @@ async def create_pull_request(
     await db.commit()
     await db.refresh(pr)
 
+    return build_pr_response(pr)
+
+
+async def publish_draft(repo_id: int, pr_number: int, user_id: int, db: AsyncSession) -> dict:
+    """发布草稿 PR 为正式 PR"""
+    from utils.db_utils import get_pull_request_or_404
+    from utils.permission_utils import check_resource_author_or_admin
+
+    pr = await get_pull_request_or_404(db, repo_id, pr_number)
+    if not pr.is_draft:
+        raise ValidationException(detail="Pull request is not a draft")
+
+    await check_resource_author_or_admin(db, pr.author_id, user_id, "publish this draft")
+    pr.is_draft = False
+    await db.commit()
+    await db.refresh(pr)
     return build_pr_response(pr)
 
 

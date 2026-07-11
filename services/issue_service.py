@@ -60,6 +60,13 @@ async def list_issues(
     if label:
         stmt = stmt.join(Issue.labels).filter(Label.name == label)
 
+    stmt = stmt.options(
+        selectinload(Issue.author),
+        selectinload(Issue.assignee),
+        selectinload(Issue.labels),
+        selectinload(Issue.closer)
+    )
+
     stmt = stmt.order_by(Issue.created_at.desc())
     issues, total = await paginate(db, stmt, page, limit)
 

@@ -124,8 +124,8 @@ async def fork_repository(
 
         # 创建物理仓库（通过 clone --bare）
         # 使用 repo_root 构建源仓库路径，而不是 get_repository_path
-        source_repo_path = os.path.join(repo_root, source_repo.path)
-        forked_repo_path = os.path.join(repo_root, new_path)
+        source_repo_path = os.path.abspath(os.path.join(repo_root, source_repo.path))
+        forked_repo_path = os.path.abspath(os.path.join(repo_root, new_path))
 
         # 确保父目录存在
         os.makedirs(os.path.dirname(forked_repo_path), exist_ok=True)

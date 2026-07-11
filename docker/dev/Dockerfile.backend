@@ -59,6 +59,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     ca-certificates \
     curl \
+    ripgrep \
     netcat-traditional \
     && rm -rf /var/lib/apt/lists/*
 

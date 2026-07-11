@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey
+from sqlalchemy import Boolean, Column, Integer, String, Text, ForeignKey
 from sqlalchemy.orm import relationship, backref
 from models.base import BaseModel
 
@@ -34,6 +34,9 @@ class PullRequest(BaseModel):
     
     status = Column(String(20), default="open")
     """PR 状态：open/merged/closed"""
+
+    is_draft = Column(Boolean, default=False)
+    """是否为草稿 PR"""
     
     # 合并相关信息
     merged_by = Column(Integer, ForeignKey("users.id"), nullable=True)

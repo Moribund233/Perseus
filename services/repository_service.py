@@ -9,7 +9,7 @@ import asyncio
 import logging
 from typing import Dict, Tuple
 from datetime import datetime, timedelta
-from sqlalchemy import select
+from sqlalchemy import select, asc, desc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import Repository
@@ -17,8 +17,8 @@ from models.branch import Branch
 from models.repository_member import RepositoryMember
 from core.exception import ValidationException, NotFoundException, ConflictException
 from utils.git_utils import init_bare_repo, get_repository_storage_path, repo_exists_async, GitError
-from utils.response_builder import build_repo_response
-from utils.db_utils import exists
+from utils.response_builder import build_repo_response, build_pagination_response
+from utils.db_utils import exists, paginate
 from core.constants import ROLE_PRIORITY
 
 # 日志记录器
@@ -115,25 +115,58 @@ async def _enrich_repos_with_physical_status(repos: list) -> list[dict]:
     ]
 
 
-async def get_repositories(db: AsyncSession, limit: int = 100):
+async def get_repositories(
+    db: AsyncSession,
+    page: int = 1,
+    limit: int = 20,
+    sort: str = "updated_at",
+    order: str = "desc",
+    q: str | None = None,
+    is_public: bool | None = None,
+):
     """
-    获取所有仓库
+    获取所有仓库（支持分页、排序、搜索、筛选）
 
     Args:
         db: 异步数据库会话
-        limit: 最大返回数量，默认100
+        page: 页码，从1开始
+        limit: 每页数量
+        sort: 排序字段（name, updated_at, stars）
+        order: 排序方向（asc, desc）
+        q: 搜索关键词（按名称、描述、路径模糊匹配）
+        is_public: 可见性筛选
 
     Returns:
-        list[dict]: 仓库列表（包含物理仓库信息）
+        dict: 分页响应，包含 items, total, page, limit, pages, has_next, has_prev
     """
-    result = await db.execute(
-        select(Repository)
-        .order_by(Repository.updated_at.desc())
-        .limit(limit)
-    )
-    repos = result.scalars().all()
+    stmt = select(Repository).filter(Repository.is_archived == False)
 
-    return await _enrich_repos_with_physical_status(list(repos))
+    if is_public is not None:
+        stmt = stmt.filter(Repository.is_public == is_public)
+
+    if q:
+        like_pattern = f"%{q}%"
+        stmt = stmt.filter(
+            or_(
+                Repository.name.ilike(like_pattern),
+                Repository.description.ilike(like_pattern),
+                Repository.path.ilike(like_pattern),
+            )
+        )
+
+    sort_column_map = {
+        "name": Repository.name,
+        "updated_at": Repository.updated_at,
+        "stars": Repository.star_count,
+    }
+    sort_col = sort_column_map.get(sort, Repository.updated_at)
+    order_func = asc if order == "asc" else desc
+    stmt = stmt.order_by(order_func(sort_col))
+
+    repos, total = await paginate(db, stmt, page, limit)
+    items = await _enrich_repos_with_physical_status(list(repos))
+
+    return build_pagination_response(items, total, page, limit)
 
 
 async def get_repository_by_id(repo_id: int, db: AsyncSession):
@@ -396,3 +429,57 @@ async def check_repository_access(repo_id: int, user_id: int, db: AsyncSession, 
         return user_role_priority >= required_role_priority
 
     return True
+
+
+async def archive_repository(repo_id: int, db: AsyncSession) -> dict:
+    """
+    归档仓库
+
+    将仓库标记为已归档状态，归档后的仓库不会出现在普通仓库列表中。
+
+    Args:
+        repo_id: 仓库ID
+        db: 异步数据库会话
+
+    Returns:
+        dict: 归档后的仓库信息
+
+    Raises:
+        NotFoundException: 仓库不存在时抛出404异常
+    """
+    result = await db.execute(select(Repository).filter(Repository.id == repo_id))
+    repo = result.scalar_one_or_none()
+    if repo is None:
+        raise NotFoundException(detail="Repository not found")
+    repo.is_archived = True
+    await db.commit()
+    await db.refresh(repo)
+    physical_exists = await _check_physical_repo_exists_async(repo)
+    return build_repo_response(repo, physical_exists)
+
+
+async def unarchive_repository(repo_id: int, db: AsyncSession) -> dict:
+    """
+    取消归档仓库
+
+    将已归档的仓库恢复为正常状态，重新出现在仓库列表中。
+
+    Args:
+        repo_id: 仓库ID
+        db: 异步数据库会话
+
+    Returns:
+        dict: 取消归档后的仓库信息
+
+    Raises:
+        NotFoundException: 仓库不存在时抛出404异常
+    """
+    result = await db.execute(select(Repository).filter(Repository.id == repo_id))
+    repo = result.scalar_one_or_none()
+    if repo is None:
+        raise NotFoundException(detail="Repository not found")
+    repo.is_archived = False
+    await db.commit()
+    await db.refresh(repo)
+    physical_exists = await _check_physical_repo_exists_async(repo)
+    return build_repo_response(repo, physical_exists)
