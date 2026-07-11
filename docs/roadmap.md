@@ -62,23 +62,18 @@ Nginx/OpenResty (反向代理)
 
 ## 阶段规划
 
-### Phase 0：OAuth2 认证 + 实时引擎基础设施（3-4 周）
+### ✅ Phase 0：OAuth2 认证 + 实时引擎基础设施（已完成）
 
 **目标**：支持第三方账号登录，WebSocket 基础链路打通
 
-| ID | 任务 | 说明 |
-|----|------|------|
-| P-001 | OAuth2 客户端框架 | 抽象 OAuth2 provider 接口，支持 GitHub / GitLab 登录 |
-| P-002 | OAuth2 登录流程 | 前端引导 + 后端 code→token 交换 + 用户创建/绑定 |
-| P-003 | 账号关联管理 | 用户中心绑定/解绑第三方账号，支持多 provider |
-| P-004 | 现有 JWT 系统增强 | 签发用户时可携带 oauth provider 信息 |
-| P-005 | WS 连接管理器 | FastAPI WebSocket 路由 + 连接生命周期管理 |
-| P-006 | Token 身份校验中间件 | WS 建立时通过 query token 或 Auth header 鉴权 |
-
-**交付标准**：
-- 用户可通过 GitHub/GitLab 登录
-- WebSocket 连接建立和鉴权链路可用
-- Nginx 无需额外配置（已有 `/ws` 路由到 FastAPI）
+| ID | 任务 | 说明 | 状态 |
+|----|------|------|------|
+| P-001 | OAuth2 客户端框架 | 抽象 OAuth2 provider 接口，支持 GitHub / GitLab 登录 | ✅ |
+| P-002 | OAuth2 登录流程 | 前端引导 + 后端 code→token 交换 + 用户创建/绑定 | ✅ |
+| P-003 | 账号关联管理 | 用户中心绑定/解绑第三方账号，支持多 provider | ✅ |
+| P-004 | 现有 JWT 系统增强 | 签发用户时可携带 oauth provider 信息 | ✅ |
+| P-005 | WS 连接管理器 | FastAPI WebSocket 路由 + 连接生命周期管理 | ✅ |
+| P-006 | Token 身份校验中间件 | WS 建立时通过 query token 或 Auth header 鉴权 | ✅ |
 
 ---
 
@@ -149,9 +144,9 @@ Nginx/OpenResty (反向代理)
 | Git HTTP/Smart Protocol | git-cgi 容器 + Nginx | ✅ 就绪 |
 | PR / Issue / Code Review | `controller/` `models/` `services/` | ✅ 核心 |
 | Webhook | `services/webhook_service.py` | ✅ 核心 |
-| 用户认证（本地 JWT） | `services/token_service.py` `controller/auth_controller.py` | ✅ 已有，需增强 |
-| OAuth2 第三方登录 | `services/auth/oauth.py` | ⏳ Phase 0 |
-| WebSocket 连接管理 | `services/realtime/ws_manager.py` | ⏳ Phase 0 |
+| 用户认证（本地 JWT） | `services/token_service.py` `controller/auth_controller.py` | ✅ 核心 |
+| OAuth2 第三方登录 | `services/auth/oauth.py` | ✅ Phase 0 |
+| WebSocket 连接管理 | `api/websocket/manager.py` | ✅ Phase 0 |
 | 房间/频道管理 | `services/realtime/room.py` | ⏳ Phase 2 |
 | 团队聊天 | `services/realtime/chat.py` | ⏳ Phase 2 |
 | 业务事件广播 | `services/realtime/events.py` | ⏳ Phase 2 |

@@ -79,12 +79,15 @@ async def verify_token(token: str) -> Optional[Dict[str, Any]]:
                 logger.warning(f"WebSocket token valid but user not found: user_id={token_data.user_id}")
                 return None
 
-            return {
+            result = {
                 "user_id": user.id,
                 "username": user.username,
                 "is_active": user.is_active,
                 "is_admin": user.is_admin,
             }
+            if token_data.oauth_provider:
+                result["oauth_provider"] = token_data.oauth_provider
+            return result
     except Exception as e:
         logger.error(f"WebSocket token verification error: {e}")
         return None

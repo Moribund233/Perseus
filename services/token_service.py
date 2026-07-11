@@ -27,10 +27,11 @@ def _get_security_config():
 
 class TokenData:
     """Token 数据类"""
-    def __init__(self, user_id: int, username: str, scopes: list = None):
+    def __init__(self, user_id: int, username: str, scopes: list = None, oauth_provider: Optional[str] = None):
         self.user_id = user_id
         self.username = username
         self.scopes = scopes or []
+        self.oauth_provider = oauth_provider
 
 
 def create_access_token(
@@ -197,7 +198,15 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
             logger.warning("username is empty or not a string")
             return None
 
-        return TokenData(user_id=user_id, username=username)
+        oauth_provider = payload.get("oauth_provider")
+        if oauth_provider is not None and not isinstance(oauth_provider, str):
+            oauth_provider = None
+
+        return TokenData(
+            user_id=user_id,
+            username=username,
+            oauth_provider=oauth_provider,
+        )
 
     except JWTError as e:
         logger.warning(f"Token verification failed: {e}")
