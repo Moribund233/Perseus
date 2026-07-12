@@ -1,0 +1,137 @@
+{
+  "landing": {
+    "nav": {
+      "features": "功能特性",
+      "collaboration": "协同办公",
+      "docs": "文档",
+      "signIn": "登录",
+      "getStarted": "立即开始",
+      "goToDashboard": "进入控制台"
+    },
+    "hero": {
+      "badge": "公开测试版已发布",
+      "title": "编写代码。<1>协同合作。</1>快速交付。",
+      "description": "团队构建优秀软件所需的一切——代码托管、实时协作、团队聊天和代码审查——尽在一个统一平台。",
+      "getStartedFree": "免费开始使用",
+      "learnMore": "了解更多",
+      "stats": {
+        "repositories": "代码仓库",
+        "commits": "提交记录",
+        "teamMembers": "团队成员",
+        "uptime": "正常运行时间"
+      }
+    },
+    "features": {
+      "title": "团队所需的一切",
+      "subtitle": "面向现代开发团队、内置协作工具的自托管 Git 平台。",
+      "codeHosting": {
+        "title": "代码托管",
+        "desc": "自托管 Git 仓库托管，支持分支保护、Webhooks 和精细化访问控制。"
+      },
+      "teamChat": {
+        "title": "团队聊天",
+        "desc": "支持频道、话题和富代码片段的实时消息。让讨论始终围绕上下文展开。"
+      },
+      "codeReview": {
+        "title": "代码审查",
+        "desc": "行内 Pull Request 审查，支持话题讨论、审批工作流和合并检查。"
+      },
+      "realtimeEditing": {
+        "title": "实时编辑",
+        "desc": "基于 CRDT 的协同代码编辑，实时光标、在线感知和冲突解决。"
+      },
+      "issueTracking": {
+        "title": "问题追踪",
+        "desc": "通过标签、里程碑、批量操作管理问题，并与 Git 工作流深度集成。"
+      },
+      "releaseManagement": {
+        "title": "发布管理",
+        "desc": "打标签、上传资源、发布 Release Note，与仓库和 Webhook 系统无缝集成。"
+      }
+    },
+    "collab": {
+      "title": "内置实时协作",
+      "description": "像 Google Docs 一样与团队一起编辑代码。实时查看谁在编辑什么、进行讨论，再也不用担心合并冲突。",
+      "items": [
+        "多光标和在线状态指示器",
+        "行内代码审查与话题讨论",
+        "基于 CRDT 的无冲突同步",
+        "代码旁的实时团队聊天"
+      ]
+    },
+    "footer": {
+      "copyright": "© 2026 Perseus — 自托管代码协作平台",
+      "about": "关于",
+      "privacy": "隐私",
+      "terms": "条款",
+      "github": "GitHub"
+    }
+  },
+  "app": {
+    "nav": {
+      "dashboard": "控制台",
+      "repositories": "仓库",
+      "pullRequests": "Pull Requests",
+      "codeEditor": "代码编辑器",
+      "teamChat": "团队聊天",
+      "theme": "主题",
+      "settings": "设置"
+    },
+    "userMenu": {
+      "profile": "个人资料",
+      "settings": "设置",
+      "signOut": "退出登录"
+    },
+    "topBar": {
+      "searchPlaceholder": "搜索...",
+      "new": "新建"
+    }
+  },
+  "auth": {
+    "signIn": "登录",
+    "createAccount": "创建账号",
+    "signInWithGitHub": "使用 GitHub 登录",
+    "signInWithGitLab": "使用 GitLab 登录",
+    "signUpWithGitHub": "使用 GitHub 注册",
+    "signUpWithGitLab": "使用 GitLab 注册",
+    "orContinueWithEmail": "或使用邮箱继续",
+    "orCreateWithEmail": "或使用邮箱创建",
+    "username": "用户名",
+    "password": "密码",
+    "rememberMe": "记住我",
+    "forgotPassword": "忘记密码？",
+    "fullName": "姓名",
+    "email": "邮箱",
+    "confirmPassword": "确认密码",
+    "placeholders": {
+      "username": "用户名",
+      "password": "输入密码",
+      "fullName": "你的姓名",
+      "email": "name@company.com",
+      "confirmPassword": "再次输入密码"
+    },
+    "rules": {
+      "usernameRequired": "请输入用户名",
+      "passwordRequired": "请输入密码",
+      "usernameRequiredRegister": "请输入用户名",
+      "usernameMin": "至少 3 个字符",
+      "emailRequired": "请输入邮箱",
+      "emailInvalid": "邮箱格式不正确",
+      "passwordRequiredRegister": "请输入密码",
+      "passwordMin": "至少 6 个字符",
+      "confirmRequired": "请确认密码",
+      "passwordMismatch": "两次输入的密码不一致"
+    },
+    "messages": {
+      "welcomeBack": "欢迎回来！",
+      "invalidCredentials": "用户名或密码错误。",
+      "accountCreated": "账号创建成功！",
+      "registrationFailed": "注册失败，请重试。"
+    }
+  },
+  "common": {
+    "language": "语言",
+    "english": "English",
+    "chinese": "中文"
+  }
+}

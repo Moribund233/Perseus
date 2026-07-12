@@ -5,7 +5,8 @@
 > **开发环境**: wsl docker-compose / command: `wsl docker-compose -f docker-compose-dev.yml up -d`
 > **当前阶段**: 实时协作层 — F-201 房间/频道管理 ✅
 > **当前阶段**: 实时协作层 — F-202 团队聊天 ✅
-> **下一阶段**: F-203 协作编辑 🎯
+> **当前阶段**: 实时协作层 — F-203 业务事件广播 ✅
+> **下一阶段**: F-204 协作文本编辑 🎯
 
 ---
 
@@ -40,25 +41,26 @@
 | P0 — 代码查看器 | **F-022**, **F-023**, **F-024** | 100% ✅ |
 | P1 — Issue 看板 | **F-025**, **F-027** | 100% ✅ |
 | P1 — Code Review | F-028, F-029 | 100% ✅ |
-| P1 — Webhook | F-031, F-032, F-033 | 100% ✅ |
+| P1 — Webhook | F-032, F-033 | F-031 (重试/退避) | 66% 🟡 |
 
-> **阶段二全部后端功能已完成** ✅ — Controller + API 测试已全部完成，路由已注册
+> **阶段二核心后端功能已完成** ✅ — Controller + API 测试已全部完成，路由已注册；Webhook 单次投递已可用，重试机制作为后续增强项
 
 ### 当前阶段：阶段三 — 高级功能（部分完成）
 
 | 模块 | 已完成 | 待完成 | 进度 |
 |------|--------|--------|------|
 | P1 — Git LFS | F-034, F-035, F-036 | — | 100% ✅ |
-| P1 — 代码搜索 | F-037, F-038 | F-039 (搜索索引维护) | 66% 🟡 |
-| P1 — WebSocket 实时协作 | F-041, F-042 | F-040 (实时 PR 推送) | 66% 🟡 |
+| P1 — 代码搜索 | F-037 | F-038 (跨仓库搜索), F-039 (搜索索引维护) | 33% 🟡 |
+| P1 — WebSocket 实时协作 | F-040, F-041, F-042 | — | 100% ✅ |
 | P2 — 通知系统 | F-043, F-044, F-045 | — | 100% ✅ |
-| P2 — CI/CD 集成 | F-046 | F-047 (构建状态展示) | 50% 🟡 |
+| P2 — CI/CD 集成 | — | F-046 (Webhook → CI 触发闭环), F-047 (构建状态展示) | 50% 🟡 |
 | P2 — 国际化 | — | F-048, F-049, F-050 | 0% 🔴 |
 
 > **状态说明**:
-> - LFS、通知系统、CI/CD Webhook 触发已完成
-> - 代码搜索、WS 基础设施已就绪，各缺一项
-> - 实时协作层 `services/realtime/` (F-201~F-206) 为产品路线图 Phase 2 任务，尚未开始
+> - LFS、通知系统、WebSocket 实时事件广播/在线状态已完成
+> - 代码搜索仅有单仓库接口，跨仓库搜索与索引自动维护待实现
+> - CI/CD 仅有构建状态存储 API，真实 push/PR 触发闭环待接入
+> - 国际化、协作文本编辑（F-204）、独立实时通知模块（F-205）尚未开始
 
 ---
 
@@ -70,6 +72,7 @@
 4. [阶段二：核心协作能力](#4-阶段二核心协作能力-2-3-周)
 5. [阶段三：高级功能](#5-阶段三高级功能-3-4-周)
 6. [阶段四：生产准备](#6-阶段四生产准备持续)
+7. [后续开发任务](#7-后续开发任务)
 
 ---
 
@@ -278,7 +281,7 @@ pytest -v -m e2e
 
 | ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
 |----|------|---------|----------|------|
-| F-031 | Webhook 触发与投递 | `test_webhook_delivery_with_retry()` | `webhook_service.py` | ✅ Controller 已创建 |
+| F-031 | Webhook 触发与单次投递 | `test_webhook_delivery_with_retry()` | `webhook_service.py` | 🟡 单次投递已实现，重试/退避待实现 |
 | F-032 | HMAC-SHA256 签名验证 | `test_webhook_hmac_signature()` | `webhook_service.py` | ✅ 已实现 `_generate_signature()` |
 | F-033 | 事件负载标准格式 | `test_push_event_payload_format()` | `webhook_service.py` | ✅ 已实现标准 Payload 格式 |
 
@@ -301,14 +304,14 @@ pytest -v -m e2e
 | ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
 |----|------|---------|----------|------|
 | F-037 | 仓库内全文搜索 | `test_search_code_in_repository()` | `services/search_service.py` | ✅ |
-| F-038 | 跨仓库搜索 | `test_cross_repo_search()` | `services/search_service.py` | ✅ |
+| F-038 | 跨仓库搜索 | `test_cross_repo_search()` | `services/search_service.py` | ❌ 待实现 |
 | F-039 | 搜索索引维护 | `test_search_index_update_on_push()` | `services/search_service.py` | ❌ 待实现 |
 
-### P1 — WebSocket 实时协作 🟡
+### P1 — WebSocket 实时协作 ✅
 
 | ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
 |----|------|---------|----------|------|
-| F-040 | 实时 PR 变更推送 | `test_pr_change_broadcasts_to_subscribers()` | `api/websocket/handlers/` | ❌ 待实现 |
+| F-040 | 实时 PR 变更推送 | `test_pr_change_broadcasts_to_subscribers()` | `api/websocket/handlers/`<br>`services/realtime/event_service.py` | ✅ |
 | F-041 | 仓库事件广播 | `test_push_event_broadcast()` | `api/websocket/manager.py` | ✅ |
 | F-042 | 在线状态跟踪 | `test_online_user_tracking()` | `api/websocket/manager.py` | ✅ |
 
@@ -324,7 +327,7 @@ pytest -v -m e2e
 
 | ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
 |----|------|---------|----------|------|
-| F-046 | Webhook → CI 触发 | `test_ci_webhook_payload()` | `utils/webhook_trigger.py` | ✅ |
+| F-046 | Webhook → CI 触发闭环 | `test_ci_webhook_payload()` | `utils/webhook_trigger.py`<br>`services/build_service.py` | 🟡 构建状态 API 已就绪，真实 push/PR 触发链路待接入 |
 | F-047 | 构建状态展示 | — | 前端新组件 | ❌ 待实现 |
 
 ### P2 — 国际化
@@ -348,6 +351,34 @@ pytest -v -m e2e
 | F-055 | 单元测试覆盖率 | Controller 层测试，目标 >80% |
 | F-056 | 安全审计 | 依赖扫描 + CORS/CSRF/SSRF 防护检查 |
 | F-057 | 日志告警 | 错误日志告警规则（Error Rate > 1%）|
+
+---
+
+## 7. 后续开发任务
+
+### 7.1 下一阶段目标
+
+基于当前后端实际实现进度，下一阶段优先补齐**代码搜索闭环**、**CI/CD 触发闭环**与**实时协作增强**，为前端提供完整可用的后端能力。
+
+### 7.2 后端待办清单（按优先级）
+
+| 优先级 | ID | 任务 | 当前状态 | 说明 | 验收标准 |
+|--------|----|------|----------|------|----------|
+| **P0** | F-038 | 跨仓库代码搜索 | ❌ 未实现 | 目前仅有单仓库搜索，需增加全局聚合接口 | 新增 `/api/v1/search` 或 `/api/v1/search/code`，支持按仓库/语言/路径过滤；补充 Service/API 测试 |
+| **P0** | F-039 | 搜索索引自动维护 | ❌ 未实现 | `broadcast_push` 未调用，真实 push 未触发索引更新 | 在 git push 后处理流程或仓库浏览器写入时调用 `SearchService.rebuild_index`；补充索引更新测试 |
+| **P0** | F-046 | CI/CD 触发闭环 | 🟡 部分实现 | 仅有 `BuildService` 状态 API，真实 push/PR 未触发 webhook | 在 PR merge / push 流程中调用 `utils/webhook_trigger.py` 相关函数，自动创建 `Build` 记录；补充集成测试 |
+| **P1** | F-031 | Webhook 重试机制 | 🟡 部分实现 | 当前 `_deliver_webhook` 仅单次投递 | 实现指数退避重试（如 3 次），记录投递状态与失败原因；补充重试测试 |
+| **P1** | F-204 | 协作文本编辑 | ⏳ Phase 2 | `services/realtime/collab.py` 不存在 | 实现 OT/CRDT 基础操作消息协议，新增 WS handler，支持房间级协作文档；补充 WS 测试 |
+| **P1** | F-205 | 独立实时通知模块 | ⏳ Phase 2 | `services/realtime/notify.py` 不存在 | 拆分实时通知逻辑，支持 @提及解析、评论/CI 状态实时推送；复用 `notification_service` + `notify_user` |
+| **P2** | F-048~050 | 国际化 | 🔴 未开始 | API 错误消息未做多语言 | 后端新增 `locales/` 与错误码映射，`core/exception.py` 支持按 `Accept-Language` 返回多语言消息 |
+| **P2** | F-051~057 | 生产准备 | 🔴 未开始 | Docker 基础已就绪，缺监控/压测/审计 | 按阶段四任务逐项推进，优先完成 Prometheus/Sentry 集成与 Controller 层测试覆盖 |
+
+### 7.3 建议迭代节奏
+
+- **Sprint 1（1-2 周）**：F-038 + F-039，完成搜索能力闭环
+- **Sprint 2（1-2 周）**：F-046 + F-031，完成 CI/CD 触发与 Webhook 可靠性
+- **Sprint 3（2-3 周）**：F-204 + F-205，补齐实时协作高级能力
+- **Sprint 4（持续）**：F-048~050 + F-051~057，国际化与生产准备
 
 ---
 

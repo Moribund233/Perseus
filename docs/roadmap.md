@@ -153,9 +153,9 @@ Nginx/OpenResty (反向代理)
 | CI/CD Webhook 触发 | `utils/webhook_trigger.py` | ✅ Phase 3 |
 | 房间/频道管理 | `services/realtime/room.py` | ✅ Phase 2 |
 | 团队聊天 | `services/realtime/chat.py` | ✅ Phase 2 |
-| 业务事件广播 | `services/realtime/events.py` | ⏳ Phase 2 |
+| 业务事件广播 | `services/realtime/event_service.py` | ✅ Phase 2 |
 | 协作文本编辑 | `services/realtime/collab.py` | ⏳ Phase 2 |
-| 在线状态 | `services/realtime/presence.py` | ⏳ Phase 2 |
+| 在线状态 | `services/realtime/room_service.py`<br>`api/websocket/manager.py` | ✅ Phase 2 |
 | 通知系统（实时推送） | `services/realtime/notify.py` | ⏳ Phase 2 |
 | 文件上传 | ✅ (代码附件) | ✅ |
 | 系统管理/审计 | `middleware/` | ✅ 基础 |
@@ -168,5 +168,8 @@ Nginx/OpenResty (反向代理)
 
 - **阶段一（基础功能）**：物理仓库创建、配置系统、PR 合并、JWT 刷新 — **全部完成** ✅
 - **阶段二（核心协作）**：SSH Key、代码查看器、Issue、Code Review、Webhook — **后端全部完成** ✅
-- **阶段三（高级功能）**：LFS、代码搜索、通知系统、CI/CD Webhook 触发 — **后端已完成** ✅；实时 PR 推送、搜索索引维护、国际化、构建状态展示 — **待开发**
-- **阶段四（生产准备）**：Docker、监控、压测、安全审计 — **待开发**
+- **阶段三（高级功能）**：
+  - **已完成** ✅：LFS、站内/邮件通知系统与偏好、Webhook 签名与投递、构建状态 API、单仓库代码搜索、Release 附件上传、实时房间/聊天/在线状态/业务事件广播
+  - **部分实现 / 待完善** 🟡：跨仓库代码搜索（F-038）、搜索索引自动维护（F-039）、CI/CD 触发闭环（F-046 后端触发链路）、Webhook 重试机制（F-031）
+  - **未开始** 🔴：协作文本编辑（F-204）、独立实时通知模块（F-205）、国际化（F-048~050）
+- **阶段四（生产准备）**：Docker 基础、Nginx 反向代理、基础中间件审计已就绪；监控、压测、安全审计、日志告警 — **待开发** 🔴

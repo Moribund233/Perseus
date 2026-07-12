@@ -1,0 +1,137 @@
+{
+  "landing": {
+    "nav": {
+      "features": "Features",
+      "collaboration": "Collaboration",
+      "docs": "Docs",
+      "signIn": "Sign In",
+      "getStarted": "Get Started",
+      "goToDashboard": "Go to Dashboard"
+    },
+    "hero": {
+      "badge": "Now in Public Beta",
+      "title": "Code. <1>Collaborate.</1> Ship.",
+      "description": "Everything your team needs to build great software — code hosting, real-time collaboration, team chat, and code review — in one unified platform.",
+      "getStartedFree": "Get Started Free",
+      "learnMore": "Learn More",
+      "stats": {
+        "repositories": "Repositories",
+        "commits": "Commits",
+        "teamMembers": "Team Members",
+        "uptime": "Uptime"
+      }
+    },
+    "features": {
+      "title": "Everything your team needs",
+      "subtitle": "Self-hosted Git platform with built-in collaboration tools designed for modern development teams.",
+      "codeHosting": {
+        "title": "Code Hosting",
+        "desc": "Self-hosted Git repository hosting with branch protection, webhooks, and fine-grained access control."
+      },
+      "teamChat": {
+        "title": "Team Chat",
+        "desc": "Real-time messaging with channels, threads, and rich code snippets. Keep discussions in context."
+      },
+      "codeReview": {
+        "title": "Code Review",
+        "desc": "Inline pull request reviews with threaded discussions, approval workflows, and merge checks."
+      },
+      "realtimeEditing": {
+        "title": "Real-time Editing",
+        "desc": "Collaborative code editing with live cursors, presence awareness, and CRDT-based conflict resolution."
+      },
+      "issueTracking": {
+        "title": "Issue Tracking",
+        "desc": "Manage issues with labels, milestones, batch operations, and integrations with your Git workflow."
+      },
+      "releaseManagement": {
+        "title": "Release Management",
+        "desc": "Tag releases, attach assets, publish release notes. Integrated with your repository and webhook system."
+      }
+    },
+    "collab": {
+      "title": "Real-time collaboration, built in",
+      "description": "Edit code together with your team just like Google Docs. See who's working on what, discuss in real-time, and never worry about merge conflicts again.",
+      "items": [
+        "Multiple cursors and presence indicators",
+        "Inline code review with threaded discussions",
+        "CRDT-based conflict-free synchronization",
+        "Real-time team chat alongside your code"
+      ]
+    },
+    "footer": {
+      "copyright": "© 2026 Perseus — Self-hosted Code Collaboration Platform",
+      "about": "About",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "github": "GitHub"
+    }
+  },
+  "app": {
+    "nav": {
+      "dashboard": "Dashboard",
+      "repositories": "Repositories",
+      "pullRequests": "Pull Requests",
+      "codeEditor": "Code Editor",
+      "teamChat": "Team Chat",
+      "theme": "Theme",
+      "settings": "Settings"
+    },
+    "userMenu": {
+      "profile": "Profile",
+      "settings": "Settings",
+      "signOut": "Sign Out"
+    },
+    "topBar": {
+      "searchPlaceholder": "Search...",
+      "new": "New"
+    }
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "createAccount": "Create Account",
+    "signInWithGitHub": "Sign in with GitHub",
+    "signInWithGitLab": "Sign in with GitLab",
+    "signUpWithGitHub": "Sign up with GitHub",
+    "signUpWithGitLab": "Sign up with GitLab",
+    "orContinueWithEmail": "or continue with email",
+    "orCreateWithEmail": "or create with email",
+    "username": "Username",
+    "password": "Password",
+    "rememberMe": "Remember me",
+    "forgotPassword": "Forgot password?",
+    "fullName": "Full Name",
+    "email": "Email",
+    "confirmPassword": "Confirm Password",
+    "placeholders": {
+      "username": "username",
+      "password": "Enter your password",
+      "fullName": "Your name",
+      "email": "name@company.com",
+      "confirmPassword": "Repeat your password"
+    },
+    "rules": {
+      "usernameRequired": "Please enter your username",
+      "passwordRequired": "Please enter your password",
+      "usernameRequiredRegister": "Please enter a username",
+      "usernameMin": "At least 3 characters",
+      "emailRequired": "Please enter your email",
+      "emailInvalid": "Invalid email",
+      "passwordRequiredRegister": "Please enter a password",
+      "passwordMin": "At least 6 characters",
+      "confirmRequired": "Please confirm your password",
+      "passwordMismatch": "Passwords do not match"
+    },
+    "messages": {
+      "welcomeBack": "Welcome back!",
+      "invalidCredentials": "Invalid username or password.",
+      "accountCreated": "Account created successfully!",
+      "registrationFailed": "Registration failed. Please try again."
+    }
+  },
+  "common": {
+    "language": "Language",
+    "english": "English",
+    "chinese": "中文"
+  }
+}
