@@ -242,6 +242,9 @@ from models.activity import Activity
 from models.notification import Notification
 from models.notification_preference import NotificationPreference
 from models.user_oauth import UserOAuthAccount
+from models.realtime_room import RealtimeRoom, RoomMember
+from models.chat_message import ChatMessage
+from models.build_status import BuildStatus
 
 __all__ = [
     "Base", "SessionLocal", "BaseModel",
@@ -259,4 +262,8 @@ __all__ = [
     "Notification",
     "NotificationPreference",
     "UserOAuthAccount",
+    "RealtimeRoom",
+    "RoomMember",
+    "ChatMessage",
+    "BuildStatus",
 ]

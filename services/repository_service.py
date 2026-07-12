@@ -288,6 +288,13 @@ async def create_repository(repo_data: dict, db: AsyncSession):
         logger.warning(f"Unexpected error creating git repository: {e}")
 
     physical_exists = await _check_physical_repo_exists_async(db_repo)
+
+    from services.realtime.room_service import RoomService
+    try:
+        await RoomService.create_room(db, db_repo.id, db_repo.name, db_repo.owner_id)
+    except Exception:
+        logger.warning(f"Failed to create room for repository {db_repo.id}")
+
     return build_repo_response(db_repo, physical_exists)
 
 
@@ -359,6 +366,17 @@ async def delete_repository(repo_id: int, db: AsyncSession):
         # 物理仓库删除失败，记录错误但不阻止数据库删除
         path_info = physical_path if physical_path else "unknown"
         logger.warning(f"Failed to delete physical repository at {path_info}: {e}")
+
+    from models.realtime_room import RealtimeRoom, RoomMember
+    room_result = await db.execute(
+        select(RealtimeRoom).filter(RealtimeRoom.repository_id == repo_id)
+    )
+    room = room_result.scalar_one_or_none()
+    if room:
+        await db.execute(
+            RoomMember.__table__.delete().where(RoomMember.room_id == room.id)
+        )
+        await db.delete(room)
 
     await db.delete(db_repo)
     await db.commit()

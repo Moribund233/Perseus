@@ -120,6 +120,9 @@ class ConnectionManager:
         
         # 仓库索引: repository_id -> set of connection_ids
         self._repository_index: Dict[int, Set[str]] = {}
+
+        # 房间索引: room_id -> set of connection_ids
+        self._room_index: Dict[int, Set[str]] = {}
         
         # 连接ID计数器
         self._connection_counter: int = 0
@@ -183,10 +186,36 @@ class ConnectionManager:
                     self._repository_index[repo_id].discard(connection_id)
                     if not self._repository_index[repo_id]:
                         del self._repository_index[repo_id]
+
+            # 捕获房间订阅（用于断开后广播）
+            subscribed_room_ids = set()
+            for room_id, conn_ids in list(self._room_index.items()):
+                if connection_id in conn_ids:
+                    subscribed_room_ids.add(room_id)
+
+            # 从房间索引中移除
+            for room_id in subscribed_room_ids:
+                self._room_index[room_id].discard(connection_id)
+                if not self._room_index[room_id]:
+                    del self._room_index[room_id]
             
             # 从连接池中移除
             if connection_id in self._connections:
                 del self._connections[connection_id]
+
+        # 广播 presence_leave 到所有订阅的房间
+        if connection.user_id is not None and connection.username:
+            for room_id in subscribed_room_ids:
+                try:
+                    await self.send_to_room(room_id, {
+                        "type": "presence_leave",
+                        "room_id": room_id,
+                        "user_id": connection.user_id,
+                        "username": connection.username,
+                        "timestamp": datetime.now().isoformat(),
+                    })
+                except Exception:
+                    pass
 
         logger.debug(f"WebSocket断开: {connection_id}, 当前连接数: {len(self._connections)}")
     
@@ -247,6 +276,62 @@ class ConnectionManager:
                 if not self._repository_index[repository_id]:
                     del self._repository_index[repository_id]
     
+    # ==================== 房间管理方法 ====================
+
+    async def subscribe_room(self, connection: Connection, room_id: int) -> None:
+        """
+        订阅房间消息
+
+        Args:
+            connection: 连接对象
+            room_id: 房间ID
+        """
+        async with self._lock:
+            if room_id not in self._room_index:
+                self._room_index[room_id] = set()
+            self._room_index[room_id].add(connection.connection_id)
+
+    async def unsubscribe_room(self, connection: Connection, room_id: int) -> None:
+        """
+        取消订阅房间消息
+
+        Args:
+            connection: 连接对象
+            room_id: 房间ID
+        """
+        async with self._lock:
+            if room_id in self._room_index:
+                self._room_index[room_id].discard(connection.connection_id)
+                if not self._room_index[room_id]:
+                    del self._room_index[room_id]
+
+    async def send_to_room(self, room_id: int, message: Dict[str, Any], exclude_user_id: Optional[int] = None) -> int:
+        """
+        发送消息到房间的所有订阅者
+
+        Args:
+            room_id: 房间ID
+            message: 消息字典
+            exclude_user_id: 排除的用户ID
+
+        Returns:
+            int: 成功发送的连接数
+        """
+        async with self._lock:
+            connection_ids = set(self._room_index.get(room_id, set()))
+        success_count = 0
+
+        for conn_id in connection_ids:
+            async with self._lock:
+                connection = self._connections.get(conn_id)
+            if connection and connection.is_alive:
+                if exclude_user_id is not None and connection.user_id == exclude_user_id:
+                    continue
+                if await connection.send(message):
+                    success_count += 1
+
+        return success_count
+
     # ==================== 消息发送方法 ====================
     
     async def send_to_connection(self, connection_id: str, message: Dict[str, Any]) -> bool:
@@ -440,6 +525,27 @@ class ConnectionManager:
                 pass
             await self.disconnect(connection)
     
+    async def get_room_connections(self, room_id: int) -> List['Connection']:
+        """获取房间的所有活跃连接"""
+        async with self._lock:
+            conn_ids = set(self._room_index.get(room_id, set()))
+            return [
+                self._connections[cid] for cid in conn_ids
+                if cid in self._connections and self._connections[cid].is_alive
+            ]
+
+    async def get_room_online_users(self, room_id: int) -> List[Dict[str, Any]]:
+        """获取房间的在线用户列表（按用户去重）"""
+        connections = await self.get_room_connections(room_id)
+        seen: Dict[int, Dict[str, Any]] = {}
+        for conn in connections:
+            if conn.user_id is not None and conn.user_id not in seen:
+                seen[conn.user_id] = {
+                    "user_id": conn.user_id,
+                    "username": conn.username,
+                }
+        return list(seen.values())
+
     # ==================== 统计信息 ====================
     
     async def get_stats(self) -> Dict[str, Any]:

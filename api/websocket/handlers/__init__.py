@@ -4,7 +4,7 @@ WebSocket消息处理器模块
 注册所有消息类型处理器
 """
 import logging
-from api.websocket.handlers import notification, sync, progress, log_handler
+from api.websocket.handlers import notification, sync, progress, log_handler, room, chat
 from api.websocket.manager import manager
 
 logger = logging.getLogger("websocket")
@@ -34,6 +34,11 @@ def register_all_handlers():
         "subscribe_logs": log_handler.handle_subscribe_logs,
         "unsubscribe_logs": log_handler.handle_unsubscribe_logs,
         "get_log_stats": log_handler.handle_get_log_stats,
+        "room_join": room.handle_room_join,
+        "room_leave": room.handle_room_leave,
+        "chat_message": chat.handle_chat_message,
+        "chat_typing": chat.handle_chat_typing,
+        "presence_list": room.handle_presence_list,
     }
     
     for msg_type, handler in handlers.items():

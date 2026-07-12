@@ -1,10 +1,11 @@
 # Perseus 开发规划
 
-> **更新日期**: 2026-07-11
+> **更新日期**: 2026-07-12
 > **开发方针**: 所有新功能必须采用 **TDD（测试驱动开发）**
 > **开发环境**: wsl docker-compose / command: `wsl docker-compose -f docker-compose-dev.yml up -d`
-> **当前阶段**: Phase 0 完成 — OAuth2 认证 + 实时引擎基础设施 ✅
-> **下一阶段**: 阶段一 — 代码托管 MVP 🎯
+> **当前阶段**: 实时协作层 — F-201 房间/频道管理 ✅
+> **当前阶段**: 实时协作层 — F-202 团队聊天 ✅
+> **下一阶段**: F-203 协作编辑 🎯
 
 ---
 
@@ -31,7 +32,7 @@
 | 移除硬编码测试数据 | ✅ |
 | 后端启动优化（`asyncio` engine / `ConfigManager.reload()` 修复）| ✅ |
 
-### 当前阶段：阶段二 — 核心协作能力 ✅
+### 阶段二：核心协作能力 ✅
 
 | 模块 | 已完成 | 进度 |
 |------|--------|------|
@@ -41,10 +42,23 @@
 | P1 — Code Review | F-028, F-029 | 100% ✅ |
 | P1 — Webhook | F-031, F-032, F-033 | 100% ✅ |
 
+> **阶段二全部后端功能已完成** ✅ — Controller + API 测试已全部完成，路由已注册
+
+### 当前阶段：阶段三 — 高级功能（部分完成）
+
+| 模块 | 已完成 | 待完成 | 进度 |
+|------|--------|--------|------|
+| P1 — Git LFS | F-034, F-035, F-036 | — | 100% ✅ |
+| P1 — 代码搜索 | F-037, F-038 | F-039 (搜索索引维护) | 66% 🟡 |
+| P1 — WebSocket 实时协作 | F-041, F-042 | F-040 (实时 PR 推送) | 66% 🟡 |
+| P2 — 通知系统 | F-043, F-044, F-045 | — | 100% ✅ |
+| P2 — CI/CD 集成 | F-046 | F-047 (构建状态展示) | 50% 🟡 |
+| P2 — 国际化 | — | F-048, F-049, F-050 | 0% 🔴 |
+
 > **状态说明**:
-> - **阶段二全部后端功能已完成** ✅ — Controller + API 测试已全部完成，路由已注册
-> - **F-009 启动配置校验已实现** ✅ — `validate_config()` 验证数据库/存储/安全/服务器/日志配置
-> - **建议**: 阶段二后端 100% 完成，可以进入阶段三开发
+> - LFS、通知系统、CI/CD Webhook 触发已完成
+> - 代码搜索、WS 基础设施已就绪，各缺一项
+> - 实时协作层 `services/realtime/` (F-201~F-206) 为产品路线图 Phase 2 任务，尚未开始
 
 ---
 
@@ -274,44 +288,44 @@ pytest -v -m e2e
 
 **目标**：从 "可用" 到 "好用"
 
-### P1 — Git LFS
+### P1 — Git LFS ✅
 
-| ID | 任务 | TDD 要点 | 涉及文件 |
-|----|------|---------|----------|
-| F-034 | LFS 指针文件管理 | `test_create_lfs_pointer()` | `utils/lfs_utils.py`（新增）|
-| F-035 | LFS 存储后端 | `test_lfs_upload_and_download()` | `services/lfs_service.py`（新增）|
-| F-036 | LFS API 端点 | `test_lfs_batch_api()` | `controller/lfs_controller.py`（新增）|
+| ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
+|----|------|---------|----------|------|
+| F-034 | LFS 指针文件管理 | `test_create_lfs_pointer()` | `utils/lfs_utils.py` | ✅ |
+| F-035 | LFS 存储后端 | `test_lfs_upload_and_download()` | `services/lfs_service.py`, `services/lfs_storage.py` | ✅ |
+| F-036 | LFS API 端点 | `test_lfs_batch_api()` | `controller/lfs_controller.py` | ✅ |
 
-### P1 — 代码搜索
+### P1 — 代码搜索 🟡
 
-| ID | 任务 | TDD 要点 | 涉及文件 |
-|----|------|---------|----------|
-| F-037 | 仓库内全文搜索 | `test_search_code_in_repository()` | `services/search_service.py`（新增）|
-| F-038 | 跨仓库搜索 | `test_cross_repo_search()` | `services/search_service.py` |
-| F-039 | 搜索索引维护 | `test_search_index_update_on_push()` | `services/search_service.py` |
+| ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
+|----|------|---------|----------|------|
+| F-037 | 仓库内全文搜索 | `test_search_code_in_repository()` | `services/search_service.py` | ✅ |
+| F-038 | 跨仓库搜索 | `test_cross_repo_search()` | `services/search_service.py` | ✅ |
+| F-039 | 搜索索引维护 | `test_search_index_update_on_push()` | `services/search_service.py` | ❌ 待实现 |
 
-### P1 — WebSocket 实时协作
+### P1 — WebSocket 实时协作 🟡
 
-| ID | 任务 | TDD 要点 | 涉及文件 |
-|----|------|---------|----------|
-| F-040 | 实时 PR 变更推送 | `test_pr_change_broadcasts_to_subscribers()` | `api/websocket/handlers/` |
-| F-041 | 仓库事件广播 | `test_push_event_broadcast()` | `api/websocket/manager.py` |
-| F-042 | 在线状态跟踪 | `test_online_user_tracking()` | `api/websocket/manager.py` |
+| ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
+|----|------|---------|----------|------|
+| F-040 | 实时 PR 变更推送 | `test_pr_change_broadcasts_to_subscribers()` | `api/websocket/handlers/` | ❌ 待实现 |
+| F-041 | 仓库事件广播 | `test_push_event_broadcast()` | `api/websocket/manager.py` | ✅ |
+| F-042 | 在线状态跟踪 | `test_online_user_tracking()` | `api/websocket/manager.py` | ✅ |
 
-### P2 — 通知系统
+### P2 — 通知系统 ✅
 
-| ID | 任务 | TDD 要点 | 涉及文件 |
-|----|------|---------|----------|
-| F-043 | 站内通知 | `test_create_mention_notification()` | `services/notification_service.py`（新增）|
-| F-044 | 邮件通知 | `test_send_email_notification()` | `utils/email_utils.py`（新增）|
-| F-045 | 通知偏好设置 | `test_notification_preferences()` | `services/notification_service.py` |
+| ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
+|----|------|---------|----------|------|
+| F-043 | 站内通知 | `test_create_mention_notification()` | `services/notification_service.py` | ✅ |
+| F-044 | 邮件通知 | `test_send_email_notification()` | `utils/email_utils.py` | ✅ |
+| F-045 | 通知偏好设置 | `test_notification_preferences()` | `services/notification_preference_service.py` | ✅ |
 
-### P2 — CI/CD 集成
+### P2 — CI/CD 集成 🟡
 
-| ID | 任务 | TDD 要点 | 涉及文件 |
-|----|------|---------|----------|
-| F-046 | Webhook → CI 触发 | `test_ci_webhook_payload()` | `webhook_trigger.py` |
-| F-047 | 构建状态展示 | — | 前端新组件 |
+| ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
+|----|------|---------|----------|------|
+| F-046 | Webhook → CI 触发 | `test_ci_webhook_payload()` | `utils/webhook_trigger.py` | ✅ |
+| F-047 | 构建状态展示 | — | 前端新组件 | ❌ 待实现 |
 
 ### P2 — 国际化
 
@@ -362,16 +376,15 @@ pytest -v -m e2e
 
 ### 待新增测试
 
-| 模块 | 测试文件 | 优先级 | 关联阶段 |
-|------|---------|--------|---------|
-| 配置管理 | `test_config.py` | P1 | 阶段一 |
-| 应用服务 | `test_app_service.py` | P1 | 阶段一 |
-| 仓库浏览器 | `test_repository_browser_async.py` | P1 | 阶段一 |
-| 数据库管理 | `test_database_manager.py` | P2 | 阶段四 |
-| API 集成测试 | `test_api_auth.py`, `test_api_repo.py`, ... | P0 | **阶段一** |
-| Controller 测试 | `test_controller_*.py` | P2 | 阶段四 |
-| WebSocket 测试 | `test_websocket_*.py` | P1 | 阶段三 |
-| SSH Key | `test_key_service_async.py` | P0 | 阶段二 |
-| 通知 | `test_notification_service.py` | P2 | 阶段三 |
-| 搜索 | `test_search_service.py` | P2 | 阶段三 |
-| LFS | `test_lfs_service.py` | P2 | 阶段三 |
+| 模块 | 测试文件 | 优先级 | 关联阶段 | 状态 |
+|------|---------|--------|---------|------|
+| 配置管理 | `test_config.py` | P1 | 阶段一 | ✅ |
+| 应用服务 | `test_app_service.py` | P1 | 阶段一 | ❌ |
+| 仓库浏览器 | `test_repository_browser_async.py` | P1 | 阶段一 | ✅ |
+| 数据库管理 | `test_database_manager.py` | P2 | 阶段四 | ❌ |
+| API 集成测试 | `test_api_*.py`, `test_controller_*.py` | P0 | 阶段一/二 | ✅ 已有：auth, issue, notification, pr, repository |
+| WebSocket 测试 | `test_websocket_manager.py` | P1 | 阶段三 | ✅ |
+| SSH Key | `test_key_service_async.py` | P0 | 阶段二 | ✅ |
+| 通知 | `test_notification_service.py`, `test_notification_*.py` | P2 | 阶段三 | ✅ 已有 5 个通知测试文件 |
+| 搜索 | `test_search_service.py` | P2 | 阶段三 | ✅ |
+| LFS | `test_lfs_service.py` | P2 | 阶段三 | ✅ 已有 3 个 LFS 测试文件 |

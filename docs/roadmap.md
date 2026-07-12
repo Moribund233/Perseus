@@ -147,12 +147,16 @@ Nginx/OpenResty (反向代理)
 | 用户认证（本地 JWT） | `services/token_service.py` `controller/auth_controller.py` | ✅ 核心 |
 | OAuth2 第三方登录 | `services/auth/oauth.py` | ✅ Phase 0 |
 | WebSocket 连接管理 | `api/websocket/manager.py` | ✅ Phase 0 |
-| 房间/频道管理 | `services/realtime/room.py` | ⏳ Phase 2 |
-| 团队聊天 | `services/realtime/chat.py` | ⏳ Phase 2 |
+| Git LFS | `services/lfs_service.py` `controller/lfs_controller.py` | ✅ Phase 3 |
+| 代码搜索 | `services/search_service.py` `controller/search_controller.py` | ✅ Phase 3 |
+| 通知系统（站内/邮件） | `services/notification_service.py` `utils/email_utils.py` | ✅ Phase 3 |
+| CI/CD Webhook 触发 | `utils/webhook_trigger.py` | ✅ Phase 3 |
+| 房间/频道管理 | `services/realtime/room.py` | ✅ Phase 2 |
+| 团队聊天 | `services/realtime/chat.py` | ✅ Phase 2 |
 | 业务事件广播 | `services/realtime/events.py` | ⏳ Phase 2 |
 | 协作文本编辑 | `services/realtime/collab.py` | ⏳ Phase 2 |
 | 在线状态 | `services/realtime/presence.py` | ⏳ Phase 2 |
-| 通知系统 | `services/realtime/notify.py` | ⏳ Phase 2 |
+| 通知系统（实时推送） | `services/realtime/notify.py` | ⏳ Phase 2 |
 | 文件上传 | ✅ (代码附件) | ✅ |
 | 系统管理/审计 | `middleware/` | ✅ 基础 |
 
@@ -164,5 +168,5 @@ Nginx/OpenResty (反向代理)
 
 - **阶段一（基础功能）**：物理仓库创建、配置系统、PR 合并、JWT 刷新 — **全部完成** ✅
 - **阶段二（核心协作）**：SSH Key、代码查看器、Issue、Code Review、Webhook — **后端全部完成** ✅
-- **阶段三（高级功能）**：LFS、代码搜索、WebSocket、通知、CI/CD、i18n — **待开发**
+- **阶段三（高级功能）**：LFS、代码搜索、通知系统、CI/CD Webhook 触发 — **后端已完成** ✅；实时 PR 推送、搜索索引维护、国际化、构建状态展示 — **待开发**
 - **阶段四（生产准备）**：Docker、监控、压测、安全审计 — **待开发**

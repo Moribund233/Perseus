@@ -20,6 +20,14 @@ from utils.response_builder import (
 )
 from utils.db_utils import paginate, get_next_sequence_number, get_pull_request_or_404
 from utils.git_utils import GitService
+from services.realtime.event_service import (
+    broadcast_pr_opened, broadcast_pr_merged, broadcast_pr_closed,
+    broadcast_pr_comment_added, broadcast_pr_review_submitted,
+)
+from services.realtime.room_service import RoomService
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 async def list_pull_requests(
@@ -166,6 +174,19 @@ async def create_pull_request(
     await db.commit()
     await db.refresh(pr)
 
+    try:
+        room = await RoomService.get_repository_room(db, repository_id)
+        if room:
+            result = await db.execute(select(User).filter(User.id == author_id))
+            author = result.scalar_one_or_none()
+            author_username = author.username if author else "unknown"
+            await broadcast_pr_opened(
+                room_id=room.id, pr_id=pr.id, title=pr.title,
+                opener_id=author_id, opener_username=author_username,
+            )
+    except Exception as e:
+        logger.warning("Failed to broadcast PR opened event: %s", e)
+
     return build_pr_response(pr)
 
 
@@ -182,6 +203,18 @@ async def publish_draft(repo_id: int, pr_number: int, user_id: int, db: AsyncSes
     pr.is_draft = False
     await db.commit()
     await db.refresh(pr)
+
+    try:
+        room = await RoomService.get_repository_room(db, repository_id)
+        if room:
+            merger_username = merger.username if merger else "unknown"
+            await broadcast_pr_merged(
+                room_id=room.id, pr_id=pr.id, title=pr.title,
+                merger_id=merger_id, merger_username=merger_username,
+            )
+    except Exception as e:
+        logger.warning("Failed to broadcast PR merged event: %s", e)
+
     return build_pr_response(pr)
 
 
@@ -267,6 +300,18 @@ async def close_pull_request(
     pr.status = "closed"
     await db.commit()
     await db.refresh(pr)
+
+    try:
+        room = await RoomService.get_repository_room(db, repository_id)
+        if room:
+            closer_result = await db.execute(select(User).filter(User.id == user_id))
+            closer = closer_result.scalar_one_or_none()
+            await broadcast_pr_closed(
+                room_id=room.id, pr_id=pr.id, title=pr.title,
+                closer_id=user_id, closer_username=closer.username if closer else "unknown",
+            )
+    except Exception as e:
+        logger.warning("Failed to broadcast PR closed event: %s", e)
 
     return build_pr_response(pr)
 
@@ -441,6 +486,19 @@ async def create_pr_comment(
     await db.commit()
     await db.refresh(comment)
 
+    try:
+        room = await RoomService.get_repository_room(db, repository_id)
+        if room:
+            author_result = await db.execute(select(User).filter(User.id == author_id))
+            author = author_result.scalar_one_or_none()
+            await broadcast_pr_comment_added(
+                room_id=room.id, pr_id=pr.id, comment_id=comment.id,
+                commenter_id=author_id, commenter_username=author.username if author else "unknown",
+                content=content,
+            )
+    except Exception as e:
+        logger.warning("Failed to broadcast PR comment event: %s", e)
+
     return build_pr_comment_response(comment)
 
 
@@ -481,27 +539,40 @@ async def create_pr_review(
     )
     existing_review = result.scalar_one_or_none()
 
+    is_new = existing_review is None
+
     if existing_review:
-        # 更新现有审查
         existing_review.status = status
         existing_review.comment = comment
         await db.commit()
         await db.refresh(existing_review)
-        return build_pr_review_response(existing_review)
+        review_obj = existing_review
+    else:
+        review = PRReview(
+            pull_request_id=pr.id,
+            reviewer_id=reviewer_id,
+            status=status,
+            comment=comment
+        )
+        db.add(review)
+        await db.commit()
+        await db.refresh(review)
+        review_obj = review
 
-    # 创建新审查
-    review = PRReview(
-        pull_request_id=pr.id,
-        reviewer_id=reviewer_id,
-        status=status,
-        comment=comment
-    )
+    try:
+        room = await RoomService.get_repository_room(db, repository_id)
+        if room:
+            reviewer_result = await db.execute(select(User).filter(User.id == reviewer_id))
+            reviewer = reviewer_result.scalar_one_or_none()
+            await broadcast_pr_review_submitted(
+                room_id=room.id, pr_id=pr.id, review_id=review_obj.id,
+                reviewer_id=reviewer_id, reviewer_username=reviewer.username if reviewer else "unknown",
+                state=status,
+            )
+    except Exception as e:
+        logger.warning("Failed to broadcast PR review event: %s", e)
 
-    db.add(review)
-    await db.commit()
-    await db.refresh(review)
-
-    return build_pr_review_response(review)
+    return build_pr_review_response(review_obj)
 
 
 async def list_pr_comments(

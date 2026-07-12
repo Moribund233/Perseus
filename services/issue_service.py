@@ -18,6 +18,11 @@ from utils.response_builder import (
     build_pagination_response
 )
 from utils.db_utils import paginate, get_next_sequence_number, get_issue_or_404
+from services.realtime.event_service import broadcast_issue_created
+from services.realtime.room_service import RoomService
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 async def list_issues(
@@ -196,6 +201,16 @@ async def create_issue(
         )
     )
     issue = result.scalar_one()
+
+    try:
+        room = await RoomService.get_repository_room(db, repository_id)
+        if room:
+            await broadcast_issue_created(
+                room_id=room.id, issue_id=issue.id, title=issue.title,
+                creator_id=author_id, creator_username=issue.author.username if issue.author else "unknown",
+            )
+    except Exception as e:
+        logger.warning("Failed to broadcast issue event: %s", e)
 
     return build_issue_response(issue)
 

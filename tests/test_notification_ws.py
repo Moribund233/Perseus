@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from api.websocket.manager import Connection, ConnectionManager
 from api.websocket.handlers.notification import (
     handle_ping, handle_subscribe, handle_unsubscribe,
-    notify_commit_new, notify_user,
+    notify_commit_new, notify_user, notify_repository_event,
 )
 
 
@@ -128,3 +128,25 @@ async def test_notify_user():
     call_args = manager_mock.send_to_user.call_args
     assert call_args[0][0] == 10
     assert call_args[0][1]["type"] == "user_notification"
+
+
+@pytest.mark.asyncio
+async def test_notify_repository_event_room_scoped():
+    """Verify repository event notification uses send_to_repository"""
+    manager_mock = MagicMock(spec=ConnectionManager)
+    manager_mock.send_to_repository = AsyncMock(return_value=2)
+
+    with patch("api.websocket.handlers.notification.manager", manager_mock):
+        count = await notify_repository_event(
+            repository_id=1,
+            event_type="pr_review_submitted",
+            event_data={"review_id": 10, "state": "approved"},
+        )
+
+    assert count == 2
+    manager_mock.send_to_repository.assert_called_once()
+    args = manager_mock.send_to_repository.call_args
+    assert args[0][0] == 1
+    payload = args[0][1]
+    assert payload["type"] == "notification"
+    assert payload["action"] == "pr_review_submitted"

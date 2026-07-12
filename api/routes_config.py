@@ -120,9 +120,21 @@ def create_api_router() -> APIRouter:
     from controller.notification_controller import router as notification_router
     api_v1_router.include_router(notification_router)
 
+    # 11g. Room 路由
+    from controller.room_controller import router as room_router
+    api_v1_router.include_router(room_router)
+
+    # 11h. Chat 路由
+    from controller.chat_controller import router as chat_router
+    api_v1_router.include_router(chat_router)
+
     # 11e. Search 路由
     from controller.search_controller import router as search_router
     api_v1_router.include_router(search_router)
+
+    # 11f. Build 路由
+    from controller.build_controller import router as build_router
+    api_v1_router.include_router(build_router)
 
     # 12. Debug 路由（仅在调试模式下可用）
     from controller.debug_controller import router as debug_router
@@ -177,6 +189,9 @@ ROUTES = {
 
     # Webhook 管理（需要仓库ID前缀）
     "webhooks": f"{API_V1_PREFIX}/repositories",
+
+    # 构建管理（需要仓库ID前缀）
+    "builds": f"{API_V1_PREFIX}/repositories",
 
     # 通知管理
     "notifications": f"{API_V1_PREFIX}/notifications",

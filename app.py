@@ -142,6 +142,10 @@ def get_app(config_path: str = "config.toml") -> FastAPI:
     return AppCache.get_app(config_path)
 
 
+# 模块级 app 实例（供 uvicorn app:app 使用）
+app = get_app()
+
+
 def start_server():
     """
     启动 Web 服务器
