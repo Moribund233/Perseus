@@ -1,0 +1,2129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perseus - Code Collaboration Platform</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-500-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-600-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-700-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/latin-400-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/latin-500-normal.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg-primary:#0d1117;--bg-secondary:#161b22;--bg-tertiary:#1c2128;--bg-sidebar:#010409;
+--bg-card:#161b22;--bg-hover:#1c2333;--bg-active:#1a2332;
+--blue-primary:#1f6feb;--blue-light:#58a6ff;--blue-glow:#388bfd;--blue-dark:#0d419d;
+--text-primary:#e6edf3;--text-secondary:#8b949e;--text-tertiary:#6e7681;
+--border-primary:#30363d;--border-secondary:#21262d;
+--green:#3fb950;--orange:#d29922;--red:#f85149;--purple:#bc8cff;
+--font-sans:'Inter',system-ui,sans-serif;--font-mono:'JetBrains Mono',monospace;
+--radius:8px;--radius-lg:12px;--shadow:0 8px 32px rgba(0,0,0,0.4);
+}
+html,body{height:100%;font-family:var(--font-sans);background:var(--bg-primary);color:var(--text-primary);overflow:hidden}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-primary);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-tertiary)}
+
+.app{display:flex;height:100vh;width:100vw}
+
+/* Sidebar */
+.sidebar{width:64px;background:var(--bg-sidebar);display:flex;flex-direction:column;align-items:center;padding:12px 0;border-right:1px solid var(--border-secondary);flex-shrink:0;z-index:100;transition:width .3s}
+.sidebar.expanded{width:240px}
+.sidebar-logo{width:40px;height:40px;margin-bottom:20px;cursor:pointer;position:relative}
+.sidebar-logo svg{width:100%;height:100%}
+.sidebar-nav{display:flex;flex-direction:column;gap:4px;width:100%;padding:0 8px;flex:1}
+.nav-item{display:flex;align-items:center;padding:10px 12px;border-radius:var(--radius);cursor:pointer;color:var(--text-secondary);transition:all .2s;position:relative;white-space:nowrap;overflow:hidden}
+.nav-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.nav-item.active{background:var(--bg-active);color:var(--blue-light)}
+.nav-item.active::before{content:'';position:absolute;left:-8px;top:50%;transform:translateY(-50%);width:3px;height:20px;background:var(--blue-primary);border-radius:0 3px 3px 0}
+.nav-item svg{width:20px;height:20px;flex-shrink:0}
+.nav-label{font-size:13px;font-weight:500;margin-left:12px;opacity:0;transition:opacity .2s}
+.sidebar:not(.expanded) .nav-label,.sidebar:not(.expanded) .nav-badge{display:none}
+.sidebar:not(.expanded) .nav-item{justify-content:center}
+.sidebar.expanded .nav-label{opacity:1}
+.nav-badge{background:var(--red);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:auto;font-weight:600}
+.sidebar-bottom{padding:0 8px;display:flex;flex-direction:column;gap:4px}
+.sidebar-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--blue-primary),var(--purple));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;cursor:pointer;margin:8px auto}
+
+/* Main Content */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* Top Bar */
+.topbar{height:48px;background:var(--bg-secondary);border-bottom:1px solid var(--border-secondary);display:flex;align-items:center;padding:0 20px;gap:16px;flex-shrink:0}
+.topbar-breadcrumb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary)}
+.topbar-breadcrumb span{color:var(--text-primary);font-weight:500}
+.topbar-search{flex:1;max-width:480px;position:relative}
+.topbar-search input{width:100%;background:var(--bg-primary);border:1px solid var(--border-primary);border-radius:var(--radius);padding:6px 12px 6px 34px;color:var(--text-primary);font-size:13px;font-family:var(--font-sans);outline:none;transition:border-color .2s}
+.topbar-search input:focus{border-color:var(--blue-primary)}
+.topbar-search input::placeholder{color:var(--text-tertiary)}
+.topbar-search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-tertiary)}
+.topbar-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
+.topbar-btn{width:32px;height:32px;border-radius:var(--radius);border:none;background:transparent;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;position:relative}
+.topbar-btn:hover{background:var(--bg-hover);color:var(--text-primary)}
+.topbar-btn svg{width:18px;height:18px}
+.topbar-btn .dot{position:absolute;top:6px;right:6px;width:7px;height:7px;background:var(--blue-light);border-radius:50%;border:1.5px solid var(--bg-secondary)}
+.btn-primary{background:var(--blue-primary);color:#fff;border:none;padding:6px 14px;border-radius:var(--radius);font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s;font-family:var(--font-sans)}
+.btn-primary:hover{background:var(--blue-glow);box-shadow:0 0 20px rgba(31,111,235,0.3)}
+.btn-secondary{background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border-primary);padding:6px 14px;border-radius:var(--radius);font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s;font-family:var(--font-sans)}
+.btn-secondary:hover{border-color:var(--text-tertiary);background:var(--bg-hover)}
+
+/* Page Container */
+.page-container{flex:1;overflow:hidden;display:none}
+.page-container.active{display:flex}
+
+/* ===== DASHBOARD PAGE ===== */
+.dashboard{flex:1;overflow-y:auto;padding:24px}
+.dash-welcome{margin-bottom:24px}
+.dash-welcome h1{font-size:24px;font-weight:700;margin-bottom:4px}
+.dash-welcome h1 span{background:linear-gradient(135deg,var(--blue-light),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.dash-welcome p{color:var(--text-secondary);font-size:14px}
+.dash-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:var(--bg-card);border:1px solid var(--border-secondary);border-radius:var(--radius-lg);padding:20px;transition:all .3s}
+.stat-card:hover{border-color:var(--border-primary);transform:translateY(-2px);box-shadow:var(--shadow)}
+.stat-card .stat-icon{width:36px;height:36px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+.stat-card .stat-icon svg{width:18px;height:18px}
+.stat-card .stat-value{font-size:28px;font-weight:700;margin-bottom:2px}
+.stat-card .stat-label{font-size:12px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.stat-card .stat-change{font-size:11px;margin-top:8px;display:flex;align-items:center;gap:4px}
+.stat-card .stat-change.up{color:var(--green)}
+.stat-card .stat-change.down{color:var(--red)}
+.dash-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.dash-section{background:var(--bg-card);border:1px solid var(--border-secondary);border-radius:var(--radius-lg);padding:20px}
+.dash-section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.dash-section-header h3{font-size:14px;font-weight:600}
+.dash-section-header a{font-size:12px;color:var(--blue-light);cursor:pointer;text-decoration:none}
+.activity-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-secondary)}
+.activity-item:last-child{border-bottom:none}
+.activity-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+.activity-content{flex:1;min-width:0}
+.activity-content p{font-size:13px;line-height:1.5}
+.activity-content p strong{color:var(--text-primary);font-weight:600}
+.activity-content .time{font-size:11px;color:var(--text-tertiary);margin-top:2px}
+.repo-quick{display:flex;flex-direction:column;gap:8px}
+.repo-quick-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--radius);cursor:pointer;transition:all .2s}
+.repo-quick-item:hover{background:var(--bg-hover)}
+.repo-quick-item .repo-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.repo-quick-item .repo-name{font-size:13px;font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.repo-quick-item .repo-lang{font-size:11px;color:var(--text-tertiary)}
+.contrib-graph{display:flex;align-items:end;gap:2px;height:60px;margin-top:12px}
+.contrib-bar{flex:1;background:var(--blue-dark);border-radius:2px;min-height:3px;transition:all .3s}
+.contrib-bar:hover{background:var(--blue-primary)}
+
+/* ===== REPOSITORIES PAGE ===== */
+.repos-page{flex:1;display:flex;overflow:hidden}
+.repos-sidebar{width:280px;background:var(--bg-secondary);border-right:1px solid var(--border-secondary);display:flex;flex-direction:column;flex-shrink:0}
+.repos-sidebar-header{padding:16px;border-bottom:1px solid var(--border-secondary)}
+.repos-sidebar-header h3{font-size:13px;font-weight:600;margin-bottom:8px}
+.repo-filter{display:flex;gap:6px;flex-wrap:wrap}
+.repo-filter-tag{padding:3px 10px;border-radius:12px;font-size:11px;background:var(--bg-primary);border:1px solid var(--border-primary);color:var(--text-secondary);cursor:pointer;transition:all .2s}
+.repo-filter-tag.active,.repo-filter-tag:hover{background:var(--blue-dark);border-color:var(--blue-primary);color:var(--blue-light)}
+.repo-tree{flex:1;overflow-y:auto;padding:8px}
+.tree-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text-secondary);transition:all .15s}
+.tree-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.tree-item.active{background:var(--bg-active);color:var(--blue-light)}
+.tree-item svg{width:16px;height:16px;flex-shrink:0}
+.tree-item .tree-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-item .tree-badge{font-size:10px;color:var(--text-tertiary);background:var(--bg-primary);padding:1px 6px;border-radius:8px}
+.tree-folder{padding-left:16px}
+.repos-main{flex:1;overflow-y:auto;padding:24px}
+.repo-header{display:flex;align-items:center;gap:16px;margin-bottom:20px}
+.repo-header h2{font-size:20px;font-weight:700}
+.repo-header .repo-visibility{font-size:11px;padding:2px 8px;border:1px solid var(--border-primary);border-radius:12px;color:var(--text-secondary)}
+.repo-tabs{display:flex;gap:0;border-bottom:1px solid var(--border-secondary);margin-bottom:20px}
+.repo-tab{padding:10px 16px;font-size:13px;color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;display:flex;align-items:center;gap:6px}
+.repo-tab:hover{color:var(--text-primary)}
+.repo-tab.active{color:var(--text-primary);border-bottom-color:var(--blue-primary)}
+.repo-tab .count{background:var(--bg-primary);padding:1px 7px;border-radius:10px;font-size:11px}
+.file-list{border:1px solid var(--border-secondary);border-radius:var(--radius-lg);overflow:hidden}
+.file-list-header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg-tertiary);border-bottom:1px solid var(--border-secondary);font-size:13px}
+.file-list-header .commit-msg{flex:1;color:var(--text-secondary)}
+.file-list-header .commit-msg strong{color:var(--text-primary)}
+.file-list-header .commit-time{color:var(--text-tertiary);font-size:12px}
+.file-row{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--border-secondary);font-size:13px;cursor:pointer;transition:background .15s}
+.file-row:last-child{border-bottom:none}
+.file-row:hover{background:var(--bg-hover)}
+.file-row svg{width:16px;height:16px;flex-shrink:0}
+.file-row .file-icon-folder{color:var(--blue-light)}
+.file-row .file-icon-file{color:var(--text-tertiary)}
+.file-row .file-name{flex:1}
+.file-row .file-msg{color:var(--text-secondary);flex:2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-row .file-time{color:var(--text-tertiary);font-size:12px;width:100px;text-align:right}
+.readme-section{margin-top:20px;border:1px solid var(--border-secondary);border-radius:var(--radius-lg);overflow:hidden}
+.readme-header{padding:12px 16px;background:var(--bg-tertiary);border-bottom:1px solid var(--border-secondary);display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500}
+.readme-body{padding:20px;font-size:14px;line-height:1.7;color:var(--text-secondary)}
+.readme-body h1{font-size:24px;color:var(--text-primary);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border-secondary)}
+.readme-body h2{font-size:18px;color:var(--text-primary);margin:16px 0 8px}
+.readme-body p{margin-bottom:12px}
+.readme-body code{background:var(--bg-primary);padding:2px 6px;border-radius:4px;font-family:var(--font-mono);font-size:12px;color:var(--blue-light)}
+.readme-body pre{background:var(--bg-primary);padding:16px;border-radius:var(--radius);overflow-x:auto;margin:12px 0;font-family:var(--font-mono);font-size:13px;line-height:1.5}
+.readme-body ul{padding-left:20px;margin-bottom:12px}
+.readme-body li{margin-bottom:4px}
+.readme-body .badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;margin-right:6px}
+.badge-blue{background:rgba(31,111,235,0.15);color:var(--blue-light)}
+.badge-green{background:rgba(63,185,80,0.15);color:var(--green)}
+.badge-purple{background:rgba(188,140,255,0.15);color:var(--purple)}
+
+/* ===== PR PAGE ===== */
+.pr-page{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.pr-toolbar{padding:16px 24px;border-bottom:1px solid var(--border-secondary);display:flex;align-items:center;gap:12px;flex-shrink:0}
+.pr-filters{display:flex;gap:8px}
+.pr-filter{padding:5px 12px;border-radius:var(--radius);font-size:12px;background:transparent;border:1px solid var(--border-primary);color:var(--text-secondary);cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;font-family:var(--font-sans)}
+.pr-filter:hover{border-color:var(--text-tertiary);color:var(--text-primary)}
+.pr-filter.active{background:var(--blue-dark);border-color:var(--blue-primary);color:var(--blue-light)}
+.pr-filter .fcount{background:rgba(255,255,255,0.1);padding:0 6px;border-radius:8px;font-size:10px}
+.pr-list{flex:1;overflow-y:auto;padding:0 24px}
+.pr-item{display:flex;gap:12px;padding:16px 0;border-bottom:1px solid var(--border-secondary);cursor:pointer;transition:all .2s}
+.pr-item:hover{background:var(--bg-hover);margin:0 -24px;padding:16px 24px;border-radius:var(--radius)}
+.pr-icon{width:20px;height:20px;flex-shrink:0;margin-top:2px}
+.pr-icon.open{color:var(--green)}
+.pr-icon.merged{color:var(--purple)}
+.pr-icon.closed{color:var(--red)}
+.pr-info{flex:1;min-width:0}
+.pr-title{font-size:14px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.pr-title:hover{color:var(--blue-light)}
+.pr-labels{display:flex;gap:4px;flex-wrap:wrap}
+.pr-label{padding:1px 8px;border-radius:12px;font-size:10px;font-weight:600}
+.pr-label.bug{background:rgba(248,81,73,0.15);color:var(--red)}
+.pr-label.feature{background:rgba(63,185,80,0.15);color:var(--green)}
+.pr-label.enhancement{background:rgba(188,140,255,0.15);color:var(--purple)}
+.pr-label.urgent{background:rgba(210,153,34,0.15);color:var(--orange)}
+.pr-meta{font-size:12px;color:var(--text-tertiary);margin-top:4px;display:flex;align-items:center;gap:12px}
+.pr-stats{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.pr-stat{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-tertiary)}
+.pr-stat svg{width:14px;height:14px}
+.pr-stat.review{color:var(--orange)}
+.pr-stat.comment{color:var(--blue-light)}
+.pr-avatars{display:flex;margin-left:8px}
+.pr-avatars .mini-avatar{width:24px;height:24px;border-radius:50%;border:2px solid var(--bg-primary);margin-left:-8px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600}
+.pr-avatars .mini-avatar:first-child{margin-left:0}
+
+/* PR Detail */
+.pr-detail{display:none;flex:1;flex-direction:column;overflow:hidden}
+.pr-detail.active{display:flex}
+.pr-detail-header{padding:20px 24px;border-bottom:1px solid var(--border-secondary);flex-shrink:0}
+.pr-detail-header h2{font-size:20px;font-weight:700;margin-bottom:8px}
+.pr-detail-meta{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--text-secondary);flex-wrap:wrap}
+.pr-detail-tabs{display:flex;border-bottom:1px solid var(--border-secondary);padding:0 24px;flex-shrink:0}
+.pr-detail-tab{padding:12px 16px;font-size:13px;color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;display:flex;align-items:center;gap:6px}
+.pr-detail-tab:hover{color:var(--text-primary)}
+.pr-detail-tab.active{color:var(--text-primary);border-bottom-color:var(--blue-primary)}
+.pr-detail-content{flex:1;overflow-y:auto;padding:20px 24px}
+.pr-comment{display:flex;gap:12px;margin-bottom:20px}
+.pr-comment-avatar{width:36px;height:36px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600}
+.pr-comment-body{flex:1;border:1px solid var(--border-secondary);border-radius:var(--radius-lg);overflow:hidden}
+.pr-comment-header{padding:10px 16px;background:var(--bg-tertiary);border-bottom:1px solid var(--border-secondary);display:flex;align-items:center;gap:8px;font-size:13px}
+.pr-comment-header strong{color:var(--text-primary)}
+.pr-comment-header .time{color:var(--text-tertiary);font-size:12px}
+.pr-comment-content{padding:16px;font-size:13px;line-height:1.7;color:var(--text-secondary)}
+.pr-comment-content p{margin-bottom:8px}
+.pr-comment-content code{background:var(--bg-primary);padding:2px 6px;border-radius:4px;font-family:var(--font-mono);font-size:12px;color:var(--blue-light)}
+.pr-diff{margin-top:16px}
+.diff-file{border:1px solid var(--border-secondary);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:16px}
+.diff-file-header{padding:10px 16px;background:var(--bg-tertiary);border-bottom:1px solid var(--border-secondary);display:flex;align-items:center;gap:8px;font-size:13px;font-family:var(--font-mono)}
+.diff-file-header .diff-badge{font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600}
+.diff-file-header .diff-add{background:rgba(63,185,80,0.15);color:var(--green)}
+.diff-file-header .diff-del{background:rgba(248,81,73,0.15);color:var(--red)}
+.diff-line{display:flex;font-family:var(--font-mono);font-size:12px;line-height:20px}
+.diff-line-num{width:50px;padding:0 8px;text-align:right;color:var(--text-tertiary);user-select:none;flex-shrink:0;border-right:1px solid var(--border-secondary)}
+.diff-line-content{flex:1;padding:0 12px;white-space:pre}
+.diff-line.add{background:rgba(63,185,80,0.08)}
+.diff-line.add .diff-line-content{color:var(--green)}
+.diff-line.del{background:rgba(248,81,73,0.08)}
+.diff-line.del .diff-line-content{color:var(--red)}
+.diff-line.ctx .diff-line-content{color:var(--text-secondary)}
+.pr-reply-box{margin-top:20px;border:1px solid var(--border-secondary);border-radius:var(--radius-lg);overflow:hidden}
+.pr-reply-tabs{display:flex;background:var(--bg-tertiary);border-bottom:1px solid var(--border-secondary)}
+.pr-reply-tab{padding:8px 16px;font-size:12px;color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent}
+.pr-reply-tab.active{color:var(--text-primary);border-bottom-color:var(--blue-primary)}
+.pr-reply-editor{min-height:100px;padding:12px 16px;font-size:13px;color:var(--text-tertiary);outline:none;font-family:var(--font-sans);line-height:1.6}
+.pr-reply-footer{padding:10px 16px;border-top:1px solid var(--border-secondary);display:flex;justify-content:flex-end;gap:8px}
+
+/* ===== EDITOR PAGE ===== */
+.editor-page{flex:1;display:flex;overflow:hidden}
+.editor-sidebar{width:260px;background:var(--bg-secondary);border-right:1px solid var(--border-secondary);display:flex;flex-direction:column;flex-shrink:0}
+.editor-sidebar-header{padding:10px 12px;border-bottom:1px solid var(--border-secondary);display:flex;align-items:center;justify-content:space-between}
+.editor-sidebar-header h4{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-tertiary);font-weight:600}
+.editor-sidebar-header button{background:none;border:none;color:var(--text-tertiary);cursor:pointer;padding:2px}
+.editor-sidebar-header button:hover{color:var(--text-primary)}
+.editor-file-tree{flex:1;overflow-y:auto;padding:4px 0}
+.ef-item{display:flex;align-items:center;gap:6px;padding:4px 12px;font-size:13px;cursor:pointer;color:var(--text-secondary);transition:all .15s;font-family:var(--font-mono)}
+.ef-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.ef-item.active{background:var(--bg-active);color:var(--text-primary)}
+.ef-item .ef-indent{width:16px;flex-shrink:0}
+.ef-item svg{width:14px;height:14px;flex-shrink:0}
+.ef-folder{color:var(--blue-light)}
+.ef-ts{color:#3178c6}
+.ef-json{color:var(--orange)}
+.ef-md{color:var(--blue-light)}
+.ef-css{color:#563d7c}
+.editor-main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.editor-tabs{display:flex;background:var(--bg-secondary);border-bottom:1px solid var(--border-secondary);overflow-x:auto;flex-shrink:0}
+.editor-tab{display:flex;align-items:center;gap:8px;padding:8px 16px;font-size:12px;color:var(--text-secondary);cursor:pointer;border-right:1px solid var(--border-secondary);white-space:nowrap;transition:all .15s;font-family:var(--font-mono);position:relative}
+.editor-tab:hover{background:var(--bg-hover)}
+.editor-tab.active{background:var(--bg-primary);color:var(--text-primary)}
+.editor-tab.active::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--blue-primary)}
+.editor-tab .tab-close{width:16px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s}
+.editor-tab:hover .tab-close{opacity:1}
+.editor-tab .tab-close:hover{background:var(--border-primary)}
+.editor-tab svg{width:14px;height:14px}
+.editor-breadcrumb{padding:4px 16px;font-size:11px;color:var(--text-tertiary);font-family:var(--font-mono);background:var(--bg-primary);border-bottom:1px solid var(--border-secondary);display:flex;align-items:center;gap:4px}
+.editor-breadcrumb span{cursor:pointer}
+.editor-breadcrumb span:hover{color:var(--text-primary)}
+.editor-content{flex:1;display:flex;overflow:hidden}
+.editor-code{flex:1;overflow:auto;background:var(--bg-primary);position:relative}
+.editor-code-area{display:flex;min-height:100%}
+.line-numbers{padding:12px 0;text-align:right;font-family:var(--font-mono);font-size:13px;line-height:1.6;color:var(--text-tertiary);user-select:none;min-width:60px;padding-right:16px;padding-left:8px;background:var(--bg-primary);white-space:pre}
+.code-content{padding:12px 16px;font-family:var(--font-mono);font-size:13px;line-height:1.6;flex:1;white-space:pre;overflow-x:auto;tab-size:2}
+.code-content .kw{color:#ff7b72}
+.code-content .str{color:#a5d6ff}
+.code-content .fn{color:#d2a8ff}
+.code-content .cm{color:#8b949e;font-style:italic}
+.code-content .tp{color:#79c0ff}
+.code-content .num{color:#79c0ff}
+.code-content .op{color:#ff7b72}
+.code-content .pr{color:#ffa657}
+.code-content .dc{color:#79c0ff}
+.editor-minimap{display:none}
+@keyframes blink{0%,50%{opacity:1}51%,100%{opacity:0}}
+
+/* Collaboration bar */
+.editor-collab-bar{display:flex;align-items:center;padding:3px 16px;background:var(--bg-tertiary);border-bottom:1px solid var(--border-secondary);gap:12px;font-size:12px;flex-shrink:0}
+.collab-avatars{display:flex;align-items:center;gap:0}
+.collab-avatar{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;margin-left:-6px;border:2px solid var(--bg-tertiary);cursor:pointer;transition:transform .15s,box-shadow .15s;position:relative;flex-shrink:0}
+.collab-avatar:first-child{margin-left:0}
+.collab-avatar:hover{transform:translateY(-2px);z-index:5}
+.collab-connection{display:flex;align-items:center;gap:5px;color:var(--text-secondary)}
+.conn-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.conn-dot.online{background:var(--green);box-shadow:0 0 6px var(--green)}
+.conn-dot.offline{background:var(--text-tertiary)}
+.collab-file-info{color:var(--text-tertiary);margin-left:auto;font-size:11px;display:flex;align-items:center;gap:6px}
+.collab-file-info strong{color:var(--text-secondary)}
+
+/* Collaboration panel (replaces terminal) */
+.editor-collab-panel{height:160px;background:var(--bg-primary);border-top:1px solid var(--border-secondary);display:flex;flex-direction:column;flex-shrink:0}
+.collab-panel-tabs{display:flex;background:var(--bg-secondary);border-bottom:1px solid var(--border-secondary);padding:0 8px;flex-shrink:0}
+.collab-panel-tab{padding:6px 12px;font-size:11px;color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px;font-family:var(--font-sans)}
+.collab-panel-tab:hover{color:var(--text-primary)}
+.collab-panel-tab.active{color:var(--text-primary);border-bottom-color:var(--blue-primary)}
+.collab-panel-tab .tab-count{background:var(--bg-tertiary);padding:0 6px;border-radius:8px;font-size:10px;color:var(--text-tertiary)}
+.collab-panel-body{flex:1;overflow-y:auto;padding:6px 0}
+.discussion-thread{display:flex;gap:10px;padding:8px 16px;cursor:pointer;transition:all .15s;border-left:3px solid transparent}
+.discussion-thread:hover{background:var(--bg-hover)}
+.discussion-thread.active{border-left-color:var(--blue-primary);background:var(--bg-active)}
+.thread-icon{flex-shrink:0;font-size:13px;margin-top:1px}
+.thread-body{flex:1;min-width:0}
+.thread-author{font-size:12px;font-weight:600;color:var(--text-primary)}
+.thread-line{font-size:11px;color:var(--blue-light);font-family:var(--font-mono);margin-top:1px}
+.thread-text{font-size:12px;color:var(--text-secondary);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.thread-meta{font-size:11px;color:var(--text-tertiary);display:flex;align-items:center;gap:8px;margin-top:3px}
+.thread-meta .reply-count{display:flex;align-items:center;gap:3px}
+.thread-time{flex-shrink:0;font-size:11px;color:var(--text-tertiary)}
+
+/* Editor list panel */
+.editor-list-item{display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:12px;color:var(--text-secondary)}
+.editor-list-item .el-avatar{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0}
+.editor-list-item .el-info{flex:1}
+.editor-list-item .el-name{font-weight:600;color:var(--text-primary)}
+.editor-list-item .el-file{font-size:11px;color:var(--text-tertiary);font-family:var(--font-mono)}
+.editor-list-item .el-status{font-size:10px;display:flex;align-items:center;gap:4px}
+.el-status-dot{width:6px;height:6px;border-radius:50%}
+.el-status-dot.editing{background:var(--green)}
+.el-status-dot.viewing{background:var(--blue-light)}
+.el-status-dot.idle{background:var(--orange)}
+
+/* Collaborator cursors in code */
+.code-content{position:relative}
+.collab-cursor{position:absolute;width:2px;pointer-events:none;z-index:10}
+.collab-cursor .cursor-label{position:absolute;left:0;top:-17px;font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px 3px 3px 0;white-space:nowrap;color:#fff;line-height:1.5;letter-spacing:0}
+.collab-selection{position:absolute;left:0;pointer-events:none;z-index:9;border-radius:2px}
+
+.editor-statusbar{height:24px;background:var(--blue-dark);display:flex;align-items:center;padding:0 12px;font-size:11px;color:rgba(255,255,255,0.8);gap:16px;flex-shrink:0}
+.statusbar-item{display:flex;align-items:center;gap:4px}
+.statusbar-item svg{width:12px;height:12px}
+.statusbar-right{margin-left:auto;display:flex;gap:16px}
+
+/* ===== CHAT PAGE ===== */
+.chat-page{flex:1;display:flex;overflow:hidden}
+.chat-channels{width:240px;background:var(--bg-secondary);border-right:1px solid var(--border-secondary);display:flex;flex-direction:column;flex-shrink:0}
+.chat-channels-header{padding:16px;border-bottom:1px solid var(--border-secondary)}
+.chat-channels-header h3{font-size:14px;font-weight:600;margin-bottom:10px}
+.chat-search{width:100%;background:var(--bg-primary);border:1px solid var(--border-primary);border-radius:var(--radius);padding:6px 10px;color:var(--text-primary);font-size:12px;font-family:var(--font-sans);outline:none}
+.chat-search:focus{border-color:var(--blue-primary)}
+.channel-group{padding:8px 0}
+.channel-group-title{padding:4px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-tertiary);font-weight:600}
+.channel-item{display:flex;align-items:center;gap:8px;padding:6px 16px;cursor:pointer;font-size:13px;color:var(--text-secondary);transition:all .15s}
+.channel-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.channel-item.active{background:var(--bg-active);color:var(--text-primary)}
+.channel-item svg{width:16px;height:16px;flex-shrink:0;opacity:0.6}
+.channel-item .ch-name{flex:1}
+.channel-item .ch-unread{background:var(--blue-primary);color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600}
+.dm-avatar{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0}
+.dm-status{position:relative}
+.dm-status::after{content:'';position:absolute;bottom:-1px;right:-1px;width:8px;height:8px;border-radius:50%;border:2px solid var(--bg-secondary)}
+.dm-status.online::after{background:var(--green)}
+.dm-status.offline::after{background:var(--text-tertiary)}
+.dm-status.away::after{background:var(--orange)}
+.chat-main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.chat-header{padding:12px 20px;border-bottom:1px solid var(--border-secondary);display:flex;align-items:center;gap:12px;flex-shrink:0}
+.chat-header-info{flex:1}
+.chat-header-info h3{font-size:15px;font-weight:600;display:flex;align-items:center;gap:6px}
+.chat-header-info p{font-size:12px;color:var(--text-secondary);margin-top:2px}
+.chat-header-actions{display:flex;gap:4px}
+.chat-messages{flex:1;overflow-y:auto;padding:16px 20px}
+.chat-date-divider{text-align:center;margin:16px 0;position:relative}
+.chat-date-divider::before{content:'';position:absolute;left:0;right:0;top:50%;height:1px;background:var(--border-secondary)}
+.chat-date-divider span{background:var(--bg-primary);padding:0 12px;font-size:11px;color:var(--text-tertiary);position:relative;font-weight:500}
+.chat-msg{display:flex;gap:12px;padding:6px 0;margin-bottom:4px;border-radius:var(--radius);transition:background .15s}
+.chat-msg:hover{background:var(--bg-hover);margin:0 -8px;padding:6px 8px}
+.chat-msg-avatar{width:36px;height:36px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;margin-top:2px}
+.chat-msg-body{flex:1;min-width:0}
+.chat-msg-header{display:flex;align-items:baseline;gap:8px;margin-bottom:2px}
+.chat-msg-header .name{font-size:14px;font-weight:600;cursor:pointer}
+.chat-msg-header .name:hover{text-decoration:underline}
+.chat-msg-header .timestamp{font-size:11px;color:var(--text-tertiary)}
+.chat-msg-text{font-size:14px;line-height:1.5;color:var(--text-secondary);word-wrap:break-word}
+.chat-msg-text code{background:var(--bg-tertiary);padding:1px 5px;border-radius:3px;font-family:var(--font-mono);font-size:12px;color:var(--blue-light)}
+.chat-msg-text a{color:var(--blue-light);text-decoration:none}
+.chat-msg-text a:hover{text-decoration:underline}
+.chat-msg-code{background:var(--bg-primary);border:1px solid var(--border-secondary);border-radius:var(--radius);padding:12px;margin-top:6px;font-family:var(--font-mono);font-size:12px;line-height:1.5;overflow-x:auto}
+.chat-msg-reaction{display:flex;gap:4px;margin-top:6px}
+.reaction{display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;background:var(--bg-primary);border:1px solid var(--border-secondary);font-size:12px;cursor:pointer;transition:all .15s}
+.reaction:hover{border-color:var(--blue-primary);background:rgba(31,111,235,0.1)}
+.reaction.active{border-color:var(--blue-primary);background:rgba(31,111,235,0.15)}
+.reaction .r-count{font-size:11px;color:var(--text-secondary)}
+.chat-input-area{padding:12px 20px;border-top:1px solid var(--border-secondary);flex-shrink:0}
+.chat-input-box{background:var(--bg-tertiary);border:1px solid var(--border-primary);border-radius:var(--radius-lg);overflow:hidden;transition:border-color .2s}
+.chat-input-box:focus-within{border-color:var(--blue-primary)}
+.chat-input{width:100%;padding:12px 16px;background:transparent;border:none;color:var(--text-primary);font-size:14px;font-family:var(--font-sans);outline:none;resize:none;min-height:40px;max-height:120px}
+.chat-input::placeholder{color:var(--text-tertiary)}
+.chat-input-toolbar{display:flex;align-items:center;padding:6px 10px;gap:2px;border-top:1px solid var(--border-secondary)}
+.chat-tool-btn{width:28px;height:28px;border-radius:6px;border:none;background:transparent;color:var(--text-tertiary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.chat-tool-btn:hover{background:var(--bg-hover);color:var(--text-primary)}
+.chat-tool-btn svg{width:16px;height:16px}
+.chat-send{margin-left:auto;background:var(--blue-primary);color:#fff;border:none;width:28px;height:28px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.chat-send:hover{background:var(--blue-glow)}
+.chat-send svg{width:14px;height:14px}
+.chat-members{width:220px;background:var(--bg-secondary);border-left:1px solid var(--border-secondary);padding:16px;overflow-y:auto;flex-shrink:0}
+.members-title{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-tertiary);font-weight:600;margin-bottom:12px}
+.member-item{display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer}
+.member-item:hover .member-name{color:var(--text-primary)}
+.member-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;position:relative;flex-shrink:0}
+.member-avatar .status-dot{position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;border-radius:50%;border:2px solid var(--bg-secondary)}
+.member-name{font-size:13px;color:var(--text-secondary);transition:color .15s}
+.member-role{font-size:10px;color:var(--text-tertiary);margin-left:auto}
+
+/* Animations */
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.animate-in{animation:fadeIn .3s ease}
+
+/* Tooltip */
+.tooltip{position:relative}
+.tooltip::after{content:attr(data-tip);position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);background:var(--bg-tertiary);border:1px solid var(--border-primary);padding:4px 8px;border-radius:6px;font-size:11px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s;z-index:1000}
+.sidebar:not(.expanded) .nav-item:hover::after{content:attr(data-tip);position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);background:var(--bg-tertiary);border:1px solid var(--border-primary);padding:4px 8px;border-radius:6px;font-size:11px;white-space:nowrap;opacity:1;pointer-events:none;z-index:1000}
+
+/* Glow effects */
+.glow-blue{box-shadow:0 0 20px rgba(31,111,235,0.15)}
+.glow-text{text-shadow:0 0 20px rgba(88,166,255,0.3)}
+
+/* Loading skeleton */
+.skeleton{background:linear-gradient(90deg,var(--bg-tertiary) 25%,var(--bg-hover) 50%,var(--bg-tertiary) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:4px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* Modal overlay */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px)}
+.modal-overlay.active{display:flex}
+.modal{background:var(--bg-secondary);border:1px solid var(--border-primary);border-radius:var(--radius-lg);width:90%;max-width:560px;box-shadow:var(--shadow);animation:fadeIn .2s ease}
+.modal-header{padding:16px 20px;border-bottom:1px solid var(--border-secondary);display:flex;align-items:center;justify-content:space-between}
+.modal-header h3{font-size:16px;font-weight:600}
+.modal-close{background:none;border:none;color:var(--text-tertiary);cursor:pointer;padding:4px}
+.modal-close:hover{color:var(--text-primary)}
+.modal-body{padding:20px}
+.modal-footer{padding:12px 20px;border-top:1px solid var(--border-secondary);display:flex;justify-content:flex-end;gap:8px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:13px;font-weight:500;margin-bottom:6px}
+.form-input{width:100%;background:var(--bg-primary);border:1px solid var(--border-primary);border-radius:var(--radius);padding:8px 12px;color:var(--text-primary);font-size:13px;font-family:var(--font-sans);outline:none;transition:border-color .2s}
+.form-input:focus{border-color:var(--blue-primary)}
+textarea.form-input{min-height:80px;resize:vertical}
+</style>
+</head>
+<body>
+<div class="app">
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+<div class="sidebar-logo" onclick="toggleSidebar()">
+<svg viewBox="-65 -50 130 100" width="40" height="40" fill="none">
+<defs>
+<linearGradient id="og" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#58a6ff"/>
+<stop offset="100%" stop-color="#bc8cff"/>
+</linearGradient>
+<radialGradient id="ogw">
+<stop offset="0%" stop-color="#58a6ff" stop-opacity="0.3"/>
+<stop offset="100%" stop-color="#58a6ff" stop-opacity="0"/>
+</radialGradient>
+</defs>
+<circle cx="0" cy="0" r="80" fill="url(#ogw)" opacity="0.5"/>
+<circle cx="0" cy="0" r="5" fill="url(#og)"/>
+<ellipse cx="0" cy="0" rx="50" ry="20" stroke="#58a6ff" stroke-width="0.8" opacity="0.4" transform="rotate(-20)"/>
+<circle cx="45" cy="-15" r="2.5" fill="#58a6ff"/>
+<circle cx="-45" cy="15" r="2" fill="#58a6ff" opacity="0.6"/>
+<ellipse cx="0" cy="0" rx="40" ry="45" stroke="#bc8cff" stroke-width="0.8" opacity="0.4" transform="rotate(30)"/>
+<circle cx="20" cy="40" r="2.5" fill="#bc8cff"/>
+<circle cx="-20" cy="-40" r="2" fill="#bc8cff" opacity="0.6"/>
+<ellipse cx="0" cy="0" rx="55" ry="30" stroke="#58a6ff" stroke-width="0.8" opacity="0.3" transform="rotate(60)"/>
+<circle cx="-30" cy="-45" r="2" fill="#58a6ff" opacity="0.5"/>
+<circle cx="30" cy="45" r="2.5" fill="#58a6ff"/>
+<circle cx="60" cy="-30" r="1.5" fill="#58a6ff" opacity="0.3"/>
+<circle cx="-55" cy="35" r="1.5" fill="#bc8cff" opacity="0.3"/>
+<circle cx="50" cy="40" r="1.5" fill="#58a6ff" opacity="0.3"/>
+</svg>
+</div>
+<div class="sidebar-nav">
+<div class="nav-item active tooltip" data-tip="Dashboard" data-page="dashboard" onclick="switchPage('dashboard')">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+<span class="nav-label">Dashboard</span>
+</div>
+<div class="nav-item tooltip" data-tip="Repositories" data-page="repos" onclick="switchPage('repos')">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+<span class="nav-label">Repositories</span>
+</div>
+<div class="nav-item tooltip" data-tip="Pull Requests" data-page="pr" onclick="switchPage('pr')">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+<span class="nav-label">Pull Requests</span>
+<span class="nav-badge">5</span>
+</div>
+<div class="nav-item tooltip" data-tip="Code Editor" data-page="editor" onclick="switchPage('editor')">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+<span class="nav-label">Code Editor</span>
+</div>
+<div class="nav-item tooltip" data-tip="Team Chat" data-page="chat" onclick="switchPage('chat')">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+<span class="nav-label">Team Chat</span>
+<span class="nav-badge">3</span>
+</div>
+</div>
+<div class="sidebar-bottom">
+<div class="nav-item tooltip" data-tip="Settings" onclick="">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+<span class="nav-label">Settings</span>
+</div>
+<div class="sidebar-avatar">ZL</div>
+</div>
+</nav>
+
+<!-- Main Content -->
+<div class="main">
+<!-- Top Bar -->
+<header class="topbar">
+<div class="topbar-breadcrumb" id="breadcrumb">
+<span>Dashboard</span>
+</div>
+<div class="topbar-search">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+<input type="text" placeholder="Search repositories, files, PRs... (Ctrl+K)">
+</div>
+<div class="topbar-actions">
+<button class="topbar-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg><span class="dot"></span></button>
+<button class="topbar-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></button>
+<button class="btn-primary" onclick="openModal()">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+New
+</button>
+</div>
+</header>
+
+<!-- ===== DASHBOARD PAGE ===== -->
+<div class="page-container active" id="page-dashboard">
+<div class="dashboard">
+<div class="dash-welcome animate-in">
+<h1>Welcome back, <span>Zhang Lei</span></h1>
+<p>Here's what's happening with your projects today.</p>
+</div>
+<div class="dash-stats animate-in">
+<div class="stat-card">
+<div class="stat-icon" style="background:rgba(31,111,235,0.15)">
+<svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+</div>
+<div class="stat-value">24</div>
+<div class="stat-label">Repositories</div>
+<div class="stat-change up">↑ 3 this week</div>
+</div>
+<div class="stat-card">
+<div class="stat-icon" style="background:rgba(63,185,80,0.15)">
+<svg viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+</div>
+<div class="stat-value">12</div>
+<div class="stat-label">Open PRs</div>
+<div class="stat-change up">↑ 5 need review</div>
+</div>
+<div class="stat-card">
+<div class="stat-icon" style="background:rgba(188,140,255,0.15)">
+<svg viewBox="0 0 24 24" fill="none" stroke="#bc8cff" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+</div>
+<div class="stat-value">8</div>
+<div class="stat-label">Team Members</div>
+<div class="stat-change up">↑ 2 new</div>
+</div>
+<div class="stat-card">
+<div class="stat-icon" style="background:rgba(210,153,34,0.15)">
+<svg viewBox="0 0 24 24" fill="none" stroke="#d29922" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+</div>
+<div class="stat-value">1,847</div>
+<div class="stat-label">Commits</div>
+<div class="stat-change up">↑ 142 this week</div>
+</div>
+</div>
+<div class="dash-grid animate-in">
+<div class="dash-section">
+<div class="dash-section-header">
+<h3>Recent Activity</h3>
+<a>View all →</a>
+</div>
+<div class="activity-item">
+<div class="activity-avatar" style="background:linear-gradient(135deg,#3fb950,#238636)">LW</div>
+<div class="activity-content">
+<p><strong>Li Wei</strong> merged PR <strong>#142</strong> in <strong>perseus-core</strong></p>
+<p class="time">12 minutes ago</p>
+</div>
+</div>
+<div class="activity-item">
+<div class="activity-avatar" style="background:linear-gradient(135deg,#58a6ff,#1f6feb)">CM</div>
+<div class="activity-content">
+<p><strong>Chen Mei</strong> pushed 3 commits to <strong>feature/auth-module</strong></p>
+<p class="time">34 minutes ago</p>
+</div>
+</div>
+<div class="activity-item">
+<div class="activity-avatar" style="background:linear-gradient(135deg,#bc8cff,#8957e5)">WJ</div>
+<div class="activity-content">
+<p><strong>Wang Jun</strong> opened PR <strong>#156</strong> — "Add WebSocket support for real-time sync"</p>
+<p class="time">1 hour ago</p>
+</div>
+</div>
+<div class="activity-item">
+<div class="activity-avatar" style="background:linear-gradient(135deg,#d29922,#9e6a03)">ZL</div>
+<div class="activity-content">
+<p><strong>You</strong> reviewed PR <strong>#148</strong> in <strong>perseus-editor</strong></p>
+<p class="time">2 hours ago</p>
+</div>
+</div>
+<div class="activity-item">
+<div class="activity-avatar" style="background:linear-gradient(135deg,#f85149,#da3633)">HY</div>
+<div class="activity-content">
+<p><strong>Huang Yan</strong> created issue <strong>#89</strong> — "Memory leak in file watcher"</p>
+<p class="time">3 hours ago</p>
+</div>
+</div>
+<div class="activity-item">
+<div class="activity-avatar" style="background:linear-gradient(135deg,#58a6ff,#1f6feb)">CM</div>
+<div class="activity-content">
+<p><strong>Chen Mei</strong> commented on issue <strong>#85</strong> in <strong>perseus-api</strong></p>
+<p class="time">5 hours ago</p>
+</div>
+</div>
+</div>
+<div>
+<div class="dash-section" style="margin-bottom:16px">
+<div class="dash-section-header">
+<h3>Your Repositories</h3>
+<a>View all →</a>
+</div>
+<div class="repo-quick">
+<div class="repo-quick-item" onclick="switchPage('repos')">
+<div class="repo-dot" style="background:#58a6ff"></div>
+<span class="repo-name">perseus-core</span>
+<span class="repo-lang">TypeScript</span>
+</div>
+<div class="repo-quick-item" onclick="switchPage('repos')">
+<div class="repo-dot" style="background:#3fb950"></div>
+<span class="repo-name">perseus-editor</span>
+<span class="repo-lang">Rust</span>
+</div>
+<div class="repo-quick-item" onclick="switchPage('repos')">
+<div class="repo-dot" style="background:#bc8cff"></div>
+<span class="repo-name">perseus-api</span>
+<span class="repo-lang">Go</span>
+</div>
+<div class="repo-quick-item" onclick="switchPage('repos')">
+<div class="repo-dot" style="background:#d29922"></div>
+<span class="repo-name">perseus-web</span>
+<span class="repo-lang">Vue</span>
+</div>
+<div class="repo-quick-item" onclick="switchPage('repos')">
+<div class="repo-dot" style="background:#f85149"></div>
+<span class="repo-name">perseus-cli</span>
+<span class="repo-lang">Rust</span>
+</div>
+</div>
+</div>
+<div class="dash-section">
+<div class="dash-section-header">
+<h3>Contribution Activity</h3>
+</div>
+<p style="font-size:12px;color:var(--text-tertiary);margin-bottom:4px">142 contributions in the last 30 days</p>
+<div class="contrib-graph" id="contribGraph"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- ===== REPOSITORIES PAGE ===== -->
+<div class="page-container" id="page-repos">
+<div class="repos-page">
+<div class="repos-sidebar">
+<div class="repos-sidebar-header">
+<h3>Explorer</h3>
+<div class="repo-filter">
+<span class="repo-filter-tag active">All</span>
+<span class="repo-filter-tag">Source</span>
+<span class="repo-filter-tag">Config</span>
+<span class="repo-filter-tag">Tests</span>
+</div>
+</div>
+<div class="repo-tree">
+<div class="tree-item" style="font-weight:600;color:var(--text-primary)">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+<span class="tree-name">perseus-core</span>
+<span class="tree-badge">main</span>
+</div>
+<div class="tree-folder">
+<div class="tree-item active">
+<svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+<span class="tree-name">src</span>
+</div>
+<div class="tree-folder">
+<div class="tree-item">
+<svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+<span class="tree-name">core</span>
+</div>
+<div class="tree-item">
+<svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+<span class="tree-name">editor</span>
+</div>
+<div class="tree-item">
+<svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+<span class="tree-name">utils</span>
+</div>
+</div>
+<div class="tree-item">
+<svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+<span class="tree-name">tests</span>
+</div>
+<div class="tree-item">
+<svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+<span class="tree-name">docs</span>
+</div>
+<div class="tree-item">
+<svg viewBox="0 0 24 24" fill="none" stroke="#3178c6" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+<span class="tree-name">package.json</span>
+</div>
+<div class="tree-item">
+<svg viewBox="0 0 24 24" fill="none" stroke="#3178c6" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+<span class="tree-name">tsconfig.json</span>
+</div>
+<div class="tree-item">
+<svg viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+<span class="tree-name">README.md</span>
+</div>
+<div class="tree-item">
+<svg viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+<span class="tree-name">.gitignore</span>
+</div>
+</div>
+</div>
+</div>
+<div class="repos-main">
+<div class="repo-header">
+<svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2" width="24" height="24"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+<h2>perseus-core</h2>
+<span class="repo-visibility">Public</span>
+<div style="margin-left:auto;display:flex;gap:8px">
+<button class="btn-secondary">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+Watch
+</button>
+<button class="btn-secondary">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+Star 2.4k
+</button>
+<button class="btn-secondary">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+Fork 384
+</button>
+</div>
+</div>
+<div class="repo-tabs">
+<div class="repo-tab active">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+Code
+</div>
+<div class="repo-tab">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+Pull Requests <span class="count">12</span>
+</div>
+<div class="repo-tab">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+Issues <span class="count">8</span>
+</div>
+<div class="repo-tab">Actions</div>
+<div class="repo-tab">Settings</div>
+</div>
+<div class="file-list">
+<div class="file-list-header">
+<div style="display:flex;align-items:center;gap:8px">
+<div class="activity-avatar" style="width:24px;height:24px;background:linear-gradient(135deg,#58a6ff,#1f6feb);font-size:10px">CM</div>
+<span class="commit-msg"><strong>Chen Mei</strong> feat: add real-time collaboration engine</span>
+</div>
+<span class="commit-time">a3f2d1c · 2 hours ago</span>
+</div>
+<div class="file-row" onclick="switchPage('editor')">
+<svg class="file-icon-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+<span class="file-name">src</span>
+<span class="file-msg">feat: add real-time collaboration engine</span>
+<span class="file-time">2 hours ago</span>
+</div>
+<div class="file-row">
+<svg class="file-icon-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+<span class="file-name">tests</span>
+<span class="file-msg">test: add unit tests for collab module</span>
+<span class="file-time">3 hours ago</span>
+</div>
+<div class="file-row">
+<svg class="file-icon-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+<span class="file-name">docs</span>
+<span class="file-msg">docs: update API reference</span>
+<span class="file-time">5 hours ago</span>
+</div>
+<div class="file-row">
+<svg class="file-icon-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+<span class="file-name">package.json</span>
+<span class="file-msg">chore: bump dependencies</span>
+<span class="file-time">1 day ago</span>
+</div>
+<div class="file-row">
+<svg class="file-icon-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+<span class="file-name">tsconfig.json</span>
+<span class="file-msg">config: enable strict mode</span>
+<span class="file-time">3 days ago</span>
+</div>
+<div class="file-row">
+<svg class="file-icon-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+<span class="file-name">README.md</span>
+<span class="file-msg">docs: add installation guide</span>
+<span class="file-time">4 days ago</span>
+</div>
+<div class="file-row">
+<svg class="file-icon-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+<span class="file-name">.gitignore</span>
+<span class="file-msg">chore: initial commit</span>
+<span class="file-time">2 weeks ago</span>
+</div>
+</div>
+<div class="readme-section">
+<div class="readme-header">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+README.md
+</div>
+<div class="readme-body">
+<h1>🏛️ Perseus Core</h1>
+<p>
+<span class="badge badge-blue">TypeScript</span>
+<span class="badge badge-green">Build Passing</span>
+<span class="badge badge-purple">v2.4.0</span>
+</p>
+<p style="margin-top:12px">The core engine for the Perseus collaborative development platform. Built with performance and extensibility in mind.</p>
+<h2>Features</h2>
+<ul>
+<li>Real-time collaborative editing with CRDT support</li>
+<li>Advanced syntax highlighting for 50+ languages</li>
+<li>Built-in terminal with SSH tunneling</li>
+<li>Git integration with visual diff viewer</li>
+<li>Plugin system for custom extensions</li>
+</ul>
+<h2>Quick Start</h2>
+<pre>npm install @perseus/core
+import { Editor } from '@perseus/core'
+
+const editor = new Editor({
+  container: '#app',
+  theme: 'perseus-dark',
+  language: 'typescript'
+})</pre>
+<h2>Documentation</h2>
+<p>Visit our <code>docs/</code> directory or check the <code>API Reference</code> for detailed usage guides.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- ===== PR PAGE ===== -->
+<div class="page-container" id="page-pr">
+<div class="pr-page">
+<div id="prListView">
+<div class="pr-toolbar">
+<div class="pr-filters">
+<button class="pr-filter active">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+Open <span class="fcount">5</span>
+</button>
+<button class="pr-filter">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>
+Merged <span class="fcount">128</span>
+</button>
+<button class="pr-filter">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+Closed <span class="fcount">14</span>
+</button>
+</div>
+<div style="margin-left:auto;display:flex;gap:8px">
+<button class="btn-secondary">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+Filter
+</button>
+<button class="btn-primary">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+New Pull Request
+</button>
+</div>
+</div>
+<div class="pr-list">
+<div class="pr-item" onclick="showPRDetail()">
+<svg class="pr-icon open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+<div class="pr-info">
+<div class="pr-title">
+Add WebSocket support for real-time collaboration
+<div class="pr-labels">
+<span class="pr-label feature">feature</span>
+<span class="pr-label urgent">priority: high</span>
+</div>
+</div>
+<div class="pr-meta">
+<span>#156 opened 1 hour ago by Wang Jun</span>
+<span>perseus-core</span>
+</div>
+</div>
+<div class="pr-stats">
+<div class="pr-stat review">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+2
+</div>
+<div class="pr-stat comment">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+8
+</div>
+<div class="pr-avatars">
+<div class="mini-avatar" style="background:linear-gradient(135deg,#bc8cff,#8957e5)">WJ</div>
+<div class="mini-avatar" style="background:linear-gradient(135deg,#3fb950,#238636)">LW</div>
+</div>
+</div>
+</div>
+<div class="pr-item" onclick="showPRDetail()">
+<svg class="pr-icon open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+<div class="pr-info">
+<div class="pr-title">
+Fix memory leak in file watcher module
+<div class="pr-labels">
+<span class="pr-label bug">bug</span>
+</div>
+</div>
+<div class="pr-meta">
+<span>#155 opened 3 hours ago by Huang Yan</span>
+<span>perseus-core</span>
+</div>
+</div>
+<div class="pr-stats">
+<div class="pr-stat review">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+1
+</div>
+<div class="pr-stat comment">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+3
+</div>
+<div class="pr-avatars">
+<div class="mini-avatar" style="background:linear-gradient(135deg,#f85149,#da3633)">HY</div>
+</div>
+</div>
+</div>
+<div class="pr-item" onclick="showPRDetail()">
+<svg class="pr-icon open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+<div class="pr-info">
+<div class="pr-title">
+Implement OAuth2 authentication flow
+<div class="pr-labels">
+<span class="pr-label feature">feature</span>
+<span class="pr-label enhancement">enhancement</span>
+</div>
+</div>
+<div class="pr-meta">
+<span>#154 opened 5 hours ago by Chen Mei</span>
+<span>perseus-api</span>
+</div>
+</div>
+<div class="pr-stats">
+<div class="pr-stat review">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+3
+</div>
+<div class="pr-stat comment">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+12
+</div>
+<div class="pr-avatars">
+<div class="mini-avatar" style="background:linear-gradient(135deg,#58a6ff,#1f6feb)">CM</div>
+<div class="mini-avatar" style="background:linear-gradient(135deg,#d29922,#9e6a03)">ZL</div>
+<div class="mini-avatar" style="background:linear-gradient(135deg,#3fb950,#238636)">LW</div>
+</div>
+</div>
+</div>
+<div class="pr-item" onclick="showPRDetail()">
+<svg class="pr-icon open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+<div class="pr-info">
+<div class="pr-title">
+Refactor editor rendering pipeline for 60fps
+<div class="pr-labels">
+<span class="pr-label enhancement">enhancement</span>
+</div>
+</div>
+<div class="pr-meta">
+<span>#153 opened 8 hours ago by Zhang Lei</span>
+<span>perseus-editor</span>
+</div>
+</div>
+<div class="pr-stats">
+<div class="pr-stat review">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+0
+</div>
+<div class="pr-stat comment">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+5
+</div>
+<div class="pr-avatars">
+<div class="mini-avatar" style="background:linear-gradient(135deg,#d29922,#9e6a03)">ZL</div>
+</div>
+</div>
+</div>
+<div class="pr-item" onclick="showPRDetail()">
+<svg class="pr-icon open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+<div class="pr-info">
+<div class="pr-title">
+Add dark mode theme customization
+<div class="pr-labels">
+<span class="pr-label feature">feature</span>
+</div>
+</div>
+<div class="pr-meta">
+<span>#152 opened 1 day ago by Li Wei</span>
+<span>perseus-web</span>
+</div>
+</div>
+<div class="pr-stats">
+<div class="pr-stat review">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+1
+</div>
+<div class="pr-stat comment">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+6
+</div>
+<div class="pr-avatars">
+<div class="mini-avatar" style="background:linear-gradient(135deg,#3fb950,#238636)">LW</div>
+<div class="mini-avatar" style="background:linear-gradient(135deg,#58a6ff,#1f6feb)">CM</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- PR Detail View -->
+<div class="pr-detail" id="prDetailView">
+<div class="pr-detail-header">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+<button class="btn-secondary" onclick="hidePRDetail()" style="padding:4px 10px">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="15 18 9 12 15 6"/></svg>
+Back
+</button>
+<span style="color:var(--text-tertiary);font-size:13px">#156</span>
+<span style="color:var(--green);font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+Open
+</span>
+</div>
+<h2>Add WebSocket support for real-time collaboration</h2>
+<div class="pr-detail-meta">
+<span><strong style="color:var(--text-primary)">Wang Jun</strong> wants to merge 14 commits into <code style="background:var(--bg-primary);padding:1px 6px;border-radius:4px;font-family:var(--font-mono);font-size:12px">main</code> from <code style="background:var(--bg-primary);padding:1px 6px;border-radius:4px;font-family:var(--font-mono);font-size:12px">feature/websocket</code></span>
+<span>· 1 hour ago</span>
+<div class="pr-labels" style="margin-left:8px">
+<span class="pr-label feature">feature</span>
+<span class="pr-label urgent">priority: high</span>
+</div>
+</div>
+</div>
+<div class="pr-detail-tabs">
+<div class="pr-detail-tab active" onclick="showPRTab(this,'conversation')">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+Conversation <span class="count">8</span>
+</div>
+<div class="pr-detail-tab" onclick="showPRTab(this,'commits')">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg>
+Commits <span class="count">14</span>
+</div>
+<div class="pr-detail-tab" onclick="showPRTab(this,'files')">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+Files Changed <span class="count">7</span>
+</div>
+</div>
+<div class="pr-detail-content" id="prConversation">
+<div class="pr-comment">
+<div class="pr-comment-avatar" style="background:linear-gradient(135deg,#bc8cff,#8957e5)">WJ</div>
+<div class="pr-comment-body">
+<div class="pr-comment-header">
+<strong>Wang Jun</strong> <span class="time">commented 1 hour ago</span>
+</div>
+<div class="pr-comment-content">
+<p>This PR adds WebSocket support to enable real-time collaboration features. Key changes include:</p>
+<p>• Implemented <code>CollaborationEngine</code> class with CRDT-based conflict resolution<br>
+• Added WebSocket server with automatic reconnection<br>
+• Integrated presence awareness (cursors, selections)<br>
+• Added operational transform fallback for older clients</p>
+<p>The implementation follows the Yjs protocol and is compatible with existing document models. All tests pass and performance benchmarks show &lt;50ms sync latency.</p>
+</div>
+</div>
+</div>
+<div class="pr-comment">
+<div class="pr-comment-avatar" style="background:linear-gradient(135deg,#3fb950,#238636)">LW</div>
+<div class="pr-comment-body">
+<div class="pr-comment-header">
+<strong>Li Wei</strong> <span class="time">reviewed 45 minutes ago</span>
+<span style="margin-left:auto;font-size:11px;padding:2px 8px;border-radius:12px;background:rgba(210,153,34,0.15);color:var(--orange)">Changes Requested</span>
+</div>
+<div class="pr-comment-content">
+<p>Great work on the CRDT implementation! A few suggestions:</p>
+<p>1. The <code>reconnect()</code> method should implement exponential backoff — currently it retries every 1s which could overwhelm the server.<br>
+2. Consider adding a message queue for offline edits.<br>
+3. The type definitions in <code>ws-types.ts</code> could use more documentation.</p>
+</div>
+</div>
+</div>
+<div class="pr-comment">
+<div class="pr-comment-avatar" style="background:linear-gradient(135deg,#bc8cff,#8957e5)">WJ</div>
+<div class="pr-comment-body">
+<div class="pr-comment-header">
+<strong>Wang Jun</strong> <span class="time">commented 30 minutes ago</span>
+</div>
+<div class="pr-comment-content">
+<p>Good points! I've pushed a fix for the backoff strategy. Here's the updated reconnection logic:</p>
+</div>
+</div>
+</div>
+<div class="pr-diff">
+<div class="diff-file">
+<div class="diff-file-header">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+src/collab/websocket-client.ts
+<span class="diff-badge diff-add">+42</span>
+<span class="diff-badge diff-del">-8</span>
+</div>
+<div class="diff-line ctx"><span class="diff-line-num">12</span><span class="diff-line-num">12</span><span class="diff-line-content">import { MessageHandler, ConnectionState } from './types';</span></div>
+<div class="diff-line ctx"><span class="diff-line-num">13</span><span class="diff-line-num">13</span><span class="diff-line-content"></span></div>
+<div class="diff-line del"><span class="diff-line-num">14</span><span class="diff-line-num"></span><span class="diff-line-content">-const RETRY_INTERVAL = 1000;</span></div>
+<div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-num">14</span><span class="diff-line-content">+const MAX_RETRY_DELAY = 30000;</span></div>
+<div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-num">15</span><span class="diff-line-content">+const BASE_RETRY_DELAY = 1000;</span></div>
+<div class="diff-line ctx"><span class="diff-line-num">15</span><span class="diff-line-num">16</span><span class="diff-line-content"></span></div>
+<div class="diff-line ctx"><span class="diff-line-num">16</span><span class="diff-line-num">17</span><span class="diff-line-content">export class WebSocketClient {</span></div>
+<div class="diff-line del"><span class="diff-line-num">17</span><span class="diff-line-num"></span><span class="diff-line-content">-  private retryCount = 0;</span></div>
+<div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-num">18</span><span class="diff-line-content">+  private retryCount = 0;</span></div>
+<div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-num">19</span><span class="diff-line-content">+  private messageQueue: Message[] = [];</span></div>
+<div class="diff-line ctx"><span class="diff-line-num">18</span><span class="diff-line-num">20</span><span class="diff-line-content"></span></div>
+<div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-num">21</span><span class="diff-line-content">+  private getRetryDelay(): number {</span></div>
+<div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-num">22</span><span class="diff-line-content">+    const delay = Math.min(</span></div>
+<div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-num">23</span><span class="diff-line-content">+      BASE_RETRY_DELAY * Math.pow(2, this.retryCount),</span></div>
+<div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-num">24</span><span class="diff-line-content">+      MAX_RETRY_DELAY</span></div>
+<div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-num">25</span><span class="diff-line-content">+    );</span></div>
+<div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-num">26</span><span class="diff-line-content">+    return delay + Math.random() * 1000; // jitter</span></div>
+<div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-num">27</span><span class="diff-line-content">+  }</span></div>
+</div>
+</div>
+<div class="pr-reply-box">
+<div class="pr-reply-tabs">
+<div class="pr-reply-tab active">Write</div>
+<div class="pr-reply-tab">Preview</div>
+</div>
+<div class="pr-reply-editor" contenteditable="true" data-placeholder="Leave a comment..."></div>
+<div class="pr-reply-footer">
+<button class="btn-secondary">Close Issue</button>
+<button class="btn-primary">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+Comment
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- ===== EDITOR PAGE ===== -->
+<div class="page-container" id="page-editor">
+<div class="editor-page">
+<div class="editor-sidebar">
+<div class="editor-sidebar-header">
+<h4>Explorer — perseus-core</h4>
+<button>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+</button>
+</div>
+<div class="editor-file-tree">
+<div class="ef-item" style="font-weight:500;color:var(--text-primary)">
+<span class="ef-indent"></span>
+<svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+PERSEUS-CORE
+</div>
+<div class="ef-item">
+<span class="ef-indent"></span>
+<svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+src
+</div>
+<div class="ef-item">
+<span class="ef-indent"></span><span class="ef-indent"></span>
+<svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+core
+</div>
+<div class="ef-item">
+<span class="ef-indent"></span><span class="ef-indent"></span><span class="ef-indent"></span>
+<svg class="ef-ts" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+engine.ts
+</div>
+<div class="ef-item">
+<span class="ef-indent"></span><span class="ef-indent"></span><span class="ef-indent"></span>
+<svg class="ef-ts" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+crdt.ts
+</div>
+<div class="ef-item">
+<span class="ef-indent"></span><span class="ef-indent"></span>
+<svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+collab
+</div>
+<div class="ef-item active">
+<span class="ef-indent"></span><span class="ef-indent"></span><span class="ef-indent"></span>
+<svg class="ef-ts" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+websocket-client.ts
+</div>
+<div class="ef-item">
+<span class="ef-indent"></span><span class="ef-indent"></span><span class="ef-indent"></span>
+<svg class="ef-ts" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+presence.ts
+</div>
+<div class="ef-item">
+<span class="ef-indent"></span><span class="ef-indent"></span>
+<svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+editor
+</div>
+<div class="ef-item">
+<span class="ef-indent"></span><span class="ef-indent"></span><span class="ef-indent"></span>
+<svg class="ef-ts" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+renderer.ts
+</div>
+<div class="ef-item">
+<span class="ef-indent"></span><span class="ef-indent"></span><span class="ef-indent"></span>
+<svg class="ef-ts" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+highlighter.ts
+</div>
+<div class="ef-item">
+<span class="ef-indent"></span><span class="ef-indent"></span>
+<svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+utils
+</div>
+<div class="ef-item">
+<span class="ef-indent"></span>
+<svg class="ef-json" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+package.json
+</div>
+<div class="ef-item">
+<span class="ef-indent"></span>
+<svg class="ef-ts" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+tsconfig.json
+</div>
+</div>
+</div>
+<div class="editor-main">
+<div class="editor-tabs">
+<div class="editor-tab">
+<svg class="ef-ts" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+engine.ts
+<span class="tab-close">×</span>
+</div>
+<div class="editor-tab active">
+<svg class="ef-ts" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+websocket-client.ts
+<span class="tab-close">×</span>
+</div>
+<div class="editor-tab">
+<svg class="ef-ts" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+presence.ts
+<span class="tab-close">×</span>
+</div>
+</div>
+<div class="editor-breadcrumb">
+<span>perseus-core</span> / <span>src</span> / <span>collab</span> / <span style="color:var(--text-primary)">websocket-client.ts</span>
+</div>
+<div class="editor-collab-bar">
+<div class="collab-connection">
+<span class="conn-dot online"></span>
+<span>Connected</span>
+</div>
+<div class="collab-avatars">
+<div class="collab-avatar" style="border-color:#3fb950;background:linear-gradient(135deg,#3fb950,#238636)" title="Li Wei — editing engine.ts">LW</div>
+<div class="collab-avatar" style="border-color:#58a6ff;background:linear-gradient(135deg,#58a6ff,#1f6feb)" title="Chen Mei — viewing websocket-client.ts">CM</div>
+<div class="collab-avatar" style="border-color:#bc8cff;background:linear-gradient(135deg,#bc8cff,#8957e5)" title="Wang Jun — idle">WJ</div>
+<div class="collab-avatar active" style="border-color:#d29922;background:linear-gradient(135deg,#d29922,#9e6a03)" title="Zhang Lei (you) — editing">ZL</div>
+</div>
+<div class="collab-file-info">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+<strong>2</strong> editors viewing this file
+</div>
+</div>
+<div class="editor-content">
+<div class="editor-code">
+<div class="editor-code-area">
+<div class="line-numbers" id="lineNumbers"></div>
+<div class="code-content" id="codeContent"></div>
+</div>
+</div>
+</div>
+<div class="editor-collab-panel">
+<div class="collab-panel-tabs">
+<div class="collab-panel-tab active">Discussions <span class="tab-count">3</span></div>
+<div class="collab-panel-tab">Editors <span class="tab-count">4</span></div>
+</div>
+<div class="collab-panel-body" id="collabPanelBody">
+<div class="discussion-thread active">
+<div class="thread-icon">💬</div>
+<div class="thread-body">
+<div class="thread-author">Li Wei</div>
+<div class="thread-line">Line 11 — <span style="color:var(--text-tertiary)">handleMessage(msg)</span></div>
+<div class="thread-text">Should we add error handling for malformed JSON messages? The current parse will throw.</div>
+<div class="thread-meta">
+<span class="reply-count"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> 2 replies</span>
+<span class="thread-time">10m ago</span>
+</div>
+</div>
+</div>
+<div class="discussion-thread">
+<div class="thread-icon">💬</div>
+<div class="thread-body">
+<div class="thread-author">Chen Mei</div>
+<div class="thread-line">Line 15 — <span style="color:var(--text-tertiary)">startHeartbeat()</span></div>
+<div class="thread-text">Should we make the heartbeat interval configurable instead of hardcoded?</div>
+<div class="thread-meta">
+<span class="reply-count"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> 1 reply</span>
+<span class="thread-time">25m ago</span>
+</div>
+</div>
+</div>
+<div class="discussion-thread">
+<div class="thread-icon">✅</div>
+<div class="thread-body">
+<div class="thread-author">Wang Jun</div>
+<div class="thread-line">Line 34 — <span style="color:var(--text-tertiary)">getRetryDelay()</span></div>
+<div class="thread-text">Fixed the jitter calculation — changed Math.random() to use crypto.getRandomValues per review feedback.</div>
+<div class="thread-meta">
+<span class="reply-count"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> Resolved</span>
+<span class="thread-time">1h ago</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="editor-statusbar">
+<div class="statusbar-item">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+main
+</div>
+<div class="statusbar-item">
+<span class="conn-dot online" style="width:6px;height:6px;display:inline-block;margin-right:2px"></span>
+Connected
+</div>
+<div class="statusbar-right">
+<div class="statusbar-item">Ln 24, Col 38</div>
+<div class="statusbar-item">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+4 online
+</div>
+<div class="statusbar-item">TypeScript</div>
+<div class="statusbar-item">UTF-8</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- ===== CHAT PAGE ===== -->
+<div class="page-container" id="page-chat">
+<div class="chat-page">
+<div class="chat-channels">
+<div class="chat-channels-header">
+<h3>Perseus Team</h3>
+<input class="chat-search" placeholder="Search conversations...">
+</div>
+<div style="flex:1;overflow-y:auto">
+<div class="channel-group">
+<div class="channel-group-title">Channels</div>
+<div class="channel-item active">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+<span class="ch-name">general</span>
+<span class="ch-unread">3</span>
+</div>
+<div class="channel-item">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+<span class="ch-name">engineering</span>
+</div>
+<div class="channel-item">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+<span class="ch-name">design</span>
+<span class="ch-unread">1</span>
+</div>
+<div class="channel-item">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+<span class="ch-name">random</span>
+</div>
+<div class="channel-item">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+<span class="ch-name">releases</span>
+</div>
+</div>
+<div class="channel-group">
+<div class="channel-group-title">Direct Messages</div>
+<div class="channel-item">
+<div class="dm-status online"><div class="dm-avatar" style="background:linear-gradient(135deg,#3fb950,#238636)">LW</div></div>
+<span class="ch-name">Li Wei</span>
+</div>
+<div class="channel-item">
+<div class="dm-status online"><div class="dm-avatar" style="background:linear-gradient(135deg,#58a6ff,#1f6feb)">CM</div></div>
+<span class="ch-name">Chen Mei</span>
+<span class="ch-unread">2</span>
+</div>
+<div class="channel-item">
+<div class="dm-status away"><div class="dm-avatar" style="background:linear-gradient(135deg,#bc8cff,#8957e5)">WJ</div></div>
+<span class="ch-name">Wang Jun</span>
+</div>
+<div class="channel-item">
+<div class="dm-status offline"><div class="dm-avatar" style="background:linear-gradient(135deg,#f85149,#da3633)">HY</div></div>
+<span class="ch-name">Huang Yan</span>
+</div>
+</div>
+</div>
+</div>
+<div class="chat-main">
+<div class="chat-header">
+<div class="chat-header-info">
+<h3>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+# general
+</h3>
+<p>Company-wide announcements and general discussion</p>
+</div>
+<div class="chat-header-actions">
+<button class="topbar-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+<button class="topbar-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+<button class="topbar-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+</div>
+</div>
+<div class="chat-messages" id="chatMessages">
+<div class="chat-date-divider"><span>Today</span></div>
+<div class="chat-msg">
+<div class="chat-msg-avatar" style="background:linear-gradient(135deg,#3fb950,#238636)">LW</div>
+<div class="chat-msg-body">
+<div class="chat-msg-header">
+<span class="name" style="color:#3fb950">Li Wei</span>
+<span class="timestamp">9:32 AM</span>
+</div>
+<div class="chat-msg-text">Good morning team! 👋 I just merged the CRDT implementation PR. The real-time sync is now working across all editors.</div>
+<div class="chat-msg-reaction">
+<div class="reaction active">🎉 <span class="r-count">4</span></div>
+<div class="reaction">🚀 <span class="r-count">3</span></div>
+<div class="reaction">❤️ <span class="r-count">2</span></div>
+</div>
+</div>
+</div>
+<div class="chat-msg">
+<div class="chat-msg-avatar" style="background:linear-gradient(135deg,#58a6ff,#1f6feb)">CM</div>
+<div class="chat-msg-body">
+<div class="chat-msg-header">
+<span class="name" style="color:#58a6ff">Chen Mei</span>
+<span class="timestamp">9:45 AM</span>
+</div>
+<div class="chat-msg-text">Nice work! I've been testing the WebSocket connection and it's super stable. Latency is consistently under 50ms. Here's what I found in the benchmarks:</div>
+<div class="chat-msg-code"><span style="color:#8b949e">// Performance results</span>
+<span style="color:#79c0ff">Avg latency</span>: <span style="color:#a5d6ff">32ms</span>
+<span style="color:#79c0ff">P99 latency</span>: <span style="color:#a5d6ff">48ms</span>
+<span style="color:#79c0ff">Throughput</span>: <span style="color:#a5d6ff">~1200 ops/sec</span>
+<span style="color:#79c0ff">Memory</span>: <span style="color:#a5d6ff">~24MB per session</span></div>
+<div class="chat-msg-reaction">
+<div class="reaction">👀 <span class="r-count">2</span></div>
+<div class="reaction active">💯 <span class="r-count">3</span></div>
+</div>
+</div>
+</div>
+<div class="chat-msg">
+<div class="chat-msg-avatar" style="background:linear-gradient(135deg,#bc8cff,#8957e5)">WJ</div>
+<div class="chat-msg-body">
+<div class="chat-msg-header">
+<span class="name" style="color:#bc8cff">Wang Jun</span>
+<span class="timestamp">10:12 AM</span>
+</div>
+<div class="chat-msg-text">I've opened PR <a href="#">#156</a> for the WebSocket support. It includes the exponential backoff fix that Li Wei suggested. Can someone take a look?</div>
+<div class="chat-msg-reaction">
+<div class="reaction">👍 <span class="r-count">2</span></div>
+</div>
+</div>
+</div>
+<div class="chat-msg">
+<div class="chat-msg-avatar" style="background:linear-gradient(135deg,#d29922,#9e6a03)">ZL</div>
+<div class="chat-msg-body">
+<div class="chat-msg-header">
+<span class="name" style="color:#d29922">Zhang Lei</span>
+<span class="timestamp">10:28 AM</span>
+</div>
+<div class="chat-msg-text">I'll review it now. Also, I've been working on the editor rendering pipeline — managed to get it to a stable 60fps even with large files (100k+ lines). The key was virtualizing the DOM updates.</div>
+</div>
+</div>
+<div class="chat-msg">
+<div class="chat-msg-avatar" style="background:linear-gradient(135deg,#f85149,#da3633)">HY</div>
+<div class="chat-msg-body">
+<div class="chat-msg-header">
+<span class="name" style="color:#f85149">Huang Yan</span>
+<span class="timestamp">10:45 AM</span>
+</div>
+<div class="chat-msg-text">That's awesome! I found a memory leak in the file watcher though — created issue <a href="#">#89</a>. It happens when files are rapidly created and deleted. The <code>fs.watch</code> listeners aren't being cleaned up properly.</div>
+<div class="chat-msg-reaction">
+<div class="reaction">🐛 <span class="r-count">1</span></div>
+</div>
+</div>
+</div>
+<div class="chat-msg">
+<div class="chat-msg-avatar" style="background:linear-gradient(135deg,#3fb950,#238636)">LW</div>
+<div class="chat-msg-body">
+<div class="chat-msg-header">
+<span class="name" style="color:#3fb950">Li Wei</span>
+<span class="timestamp">11:02 AM</span>
+</div>
+<div class="chat-msg-text">Good catch Huang Yan! I'll take a look at the file watcher issue. In the meantime, let's plan the sprint for next week. We should prioritize:</div>
+<div class="chat-msg-text" style="margin-top:4px">1. WebSocket stability improvements<br>2. File watcher memory leak fix<br>3. Editor performance optimizations<br>4. OAuth2 integration testing</div>
+<div class="chat-msg-reaction">
+<div class="reaction active">✅ <span class="r-count">5</span></div>
+</div>
+</div>
+</div>
+</div>
+<div class="chat-input-area">
+<div class="chat-input-box">
+<textarea class="chat-input" placeholder="Message #general..." rows="1" id="chatInput"></textarea>
+<div class="chat-input-toolbar">
+<button class="chat-tool-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></button>
+<button class="chat-tool-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></button>
+<button class="chat-tool-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></button>
+<button class="chat-tool-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button>
+<button class="chat-tool-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+<button class="chat-send" onclick="sendMessage()">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+</button>
+</div>
+</div>
+</div>
+</div>
+<div class="chat-members">
+<div class="members-title">Online — 5</div>
+<div class="member-item">
+<div class="member-avatar" style="background:linear-gradient(135deg,#3fb950,#238636)">LW<span class="status-dot" style="background:var(--green)"></span></div>
+<span class="member-name">Li Wei</span>
+<span class="member-role">Lead</span>
+</div>
+<div class="member-item">
+<div class="member-avatar" style="background:linear-gradient(135deg,#58a6ff,#1f6feb)">CM<span class="status-dot" style="background:var(--green)"></span></div>
+<span class="member-name">Chen Mei</span>
+<span class="member-role">Dev</span>
+</div>
+<div class="member-item">
+<div class="member-avatar" style="background:linear-gradient(135deg,#bc8cff,#8957e5)">WJ<span class="status-dot" style="background:var(--orange)"></span></div>
+<span class="member-name">Wang Jun</span>
+<span class="member-role">Dev</span>
+</div>
+<div class="member-item">
+<div class="member-avatar" style="background:linear-gradient(135deg,#d29922,#9e6a03)">ZL<span class="status-dot" style="background:var(--green)"></span></div>
+<span class="member-name">Zhang Lei</span>
+<span class="member-role">Dev</span>
+</div>
+<div class="member-item">
+<div class="member-avatar" style="background:linear-gradient(135deg,#f85149,#da3633)">HY<span class="status-dot" style="background:var(--green)"></span></div>
+<span class="member-name">Huang Yan</span>
+<span class="member-role">QA</span>
+</div>
+<div class="members-title" style="margin-top:20px">Offline — 3</div>
+<div class="member-item" style="opacity:0.5">
+<div class="member-avatar" style="background:linear-gradient(135deg,#6e7681,#484f58)">XK<span class="status-dot" style="background:var(--text-tertiary)"></span></div>
+<span class="member-name">Xu Kai</span>
+<span class="member-role">Dev</span>
+</div>
+<div class="member-item" style="opacity:0.5">
+<div class="member-avatar" style="background:linear-gradient(135deg,#6e7681,#484f58)">SL<span class="status-dot" style="background:var(--text-tertiary)"></span></div>
+<span class="member-name">Sun Lin</span>
+<span class="member-role">Design</span>
+</div>
+<div class="member-item" style="opacity:0.5">
+<div class="member-avatar" style="background:linear-gradient(135deg,#6e7681,#484f58)">ZH<span class="status-dot" style="background:var(--text-tertiary)"></span></div>
+<span class="member-name">Zhao He</span>
+<span class="member-role">DevOps</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+<div class="modal" onclick="event.stopPropagation()">
+<div class="modal-header">
+<h3>Create New</h3>
+<button class="modal-close" onclick="closeModal()">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+</button>
+</div>
+<div class="modal-body">
+<div class="form-group">
+<label>Type</label>
+<select class="form-input" id="modalType">
+<option>Repository</option>
+<option>Pull Request</option>
+<option>Issue</option>
+<option>Snippet</option>
+</select>
+</div>
+<div class="form-group">
+<label>Name</label>
+<input class="form-input" placeholder="Enter name...">
+</div>
+<div class="form-group">
+<label>Description</label>
+<textarea class="form-input" placeholder="Enter description..."></textarea>
+</div>
+<div class="form-group">
+<label>Visibility</label>
+<select class="form-input">
+<option>Private</option>
+<option>Internal</option>
+<option>Public</option>
+</select>
+</div>
+</div>
+<div class="modal-footer">
+<button class="btn-secondary" onclick="closeModal()">Cancel</button>
+<button class="btn-primary" onclick="closeModal()">Create</button>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+// Page switching
+function switchPage(page) {
+document.querySelectorAll('.page-container').forEach(p => p.classList.remove('active'));
+document.querySelectorAll('.nav-item[data-page]').forEach(n => n.classList.remove('active'));
+document.getElementById('page-' + page).classList.add('active');
+document.querySelector('.nav-item[data-page="' + page + '"]').classList.add('active');
+const names = {dashboard:'Dashboard',repos:'Repositories / perseus-core',pr:'Pull Requests',editor:'Code Editor',chat:'Team Chat'};
+document.getElementById('breadcrumb').innerHTML = '<span>' + (names[page]||page) + '</span>';
+if(page === 'pr') { hidePRDetail(); }
+}
+
+// Sidebar toggle
+function toggleSidebar() {
+document.getElementById('sidebar').classList.toggle('expanded');
+}
+
+// PR detail
+function showPRDetail() {
+document.getElementById('prListView').style.display = 'none';
+document.getElementById('prDetailView').classList.add('active');
+document.getElementById('breadcrumb').innerHTML = '<span>Pull Requests</span> / <span>#156 WebSocket Support</span>';
+}
+function hidePRDetail() {
+document.getElementById('prListView').style.display = '';
+document.getElementById('prDetailView').classList.remove('active');
+document.getElementById('breadcrumb').innerHTML = '<span>Pull Requests</span>';
+}
+function showPRTab(el, tab) {
+document.querySelectorAll('.pr-detail-tab').forEach(t => t.classList.remove('active'));
+el.classList.add('active');
+}
+
+// Modal
+function openModal() { document.getElementById('modalOverlay').classList.add('active'); }
+function closeModal(e) {
+if(!e || e.target === document.getElementById('modalOverlay'))
+document.getElementById('modalOverlay').classList.remove('active');
+}
+
+// Contribution graph
+function initContribGraph() {
+const graph = document.getElementById('contribGraph');
+if(!graph) return;
+graph.innerHTML = '';
+for(let i = 0; i < 30; i++) {
+const bar = document.createElement('div');
+bar.className = 'contrib-bar';
+const h = Math.random() * 100;
+bar.style.height = Math.max(3, h) + '%';
+if(h > 70) bar.style.background = 'var(--blue-primary)';
+else if(h > 40) bar.style.background = 'var(--blue-glow)';
+graph.appendChild(bar);
+}
+}
+
+// Code editor content
+function initEditor() {
+const code = `import { EventEmitter } from 'events';
+import { CRDTDocument, Operation } from './crdt';
+import { PresenceManager, CursorState } from './presence';
+import { MessageHandler, ConnectionState, WSMessage } from './types';
+
+const MAX_RETRY_DELAY = 30000;
+const BASE_RETRY_DELAY = 1000;
+const HEARTBEAT_INTERVAL = 15000;
+
+/**
+ * WebSocket client for real-time collaboration.
+ * Implements automatic reconnection with exponential
+ * backoff and message queuing for offline support.
+ */
+export class WebSocketClient extends EventEmitter {
+  private ws: WebSocket | null = null;
+  private url: string;
+  private retryCount = 0;
+  private messageQueue: WSMessage[] = [];
+  private presenceManager: PresenceManager;
+  private heartbeatTimer: NodeJS.Timer | null = null;
+  private state: ConnectionState = 'disconnected';
+
+  constructor(url: string, private doc: CRDTDocument) {
+    super();
+    this.url = url;
+    this.presenceManager = new PresenceManager();
+    this.setupDocumentListeners();
+  }
+
+  /**
+   * Establish WebSocket connection with retry logic.
+   */
+  async connect(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        this.ws = new WebSocket(this.url);
+        this.state = 'connecting';
+        this.emit('stateChange', this.state);
+
+        this.ws.onopen = () => {
+          this.state = 'connected';
+          this.retryCount = 0;
+          this.emit('stateChange', this.state);
+          this.startHeartbeat();
+          this.flushMessageQueue();
+          resolve();
+        };
+
+        this.ws.onmessage = (event) => {
+          const msg: WSMessage = JSON.parse(event.data);
+          this.handleMessage(msg);
+        };
+
+        this.ws.onclose = (event) => {
+          this.state = 'disconnected';
+          this.emit('stateChange', this.state);
+          this.stopHeartbeat();
+          if (!event.wasClean) {
+            this.scheduleReconnect();
+          }
+        };
+
+        this.ws.onerror = (error) => {
+          this.emit('error', error);
+          reject(error);
+        };
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  private getRetryDelay(): number {
+    const delay = Math.min(
+      BASE_RETRY_DELAY * Math.pow(2, this.retryCount),
+      MAX_RETRY_DELAY
+    );
+    // Add jitter to prevent thundering herd
+    return delay + Math.random() * 1000;
+  }
+
+  private scheduleReconnect(): void {
+    this.retryCount++;
+    const delay = this.getRetryDelay();
+    this.emit('reconnecting', { attempt: this.retryCount, delay });
+    setTimeout(() => this.connect(), delay);
+  }
+
+  /**
+   * Send an operation to all connected peers.
+   */
+  sendOperation(op: Operation): void {
+    const msg: WSMessage = {
+      type: 'operation',
+      payload: op,
+      timestamp: Date.now(),
+      clientId: this.presenceManager.clientId
+    };
+
+    if (this.state === 'connected') {
+      this.ws!.send(JSON.stringify(msg));
+    } else {
+      this.messageQueue.push(msg);
+    }
+  }
+
+  private flushMessageQueue(): void {
+    while (this.messageQueue.length > 0) {
+      const msg = this.messageQueue.shift()!;
+      this.ws!.send(JSON.stringify(msg));
+    }
+  }
+
+  private handleMessage(msg: WSMessage): void {
+    switch (msg.type) {
+      case 'operation':
+        this.doc.applyRemoteOperation(msg.payload);
+        this.emit('remoteOperation', msg.payload);
+        break;
+      case 'presence':
+        this.presenceManager.updatePresence(
+          msg.clientId, msg.payload
+        );
+        this.emit('presenceUpdate', msg.payload);
+        break;
+      case 'heartbeat':
+        // Acknowledge server heartbeat
+        break;
+    }
+  }
+
+  private startHeartbeat(): void {
+    this.heartbeatTimer = setInterval(() => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: 'heartbeat' }));
+      }
+    }, HEARTBEAT_INTERVAL);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
+  private setupDocumentListeners(): void {
+    this.doc.on('localOperation', (op: Operation) => {
+      this.sendOperation(op);
+    });
+  }
+
+  disconnect(): void {
+    this.stopHeartbeat();
+    if (this.ws) {
+      this.ws.close(1000, 'Client disconnect');
+      this.ws = null;
+    }
+    this.state = 'disconnected';
+    this.emit('stateChange', this.state);
+  }
+}`;
+
+const lines = code.split('\n');
+const lineNums = document.getElementById('lineNumbers');
+const codeContent = document.getElementById('codeContent');
+
+let lineNumsHTML = '';
+let codeHTML = '';
+
+const discussionLines = {5:true, 11:true, 22:true, 34:true};
+const collaboratorCursors = {
+4: {name:'CM', color:'#58a6ff'},
+8: {name:'LW', color:'#3fb950', selection:10}
+};
+
+lines.forEach((line, i) => {
+const lineNum = i + 1;
+let marker = '';
+if (discussionLines[lineNum]) {
+marker = '<span style="color:var(--blue-light);cursor:pointer;font-size:11px;margin-right:3px" title="Open discussion thread" onclick="event.stopPropagation();document.querySelector(\'.collab-panel-tab\').click()">💬</span>';
+}
+lineNumsHTML += marker + lineNum + '\n';
+codeHTML += highlightTS(line) + '\n';
+});
+lineNums.innerHTML = lineNumsHTML;
+codeContent.innerHTML = codeHTML;
+
+let cursorHTML = '';
+Object.keys(collaboratorCursors).forEach(lineNum => {
+const c = collaboratorCursors[lineNum];
+const ln = parseInt(lineNum);
+const endLine = c.selection ? c.selection : ln;
+const lineHeight = 20.8;
+const top = (ln - 1) * lineHeight;
+const height = (endLine - ln + 1) * lineHeight;
+cursorHTML += `<div class="collab-cursor" style="left:0;top:${top}px;background:${c.color};height:${lineHeight}px" title="${c.name}">
+<span class="cursor-label" style="background:${c.color}">${c.name}</span>
+</div>`;
+if (c.selection) {
+cursorHTML += `<div class="collab-selection" style="left:0;top:${top}px;width:100%;height:${height}px;background:${c.color}"></div>`;
+}
+});
+codeContent.insertAdjacentHTML('beforeend', cursorHTML);
+}
+
+function highlightTS(line) {
+let escaped = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+// Comments
+if(escaped.trim().startsWith('//') || escaped.trim().startsWith('*') || escaped.trim().startsWith('/**')) {
+return '<span class="cm">' + escaped + '</span>';
+}
+// Strings
+escaped = escaped.replace(/('(?:[^'\\]|\\.)*')/g, '<span class="str">$1</span>');
+escaped = escaped.replace(/("(?:[^"\\]|\\.)*")/g, '<span class="str">$1</span>');
+escaped = escaped.replace(/(`(?:[^`\\]|\\.)*`)/g, '<span class="str">$1</span>');
+// Keywords
+const kws = ['import','from','export','class','extends','const','let','var','function','return','if','else','switch','case','break','new','this','private','public','async','await','try','catch','throw','typeof','interface','type','enum','void','null','undefined','true','false','static','super','constructor'];
+kws.forEach(kw => {
+const re = new RegExp('\\b(' + kw + ')\\b', 'g');
+escaped = escaped.replace(re, '<span class="kw">$1</span>');
+});
+// Types
+const types = ['Promise','WebSocket','EventEmitter','NodeJS','Timer','string','number','boolean','any','void','CRDTDocument','Operation','PresenceManager','CursorState','MessageHandler','ConnectionState','WSMessage'];
+types.forEach(tp => {
+const re = new RegExp('\\b(' + tp + ')\\b', 'g');
+escaped = escaped.replace(re, '<span class="tp">$1</span>');
+});
+// Numbers
+escaped = escaped.replace(/\b(\d+)\b/g, '<span class="num">$1</span>');
+// Function calls
+escaped = escaped.replace(/\b([a-zA-Z_]\w*)\s*\(/g, '<span class="fn">$1</span>(');
+return escaped;
+}
+
+// Chat
+function sendMessage() {
+const input = document.getElementById('chatInput');
+const text = input.value.trim();
+if(!text) return;
+const messages = document.getElementById('chatMessages');
+const now = new Date();
+const time = now.getHours() + ':' + String(now.getMinutes()).padStart(2,'0');
+const msgHTML = `<div class="chat-msg" style="animation:fadeIn .3s ease">
+<div class="chat-msg-avatar" style="background:linear-gradient(135deg,#d29922,#9e6a03)">ZL</div>
+<div class="chat-msg-body">
+<div class="chat-msg-header">
+<span class="name" style="color:#d29922">Zhang Lei</span>
+<span class="timestamp">${time}</span>
+</div>
+<div class="chat-msg-text">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+</div>
+</div>`;
+messages.insertAdjacentHTML('beforeend', msgHTML);
+input.value = '';
+messages.scrollTop = messages.scrollHeight;
+}
+
+document.getElementById('chatInput').addEventListener('keydown', function(e) {
+if(e.key === 'Enter' && !e.shiftKey) {
+e.preventDefault();
+sendMessage();
+}
+});
+
+// Repo filter tags
+document.querySelectorAll('.repo-filter-tag').forEach(tag => {
+tag.addEventListener('click', function() {
+this.parentElement.querySelectorAll('.repo-filter-tag').forEach(t => t.classList.remove('active'));
+this.classList.add('active');
+});
+});
+
+// PR filters
+document.querySelectorAll('.pr-filter').forEach(f => {
+f.addEventListener('click', function() {
+document.querySelectorAll('.pr-filter').forEach(x => x.classList.remove('active'));
+this.classList.add('active');
+});
+});
+
+// Repo tabs
+document.querySelectorAll('.repo-tab').forEach(t => {
+t.addEventListener('click', function() {
+document.querySelectorAll('.repo-tab').forEach(x => x.classList.remove('active'));
+this.classList.add('active');
+});
+});
+
+// Channel items
+document.querySelectorAll('.channel-item').forEach(c => {
+c.addEventListener('click', function() {
+document.querySelectorAll('.channel-item').forEach(x => x.classList.remove('active'));
+this.classList.add('active');
+});
+});
+
+// Editor tabs
+document.querySelectorAll('.editor-tab').forEach(t => {
+t.addEventListener('click', function() {
+document.querySelectorAll('.editor-tab').forEach(x => x.classList.remove('active'));
+this.classList.add('active');
+});
+});
+
+// Collab panel tabs
+document.querySelectorAll('.collab-panel-tab').forEach(t => {
+t.addEventListener('click', function() {
+document.querySelectorAll('.collab-panel-tab').forEach(x => x.classList.remove('active'));
+this.classList.add('active');
+const panelBody = document.getElementById('collabPanelBody');
+if (this.textContent.trim().startsWith('Editors')) {
+panelBody.innerHTML = `
+<div class="editor-list-item">
+<div class="el-avatar" style="background:linear-gradient(135deg,#3fb950,#238636)">LW</div>
+<div class="el-info">
+<div class="el-name">Li Wei</div>
+<div class="el-file">engine.ts</div>
+</div>
+<div class="el-status"><span class="el-status-dot editing"></span> editing</div>
+</div>
+<div class="editor-list-item">
+<div class="el-avatar" style="background:linear-gradient(135deg,#58a6ff,#1f6feb)">CM</div>
+<div class="el-info">
+<div class="el-name">Chen Mei</div>
+<div class="el-file">websocket-client.ts</div>
+</div>
+<div class="el-status"><span class="el-status-dot viewing"></span> viewing</div>
+</div>
+<div class="editor-list-item">
+<div class="el-avatar" style="background:linear-gradient(135deg,#bc8cff,#8957e5)">WJ</div>
+<div class="el-info">
+<div class="el-name">Wang Jun</div>
+<div class="el-file">crdt.ts</div>
+</div>
+<div class="el-status"><span class="el-status-dot viewing"></span> viewing</div>
+</div>
+<div class="editor-list-item">
+<div class="el-avatar" style="background:linear-gradient(135deg,#d29922,#9e6a03)">ZL</div>
+<div class="el-info">
+<div class="el-name">Zhang Lei</div>
+<div class="el-file">websocket-client.ts <span style="color:var(--text-tertiary);font-size:10px">(you)</span></div>
+</div>
+<div class="el-status"><span class="el-status-dot editing"></span> editing</div>
+</div>`;
+} else {
+panelBody.innerHTML = `<div class="discussion-thread active">
+<div class="thread-icon">💬</div>
+<div class="thread-body">
+<div class="thread-author">Li Wei</div>
+<div class="thread-line">Line 11 — <span style="color:var(--text-tertiary)">handleMessage(msg)</span></div>
+<div class="thread-text">Should we add error handling for malformed JSON messages? The current parse will throw.</div>
+<div class="thread-meta">
+<span class="reply-count"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> 2 replies</span>
+<span class="thread-time">10m ago</span>
+</div>
+</div>
+</div>
+<div class="discussion-thread">
+<div class="thread-icon">💬</div>
+<div class="thread-body">
+<div class="thread-author">Chen Mei</div>
+<div class="thread-line">Line 5 — <span style="color:var(--text-tertiary)">startHeartbeat()</span></div>
+<div class="thread-text">Should we make the heartbeat interval configurable instead of hardcoded?</div>
+<div class="thread-meta">
+<span class="reply-count"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> 1 reply</span>
+<span class="thread-time">25m ago</span>
+</div>
+</div>
+</div>
+<div class="discussion-thread">
+<div class="thread-icon">✅</div>
+<div class="thread-body">
+<div class="thread-author">Wang Jun</div>
+<div class="thread-line">Line 34 — <span style="color:var(--text-tertiary)">getRetryDelay()</span></div>
+<div class="thread-text">Fixed the jitter calculation — changed Math.random() to use crypto.getRandomValues per review feedback.</div>
+<div class="thread-meta">
+<span class="reply-count">Resolved</span>
+<span class="thread-time">1h ago</span>
+</div>
+</div>
+</div>`;
+}
+});
+});
+
+// Reply tabs
+document.querySelectorAll('.pr-reply-tab').forEach(t => {
+t.addEventListener('click', function() {
+document.querySelectorAll('.pr-reply-tab').forEach(x => x.classList.remove('active'));
+this.classList.add('active');
+});
+});
+
+// Reactions
+document.querySelectorAll('.reaction').forEach(r => {
+r.addEventListener('click', function() {
+this.classList.toggle('active');
+const count = this.querySelector('.r-count');
+let n = parseInt(count.textContent);
+count.textContent = this.classList.contains('active') ? n + 1 : n - 1;
+});
+});
+
+// Placeholder for contenteditable
+document.querySelectorAll('[contenteditable]').forEach(el => {
+el.addEventListener('focus', function() {
+if(this.textContent.trim() === '') this.innerHTML = '';
+});
+el.addEventListener('blur', function() {
+if(this.textContent.trim() === '') this.innerHTML = '';
+});
+});
+
+// Keyboard shortcut
+document.addEventListener('keydown', function(e) {
+if((e.ctrlKey || e.metaKey) && e.key === 'k') {
+e.preventDefault();
+document.querySelector('.topbar-search input').focus();
+}
+});
+
+// Init
+initContribGraph();
+initEditor();
+
+// Scroll chat to bottom
+setTimeout(() => {
+const chat = document.getElementById('chatMessages');
+if(chat) chat.scrollTop = chat.scrollHeight;
+}, 100);
+</script>
+</body>
+</html>

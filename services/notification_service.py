@@ -8,6 +8,7 @@ from models.user import User
 from core.exception import NotFoundException
 from utils.email_utils import send_notification_email
 from services import notification_preference_service
+from api.websocket.handlers.notification import notify_user
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,13 @@ async def create_notification(
                 if not success:
                     logger.warning("Failed to send notification email to %s for notification type '%s'", user.email, type)
 
-    return build_notification_response(notif)
+    result_data = build_notification_response(notif)
+    try:
+        await notify_user(user_id, type, result_data)
+    except Exception as e:
+        logger.warning("Failed to push WebSocket notification for user %d: %s", user_id, e)
+
+    return result_data
 
 
 async def get_user_notifications(

@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perseus — Code Collaboration Platform</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-500-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-600-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-700-normal.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#0d1117;--bg-card:#161b22;--bg-elevated:#1c2128;
+--blue:#1f6feb;--blue-light:#58a6ff;--blue-glow:#388bfd;
+--text:#e6edf3;--text-secondary:#8b949e;--text-tertiary:#6e7681;
+--border:#30363d;--border-light:#21262d;
+--green:#3fb950;--orange:#d29922;--red:#f85149;--purple:#bc8cff;
+--font:'Inter',system-ui,sans-serif;--font-mono:'JetBrains Mono',monospace;
+--radius:10px;--radius-lg:16px;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--text);overflow-x:hidden;line-height:1.5}
+::selection{background:var(--blue);color:#fff}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Navbar */
+.nav{position:fixed;top:0;left:0;right:0;height:64px;display:flex;align-items:center;padding:0 40px;background:rgba(13,17,23,0.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border-light);z-index:100}
+.nav-logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;color:var(--text);text-decoration:none}
+.nav-logo svg{width:28px;height:28px}
+.nav-links{display:flex;align-items:center;gap:32px;margin-left:48px}
+.nav-links a{color:var(--text-secondary);text-decoration:none;font-size:14px;font-weight:500;transition:color .2s}
+.nav-links a:hover{color:var(--text)}
+.nav-actions{margin-left:auto;display:flex;align-items:center;gap:12px}
+.nav-btn{background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 20px;border-radius:var(--radius);font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;font-family:var(--font)}
+.nav-btn:hover{border-color:var(--text-tertiary);background:var(--bg-card)}
+.nav-btn.primary{background:var(--blue);border:none;color:#fff}
+.nav-btn.primary:hover{background:var(--blue-glow);box-shadow:0 0 24px rgba(31,111,235,0.3)}
+
+/* Hero */
+.hero{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:120px 40px 80px;position:relative;overflow:hidden}
+.hero-bg{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.hero-bg .g1{position:absolute;top:-200px;right:-200px;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(31,111,235,0.12),transparent 70%)}
+.hero-bg .g2{position:absolute;bottom:-300px;left:-200px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(188,140,255,0.08),transparent 70%)}
+.hero-bg .grid{position:absolute;inset:0;background-image:linear-gradient(rgba(48,54,61,0.15) 1px,transparent 1px),linear-gradient(90deg,rgba(48,54,61,0.15) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse at center,black 30%,transparent 70%);-webkit-mask-image:radial-gradient(ellipse at center,black 30%,transparent 70%)}
+.hero-content{text-align:center;max-width:800px;position:relative;z-index:1}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(31,111,235,0.12);border:1px solid rgba(31,111,235,0.25);padding:6px 16px;border-radius:20px;font-size:13px;color:var(--blue-light);margin-bottom:24px;font-weight:500}
+.hero-badge svg{width:14px;height:14px}
+.hero h1{font-size:56px;font-weight:800;line-height:1.1;margin-bottom:20px;letter-spacing:-1px}
+.hero h1 .hl{background:linear-gradient(135deg,var(--blue-light),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{font-size:18px;color:var(--text-secondary);max-width:600px;margin:0 auto 40px;line-height:1.7}
+.hero-actions{display:flex;align-items:center;justify-content:center;gap:16px}
+.btn-hero-primary{background:var(--blue);border:none;color:#fff;padding:14px 32px;border-radius:var(--radius);font-size:16px;font-weight:600;cursor:pointer;transition:all .2s;font-family:var(--font)}
+.btn-hero-primary:hover{background:var(--blue-glow);box-shadow:0 0 32px rgba(31,111,235,0.4);transform:translateY(-2px)}
+.btn-hero-secondary{background:var(--bg-card);border:1px solid var(--border);color:var(--text);padding:14px 32px;border-radius:var(--radius);font-size:16px;font-weight:500;cursor:pointer;transition:all .2s;font-family:var(--font)}
+.btn-hero-secondary:hover{border-color:var(--text-tertiary);background:var(--bg-elevated);transform:translateY(-2px)}
+.hero-stats{display:flex;justify-content:center;gap:48px;margin-top:60px}
+.hero-stat{text-align:center}
+.hero-stat .num{font-size:32px;font-weight:800;color:var(--text)}
+.hero-stat .label{font-size:13px;color:var(--text-tertiary);margin-top:4px}
+
+/* Features */
+.features{padding:100px 40px;border-top:1px solid var(--border-light)}
+.features-header{text-align:center;max-width:600px;margin:0 auto 60px}
+.features-header h2{font-size:36px;font-weight:700;margin-bottom:12px}
+.features-header p{color:var(--text-secondary);font-size:16px}
+.features-grid{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.feature-card{background:var(--bg-card);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:32px;transition:all .3s;cursor:default}
+.feature-card:hover{border-color:var(--border);transform:translateY(-4px);box-shadow:0 12px 48px rgba(0,0,0,0.3)}
+.feature-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+.feature-card h3{font-size:18px;font-weight:600;margin-bottom:8px}
+.feature-card p{font-size:14px;color:var(--text-secondary);line-height:1.7}
+
+/* Collab section */
+.collab-section{padding:100px 40px;border-top:1px solid var(--border-light)}
+.collab-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:80px}
+.collab-text{flex:1}
+.collab-text h2{font-size:36px;font-weight:700;margin-bottom:16px}
+.collab-text p{font-size:16px;color:var(--text-secondary);line-height:1.8;margin-bottom:24px}
+.collab-text ul{list-style:none;display:flex;flex-direction:column;gap:12px}
+.collab-text ul li{display:flex;align-items:center;gap:10px;font-size:15px;color:var(--text)}
+.collab-text ul li svg{width:18px;height:18px;color:var(--green);flex-shrink:0}
+.collab-visual{flex:1;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:32px;min-height:320px;display:flex;flex-direction:column;gap:16px;position:relative;overflow:hidden}
+.collab-visual .mh{display:flex;align-items:center;gap:8px;padding-bottom:16px;border-bottom:1px solid var(--border-light)}
+.collab-visual .dot{width:10px;height:10px;border-radius:50%}
+.collab-visual .ml{height:12px;border-radius:6px;background:var(--bg-elevated);animation:pulse 2s ease-in-out infinite}
+.collab-visual .ml:nth-child(2){width:85%}
+.collab-visual .ml:nth-child(3){width:70%}
+.collab-visual .ml:nth-child(4){width:92%}
+.collab-visual .ml:nth-child(5){width:60%}
+.collab-visual .ml:nth-child(6){width:78%}
+.collab-visual .ma{position:absolute;bottom:24px;right:24px;width:32px;height:32px;border-radius:50%;border:2px solid var(--green);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;background:linear-gradient(135deg,#3fb950,#238636)}
+.collab-visual .ma:nth-child(8){right:64px;border-color:var(--blue-light);background:linear-gradient(135deg,#58a6ff,#1f6feb)}
+.collab-visual .mc{position:absolute;width:2px;height:20px;background:var(--blue-light);top:100px;left:60%;animation:blink 1s infinite}
+.collab-visual .mlb{position:absolute;top:82px;left:60%;font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px 4px 4px 0;background:var(--blue-light);color:#fff}
+
+/* Footer */
+.footer{padding:40px;border-top:1px solid var(--border-light)}
+.footer-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between}
+.footer-copy{font-size:13px;color:var(--text-tertiary)}
+.footer-links{display:flex;gap:24px}
+.footer-links a{color:var(--text-secondary);text-decoration:none;font-size:13px;transition:color .2s}
+.footer-links a:hover{color:var(--text)}
+
+/* Auth Modal */
+.auth-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);padding:20px}
+.auth-overlay.open{display:flex}
+.auth-modal{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);width:100%;max-width:420px;padding:36px 40px 32px;box-shadow:0 24px 80px rgba(0,0,0,0.6);animation:fadeUp .25s ease;position:relative;max-height:90vh;overflow-y:auto}
+.auth-close{position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:8px;border:none;background:transparent;color:var(--text-tertiary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-size:18px}
+.auth-close:hover{background:var(--bg-elevated);color:var(--text)}
+.auth-logo{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:24px;text-decoration:none}
+.auth-logo svg{width:28px;height:28px}
+.auth-logo span{font-size:20px;font-weight:700;color:var(--text)}
+.auth-tabs{display:flex;margin-bottom:24px;border-bottom:1px solid var(--border-light)}
+.auth-tab{flex:1;text-align:center;padding:10px 0;font-size:14px;font-weight:500;color:var(--text-tertiary);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;font-family:var(--font);background:none;border-top:none;border-left:none;border-right:none}
+.auth-tab:hover{color:var(--text-secondary)}
+.auth-tab.active{color:var(--text);border-bottom-color:var(--blue)}
+.oauth-btns{display:flex;flex-direction:column;gap:10px;margin-bottom:18px}
+.oauth-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:10px 16px;border-radius:var(--radius);font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;font-family:var(--font);border:1px solid var(--border);background:var(--bg-elevated);color:var(--text)}
+.oauth-btn:hover{background:var(--bg-card);border-color:var(--text-tertiary)}
+.oauth-btn svg{width:20px;height:20px;flex-shrink:0}
+.oauth-btn .obl{flex:1;text-align:center}
+.divider{display:flex;align-items:center;gap:16px;margin-bottom:18px;color:var(--text-tertiary);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border-light)}
+.fg{margin-bottom:16px}
+.fg label{display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text-secondary)}
+.fi{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:var(--text);font-size:14px;font-family:var(--font);outline:none;transition:border-color .2s}
+.fi:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,111,235,0.12)}
+.fi::placeholder{color:var(--text-tertiary)}
+.fr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.fc{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);cursor:pointer}
+.fc input[type=checkbox]{accent-color:var(--blue);width:16px;height:16px;cursor:pointer}
+.fl{font-size:13px;color:var(--blue-light);text-decoration:none;cursor:pointer}
+.fl:hover{text-decoration:underline}
+.btn-submit{width:100%;padding:12px;border-radius:var(--radius);font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;font-family:var(--font);background:var(--blue);border:none;color:#fff}
+.btn-submit:hover{background:var(--blue-glow);box-shadow:0 0 24px rgba(31,111,235,0.3)}
+.auth-footer{text-align:center;margin-top:20px;font-size:13px;color:var(--text-tertiary)}
+.auth-footer a{color:var(--blue-light);text-decoration:none;cursor:pointer;font-weight:500}
+.auth-footer a:hover{text-decoration:underline}
+.fe{background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.2);border-radius:var(--radius);padding:10px 14px;font-size:13px;color:var(--red);margin-bottom:16px;display:none}
+.fe.show{display:block}
+.nr{display:flex;gap:12px}
+.nr .fg{flex:1}
+
+@keyframes pulse{0%,100%{opacity:0.5}50%{opacity:1}}
+@keyframes blink{0%,50%{opacity:1}51%,100%{opacity:0}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+@media(max-width:768px){
+.nav{padding:0 20px}
+.nav-links{display:none}
+.hero{padding:100px 20px 60px}
+.hero h1{font-size:32px}
+.hero-stats{flex-direction:column;gap:24px}
+.features-grid{grid-template-columns:1fr}
+.features{padding:60px 20px}
+.collab-inner{flex-direction:column;gap:40px}
+.collab-section{padding:60px 20px}
+.footer-inner{flex-direction:column;gap:16px;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+<a href="#" class="nav-logo">
+<svg viewBox="-65 -50 130 100" width="28" height="28" fill="none">
+<defs>
+<linearGradient id="og" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#58a6ff"/>
+<stop offset="100%" stop-color="#bc8cff"/>
+</linearGradient>
+<radialGradient id="ogw">
+<stop offset="0%" stop-color="#58a6ff" stop-opacity="0.3"/>
+<stop offset="100%" stop-color="#58a6ff" stop-opacity="0"/>
+</radialGradient>
+</defs>
+<circle cx="0" cy="0" r="80" fill="url(#ogw)" opacity="0.5"/>
+<circle cx="0" cy="0" r="5" fill="url(#og)"/>
+<ellipse cx="0" cy="0" rx="50" ry="20" stroke="#58a6ff" stroke-width="0.8" opacity="0.4" transform="rotate(-20)"/>
+<circle cx="45" cy="-15" r="2.5" fill="#58a6ff"/>
+<circle cx="-45" cy="15" r="2" fill="#58a6ff" opacity="0.6"/>
+<ellipse cx="0" cy="0" rx="40" ry="45" stroke="#bc8cff" stroke-width="0.8" opacity="0.4" transform="rotate(30)"/>
+<circle cx="20" cy="40" r="2.5" fill="#bc8cff"/>
+<circle cx="-20" cy="-40" r="2" fill="#bc8cff" opacity="0.6"/>
+<ellipse cx="0" cy="0" rx="55" ry="30" stroke="#58a6ff" stroke-width="0.8" opacity="0.3" transform="rotate(60)"/>
+<circle cx="-30" cy="-45" r="2" fill="#58a6ff" opacity="0.5"/>
+<circle cx="30" cy="45" r="2.5" fill="#58a6ff"/>
+<circle cx="60" cy="-30" r="1.5" fill="#58a6ff" opacity="0.3"/>
+<circle cx="-55" cy="35" r="1.5" fill="#bc8cff" opacity="0.3"/>
+<circle cx="50" cy="40" r="1.5" fill="#58a6ff" opacity="0.3"/>
+</svg>
+Perseus
+</a>
+<div class="nav-links">
+<a href="#features">Features</a>
+<a href="#collab">Collaboration</a>
+<a href="#">Docs</a>
+</div>
+<div class="nav-actions">
+<button class="nav-btn" onclick="openAuth('login')">Sign In</button>
+<button class="nav-btn primary" onclick="openAuth('register')">Get Started</button>
+</div>
+</nav>
+
+<section class="hero">
+<div class="hero-bg">
+<div class="g1"></div>
+<div class="g2"></div>
+<div class="grid"></div>
+</div>
+<div class="hero-content">
+<div class="hero-badge">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+Now in Public Beta
+</div>
+<h1>Code. <span class="hl">Collaborate.</span> Ship.</h1>
+<p>Everything your team needs to build great software — code hosting, real-time collaboration, team chat, and code review — in one unified platform.</p>
+<div class="hero-actions">
+<button class="btn-hero-primary" onclick="openAuth('register')">Get Started Free</button>
+<button class="btn-hero-secondary" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">Learn More</button>
+</div>
+<div class="hero-stats">
+<div class="hero-stat"><div class="num">24</div><div class="label">Repositories</div></div>
+<div class="hero-stat"><div class="num">1.8K</div><div class="label">Commits</div></div>
+<div class="hero-stat"><div class="num">8</div><div class="label">Team Members</div></div>
+<div class="hero-stat"><div class="num">99.9%</div><div class="label">Uptime</div></div>
+</div>
+</div>
+</section>
+
+<section class="features" id="features">
+<div class="features-header">
+<h2>Everything your team needs</h2>
+<p>Self-hosted Git platform with built-in collaboration tools designed for modern development teams.</p>
+</div>
+<div class="features-grid">
+<div class="feature-card"><div class="feature-icon" style="background:rgba(31,111,235,0.12);color:var(--blue-light)">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+</div><h3>Code Hosting</h3><p>Self-hosted Git repository hosting with branch protection, webhooks, and fine-grained access control.</p></div>
+<div class="feature-card"><div class="feature-icon" style="background:rgba(63,185,80,0.12);color:var(--green)">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+</div><h3>Team Chat</h3><p>Real-time messaging with channels, threads, and rich code snippets. Keep discussions in context.</p></div>
+<div class="feature-card"><div class="feature-icon" style="background:rgba(188,140,255,0.12);color:var(--purple)">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+</div><h3>Code Review</h3><p>Inline pull request reviews with threaded discussions, approval workflows, and merge checks.</p></div>
+<div class="feature-card"><div class="feature-icon" style="background:rgba(210,153,34,0.12);color:var(--orange)">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+</div><h3>Real-time Editing</h3><p>Collaborative code editing with live cursors, presence awareness, and CRDT-based conflict resolution.</p></div>
+<div class="feature-card"><div class="feature-icon" style="background:rgba(248,81,73,0.12);color:var(--red)">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+</div><h3>Issue Tracking</h3><p>Manage issues with labels, milestones, batch operations, and integrations with your Git workflow.</p></div>
+<div class="feature-card"><div class="feature-icon" style="background:rgba(31,111,235,0.12);color:var(--blue-light)">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><polyline points="6 9 12 15 18 9"/></svg>
+</div><h3>Release Management</h3><p>Tag releases, attach assets, publish release notes. Integrated with your repository and webhook system.</p></div>
+</div>
+</section>
+
+<section class="collab-section" id="collab">
+<div class="collab-inner">
+<div class="collab-text">
+<h2>Real-time collaboration, built in</h2>
+<p>Edit code together with your team just like Google Docs. See who's working on what, discuss in real-time, and never worry about merge conflicts again.</p>
+<ul>
+<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Multiple cursors and presence indicators</li>
+<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Inline code review with threaded discussions</li>
+<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> CRDT-based conflict-free synchronization</li>
+<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Real-time team chat alongside your code</li>
+</ul>
+</div>
+<div class="collab-visual">
+<div class="mh">
+<div class="dot" style="background:#ff5f56"></div>
+<div class="dot" style="background:#ffbd2e"></div>
+<div class="dot" style="background:#27c93f"></div>
+<span style="font-size:12px;color:var(--text-tertiary);margin-left:8px">websocket-client.ts — Perseus</span>
+</div>
+<div class="ml" style="width:60%"></div>
+<div class="ml" style="width:45%"></div>
+<div class="ml" style="width:75%"></div>
+<div class="ml" style="width:30%"></div>
+<div class="ml" style="background:var(--blue);width:55%"></div>
+<div class="ml" style="width:65%"></div>
+<div class="ml" style="width:40%"></div>
+<div class="ml" style="background:rgba(63,185,80,0.3);width:50%"></div>
+<div class="ml" style="width:70%"></div>
+<div class="ml" style="width:35%"></div>
+<div class="ma">LW</div>
+<div class="ma">CM</div>
+<div class="mc" style="left:45%;top:108px"></div>
+<div class="mlb" style="left:45%;top:90px">CM</div>
+<div class="mc" style="left:55%;top:170px;background:var(--green)"></div>
+<div class="mlb" style="left:55%;top:152px;background:var(--green)">LW</div>
+</div>
+</div>
+</section>
+
+<footer class="footer">
+<div class="footer-inner">
+<div class="footer-copy">© 2026 Perseus — Self-hosted Code Collaboration Platform</div>
+<div class="footer-links">
+<a href="#">About</a>
+<a href="#">Privacy</a>
+<a href="#">Terms</a>
+<a href="#">GitHub</a>
+</div>
+</div>
+</footer>
+
+<!-- Auth Modal -->
+<div class="auth-overlay" id="authOverlay" onclick="if(event.target===this)closeAuth()">
+<div class="auth-modal">
+<button class="auth-close" onclick="closeAuth()">✕</button>
+<a href="#" class="auth-logo">
+<svg viewBox="-65 -50 130 100" width="28" height="28" fill="none">
+<defs>
+<linearGradient id="og" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#58a6ff"/>
+<stop offset="100%" stop-color="#bc8cff"/>
+</linearGradient>
+<radialGradient id="ogw">
+<stop offset="0%" stop-color="#58a6ff" stop-opacity="0.3"/>
+<stop offset="100%" stop-color="#58a6ff" stop-opacity="0"/>
+</radialGradient>
+</defs>
+<circle cx="0" cy="0" r="80" fill="url(#ogw)" opacity="0.5"/>
+<circle cx="0" cy="0" r="5" fill="url(#og)"/>
+<ellipse cx="0" cy="0" rx="50" ry="20" stroke="#58a6ff" stroke-width="0.8" opacity="0.4" transform="rotate(-20)"/>
+<circle cx="45" cy="-15" r="2.5" fill="#58a6ff"/>
+<circle cx="-45" cy="15" r="2" fill="#58a6ff" opacity="0.6"/>
+<ellipse cx="0" cy="0" rx="40" ry="45" stroke="#bc8cff" stroke-width="0.8" opacity="0.4" transform="rotate(30)"/>
+<circle cx="20" cy="40" r="2.5" fill="#bc8cff"/>
+<circle cx="-20" cy="-40" r="2" fill="#bc8cff" opacity="0.6"/>
+<ellipse cx="0" cy="0" rx="55" ry="30" stroke="#58a6ff" stroke-width="0.8" opacity="0.3" transform="rotate(60)"/>
+<circle cx="-30" cy="-45" r="2" fill="#58a6ff" opacity="0.5"/>
+<circle cx="30" cy="45" r="2.5" fill="#58a6ff"/>
+<circle cx="60" cy="-30" r="1.5" fill="#58a6ff" opacity="0.3"/>
+<circle cx="-55" cy="35" r="1.5" fill="#bc8cff" opacity="0.3"/>
+<circle cx="50" cy="40" r="1.5" fill="#58a6ff" opacity="0.3"/>
+</svg>
+<span>Perseus</span>
+</a>
+
+<div class="auth-tabs">
+<button class="auth-tab" data-tab="login" onclick="switchAuthTab('login')">Sign In</button>
+<button class="auth-tab" data-tab="register" onclick="switchAuthTab('register')">Create Account</button>
+</div>
+
+<!-- Sign In -->
+<div class="auth-panel" id="apanel-login">
+<div class="oauth-btns">
+<button class="oauth-btn" onclick="oauthLogin('github')">
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+<span class="obl">Sign in with GitHub</span>
+</button>
+<button class="oauth-btn" onclick="oauthLogin('gitlab')">
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 01-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 014.82 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0118.6 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.51L23 13.45a.84.84 0 01-.35.94z"/></svg>
+<span class="obl">Sign in with GitLab</span>
+</button>
+</div>
+<div class="divider">or continue with email</div>
+<div class="fe" id="loginError">Invalid email or password.</div>
+<form onsubmit="handleLogin(event)">
+<div class="fg">
+<label>Email</label>
+<input class="fi" type="email" id="loginEmail" placeholder="name@company.com" required autocomplete="email">
+</div>
+<div class="fg">
+<label>Password</label>
+<input class="fi" type="password" id="loginPassword" placeholder="Enter your password" required autocomplete="current-password">
+</div>
+<div class="fr">
+<label class="fc"><input type="checkbox" checked> Remember me</label>
+<a class="fl" onclick="alert('Password reset link would be sent to your email.')">Forgot password?</a>
+</div>
+<button type="submit" class="btn-submit">Sign In</button>
+</form>
+</div>
+
+<!-- Register -->
+<div class="auth-panel" id="apanel-register" style="display:none">
+<div class="oauth-btns">
+<button class="oauth-btn" onclick="oauthLogin('github')">
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+<span class="obl">Sign up with GitHub</span>
+</button>
+<button class="oauth-btn" onclick="oauthLogin('gitlab')">
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 01-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 014.82 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0118.6 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.51L23 13.45a.84.84 0 01-.35.94z"/></svg>
+<span class="obl">Sign up with GitLab</span>
+</button>
+</div>
+<div class="divider">or create with email</div>
+<div class="fe" id="registerError">Please check your information.</div>
+<form onsubmit="handleRegister(event)">
+<div class="nr">
+<div class="fg">
+<label>First Name</label>
+<input class="fi" type="text" id="regFirst" placeholder="First" required>
+</div>
+<div class="fg">
+<label>Last Name</label>
+<input class="fi" type="text" id="regLast" placeholder="Last" required>
+</div>
+</div>
+<div class="fg">
+<label>Email</label>
+<input class="fi" type="email" id="regEmail" placeholder="name@company.com" required autocomplete="email">
+</div>
+<div class="fg">
+<label>Password</label>
+<input class="fi" type="password" id="regPassword" placeholder="At least 8 characters" required minlength="8" autocomplete="new-password">
+</div>
+<div class="fg">
+<label>Confirm Password</label>
+<input class="fi" type="password" id="regConfirm" placeholder="Repeat your password" required autocomplete="new-password">
+</div>
+<button type="submit" class="btn-submit">Create Account</button>
+</form>
+</div>
+
+<div class="auth-footer" id="authFooter">
+<span id="aft">Don't have an account?</span>
+<a id="afl" onclick="switchAuthTab('register')">Create one</a>
+</div>
+</div>
+</div>
+
+<script>
+function openAuth(tab) {
+document.getElementById('authOverlay').classList.add('open');
+document.body.style.overflow = 'hidden';
+switchAuthTab(tab || 'login');
+}
+function closeAuth() {
+document.getElementById('authOverlay').classList.remove('open');
+document.body.style.overflow = '';
+}
+function switchAuthTab(tab) {
+document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+document.querySelector(`.auth-tab[data-tab="${tab}"]`).classList.add('active');
+document.querySelectorAll('.auth-panel').forEach(p => p.style.display = 'none');
+document.getElementById('apanel-' + tab).style.display = '';
+const isLogin = tab === 'login';
+document.getElementById('aft').textContent = isLogin ? "Don't have an account?" : "Already have an account?";
+document.getElementById('afl').textContent = isLogin ? 'Create one' : 'Sign in';
+document.getElementById('afl').onclick = isLogin ? () => switchAuthTab('register') : () => switchAuthTab('login');
+}
+function showError(id, msg) {
+const el = document.getElementById(id);
+el.textContent = msg;
+el.classList.add('show');
+setTimeout(() => el.classList.remove('show'), 4000);
+}
+function handleLogin(e) {
+e.preventDefault();
+const email = document.getElementById('loginEmail').value;
+const password = document.getElementById('loginPassword').value;
+if (!email || !password) return showError('loginError', 'Please fill in all fields.');
+window.location.href = 'index.html';
+}
+function handleRegister(e) {
+e.preventDefault();
+const first = document.getElementById('regFirst').value;
+const last = document.getElementById('regLast').value;
+const email = document.getElementById('regEmail').value;
+const pass = document.getElementById('regPassword').value;
+const conf = document.getElementById('regConfirm').value;
+if (!first || !last || !email || !pass || !conf) return showError('registerError', 'Please fill in all fields.');
+if (pass.length < 8) return showError('registerError', 'Password must be at least 8 characters.');
+if (pass !== conf) return showError('registerError', 'Passwords do not match.');
+window.location.href = 'index.html';
+}
+function oauthLogin(provider) {
+alert(`${provider.charAt(0).toUpperCase() + provider.slice(1)} OAuth flow would open a new window. After authorization, you would be redirected back to Perseus.`);
+}
+</script>
+
+</body>
+</html>

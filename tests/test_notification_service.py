@@ -216,3 +216,26 @@ async def test_create_notification_email_failure(async_db: AsyncSession, async_t
             title="You were mentioned",
             message="@you in PR #1",
         )
+
+
+@pytest.mark.asyncio
+async def test_create_notification_sends_ws_push(async_db: AsyncSession, async_test_user):
+    """创建通知后自动推送 WebSocket 通知"""
+    mock_notify = AsyncMock(return_value=1)
+
+    with patch("services.notification_service.notify_user", mock_notify):
+        notif = await notification_service.create_notification(
+            db=async_db,
+            user_id=async_test_user.id,
+            type="mention",
+            title="You were mentioned",
+            message="@you in PR #1",
+        )
+
+    assert notif["type"] == "mention"
+    mock_notify.assert_awaited_once()
+    args = mock_notify.call_args
+    assert args[0][0] == async_test_user.id  # user_id
+    assert args[0][1] == "mention"  # notification_type
+    assert args[0][2]["id"] == notif["id"]  # data
+    assert args[0][2]["title"] == "You were mentioned"
