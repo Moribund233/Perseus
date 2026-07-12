@@ -46,6 +46,7 @@ def build_user_response(user) -> Dict[str, Any]:
         "username": user.username,
         "email": user.email,
         "full_name": user.full_name,
+        "avatar_url": user.avatar_url,
         "is_active": user.is_active,
         "is_admin": user.is_admin,
         "created_at": format_datetime(user.created_at),

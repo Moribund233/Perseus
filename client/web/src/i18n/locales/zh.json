@@ -85,6 +85,133 @@
     "topBar": {
       "searchPlaceholder": "搜索...",
       "new": "新建"
+    },
+    "repositories": {
+      "title": "仓库",
+      "explorer": "资源管理器",
+      "filters": {
+        "all": "全部",
+        "source": "源码",
+        "config": "配置",
+        "tests": "测试"
+      },
+      "actions": {
+        "watch": "关注",
+        "star": "星标",
+        "fork": "派生"
+      },
+      "visibility": {
+        "public": "公开",
+        "private": "私有"
+      },
+      "tabs": {
+        "code": "代码",
+        "issues": "问题",
+        "pullRequests": "Pull Requests",
+        "settings": "设置"
+      },
+      "fileList": {
+        "lastCommit": "最新提交",
+        "name": "名称",
+        "message": "提交信息",
+        "time": "时间"
+      },
+      "readme": "README"
+    },
+    "dashboard": {
+      "welcomeBack": "欢迎回来，{{name}}",
+      "subtitle": "以下是您今天项目的动态概览。",
+      "stats": {
+        "repositories": "仓库",
+        "openPRs": "待处理 PR",
+        "teamMembers": "团队成员",
+        "commits": "提交",
+        "repositoriesChange": "本周新增 3 个",
+        "openPRsChange": "5 个待审查",
+        "teamMembersChange": "新增 2 人",
+        "commitsChange": "本周 142 次提交"
+      },
+      "recentActivity": "最近动态",
+      "viewAll": "查看全部",
+      "yourRepositories": "你的仓库",
+      "contributionActivity": "贡献活动",
+      "contributionsCount": "过去 30 天共 {{count}} 次贡献",
+      "activity": {
+        "mergedPR": "合并了 PR <strong>#{{id}}</strong> 到 <strong>{{repo}}</strong>",
+        "pushedCommits": "推送了 {{count}} 次提交到 <strong>{{branch}}</strong>",
+        "openedPR": "打开了 PR <strong>#{{id}}</strong> — \"{{title}}\"",
+        "reviewedPR": "审查了 PR <strong>#{{id}}</strong> 在 <strong>{{repo}}</strong>",
+        "createdIssue": "创建了 issue <strong>#{{id}}</strong> — \"{{title}}\"",
+        "commentedOnIssue": "评论了 issue <strong>#{{id}}</strong> 在 <strong>{{repo}}</strong>"
+      }
+    },
+    "pullRequests": {
+      "title": "Pull Requests",
+      "filters": {
+        "open": "打开",
+        "merged": "已合并",
+        "closed": "已关闭",
+        "all": "全部"
+      },
+      "openedBy": "#{{id}} 由 {{author}} 于 {{time}} 打开",
+      "comments": "{{count}} 条评论",
+      "reviews": "{{count}} 条审查",
+      "filter": "筛选",
+      "newPullRequest": "新建 Pull Request"
+    },
+    "codeEditor": {
+      "title": "代码编辑器",
+      "online": "在线",
+      "offline": "离线",
+      "discussions": "讨论",
+      "activity": "动态"
+    },
+    "teamChat": {
+      "title": "团队聊天",
+      "channels": "频道",
+      "directMessages": "私信",
+      "members": "成员",
+      "placeholder": "给 #{{channel}} 发送消息...",
+      "today": "今天"
+    },
+    "settings": {
+      "title": "设置",
+      "profile": "个人资料",
+      "account": "账号",
+      "appearance": "外观",
+      "notifications": "通知",
+      "preferences": "偏好设置",
+      "save": "保存",
+      "saveChanges": "保存更改",
+      "cancel": "取消",
+      "changeAvatar": "更换头像",
+      "publicProfile": "公开资料",
+      "publicProfileDesc": "这些信息将公开显示在你的个人资料页。",
+      "name": "姓名",
+      "bio": "简介",
+      "bioPlaceholder": "简单介绍一下你自己。",
+      "company": "公司",
+      "location": "位置",
+      "website": "网站",
+      "accountSettings": "账号设置",
+      "accountSettingsDesc": "更新用户名并管理密码。",
+      "currentPassword": "当前密码",
+      "newPassword": "新密码",
+      "confirmNewPassword": "确认新密码",
+      "changePassword": "修改密码",
+      "appearanceSettings": "外观设置",
+      "appearanceSettingsDesc": "自定义 Perseus 的显示方式。",
+      "theme": "主题",
+      "dark": "深色",
+      "light": "浅色",
+      "system": "跟随系统",
+      "language": "语言",
+      "notificationsSettings": "通知",
+      "notificationsSettingsDesc": "选择你希望接收通知的方式。",
+      "emailNotifications": "邮件通知",
+      "pushNotifications": "推送通知",
+      "emailNotificationsDesc": "接收关于 PR、Issue 和提及的更新。",
+      "pushNotificationsDesc": "接收实时事件的浏览器通知。"
     }
   },
   "auth": {

@@ -23,6 +23,9 @@ class User(BaseModel):
     full_name = Column(String(100), nullable=True)
     """用户全名，可选，长度不超过100个字符"""
 
+    avatar_url = Column(String(512), nullable=True)
+    """用户头像 URL，可选，长度不超过512个字符"""
+
     is_active = Column(Boolean, default=True)
     """用户是否激活，默认为True"""
 

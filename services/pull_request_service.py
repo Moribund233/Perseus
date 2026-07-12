@@ -4,12 +4,14 @@ Pull Request 服务层
 处理 Pull Request 相关的所有业务逻辑
 """
 import os
+import asyncio
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy import select
 
 from models import PullRequest, PRComment, PRReview, User
+from services.repository_service import get_accessible_repository_ids
 from core.exception import ValidationException, NotFoundException, AuthorizationException
 from utils.permission_utils import check_resource_author_or_admin, check_repository_permission
 from utils.response_builder import (
@@ -19,7 +21,9 @@ from utils.response_builder import (
     build_pagination_response
 )
 from utils.db_utils import paginate, get_next_sequence_number, get_pull_request_or_404
-from utils.git_utils import GitService
+from utils.git_utils import GitService, get_repository_storage_path
+from services.build_service import BuildService
+from services.search_service import SearchService
 from services.realtime.event_service import (
     broadcast_pr_opened, broadcast_pr_merged, broadcast_pr_closed,
     broadcast_pr_comment_added, broadcast_pr_review_submitted,
@@ -59,6 +63,54 @@ async def list_pull_requests(
 
     if author_id:
         stmt = stmt.filter(PullRequest.author_id == author_id)
+
+    stmt = stmt.order_by(PullRequest.created_at.desc())
+    prs, total = await paginate(db, stmt, page, limit)
+
+    return build_pagination_response(
+        items=[build_pr_response(pr) for pr in prs],
+        total=total,
+        page=page,
+        limit=limit
+    )
+
+
+async def list_pull_requests_for_user(
+    db: AsyncSession,
+    user_id: int,
+    status: Optional[str] = None,
+    page: int = 1,
+    limit: int = 20
+) -> Dict[str, Any]:
+    """
+    获取当前用户相关的跨仓库 PR 列表
+
+    仅返回用户可访问仓库中，由该用户创建的 PR。
+
+    Args:
+        db: 异步数据库会话
+        user_id: 当前用户ID
+        status: 状态筛选（open/merged/closed）
+        page: 页码
+        limit: 每页数量
+
+    Returns:
+        dict: 包含 PR 列表和分页信息
+    """
+    accessible_ids = await get_accessible_repository_ids(db, user_id)
+
+    if not accessible_ids:
+        return build_pagination_response(items=[], total=0, page=page, limit=limit)
+
+    stmt = (
+        select(PullRequest)
+        .options(selectinload(PullRequest.author), selectinload(PullRequest.repository))
+        .filter(PullRequest.repository_id.in_(accessible_ids))
+        .filter(PullRequest.author_id == user_id)
+    )
+
+    if status:
+        stmt = stmt.filter(PullRequest.status == status)
 
     stmt = stmt.order_by(PullRequest.created_at.desc())
     prs, total = await paginate(db, stmt, page, limit)
@@ -427,6 +479,36 @@ async def merge_pull_request(
 
     await db.commit()
     await db.refresh(pr)
+
+    # F-046: PR 合并后自动创建 CI Build 记录
+    try:
+        target_commit = git_service.get_branch_commit(pr.target_branch)
+        commit_sha = str(target_commit.id) if target_commit else merged_commit_hash
+        commit_message = target_commit.message.strip() if target_commit else merge_message
+
+        await BuildService.create_build(
+            db=db,
+            repo_id=repository_id,
+            branch=pr.target_branch,
+            commit_sha=commit_sha,
+            commit_message=commit_message[:1000] if commit_message else None,
+            triggered_by=merger_id,
+        )
+    except Exception as build_err:
+        logger.warning(f"Failed to create CI build after PR merge: {build_err}")
+
+    # F-039: PR 合并后重建搜索索引
+    try:
+        from models import Repository
+        repo_result = await db.execute(
+            select(Repository).filter(Repository.id == repository_id)
+        )
+        repo = repo_result.scalar_one_or_none()
+        if repo:
+            repo_path = get_repository_storage_path(repo.path)
+            await asyncio.to_thread(SearchService.rebuild_index, repo_path)
+    except Exception as index_err:
+        logger.warning(f"Failed to rebuild search index after PR merge: {index_err}")
 
     return build_pr_response(pr)
 

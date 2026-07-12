@@ -617,3 +617,95 @@ async def test_detect_merge_conflict(async_db: AsyncSession, test_repo_with_conf
     assert pr_after["status"] == "open", "PR 状态应该保持 open"
 
     print("✓ test_detect_merge_conflict 通过")
+
+
+# =============================================================================
+# F-046: PR 合并后自动创建 CI Build 记录
+# =============================================================================
+
+@pytest.mark.asyncio
+async def test_merge_pr_creates_build_record(async_db: AsyncSession, test_repo_with_git, async_test_user):
+    """
+    测试 PR 合并后自动创建 Build 记录
+
+    验证点：
+    1. PR 合并成功
+    2. 仓库对应的 Build 记录数量从 0 变为 1
+    3. Build 状态为 pending
+    """
+    from services import pull_request_service
+    from services.build_service import BuildService
+
+    repo = test_repo_with_git
+
+    # 合并前没有 Build 记录
+    builds_before = await BuildService.get_builds_for_repository(async_db, repo.id)
+    assert len(builds_before) == 0, "合并前不应该有 Build 记录"
+
+    # 创建并合并 PR
+    pr = await pull_request_service.create_pull_request(
+        async_db, repo.id, async_test_user.id,
+        title="Build Trigger PR",
+        description="This PR should trigger a build",
+        source_branch="feature",
+        target_branch="main"
+    )
+
+    await pull_request_service.merge_pull_request(
+        async_db, repo.id, pr["pr_number"], async_test_user.id, merge_method="merge"
+    )
+
+    # 验证 Build 记录已创建
+    builds_after = await BuildService.get_builds_for_repository(async_db, repo.id)
+    assert len(builds_after) == 1, "合并后应该自动创建一个 Build 记录"
+    build = builds_after[0]
+    assert build.status == "pending", "Build 初始状态应为 pending"
+    assert build.branch == "main", "Build 分支应为目标分支 main"
+    assert build.repo_id == repo.id, "Build 应关联到正确仓库"
+
+    print("✓ test_merge_pr_creates_build_record 通过")
+
+
+# =============================================================================
+# F-039: PR 合并后重建搜索索引
+# =============================================================================
+
+@pytest.mark.asyncio
+async def test_merge_pr_rebuilds_search_index(async_db: AsyncSession, test_repo_with_git, async_test_user):
+    """
+    测试 PR 合并后自动重建搜索索引
+
+    验证点：
+    1. PR 合并成功
+    2. 仓库物理路径下生成 .perseus_search_index 目录
+    """
+    import os
+    from services import pull_request_service
+    from services.search_service import SearchService
+    from utils.git_utils import get_repository_storage_path
+
+    repo = test_repo_with_git
+
+    # 创建并合并 PR
+    pr = await pull_request_service.create_pull_request(
+        async_db, repo.id, async_test_user.id,
+        title="Search Index PR",
+        description="This PR should rebuild search index",
+        source_branch="feature",
+        target_branch="main"
+    )
+
+    await pull_request_service.merge_pull_request(
+        async_db, repo.id, pr["pr_number"], async_test_user.id, merge_method="merge"
+    )
+
+    # 验证搜索索引目录已创建
+    repo_path = get_repository_storage_path(repo.path)
+    index_path = os.path.join(repo_path, ".perseus_search_index")
+    assert os.path.exists(index_path), "合并后应创建搜索索引目录"
+
+    # 验证索引文件已生成
+    index_db_path = os.path.join(index_path, "fts.db")
+    assert os.path.exists(index_db_path), "搜索索引数据库文件应存在"
+
+    print("✓ test_merge_pr_rebuilds_search_index 通过")

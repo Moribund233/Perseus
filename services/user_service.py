@@ -3,7 +3,10 @@
 
 处理与用户相关的所有业务逻辑
 """
+import os
+import shutil
 import logging
+from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from models import User
@@ -14,6 +17,16 @@ from utils.response_builder import build_user_response
 
 # 日志记录器
 logger = logging.getLogger(__name__)
+
+# 头像存储目录
+AVATAR_UPLOAD_DIR = Path("./data/uploads/avatars").resolve()
+AVATAR_MAX_SIZE = 5 * 1024 * 1024  # 5MB
+AVATAR_ALLOWED_CONTENT_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+}
 
 
 def user_to_dict(user: User) -> dict:
@@ -181,6 +194,41 @@ async def delete_user(user_id: int, db: AsyncSession):
     return {"message": "User deleted successfully"}
 
 
+async def change_password(user: User, old_password: str, new_password: str, db: AsyncSession):
+    """
+    修改当前用户密码
+
+    必须提供正确的旧密码才能设置新密码。
+
+    Args:
+        user: 当前用户对象
+        old_password: 旧密码
+        new_password: 新密码
+        db: 异步数据库会话
+
+    Returns:
+        dict: 成功消息
+
+    Raises:
+        AuthenticationException: 旧密码错误时抛出401异常
+        ValidationException: 新密码不符合要求时抛出422异常
+    """
+    if not old_password or not new_password:
+        raise ValidationException(detail="Old password and new password are required")
+
+    if len(new_password) < 6:
+        raise ValidationException(detail="New password must be at least 6 characters")
+
+    if not verify_password(old_password, user.password):
+        raise AuthenticationException(detail="Invalid old password")
+
+    user.password = get_password_hash(new_password)
+    await db.commit()
+    await db.refresh(user)
+
+    return {"message": "Password changed successfully"}
+
+
 async def login_user(credentials: dict, db: AsyncSession):
     """
     用户登录（异步版本）
@@ -250,3 +298,94 @@ async def authenticate_user(username: str, password: str, db: AsyncSession) -> U
         return user
 
     return None
+
+
+def _get_avatar_file_path(user_id: int, ext: str) -> Path:
+    """获取头像文件存储路径"""
+    AVATAR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    return AVATAR_UPLOAD_DIR / f"{user_id}{ext}"
+
+
+def _get_avatar_content_type(file_path: Path) -> str:
+    """根据文件扩展名获取 Content-Type"""
+    ext = file_path.suffix.lower()
+    for content_type, suffix in AVATAR_ALLOWED_CONTENT_TYPES.items():
+        if suffix == ext:
+            return content_type
+    return "application/octet-stream"
+
+
+async def update_user_avatar(
+    user: User,
+    filename: str,
+    content_type: str,
+    file_data: bytes,
+    db: AsyncSession
+) -> dict:
+    """
+    更新用户头像
+
+    Args:
+        user: 当前用户对象
+        filename: 原始文件名
+        content_type: HTTP Content-Type
+        file_data: 文件二进制内容
+        db: 异步数据库会话
+
+    Returns:
+        dict: 更新后的用户信息
+
+    Raises:
+        ValidationException: 文件类型或大小不符合要求
+    """
+    if not content_type or content_type not in AVATAR_ALLOWED_CONTENT_TYPES:
+        raise ValidationException(
+            detail=f"Invalid image format. Allowed: {', '.join(AVATAR_ALLOWED_CONTENT_TYPES.keys())}"
+        )
+
+    if len(file_data) > AVATAR_MAX_SIZE:
+        raise ValidationException(detail=f"Avatar file too large. Max size: {AVATAR_MAX_SIZE // 1024 // 1024}MB")
+
+    ext = AVATAR_ALLOWED_CONTENT_TYPES[content_type]
+    file_path = _get_avatar_file_path(user.id, ext)
+
+    # 删除旧头像文件（如果扩展名不同）
+    for old_file in AVATAR_UPLOAD_DIR.glob(f"{user.id}.*"):
+        if old_file != file_path:
+            try:
+                old_file.unlink()
+            except OSError:
+                pass
+
+    # 保存新头像
+    with open(file_path, "wb") as f:
+        f.write(file_data)
+
+    # 更新用户头像 URL
+    avatar_url = f"/api/v1/users/{user.id}/avatar"
+    user.avatar_url = avatar_url
+    await db.commit()
+    await db.refresh(user)
+
+    return build_user_response(user)
+
+
+async def get_user_avatar(user_id: int) -> tuple[Path, str]:
+    """
+    获取用户头像文件
+
+    Args:
+        user_id: 用户ID
+
+    Returns:
+        tuple[Path, str]: 文件路径和 Content-Type
+
+    Raises:
+        NotFoundException: 头像文件不存在
+    """
+    for ext in AVATAR_ALLOWED_CONTENT_TYPES.values():
+        file_path = AVATAR_UPLOAD_DIR / f"{user_id}{ext}"
+        if file_path.exists():
+            return file_path, _get_avatar_content_type(file_path)
+
+    raise NotFoundException(detail="Avatar not found")

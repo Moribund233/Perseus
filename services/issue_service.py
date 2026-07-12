@@ -6,9 +6,10 @@ Issue 服务层
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 
 from models import Issue, Label, IssueComment
+from services.repository_service import get_accessible_repository_ids
 from core.exception import ValidationException, NotFoundException
 from utils.permission_utils import check_resource_author_or_admin
 from utils.response_builder import (
@@ -71,6 +72,64 @@ async def list_issues(
         selectinload(Issue.labels),
         selectinload(Issue.closer)
     )
+
+    stmt = stmt.order_by(Issue.created_at.desc())
+    issues, total = await paginate(db, stmt, page, limit)
+
+    return build_pagination_response(
+        items=[build_issue_response(issue) for issue in issues],
+        total=total,
+        page=page,
+        limit=limit
+    )
+
+
+async def list_issues_for_user(
+    db: AsyncSession,
+    user_id: int,
+    status: Optional[str] = None,
+    page: int = 1,
+    limit: int = 20
+) -> Dict[str, Any]:
+    """
+    获取当前用户相关的跨仓库 Issue 列表
+
+    仅返回用户可访问仓库中，由该用户创建或指派给该用户的 Issue。
+
+    Args:
+        db: 异步数据库会话
+        user_id: 当前用户ID
+        status: 状态筛选
+        page: 页码
+        limit: 每页数量
+
+    Returns:
+        dict: 包含 Issue 列表和分页信息
+    """
+    accessible_ids = await get_accessible_repository_ids(db, user_id)
+
+    if not accessible_ids:
+        return build_pagination_response(items=[], total=0, page=page, limit=limit)
+
+    stmt = (
+        select(Issue)
+        .options(
+            selectinload(Issue.author),
+            selectinload(Issue.assignee),
+            selectinload(Issue.labels),
+            selectinload(Issue.repository)
+        )
+        .filter(Issue.repository_id.in_(accessible_ids))
+        .filter(
+            or_(
+                Issue.author_id == user_id,
+                Issue.assignee_id == user_id
+            )
+        )
+    )
+
+    if status:
+        stmt = stmt.filter(Issue.status == status)
 
     stmt = stmt.order_by(Issue.created_at.desc())
     issues, total = await paginate(db, stmt, page, limit)

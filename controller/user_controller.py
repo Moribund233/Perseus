@@ -3,7 +3,8 @@
 
 处理与用户相关的HTTP请求，调用服务层方法并返回响应
 """
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, UploadFile, File
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
@@ -17,8 +18,14 @@ from services.user_service import (
     get_user_by_id as service_get_user_by_id,
     create_user as service_create_user,
     update_user as service_update_user,
-    delete_user as service_delete_user
+    delete_user as service_delete_user,
+    change_password as service_change_password,
+    update_user_avatar as service_update_user_avatar,
+    get_user_avatar as service_get_user_avatar,
 )
+from services.dashboard_service import get_user_dashboard as service_get_user_dashboard
+from services.pull_request_service import list_pull_requests_for_user as service_list_pull_requests_for_user
+from services.issue_service import list_issues_for_user as service_list_issues_for_user
 
 # 创建路由实例
 router = APIRouter(prefix=get_route_prefix("users"), tags=["users"])
@@ -40,6 +47,12 @@ class UserUpdateRequest(BaseModel):
     email: Optional[EmailStr] = Field(None, description="邮箱地址")
     full_name: Optional[str] = Field(None, max_length=100, description="全名")
     is_active: Optional[bool] = Field(None, description="是否激活")
+
+
+class ChangePasswordRequest(BaseModel):
+    """修改密码请求体"""
+    old_password: str = Field(..., min_length=1, description="旧密码")
+    new_password: str = Field(..., min_length=6, max_length=128, description="新密码")
 
 
 @router.get("", summary="获取所有用户")
@@ -74,6 +87,148 @@ async def get_current_user_info(
         User: 当前用户信息
     """
     return current_user
+
+
+@router.get("/me/dashboard", summary="获取当前用户 Dashboard")
+async def get_current_user_dashboard(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取当前登录用户的 Dashboard 聚合数据
+
+    Args:
+        db: 数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        dict: Dashboard 数据
+    """
+    return await service_get_user_dashboard(db, current_user.id)
+
+
+@router.get("/me/pull-requests", summary="获取当前用户的跨仓库 PR 列表")
+async def get_current_user_pull_requests(
+    status: Optional[str] = None,
+    page: int = 1,
+    limit: int = 20,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取当前登录用户相关的跨仓库 Pull Request 列表
+
+    Args:
+        status: 状态筛选（open/merged/closed）
+        page: 页码
+        limit: 每页数量
+        db: 数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        dict: 分页 PR 列表
+    """
+    return await service_list_pull_requests_for_user(
+        db, current_user.id, status=status, page=page, limit=limit
+    )
+
+
+@router.get("/me/issues", summary="获取当前用户的跨仓库 Issue 列表")
+async def get_current_user_issues(
+    status: Optional[str] = None,
+    page: int = 1,
+    limit: int = 20,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取当前登录用户相关的跨仓库 Issue 列表
+
+    Args:
+        status: 状态筛选（open/closed）
+        page: 页码
+        limit: 每页数量
+        db: 数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        dict: 分页 Issue 列表
+    """
+    return await service_list_issues_for_user(
+        db, current_user.id, status=status, page=page, limit=limit
+    )
+
+
+@router.post("/me/password", summary="修改当前用户密码")
+async def change_current_user_password(
+    data: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    修改当前登录用户的密码
+
+    Args:
+        data: 密码修改数据
+        db: 数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        dict: 操作成功消息
+    """
+    return await service_change_password(
+        current_user, data.old_password, data.new_password, db
+    )
+
+
+@router.post("/me/avatar", summary="上传当前用户头像")
+async def upload_current_user_avatar(
+    file: UploadFile = File(..., description="头像图片文件（JPEG/PNG/GIF/WebP，最大5MB）"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    上传当前登录用户的头像
+
+    Args:
+        file: 头像图片文件
+        db: 数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        dict: 更新后的用户信息，包含 avatar_url
+
+    Raises:
+        ValidationException: 文件格式或大小不符合要求
+    """
+    file_data = await file.read()
+    return await service_update_user_avatar(
+        user=current_user,
+        filename=file.filename or "avatar",
+        content_type=file.content_type or "",
+        file_data=file_data,
+        db=db,
+    )
+
+
+@router.get("/{user_id}/avatar", summary="获取用户头像")
+async def get_user_avatar_file(
+    user_id: int
+):
+    """
+    获取用户头像文件
+
+    Args:
+        user_id: 用户ID
+
+    Returns:
+        FileResponse: 头像图片文件
+
+    Raises:
+        NotFoundException: 头像不存在
+    """
+    file_path, content_type = await service_get_user_avatar(user_id)
+    return FileResponse(path=str(file_path), media_type=content_type)
 
 
 @router.get("/{user_id}", summary="根据ID获取用户")

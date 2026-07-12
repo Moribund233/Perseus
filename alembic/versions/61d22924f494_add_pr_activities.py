@@ -50,17 +50,10 @@ def upgrade() -> None:
     sa.Column('full_name', sa.String(length=100), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=True),
     sa.Column('is_admin', sa.Boolean(), nullable=True),
-    sa.Column('capella_user_id', sa.String(length=36), nullable=True),
-    sa.Column('capella_username', sa.String(length=50), nullable=True),
-    sa.Column('capella_mapping_id', sa.String(length=36), nullable=True),
-    sa.Column('capella_access_token', sa.String(length=512), nullable=True),
-    sa.Column('capella_refresh_token', sa.String(length=256), nullable=True),
-    sa.Column('capella_token_expires_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('capella_user_id')
     )
     with op.batch_alter_table('users', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_users_email'), ['email'], unique=True)
@@ -82,24 +75,6 @@ def upgrade() -> None:
     )
     with op.batch_alter_table('branches', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_branches_id'), ['id'], unique=False)
-
-    op.create_table('capella_resource_bindings',
-    sa.Column('user_id', sa.Integer(), nullable=False),
-    sa.Column('repo_id', sa.Integer(), nullable=True),
-    sa.Column('resource_type', sa.String(length=64), nullable=False),
-    sa.Column('resource_id', sa.String(length=255), nullable=False),
-    sa.Column('room_id', sa.String(length=36), nullable=False),
-    sa.Column('capella_binding_id', sa.String(length=36), nullable=False),
-    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
-    sa.ForeignKeyConstraint(['repo_id'], ['repositories.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('resource_type', 'resource_id', name='uq_resource_type_id')
-    )
-    with op.batch_alter_table('capella_resource_bindings', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_capella_resource_bindings_id'), ['id'], unique=False)
 
     op.create_table('issues',
     sa.Column('repository_id', sa.Integer(), nullable=False),
@@ -494,10 +469,6 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_issues_id'))
 
     op.drop_table('issues')
-    with op.batch_alter_table('capella_resource_bindings', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_capella_resource_bindings_id'))
-
-    op.drop_table('capella_resource_bindings')
     with op.batch_alter_table('branches', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_branches_id'))
 

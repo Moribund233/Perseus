@@ -21,10 +21,6 @@ from services.issue_service import (
     reopen_issue as service_reopen_issue,
     create_issue_comment as service_create_issue_comment,
     list_issue_comments as service_list_issue_comments,
-    list_labels as service_list_labels,
-    create_label as service_create_label,
-    update_label as service_update_label,
-    delete_label as service_delete_label,
     filter_issues as service_filter_issues,
     batch_close_issues as service_batch_close_issues,
     batch_reopen_issues as service_batch_reopen_issues,
@@ -58,20 +54,6 @@ class IssueUpdateRequest(BaseModel):
 class IssueCommentCreateRequest(BaseModel):
     """创建 Issue 评论请求体"""
     content: str = Field(..., min_length=1, description="评论内容")
-
-
-class LabelCreateRequest(BaseModel):
-    """创建标签请求体"""
-    name: str = Field(..., min_length=1, max_length=50, description="标签名称")
-    color: str = Field(..., pattern=r"^#[0-9A-Fa-f]{6}$", description="标签颜色（十六进制）")
-    description: Optional[str] = Field(None, max_length=255, description="标签描述")
-
-
-class LabelUpdateRequest(BaseModel):
-    """更新标签请求体"""
-    name: Optional[str] = Field(None, min_length=1, max_length=50, description="标签名称")
-    color: Optional[str] = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$", description="标签颜色（十六进制）")
-    description: Optional[str] = Field(None, max_length=255, description="标签描述")
 
 
 @router.get("/{repo_id}/issues")
@@ -523,104 +505,3 @@ async def create_issue_comment(
     )
 
 
-# ==================== Label 管理 ====================
-
-@router.get("/{repo_id}/labels")
-async def list_labels(
-    repo_id: int,
-    db: AsyncSession = Depends(get_async_db)
-):
-    """
-    获取仓库标签列表
-    
-    Args:
-        repo_id: 仓库ID
-        db: 数据库会话
-    
-    Returns:
-        list: 标签列表
-    """
-    return await service_list_labels(
-        db=db,
-        repository_id=repo_id
-    )
-
-
-@router.post("/{repo_id}/labels")
-async def create_label(
-    repo_id: int,
-    data: LabelCreateRequest,
-    db: AsyncSession = Depends(get_async_db)
-):
-    """
-    创建标签
-    
-    Args:
-        repo_id: 仓库ID
-        data: 标签数据
-        db: 数据库会话
-    
-    Returns:
-        dict: 创建的标签数据
-    """
-    return await service_create_label(
-        db=db,
-        repository_id=repo_id,
-        name=data.name,
-        color=data.color,
-        description=data.description
-    )
-
-
-@router.patch("/{repo_id}/labels/{label_id}")
-async def update_label(
-    repo_id: int,
-    label_id: int,
-    data: LabelUpdateRequest,
-    db: AsyncSession = Depends(get_async_db)
-):
-    """
-    更新标签
-    
-    Args:
-        repo_id: 仓库ID
-        label_id: 标签ID
-        data: 更新数据
-        db: 数据库会话
-    
-    Returns:
-        dict: 更新后的标签数据
-    """
-    return await service_update_label(
-        db=db,
-        repository_id=repo_id,
-        label_id=label_id,
-        name=data.name,
-        color=data.color,
-        description=data.description
-    )
-
-
-@router.delete("/{repo_id}/labels/{label_id}")
-async def delete_label(
-    repo_id: int,
-    label_id: int,
-    db: AsyncSession = Depends(get_async_db)
-):
-    """
-    删除标签
-    
-    Args:
-        repo_id: 仓库ID
-        label_id: 标签ID
-        db: 数据库会话
-    
-    Returns:
-        dict: 操作结果
-    """
-    await service_delete_label(
-        db=db,
-        repository_id=repo_id,
-        label_id=label_id
-    )
-    return {"message": "Label deleted successfully"}

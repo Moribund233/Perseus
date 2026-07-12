@@ -56,7 +56,7 @@ async def get_repository_member(repo_id: int, user_id: int, db: AsyncSession):
     return member
 
 
-async def add_repository_member(repo_id: int, member_data: dict, db: AsyncSession):
+async def add_repository_member(repo_id: int, member_data: dict, db: AsyncSession, operator_id: int = None):
     """
     添加仓库成员
 
@@ -64,6 +64,7 @@ async def add_repository_member(repo_id: int, member_data: dict, db: AsyncSessio
         repo_id: 仓库ID
         member_data: 成员信息
         db: 异步数据库会话
+        operator_id: 操作人用户ID（可选，用于审计）
 
     Returns:
         RepositoryMember: 添加的成员信息
@@ -111,7 +112,7 @@ async def add_repository_member(repo_id: int, member_data: dict, db: AsyncSessio
     return db_member
 
 
-async def update_repository_member(repo_id: int, user_id: int, member_data: dict, db: AsyncSession):
+async def update_repository_member(repo_id: int, user_id: int, member_data: dict, db: AsyncSession, operator_id: int = None):
     """
     更新仓库成员信息
 
@@ -120,6 +121,7 @@ async def update_repository_member(repo_id: int, user_id: int, member_data: dict
         user_id: 用户ID
         member_data: 更新的成员信息
         db: 异步数据库会话
+        operator_id: 操作人用户ID（可选，用于审计）
 
     Returns:
         RepositoryMember: 更新后的成员信息
@@ -140,7 +142,7 @@ async def update_repository_member(repo_id: int, user_id: int, member_data: dict
     return db_member
 
 
-async def remove_repository_member(repo_id: int, user_id: int, db: AsyncSession):
+async def remove_repository_member(repo_id: int, user_id: int, db: AsyncSession, operator_id: int = None):
     """
     删除仓库成员
 
@@ -148,6 +150,7 @@ async def remove_repository_member(repo_id: int, user_id: int, db: AsyncSession)
         repo_id: 仓库ID
         user_id: 用户ID
         db: 异步数据库会话
+        operator_id: 操作人用户ID（可选，用于审计）
 
     Returns:
         dict: 成功消息
@@ -168,7 +171,7 @@ async def remove_repository_member(repo_id: int, user_id: int, db: AsyncSession)
     return {"message": "Member removed successfully"}
 
 
-async def update_member_role(repo_id: int, user_id: int, role: str, db: AsyncSession):
+async def update_member_role(repo_id: int, user_id: int, role: str, db: AsyncSession, operator_id: int = None):
     """
     更新成员角色
 
@@ -177,6 +180,7 @@ async def update_member_role(repo_id: int, user_id: int, role: str, db: AsyncSes
         user_id: 用户ID
         role: 新角色
         db: 异步数据库会话
+        operator_id: 操作人用户ID（可选，用于审计）
 
     Returns:
         RepositoryMember: 更新后的成员信息
@@ -189,7 +193,7 @@ async def update_member_role(repo_id: int, user_id: int, role: str, db: AsyncSes
     if role not in VALID_ROLES:
         raise ValidationException(detail=f"Invalid role. Valid roles are: {', '.join(VALID_ROLES)}")
 
-    return await update_repository_member(repo_id, user_id, {"role": role}, db)
+    return await update_repository_member(repo_id, user_id, {"role": role}, db, operator_id=operator_id)
 
 
 async def get_user_repositories(user_id: int, db: AsyncSession):
@@ -262,7 +266,7 @@ async def check_member_permission(repo_id: int, user_id: int, required_role: str
     return user_role_priority >= required_role_priority
 
 
-async def activate_repository_member(repo_id: int, user_id: int, db: AsyncSession):
+async def activate_repository_member(repo_id: int, user_id: int, db: AsyncSession, operator_id: int = None):
     """
     激活仓库成员
 
@@ -270,6 +274,7 @@ async def activate_repository_member(repo_id: int, user_id: int, db: AsyncSessio
         repo_id: 仓库ID
         user_id: 用户ID
         db: 异步数据库会话
+        operator_id: 操作人用户ID（可选，用于审计）
 
     Returns:
         RepositoryMember: 更新后的成员信息
@@ -277,10 +282,10 @@ async def activate_repository_member(repo_id: int, user_id: int, db: AsyncSessio
     Raises:
         NotFoundException: 成员不存在时抛出404异常
     """
-    return await update_repository_member(repo_id, user_id, {"is_active": True}, db)
+    return await update_repository_member(repo_id, user_id, {"is_active": True}, db, operator_id=operator_id)
 
 
-async def deactivate_repository_member(repo_id: int, user_id: int, db: AsyncSession):
+async def deactivate_repository_member(repo_id: int, user_id: int, db: AsyncSession, operator_id: int = None):
     """
     停用仓库成员
 
@@ -288,6 +293,7 @@ async def deactivate_repository_member(repo_id: int, user_id: int, db: AsyncSess
         repo_id: 仓库ID
         user_id: 用户ID
         db: 异步数据库会话
+        operator_id: 操作人用户ID（可选，用于审计）
 
     Returns:
         RepositoryMember: 更新后的成员信息
@@ -302,4 +308,4 @@ async def deactivate_repository_member(repo_id: int, user_id: int, db: AsyncSess
     if db_member.role == "owner":
         raise AuthorizationException(detail="Cannot deactivate repository owner")
 
-    return await update_repository_member(repo_id, user_id, {"is_active": False}, db)
+    return await update_repository_member(repo_id, user_id, {"is_active": False}, db, operator_id=operator_id)

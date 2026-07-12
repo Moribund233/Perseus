@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'c75cd32eb873'
-down_revision: Union[str, Sequence[str], None] = '71b8169a1172'
+down_revision: Union[str, Sequence[str], None] = '42017859e904'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -35,9 +35,6 @@ def upgrade() -> None:
     with op.batch_alter_table('stargazers', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_stargazers_id'), ['id'], unique=False)
 
-    with op.batch_alter_table('capella_resource_bindings', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_capella_resource_bindings_id'), ['id'], unique=False)
-
     with op.batch_alter_table('repositories', schema=None) as batch_op:
         batch_op.add_column(sa.Column('star_count', sa.Integer(), nullable=False, server_default=sa.text('0')))
 
@@ -55,9 +52,6 @@ def downgrade() -> None:
 
     with op.batch_alter_table('repositories', schema=None) as batch_op:
         batch_op.drop_column('star_count')
-
-    with op.batch_alter_table('capella_resource_bindings', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_capella_resource_bindings_id'))
 
     with op.batch_alter_table('stargazers', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_stargazers_id'))

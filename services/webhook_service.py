@@ -458,6 +458,9 @@ async def _deliver_webhook(
     """
     投递 WebHook
 
+    支持最多 3 次指数退避重试（1s, 2s, 4s），最终失败的投递记录会保留
+    最后一次错误信息。
+
     Args:
         webhook: WebHook 实例
         event: 事件类型
@@ -508,40 +511,57 @@ async def _deliver_webhook(
         db.add(delivery)
         await db.commit()
 
-    # 发送请求
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                webhook.url,
-                content=body,
-                headers=headers
-            )
+    # F-031: 指数退避重试，最多 3 次
+    max_retries = 3
+    last_exception: Optional[Exception] = None
 
-        duration_ms = int((time.time() - start_time) * 1000)
+    for attempt in range(max_retries):
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    webhook.url,
+                    content=body,
+                    headers=headers
+                )
 
-        # 更新投递记录
-        delivery.response_status = response.status_code
-        delivery.response_body = response.text[:10000]  # 限制大小
-        delivery.response_headers = json.dumps(dict(response.headers))
-        delivery.duration_ms = duration_ms
-        delivery.is_success = 200 <= response.status_code < 300
+            duration_ms = int((time.time() - start_time) * 1000)
 
-        # 更新 WebHook 最后触发信息
-        webhook.last_triggered_at = datetime.utcnow()
-        webhook.last_response_status = response.status_code
-        webhook.last_response_body = response.text[:1000]
+            # 更新投递记录
+            delivery.response_status = response.status_code
+            delivery.response_body = response.text[:10000]  # 限制大小
+            delivery.response_headers = json.dumps(dict(response.headers))
+            delivery.duration_ms = duration_ms
+            delivery.is_success = 200 <= response.status_code < 300
+            delivery.error_message = None
 
-    except Exception as e:
-        duration_ms = int((time.time() - start_time) * 1000)
+            # 更新 WebHook 最后触发信息
+            webhook.last_triggered_at = datetime.utcnow()
+            webhook.last_response_status = response.status_code
+            webhook.last_response_body = response.text[:1000]
 
-        delivery.response_status = 0
-        delivery.duration_ms = duration_ms
-        delivery.is_success = False
-        delivery.error_message = str(e)[:1000]
+            if delivery.is_success:
+                break
 
-        webhook.last_triggered_at = datetime.utcnow()
-        webhook.last_response_status = 0
-        webhook.last_response_body = str(e)[:1000]
+            # 非 2xx 响应且还有重试次数时，记录为本次失败原因并继续
+            last_exception = Exception(f"HTTP {response.status_code}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2 ** attempt)
+
+        except Exception as e:
+            duration_ms = int((time.time() - start_time) * 1000)
+            last_exception = e
+
+            delivery.response_status = 0
+            delivery.duration_ms = duration_ms
+            delivery.is_success = False
+            delivery.error_message = str(e)[:1000]
+
+            webhook.last_triggered_at = datetime.utcnow()
+            webhook.last_response_status = 0
+            webhook.last_response_body = str(e)[:1000]
+
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2 ** attempt)
 
     if db:
         await db.commit()

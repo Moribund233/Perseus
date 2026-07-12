@@ -85,6 +85,133 @@
     "topBar": {
       "searchPlaceholder": "Search...",
       "new": "New"
+    },
+    "repositories": {
+      "title": "Repositories",
+      "explorer": "Explorer",
+      "filters": {
+        "all": "All",
+        "source": "Source",
+        "config": "Config",
+        "tests": "Tests"
+      },
+      "actions": {
+        "watch": "Watch",
+        "star": "Star",
+        "fork": "Fork"
+      },
+      "visibility": {
+        "public": "Public",
+        "private": "Private"
+      },
+      "tabs": {
+        "code": "Code",
+        "issues": "Issues",
+        "pullRequests": "Pull Requests",
+        "settings": "Settings"
+      },
+      "fileList": {
+        "lastCommit": "Latest commit",
+        "name": "Name",
+        "message": "Message",
+        "time": "Time"
+      },
+      "readme": "README"
+    },
+    "dashboard": {
+      "welcomeBack": "Welcome back, {{name}}",
+      "subtitle": "Here's what's happening with your projects today.",
+      "stats": {
+        "repositories": "Repositories",
+        "openPRs": "Open PRs",
+        "teamMembers": "Team Members",
+        "commits": "Commits",
+        "repositoriesChange": "3 this week",
+        "openPRsChange": "5 need review",
+        "teamMembersChange": "2 new",
+        "commitsChange": "142 this week"
+      },
+      "recentActivity": "Recent Activity",
+      "viewAll": "View all",
+      "yourRepositories": "Your Repositories",
+      "contributionActivity": "Contribution Activity",
+      "contributionsCount": "{{count}} contributions in the last 30 days",
+      "activity": {
+        "mergedPR": "merged PR <strong>#{{id}}</strong> in <strong>{{repo}}</strong>",
+        "pushedCommits": "pushed {{count}} commits to <strong>{{branch}}</strong>",
+        "openedPR": "opened PR <strong>#{{id}}</strong> — \"{{title}}\"",
+        "reviewedPR": "reviewed PR <strong>#{{id}}</strong> in <strong>{{repo}}</strong>",
+        "createdIssue": "created issue <strong>#{{id}}</strong> — \"{{title}}\"",
+        "commentedOnIssue": "commented on issue <strong>#{{id}}</strong> in <strong>{{repo}}</strong>"
+      }
+    },
+    "pullRequests": {
+      "title": "Pull Requests",
+      "filters": {
+        "open": "Open",
+        "merged": "Merged",
+        "closed": "Closed",
+        "all": "All"
+      },
+      "openedBy": "#{{id}} opened by {{author}} {{time}}",
+      "comments": "{{count}} comments",
+      "reviews": "{{count}} reviews",
+      "filter": "Filter",
+      "newPullRequest": "New Pull Request"
+    },
+    "codeEditor": {
+      "title": "Code Editor",
+      "online": "Online",
+      "offline": "Offline",
+      "discussions": "Discussions",
+      "activity": "Activity"
+    },
+    "teamChat": {
+      "title": "Team Chat",
+      "channels": "Channels",
+      "directMessages": "Direct Messages",
+      "members": "Members",
+      "placeholder": "Message #{{channel}}...",
+      "today": "Today"
+    },
+    "settings": {
+      "title": "Settings",
+      "profile": "Profile",
+      "account": "Account",
+      "appearance": "Appearance",
+      "notifications": "Notifications",
+      "preferences": "Preferences",
+      "save": "Save",
+      "saveChanges": "Save Changes",
+      "cancel": "Cancel",
+      "changeAvatar": "Change Avatar",
+      "publicProfile": "Public Profile",
+      "publicProfileDesc": "This information will be displayed publicly on your profile.",
+      "name": "Name",
+      "bio": "Bio",
+      "bioPlaceholder": "Tell us a little about yourself.",
+      "company": "Company",
+      "location": "Location",
+      "website": "Website",
+      "accountSettings": "Account Settings",
+      "accountSettingsDesc": "Update your username and manage your password.",
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "confirmNewPassword": "Confirm New Password",
+      "changePassword": "Change Password",
+      "appearanceSettings": "Appearance Settings",
+      "appearanceSettingsDesc": "Customize how Perseus looks for you.",
+      "theme": "Theme",
+      "dark": "Dark",
+      "light": "Light",
+      "system": "System",
+      "language": "Language",
+      "notificationsSettings": "Notifications",
+      "notificationsSettingsDesc": "Choose how you want to be notified.",
+      "emailNotifications": "Email Notifications",
+      "pushNotifications": "Push Notifications",
+      "emailNotificationsDesc": "Receive updates about PRs, issues and mentions.",
+      "pushNotificationsDesc": "Get browser notifications for real-time events."
     }
   },
   "auth": {

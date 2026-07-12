@@ -2,7 +2,7 @@ import { Row, Col, Card, Skeleton } from 'antd';
 
 export default function DashboardSkeleton() {
   return (
-    <div style={{ height: '100%' }}>
+    <div style={{ height: '100%', padding: 24 }}>
       <Skeleton.Input active style={{ width: 300, height: 32, marginBottom: 24 }} />
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         {[1, 2, 3, 4].map((i) => (

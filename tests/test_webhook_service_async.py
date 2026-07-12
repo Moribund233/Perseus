@@ -307,3 +307,63 @@ def test_build_delivery_response():
     # 包含详细信息
     response = webhook_service.build_delivery_response(delivery, include_details=True)
     assert "payload" in response
+
+
+# =============================================================================
+# F-031: WebHook 投递重试测试
+# =============================================================================
+
+@pytest.mark.asyncio
+async def test_webhook_delivery_retries_on_failure(async_db: AsyncSession, test_webhook, respx_mock):
+    """
+    测试 WebHook 投递失败时执行重试
+
+    验证点：
+    1. 目标 URL 前两次返回 500，第三次返回 200
+    2. 最终投递记录 is_success 为 True
+    3. 目标 URL 被请求 3 次
+    """
+    import respx
+    from httpx import Response
+
+    route = respx_mock.post("https://example.com/webhook").mock(
+        side_effect=[Response(500), Response(500), Response(200)]
+    )
+
+    delivery = await webhook_service._deliver_webhook(
+        webhook=test_webhook,
+        event="push",
+        payload={"ref": "main"},
+        db=async_db,
+    )
+
+    assert delivery.is_success is True
+    assert delivery.response_status == 200
+    assert route.call_count == 3
+
+
+@pytest.mark.asyncio
+async def test_webhook_delivery_records_final_failure(async_db: AsyncSession, test_webhook, respx_mock):
+    """
+    测试 WebHook 投递最终失败时记录最后一次错误
+
+    验证点：
+    1. 目标 URL 始终返回 500
+    2. 最终投递记录 is_success 为 False
+    3. 目标 URL 被请求 3 次（含初始投递）
+    """
+    import respx
+    from httpx import Response
+
+    route = respx_mock.post("https://example.com/webhook").mock(return_value=Response(500))
+
+    delivery = await webhook_service._deliver_webhook(
+        webhook=test_webhook,
+        event="push",
+        payload={"ref": "main"},
+        db=async_db,
+    )
+
+    assert delivery.is_success is False
+    assert delivery.response_status == 500
+    assert route.call_count == 3

@@ -41,7 +41,7 @@ export const perseusTheme: ThemeConfig = {
       itemActiveBg: '#1a2332',
       subMenuItemBg: 'transparent',
       popupBg: '#161b22',
-      iconSize: 18,
+      iconSize: 20,
       itemHeight: 40,
       itemBorderRadius: 8,
     },

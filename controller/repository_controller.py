@@ -3,7 +3,7 @@
 
 处理与仓库相关的HTTP请求，调用服务层方法并返回响应
 """
-from fastapi import APIRouter, Depends, Request, status, HTTPException
+from fastapi import APIRouter, Depends, Path, Request, status, HTTPException
 from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +20,7 @@ from core.exception import AuthorizationException
 from services.repository_service import (
     get_repositories as service_get_repositories,
     get_repository_by_id as service_get_repository_by_id,
+    get_repository_by_path as service_get_repository_by_path,
     get_repositories_by_user as service_get_repositories_by_user,
     create_repository as service_create_repository,
     update_repository as service_update_repository,
@@ -89,6 +90,36 @@ async def get_repositories_by_user(
     return await service_get_repositories_by_user(user_id, db)
 
 
+@router.get("/{owner}/{repo}")
+async def get_repository_by_path(
+    owner: str,
+    repo: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    根据 owner/repo 路径获取仓库（需要认证）
+
+    Args:
+        owner: 仓库所有者用户名
+        repo: 仓库名称
+        db: 异步数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        Repository: 仓库信息
+
+    Raises:
+        NotFoundException: 仓库不存在时抛出404异常
+        AuthorizationException: 无权限访问私有仓库时抛出403异常
+    """
+    repository = await service_get_repository_by_path(owner, repo, db)
+    has_access = await service_check_repository_access(repository["id"], current_user.id, db)
+    if not has_access:
+        raise AuthorizationException(detail="You do not have access to this repository")
+    return repository
+
+
 @router.get("/{repo_id}")
 async def get_repository(
     repo_id: int,
@@ -100,7 +131,7 @@ async def get_repository(
 
     Args:
         repo_id: 仓库ID
-        db: 数据库会话
+        db: 异步数据库会话
         current_user: 当前认证用户
 
     Returns:

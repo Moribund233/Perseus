@@ -134,3 +134,29 @@ async def update_build(
         logs=data.logs,
     )
     return _build_to_response(build)
+
+
+@router.get("/{repo_id}/builds/{build_id}/logs")
+async def get_build_logs(
+    repo_id: int,
+    build_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    获取构建日志
+
+    Args:
+        repo_id: 仓库ID
+        build_id: 构建ID
+        db: 数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        dict: 构建日志文本
+    """
+    await _get_repo(repo_id, db)
+    build = await BuildService.get_build(db=db, build_id=build_id)
+    if build.repo_id != repo_id:
+        raise NotFoundException(detail="Build not found")
+    return {"logs": build.logs or ""}

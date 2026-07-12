@@ -41,7 +41,7 @@
 | P0 — 代码查看器 | **F-022**, **F-023**, **F-024** | 100% ✅ |
 | P1 — Issue 看板 | **F-025**, **F-027** | 100% ✅ |
 | P1 — Code Review | F-028, F-029 | 100% ✅ |
-| P1 — Webhook | F-032, F-033 | F-031 (重试/退避) | 66% 🟡 |
+| P1 — Webhook | F-031, F-032, F-033 | — | 100% ✅ |
 
 > **阶段二核心后端功能已完成** ✅ — Controller + API 测试已全部完成，路由已注册；Webhook 单次投递已可用，重试机制作为后续增强项
 
@@ -50,10 +50,10 @@
 | 模块 | 已完成 | 待完成 | 进度 |
 |------|--------|--------|------|
 | P1 — Git LFS | F-034, F-035, F-036 | — | 100% ✅ |
-| P1 — 代码搜索 | F-037 | F-038 (跨仓库搜索), F-039 (搜索索引维护) | 33% 🟡 |
+| P1 — 代码搜索 | F-037, F-038, F-039 | — | 100% ✅ |
 | P1 — WebSocket 实时协作 | F-040, F-041, F-042 | — | 100% ✅ |
 | P2 — 通知系统 | F-043, F-044, F-045 | — | 100% ✅ |
-| P2 — CI/CD 集成 | — | F-046 (Webhook → CI 触发闭环), F-047 (构建状态展示) | 50% 🟡 |
+| P2 — CI/CD 集成 | F-046 | F-047 (构建状态展示) | 50% 🟡 |
 | P2 — 国际化 | — | F-048, F-049, F-050 | 0% 🔴 |
 
 > **状态说明**:
@@ -281,7 +281,7 @@ pytest -v -m e2e
 
 | ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
 |----|------|---------|----------|------|
-| F-031 | Webhook 触发与单次投递 | `test_webhook_delivery_with_retry()` | `webhook_service.py` | 🟡 单次投递已实现，重试/退避待实现 |
+| F-031 | Webhook 触发与重试投递 | `test_webhook_delivery_with_retry()` | `webhook_service.py` | ✅ 已实现 3 次指数退避重试 |
 | F-032 | HMAC-SHA256 签名验证 | `test_webhook_hmac_signature()` | `webhook_service.py` | ✅ 已实现 `_generate_signature()` |
 | F-033 | 事件负载标准格式 | `test_push_event_payload_format()` | `webhook_service.py` | ✅ 已实现标准 Payload 格式 |
 
@@ -304,8 +304,8 @@ pytest -v -m e2e
 | ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
 |----|------|---------|----------|------|
 | F-037 | 仓库内全文搜索 | `test_search_code_in_repository()` | `services/search_service.py` | ✅ |
-| F-038 | 跨仓库搜索 | `test_cross_repo_search()` | `services/search_service.py` | ❌ 待实现 |
-| F-039 | 搜索索引维护 | `test_search_index_update_on_push()` | `services/search_service.py` | ❌ 待实现 |
+| F-038 | 跨仓库搜索 | `test_cross_repo_search()` | `services/search_service.py`<br>`controller/search_controller.py` | ✅ 已实现 `/api/v1/search/code` |
+| F-039 | 搜索索引维护 | `test_search_index_update_on_push()` | `services/search_service.py`<br>`services/pull_request_service.py` | ✅ PR merge 后自动重建索引 |
 
 ### P1 — WebSocket 实时协作 ✅
 
@@ -327,7 +327,7 @@ pytest -v -m e2e
 
 | ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
 |----|------|---------|----------|------|
-| F-046 | Webhook → CI 触发闭环 | `test_ci_webhook_payload()` | `utils/webhook_trigger.py`<br>`services/build_service.py` | 🟡 构建状态 API 已就绪，真实 push/PR 触发链路待接入 |
+| F-046 | PR Merge → CI Build 触发闭环 | `test_merge_pr_creates_build_record()` | `services/pull_request_service.py`<br>`services/build_service.py` | ✅ PR merge 后自动创建 Build 记录 |
 | F-047 | 构建状态展示 | — | 前端新组件 | ❌ 待实现 |
 
 ### P2 — 国际化
@@ -364,10 +364,10 @@ pytest -v -m e2e
 
 | 优先级 | ID | 任务 | 当前状态 | 说明 | 验收标准 |
 |--------|----|------|----------|------|----------|
-| **P0** | F-038 | 跨仓库代码搜索 | ❌ 未实现 | 目前仅有单仓库搜索，需增加全局聚合接口 | 新增 `/api/v1/search` 或 `/api/v1/search/code`，支持按仓库/语言/路径过滤；补充 Service/API 测试 |
-| **P0** | F-039 | 搜索索引自动维护 | ❌ 未实现 | `broadcast_push` 未调用，真实 push 未触发索引更新 | 在 git push 后处理流程或仓库浏览器写入时调用 `SearchService.rebuild_index`；补充索引更新测试 |
-| **P0** | F-046 | CI/CD 触发闭环 | 🟡 部分实现 | 仅有 `BuildService` 状态 API，真实 push/PR 未触发 webhook | 在 PR merge / push 流程中调用 `utils/webhook_trigger.py` 相关函数，自动创建 `Build` 记录；补充集成测试 |
-| **P1** | F-031 | Webhook 重试机制 | 🟡 部分实现 | 当前 `_deliver_webhook` 仅单次投递 | 实现指数退避重试（如 3 次），记录投递状态与失败原因；补充重试测试 |
+| **P0** | F-038 | 跨仓库代码搜索 | ✅ 已实现 | 新增 `/api/v1/search/code` 全局聚合接口 | 支持按仓库/语言/路径过滤；已补充 API 测试 |
+| **P0** | F-039 | 搜索索引自动维护 | ✅ 已实现 | PR merge 后自动调用 `SearchService.rebuild_index` | 已补充 PR merge 后索引重建测试 |
+| **P0** | F-046 | CI/CD 触发闭环 | ✅ 已实现 | PR merge 后自动创建 `Build` 记录 | 已补充 `test_merge_pr_creates_build_record` |
+| **P1** | F-031 | Webhook 重试机制 | ✅ 已实现 | `_deliver_webhook` 支持最多 3 次指数退避重试 | 已补充重试与最终失败测试 |
 | **P1** | F-204 | 协作文本编辑 | ⏳ Phase 2 | `services/realtime/collab.py` 不存在 | 实现 OT/CRDT 基础操作消息协议，新增 WS handler，支持房间级协作文档；补充 WS 测试 |
 | **P1** | F-205 | 独立实时通知模块 | ⏳ Phase 2 | `services/realtime/notify.py` 不存在 | 拆分实时通知逻辑，支持 @提及解析、评论/CI 状态实时推送；复用 `notification_service` + `notify_user` |
 | **P2** | F-048~050 | 国际化 | 🔴 未开始 | API 错误消息未做多语言 | 后端新增 `locales/` 与错误码映射，`core/exception.py` 支持按 `Accept-Language` 返回多语言消息 |

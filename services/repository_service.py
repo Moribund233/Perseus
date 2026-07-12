@@ -191,6 +191,66 @@ async def get_repository_by_id(repo_id: int, db: AsyncSession):
     return build_repo_response(repo, physical_exists)
 
 
+async def get_repository_by_path(owner: str, repo_name: str, db: AsyncSession):
+    """
+    根据 owner/repo 路径获取仓库
+
+    Repository.path 格式固定为 {username}/{repo_name}，且具有唯一约束。
+
+    Args:
+        owner: 仓库所有者用户名
+        repo_name: 仓库名称
+        db: 异步数据库会话
+
+    Returns:
+        dict: 仓库信息（包含物理仓库信息）
+
+    Raises:
+        NotFoundException: 仓库不存在时抛出404异常
+    """
+    path = f"{owner}/{repo_name}"
+    result = await db.execute(select(Repository).filter(Repository.path == path))
+    repo = result.scalar_one_or_none()
+    if repo is None:
+        raise NotFoundException(detail="Repository not found")
+    physical_exists = await _check_physical_repo_exists_async(repo)
+    return build_repo_response(repo, physical_exists)
+
+
+async def get_accessible_repository_ids(db: AsyncSession, user_id: int) -> list[int]:
+    """
+    获取指定用户可访问的仓库 ID 列表
+
+    包括：公开仓库、用户拥有的仓库、用户作为活跃成员参与的仓库。
+
+    Args:
+        db: 异步数据库会话
+        user_id: 用户ID
+
+    Returns:
+        list[int]: 可访问仓库 ID 列表
+    """
+    stmt = (
+        select(Repository.id)
+        .outerjoin(
+            RepositoryMember,
+            (RepositoryMember.repository_id == Repository.id) &
+            (RepositoryMember.user_id == user_id) &
+            (RepositoryMember.is_active == True)
+        )
+        .filter(
+            or_(
+                Repository.is_public == True,
+                Repository.owner_id == user_id,
+                RepositoryMember.user_id.is_not(None)
+            )
+        )
+        .distinct()
+    )
+    result = await db.execute(stmt)
+    return [row[0] for row in result.all()]
+
+
 async def get_repositories_by_user(user_id: int, db: AsyncSession):
     """
     根据用户ID获取仓库列表

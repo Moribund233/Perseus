@@ -52,10 +52,6 @@ def create_api_router() -> APIRouter:
     from controller.user_controller import router as user_router
     api_v1_router.include_router(user_router)
 
-    # 5. 仓库管理路由
-    from controller.repository_controller import router as repository_router
-    api_v1_router.include_router(repository_router)
-
     # 6. 仓库成员路由
     from controller.repository_member_controller import router as repository_member_router
     api_v1_router.include_router(repository_member_router)
@@ -132,9 +128,19 @@ def create_api_router() -> APIRouter:
     from controller.search_controller import router as search_router
     api_v1_router.include_router(search_router)
 
+    # 11e2. 跨仓库 Search 路由
+    from controller.search_controller import global_search_router
+    api_v1_router.include_router(global_search_router)
+
     # 11f. Build 路由
     from controller.build_controller import router as build_router
     api_v1_router.include_router(build_router)
+
+    # 5. 仓库管理路由（含 /{owner}/{repo} 路径查询）
+    # 放在其他仓库子路由（issues/pull-requests/builds/search 等）之后注册，
+    # 避免 /{owner}/{repo} 过早匹配 /1/issues 这类子路径。
+    from controller.repository_controller import router as repository_router
+    api_v1_router.include_router(repository_router)
 
     # 12. Debug 路由（仅在调试模式下可用）
     from controller.debug_controller import router as debug_router
