@@ -16,7 +16,7 @@ from models import Repository
 from models.branch import Branch
 from models.repository_member import RepositoryMember
 from core.exception import ValidationException, NotFoundException, ConflictException
-from utils.git_utils import init_bare_repo, get_repository_storage_path, repo_exists_async, GitError
+from utils.git_utils import init_bare_repo, get_repository_storage_path, repo_exists_async, enable_receive_pack, GitError
 from utils.response_builder import build_repo_response, build_pagination_response
 from utils.db_utils import exists, paginate
 from core.constants import ROLE_PRIORITY
@@ -340,6 +340,8 @@ async def create_repository(repo_data: dict, db: AsyncSession):
     try:
         physical_path = get_repository_storage_path(db_repo.path)
         init_bare_repo(physical_path)
+        # 启用 HTTP push（git-http-backend 默认禁止 receive-pack）
+        enable_receive_pack(physical_path)
     except GitError as e:
         # 物理仓库创建失败，记录错误但不阻止创建
         logger.warning(f"Failed to create physical git repository at {physical_path}: {e}")
@@ -415,7 +417,7 @@ async def delete_repository(repo_id: int, db: AsyncSession):
     if db_repo is None:
         raise NotFoundException(detail="Repository not found")
 
-    # 获取物理仓库路径
+    # 获取物理仓库路径（get_repository_storage_path 已包含 .git 后缀）
     physical_path = None
     try:
         physical_path = get_repository_storage_path(db_repo.path)

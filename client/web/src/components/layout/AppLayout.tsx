@@ -296,7 +296,29 @@ export default function AppLayout() {
               flexShrink: 0,
             }}
           >
-            <span style={{ color: textPrimary, fontWeight: 500 }}>{activeLabel}</span>
+            {(() => {
+              const repoMatch = location.pathname.match(/^\/repositories\/([^/]+)\/([^/]+)/);
+              if (repoMatch) {
+                const [, owner, repoName] = repoMatch;
+                return (
+                  <>
+                    <span
+                      onClick={() => navigate('/repositories')}
+                      style={{ cursor: 'pointer', transition: 'color 0.15s' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = textPrimary; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = textSecondary; }}
+                    >
+                      {t('app.nav.repositories')}
+                    </span>
+                    <span style={{ color: '#6e7681' }}>/</span>
+                    <span style={{ color: textSecondary }}>{owner}</span>
+                    <span style={{ color: '#6e7681' }}>/</span>
+                    <span style={{ color: textPrimary, fontWeight: 500 }}>{repoName}</span>
+                  </>
+                );
+              }
+              return <span style={{ color: textPrimary, fontWeight: 500 }}>{activeLabel}</span>;
+            })()}
           </div>
 
           {/* Search */}

@@ -11,6 +11,9 @@ import {
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import PullRequestsSkeleton from '../../components/skeleton/PullRequestsSkeleton';
+import { usePullRequestsStore } from '../../stores/pullRequests';
+import { useAuthStore } from '../../stores/auth';
+import { useRepositoriesStore } from '../../stores/repositories';
 
 const { Content } = Layout;
 
@@ -41,13 +44,6 @@ interface PR {
   avatars: string[];
 }
 
-const prs: PR[] = [
-  { id: 142, title: 'Add WebSocket support for real-time sync', author: 'Wang Jun', time: '1 hour ago', status: 'open', labels: [{ name: 'feature', color: 'green' }, { name: 'urgent', color: 'orange' }], comments: 4, reviews: 2, avatars: ['WJ', 'LW', 'CM'] },
-  { id: 148, title: 'Refactor repository tree renderer', author: 'Li Wei', time: '3 hours ago', status: 'open', labels: [{ name: 'enhancement', color: 'purple' }], comments: 1, reviews: 0, avatars: ['LW'] },
-  { id: 135, title: 'Fix memory leak in file watcher', author: 'Huang Yan', time: '2 days ago', status: 'merged', labels: [{ name: 'bug', color: 'red' }], comments: 7, reviews: 3, avatars: ['HY', 'ZL'] },
-  { id: 128, title: 'Update CI pipeline to use new runner', author: 'Chen Mei', time: '3 days ago', status: 'closed', labels: [{ name: 'enhancement', color: 'purple' }], comments: 2, reviews: 1, avatars: ['CM'] },
-];
-
 const labelColorMap: Record<string, string> = {
   bug: '#f85149',
   feature: '#3fb950',
@@ -55,13 +51,40 @@ const labelColorMap: Record<string, string> = {
   urgent: '#d29922',
 };
 
-const avatarColorMap: Record<string, string> = {
-  ZL: '#1f6feb',
-  LW: '#3fb950',
-  CM: '#58a6ff',
-  WJ: '#bc8cff',
-  HY: '#d29922',
-};
+const avatarColors = ['#1f6feb', '#3fb950', '#58a6ff', '#bc8cff', '#d29922', '#f85149', '#f0883e', '#7956d9'];
+
+function relativeTime(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diff = now - then;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  const weeks = Math.floor(days / 7);
+  const months = Math.floor(days / 30);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  if (weeks < 5) return `${weeks}w ago`;
+  return `${months}mo ago`;
+}
+
+function getInitials(name: string): string {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+}
+
+function getAvatarColor(initials: string): string {
+  let hash = 0;
+  for (let i = 0; i < initials.length; i++) {
+    hash = initials.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return avatarColors[Math.abs(hash) % avatarColors.length];
+}
+
+function resolveLabelColor(color: string): string {
+  return color.startsWith('#') ? color : (labelColorMap[color] || '#8b949e');
+}
 
 const statusIcon = (status: string) => {
   if (status === 'open') return <PullRequestOutlined style={{ color: '#3fb950', fontSize: 20 }} />;
@@ -70,20 +93,65 @@ const statusIcon = (status: string) => {
 };
 
 export default function PullRequestsPage() {
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuthStore();
+  const { repositories, fetchRepositoriesByUser, isLoading: repoLoading, error: repoError } = useRepositoriesStore();
+  const { pullRequests, isLoading: prLoading, error: prError, fetchPullRequests } = usePullRequestsStore();
+
+  const [selectedRepoId, setSelectedRepoId] = useState<number | null>(null);
   const [filter, setFilter] = useState<'open' | 'merged' | 'closed' | 'all'>('open');
+  const [initialLoading, setInitialLoading] = useState(true);
   const { t } = useTranslation();
 
+  const activeRepoId = selectedRepoId ?? repositories[0]?.id;
+  const error = repoError || prError;
+
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(timer);
-  }, []);
+    if (user?.id) {
+      fetchRepositoriesByUser(user.id);
+    }
+  }, [user?.id, fetchRepositoriesByUser]);
 
-  if (loading) return <PullRequestsSkeleton />;
+  useEffect(() => {
+    if (activeRepoId) {
+      fetchPullRequests(activeRepoId);
+    }
+  }, [activeRepoId, fetchPullRequests]);
 
-  const filtered = prs.filter((p) => filter === 'all' || p.status === filter);
-  const filterCounts = { open: 5, merged: 128, closed: 14, all: 147 };
+  useEffect(() => {
+    if (pullRequests.length > 0 || prError || (!prLoading && !repoLoading)) {
+      setInitialLoading(false);
+    }
+  }, [pullRequests.length, prError, prLoading, repoLoading]);
+
+  if (initialLoading) {
+    return <PullRequestsSkeleton />;
+  }
+
+  const mappedPRs: PR[] = pullRequests.map((pr) => {
+    const authorName = pr.author?.full_name || pr.author?.username || 'Unknown';
+    const initials = getInitials(authorName);
+    return {
+      id: pr.pr_number,
+      title: pr.title,
+      author: authorName,
+      time: relativeTime(pr.created_at),
+      status: pr.status,
+      labels: (pr.labels || []).map((l) => ({ name: l.name, color: l.color })),
+      comments: pr.comment_count ?? 0,
+      reviews: pr.review_count ?? 0,
+      avatars: [initials],
+    };
+  });
+
+  const filterCounts = {
+    open: pullRequests.filter((p) => p.status === 'open').length,
+    merged: pullRequests.filter((p) => p.status === 'merged').length,
+    closed: pullRequests.filter((p) => p.status === 'closed').length,
+    all: pullRequests.length,
+  };
+
   const filterOrder: Array<'open' | 'merged' | 'closed' | 'all'> = ['open', 'merged', 'closed', 'all'];
+  const filtered = mappedPRs.filter((p) => filter === 'all' || p.status === filter);
 
   return (
     <Layout style={{ height: '100%', background: 'transparent' }}>
@@ -101,6 +169,26 @@ export default function PullRequestsPage() {
           }}
         >
           <div style={{ display: 'flex', gap: 4 }}>
+            {repositories.length > 1 && (
+              <select
+                value={activeRepoId ?? ''}
+                onChange={(e) => setSelectedRepoId(Number(e.target.value))}
+                style={{
+                  background: bgSecondary,
+                  color: textPrimary,
+                  border: `1px solid ${borderColor}`,
+                  borderRadius: 6,
+                  padding: '4px 8px',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                {repositories.map((r) => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+            )}
             {filterOrder.map((f) => {
               const isActive = filter === f;
               return (
@@ -192,6 +280,12 @@ export default function PullRequestsPage() {
           </div>
         </div>
 
+        {error && (
+          <div style={{ padding: '12px 24px', color: '#f85149', fontSize: 13, borderBottom: `1px solid ${borderColor}` }}>
+            {error}
+          </div>
+        )}
+
         {/* PR List */}
         <div style={{ flex: 1, overflow: 'auto', padding: '0 24px' }}>
           {filtered.map((pr) => (
@@ -225,23 +319,26 @@ export default function PullRequestsPage() {
                   }}
                 >
                   {pr.title}
-                  {pr.labels.map((l) => (
-                    <Tag
-                      key={l.name}
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 600,
-                        borderRadius: 12,
-                        background: `${labelColorMap[l.color]}22`,
-                        color: labelColorMap[l.color],
-                        border: 'none',
-                        margin: 0,
-                        padding: '2px 8px',
-                      }}
-                    >
-                      {l.name}
-                    </Tag>
-                  ))}
+                  {pr.labels.map((l) => {
+                    const lc = resolveLabelColor(l.color);
+                    return (
+                      <Tag
+                        key={l.name}
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          borderRadius: 12,
+                          background: `${lc}22`,
+                          color: lc,
+                          border: 'none',
+                          margin: 0,
+                          padding: '2px 8px',
+                        }}
+                      >
+                        {l.name}
+                      </Tag>
+                    );
+                  })}
                 </div>
                 <div style={{ fontSize: 12, color: textTertiary }}>
                   {t('app.pullRequests.openedBy', { id: pr.id, author: pr.author, time: pr.time })}
@@ -260,7 +357,7 @@ export default function PullRequestsPage() {
                       key={a}
                       size={24}
                       style={{
-                        background: avatarColorMap[a] || bluePrimary,
+                        background: getAvatarColor(a),
                         fontSize: 9,
                         fontWeight: 600,
                         marginLeft: i > 0 ? -8 : 0,

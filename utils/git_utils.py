@@ -71,12 +71,7 @@ class GitService:
         if not repo:
             raise NotFoundException(detail="Repository not found")
 
-        # 从配置获取仓库根目录
-        from core.config import get_config
-        config = get_config()
-        repo_root = config.storage.repo_root
-
-        repo_path = os.path.join(repo_root, repo.path)
+        repo_path = get_repository_storage_path(repo.path)
         return cls(repo_path)
 
     def check_merge_conflicts(
@@ -401,12 +396,7 @@ async def get_repository_path(db: AsyncSession, repository_id: int) -> str:
     if not repo:
         raise NotFoundException(detail="Repository not found")
 
-    # 从配置获取仓库根目录
-    from core.config import get_config
-    config = get_config()
-    repo_root = config.storage.repo_root
-
-    return os.path.join(repo_root, repo.path)
+    return get_repository_storage_path(repo.path)
 
 
 def check_merge_conflicts(
@@ -460,8 +450,10 @@ def init_bare_repo(repo_path: str) -> bool:
     """
     初始化一个 bare Git 仓库（空仓库，无初始提交）
 
+    get_repository_storage_path 已添加 .git 后缀，此处假设传入了含后缀的完整路径。
+
     Args:
-        repo_path: 仓库目录路径
+        repo_path: 仓库物理路径（含 .git 后缀，如 /data/repositories/admin/Eridanus.git）
 
     Returns:
         bool: 是否成功创建（True=新创建，False=已存在）
@@ -469,23 +461,54 @@ def init_bare_repo(repo_path: str) -> bool:
     Raises:
         GitError: 创建失败
     """
+    physical_path = repo_path
+
     try:
         # 确保父目录存在
-        parent_dir = os.path.dirname(repo_path)
+        parent_dir = os.path.dirname(physical_path)
         if parent_dir:
             os.makedirs(parent_dir, exist_ok=True)
 
         # 如果已是仓库，返回 False
-        if os.path.exists(os.path.join(repo_path, "HEAD")):
+        if os.path.exists(os.path.join(physical_path, "HEAD")):
             return False
 
         # 创建 bare 仓库（空仓库，无初始提交）
-        pygit2.init_repository(repo_path, bare=True)
+        pygit2.init_repository(physical_path, bare=True)
 
         return True
 
     except Exception as e:
-        raise GitError(f"Failed to create bare repository: {e}")
+        raise GitError(f"Failed to create bare repository at {physical_path}: {e}")
+
+
+def enable_receive_pack(repo_path: str) -> None:
+    """
+    启用仓库的 Git HTTP receive-pack（允许通过 HTTP push）。
+
+    git-http-backend 默认仅启用 upload-pack（clone/fetch），
+    receive-pack（push）需要仓库配置 http.receivepack=true。
+
+    Args:
+        repo_path: bare 仓库的完整物理路径（含 .git 后缀）
+    """
+    config_path = os.path.join(repo_path, "config")
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["git", "config", "--file", config_path,
+             "http.receivepack", "true"],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode != 0:
+            logger.warning(f"Failed to set http.receivepack for {physical_path}: {result.stderr.strip()}")
+        else:
+            logger.info(f"Enabled http.receivepack for {physical_path}")
+    except Exception as e:
+        logger.warning(f"Failed to enable receive-pack for {physical_path}: {e}")
+
+
+
 
 
 def repo_exists(repo_path: str) -> bool:
@@ -561,12 +584,16 @@ def get_repository_storage_path(repo_path: str, repo_root: Optional[str] = None)
     """
     获取仓库的物理存储路径
 
+    自动添加 .git 后缀以匹配 Git HTTP Smart Protocol 的路径约定。
+    git-http-backend 从 URL（如 /admin/repo.git/info/refs）提取带有 .git 后缀的路径，
+    因此物理仓库目录需要以 .git 结尾。
+
     Args:
-        repo_path: 仓库的逻辑路径（如 /repos/test-repo）
+        repo_path: 仓库的逻辑路径（如 admin/test-repo，不含 .git 后缀）
         repo_root: 仓库根目录，如果为None则从配置读取
 
     Returns:
-        str: 物理存储路径
+        str: 物理存储路径（含 .git 后缀）
     """
     if repo_root is None:
         # 从配置读取
@@ -577,6 +604,11 @@ def get_repository_storage_path(repo_path: str, repo_root: Optional[str] = None)
     # 将 repo_path 中的 / 转换为系统路径分隔符，并移除开头的分隔符
     normalized_path = os.path.normpath(repo_path)
     clean_path = normalized_path.lstrip(os.sep)
+
+    # 添加 .git 后缀以兼容 git-http-backend 的路径查找约定
+    if clean_path and not clean_path.endswith('.git'):
+        clean_path += '.git'
+
     return os.path.join(repo_root, clean_path)
 
 

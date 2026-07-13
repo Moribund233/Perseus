@@ -1,5 +1,5 @@
 import { useState, useEffect, type ReactNode } from 'react';
-import { Layout, Card, Form, Input, Button, Switch, Select, Avatar, Divider, Radio } from 'antd';
+import { Layout, Card, Form, Input, Button, Switch, Select, Avatar, Divider, Radio, message } from 'antd';
 import {
   UserOutlined,
   LockOutlined,
@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/auth';
+import { settingsApi } from '../../api/settings';
 import SettingsSkeleton from '../../components/skeleton/SettingsSkeleton';
 
 const { Sider, Content } = Layout;
@@ -52,6 +53,7 @@ function FormFieldLabel({ label }: { label: string }) {
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
+  const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const { user } = useAuthStore();
   const { t, i18n } = useTranslation();
@@ -63,19 +65,68 @@ export default function SettingsPage() {
 
   useEffect(() => {
     form.setFieldsValue({
-      username: user?.username || 'zhang-lei',
-      name: user?.full_name || 'Zhang Lei',
-      email: user?.email || 'zhang.lei@example.com',
+      username: user?.username || '',
+      name: user?.full_name || '',
+      email: user?.email || '',
       bio: '',
-      company: 'Perseus Labs',
-      location: 'Shanghai, China',
-      website: 'https://github.com/zhang-lei',
+      company: '',
+      location: '',
+      website: '',
       language: i18n.language || 'en',
       theme: 'dark',
       emailNotifications: true,
       pushNotifications: false,
     });
   }, [user, i18n.language, form]);
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    try {
+      setSaving(true);
+      const values = form.getFieldsValue(['name', 'bio', 'company', 'location', 'website']);
+      await settingsApi.updateProfile(user.id, {
+        full_name: values.name,
+      });
+      message.success(t('app.settings.saveSuccess'));
+    } catch {
+      message.error(t('app.settings.saveError'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveAccount = async () => {
+    if (!user) return;
+    try {
+      setSaving(true);
+      const values = form.getFieldsValue(['username', 'email', 'currentPassword', 'newPassword', 'confirmNewPassword']);
+      await settingsApi.updateProfile(user.id, {
+        username: values.username,
+        email: values.email,
+      });
+      if (values.newPassword) {
+        if (values.newPassword !== values.confirmNewPassword) {
+          message.error(t('app.settings.passwordMismatch'));
+          return;
+        }
+        await settingsApi.changePassword({
+          old_password: values.currentPassword,
+          new_password: values.newPassword,
+        });
+      }
+      message.success(t('app.settings.saveSuccess'));
+    } catch {
+      message.error(t('app.settings.saveError'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveNotifications = () => {
+    const values = form.getFieldsValue(['emailNotifications', 'pushNotifications']);
+    console.log('Notification preferences:', values);
+    message.success(t('app.settings.saveSuccess'));
+  };
 
   if (loading) return <SettingsSkeleton />;
 
@@ -207,6 +258,8 @@ export default function SettingsPage() {
                 <Button
                   type="primary"
                   icon={<CheckOutlined style={{ fontSize: 14 }} />}
+                  loading={saving}
+                  onClick={handleSaveProfile}
                   style={{ background: bluePrimary, borderColor: bluePrimary, borderRadius: 8, fontSize: 13, height: 34 }}
                 >
                   {t('app.settings.saveChanges')}
@@ -268,6 +321,8 @@ export default function SettingsPage() {
                 <Button
                   type="primary"
                   icon={<CheckOutlined style={{ fontSize: 14 }} />}
+                  loading={saving}
+                  onClick={handleSaveAccount}
                   style={{ background: bluePrimary, borderColor: bluePrimary, borderRadius: 8, fontSize: 13, height: 34 }}
                 >
                   {t('app.settings.saveChanges')}
@@ -405,6 +460,8 @@ export default function SettingsPage() {
                 <Button
                   type="primary"
                   icon={<CheckOutlined style={{ fontSize: 14 }} />}
+                  loading={saving}
+                  onClick={handleSaveNotifications}
                   style={{ background: bluePrimary, borderColor: bluePrimary, borderRadius: 8, fontSize: 13, height: 34 }}
                 >
                   {t('app.settings.saveChanges')}

@@ -56,6 +56,11 @@ ENV GIT_HTTP_EXPORT_ALL=1
 # 仓库根目录（与 app 容器共享 volume）
 ENV GIT_PROJECT_ROOT=/data/repositories
 
+# 预配置 safe.directory（Git 2.35.2+ 安全特性）
+# app 容器（user 1000:perseus）创建仓库，git-cgi 以 root 运行，
+# 不设置此选项会导致 "dubious ownership" 错误
+RUN git config --system safe.directory "*"
+
 # 创建仓库目录
 RUN mkdir -p /data/repositories && chmod 755 /data/repositories
 

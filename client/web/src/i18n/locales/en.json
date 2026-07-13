@@ -89,6 +89,10 @@
     "repositories": {
       "title": "Repositories",
       "explorer": "Explorer",
+      "filter": {
+        "mine": "My Repositories",
+        "all": "All Repositories"
+      },
       "filters": {
         "all": "All",
         "source": "Source",
@@ -116,7 +120,12 @@
         "message": "Message",
         "time": "Time"
       },
-      "readme": "README"
+      "readme": "README",
+      "empty": {
+        "title": "This repository is empty",
+        "description": "Push your first commit to get started.",
+        "noFiles": "No files yet"
+      }
     },
     "dashboard": {
       "welcomeBack": "Welcome back, {{name}}",

@@ -89,6 +89,10 @@
     "repositories": {
       "title": "仓库",
       "explorer": "资源管理器",
+      "filter": {
+        "mine": "我的仓库",
+        "all": "所有仓库"
+      },
       "filters": {
         "all": "全部",
         "source": "源码",
@@ -116,7 +120,12 @@
         "message": "提交信息",
         "time": "时间"
       },
-      "readme": "README"
+      "readme": "README",
+      "empty": {
+        "title": "这是一个空仓库",
+        "description": "推送你的第一次提交以开始使用。",
+        "noFiles": "暂无文件"
+      }
     },
     "dashboard": {
       "welcomeBack": "欢迎回来，{{name}}",

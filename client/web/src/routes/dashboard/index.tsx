@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Card, Row, Col, List, Button } from 'antd';
+import { Card, Row, Col, List, Button, message } from 'antd';
 import {
   AppstoreOutlined,
   PullRequestOutlined,
@@ -11,6 +11,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/auth';
+import { useRepositoriesStore } from '../../stores/repositories';
+import { settingsApi, type DashboardData } from '../../api/settings';
 import DashboardSkeleton from '../../components/skeleton/DashboardSkeleton';
 
 type ActivityType = 'mergedPR' | 'pushedCommits' | 'openedPR' | 'reviewedPR' | 'createdIssue' | 'commentedOnIssue';
@@ -25,7 +27,9 @@ interface Activity {
 }
 
 interface Repo {
+  id: number;
   name: string;
+  path: string;
   lang: string;
   color: string;
 }
@@ -85,17 +89,31 @@ export default function DashboardPage() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { repositories, fetchRepositories } = useRepositoriesStore();
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(timer);
-  }, []);
+    const loadData = async () => {
+      try {
+        const [data] = await Promise.all([
+          settingsApi.getDashboard(),
+          fetchRepositories(),
+        ]);
+        setDashboardData(data);
+      } catch (err) {
+        message.error((err as Error).message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [fetchRepositories, t]);
 
   const stats = useMemo(
     () => [
       {
         label: t('app.dashboard.stats.repositories'),
-        value: '24',
+        value: (dashboardData?.repo_count ?? 0).toLocaleString(),
         change: t('app.dashboard.stats.repositoriesChange'),
         icon: <AppstoreOutlined />,
         color: '#58a6ff',
@@ -103,7 +121,7 @@ export default function DashboardPage() {
       },
       {
         label: t('app.dashboard.stats.openPRs'),
-        value: '12',
+        value: (dashboardData?.open_prs ?? 0).toLocaleString(),
         change: t('app.dashboard.stats.openPRsChange'),
         icon: <PullRequestOutlined />,
         color: '#3fb950',
@@ -111,7 +129,7 @@ export default function DashboardPage() {
       },
       {
         label: t('app.dashboard.stats.teamMembers'),
-        value: '8',
+        value: (dashboardData?.open_issues ?? 0).toLocaleString(),
         change: t('app.dashboard.stats.teamMembersChange'),
         icon: <TeamOutlined />,
         color: '#bc8cff',
@@ -119,42 +137,41 @@ export default function DashboardPage() {
       },
       {
         label: t('app.dashboard.stats.commits'),
-        value: '1,847',
+        value: (dashboardData?.open_issues ?? 0).toLocaleString(),
         change: t('app.dashboard.stats.commitsChange'),
         icon: <ForkOutlined />,
         color: '#d29922',
         bg: 'rgba(210,153,34,0.15)',
       },
     ],
-    [t]
+    [dashboardData, t]
   );
 
   const activities: Activity[] = useMemo(
-    () => [
-      { name: 'Li Wei', initials: 'LW', gradient: 'linear-gradient(135deg,#3fb950,#238636)', type: 'mergedPR', params: { id: 142, repo: 'perseus-core' }, time: '12 minutes ago' },
-      { name: 'Chen Mei', initials: 'CM', gradient: 'linear-gradient(135deg,#58a6ff,#1f6feb)', type: 'pushedCommits', params: { count: 3, branch: 'feature/auth-module' }, time: '34 minutes ago' },
-      { name: 'Wang Jun', initials: 'WJ', gradient: 'linear-gradient(135deg,#bc8cff,#8957e5)', type: 'openedPR', params: { id: 156, title: 'Add WebSocket support for real-time sync' }, time: '1 hour ago' },
-      { name: 'You', initials: 'ZL', gradient: 'linear-gradient(135deg,#d29922,#9e6a03)', type: 'reviewedPR', params: { id: 148, repo: 'perseus-editor' }, time: '2 hours ago' },
-      { name: 'Huang Yan', initials: 'HY', gradient: 'linear-gradient(135deg,#f85149,#da3633)', type: 'createdIssue', params: { id: 89, title: 'Memory leak in file watcher' }, time: '3 hours ago' },
-      { name: 'Chen Mei', initials: 'CM', gradient: 'linear-gradient(135deg,#58a6ff,#1f6feb)', type: 'commentedOnIssue', params: { id: 85, repo: 'perseus-api' }, time: '5 hours ago' },
-    ],
-    []
+    () => (dashboardData?.recent_activities ?? []).map((item) => ({
+      name: (item.name as string) ?? 'Unknown',
+      initials: (item.initials as string) ?? '??',
+      gradient: (item.gradient as string) ?? 'linear-gradient(135deg,#58a6ff,#1f6feb)',
+      type: (item.type as ActivityType) ?? 'pushedCommits',
+      params: (item.params as Record<string, string | number | undefined>) ?? {},
+      time: (item.time as string) ?? '',
+    })),
+    [dashboardData?.recent_activities]
   );
 
   const repos: Repo[] = useMemo(
-    () => [
-      { name: 'perseus-core', lang: 'TypeScript', color: '#58a6ff' },
-      { name: 'perseus-editor', lang: 'Rust', color: '#3fb950' },
-      { name: 'perseus-api', lang: 'Go', color: '#bc8cff' },
-      { name: 'perseus-web', lang: 'Vue', color: '#d29922' },
-      { name: 'perseus-cli', lang: 'Rust', color: '#f85149' },
-    ],
-    []
+    () => (repositories ?? []).map((repo) => ({
+      id: repo.id,
+      name: repo.name,
+      path: repo.path,
+      lang: '',
+      color: '#58a6ff',
+    })),
+    [repositories]
   );
 
   const renderActivityAction = (item: Activity) => {
     const template = t(`app.dashboard.activity.${item.type}`, item.params);
-    // Escape name to avoid XSS and compose final HTML
     const name = item.name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return { __html: `<strong>${name}</strong> ${template}` };
   };
@@ -247,7 +264,7 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {repos.map((repo) => (
                 <div
-                  key={repo.name}
+                  key={repo.id}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -259,7 +276,10 @@ export default function DashboardPage() {
                     color: '#e6edf3',
                   }}
                   className="repo-quick-item"
-                  onClick={() => navigate('/repositories/perseus/' + repo.name)}
+                  onClick={() => {
+                    const repoOwner = repo.path.split('/')[0];
+                    navigate(`/repositories/${repoOwner}/${repo.name}`);
+                  }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = '#1c2333'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >

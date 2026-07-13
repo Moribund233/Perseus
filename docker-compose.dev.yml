@@ -58,6 +58,8 @@ services:
       LOG_LEVEL: debug
       # 时区
       TZ: Asia/Shanghai
+      # Git 裸仓库根目录（与 git-cgi 共享 volume）
+      PERSEUS_STORAGE_REPO_ROOT: /data/repositories
       # 首次运行管理员引导（通过 .env 文件配置）
       PERSEUS_ADMIN_USERNAME: ${PERSEUS_ADMIN_USERNAME:-admin}
       PERSEUS_ADMIN_PASSWORD: ${PERSEUS_ADMIN_PASSWORD}

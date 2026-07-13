@@ -40,6 +40,11 @@ def create_api_router() -> APIRouter:
     from controller.auth_controller import router as auth_router
     api_v1_router.include_router(auth_router)
 
+    # 3a. Git HTTP Smart Protocol 认证路由
+    # 用于 Nginx auth_request 子请求验证，必须先于 API 代理路由注册
+    from controller.git_auth_controller import router as git_auth_router
+    api_v1_router.include_router(git_auth_router, prefix=API_V1_PREFIX)
+
     # 3b. OAuth 认证路由
     from controller.oauth_controller import router as oauth_router
     api_v1_router.include_router(oauth_router)

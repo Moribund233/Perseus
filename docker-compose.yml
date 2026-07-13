@@ -50,6 +50,8 @@ services:
       PERSEUS_APP_DEBUG: "${PERSEUS_APP_DEBUG:-false}"
       PERSEUS_STRESS_TEST: "false"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
+      # Git 裸仓库根目录（与 git-cgi 共享 volume）
+      PERSEUS_STORAGE_REPO_ROOT: /data/repositories
       TZ: Asia/Shanghai
     volumes:
       - repos:/data/repositories
