@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Uuid as SAUuid
 from sqlalchemy.orm import relationship
 from models.base import BaseModel
 
@@ -11,10 +11,10 @@ class RepositoryMember(BaseModel):
     """
     __tablename__ = "repository_members"  # 数据库表名
     
-    repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
+    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
     """仓库ID，外键关联到repositories表"""
     
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     """用户ID，外键关联到users表"""
     
     role = Column(String(20), nullable=False, default="developer")

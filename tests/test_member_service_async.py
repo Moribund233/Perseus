@@ -3,6 +3,7 @@ Member Service 异步测试
 
 测试仓库成员服务层的所有功能
 """
+import uuid
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -56,7 +57,7 @@ async def test_get_repository_member(async_db: AsyncSession, async_test_repo: Re
 async def test_get_repository_member_not_found(async_db: AsyncSession, async_test_repo: Repository):
     """测试获取不存在的成员"""
     with pytest.raises(NotFoundException):
-        await member_service.get_repository_member(async_test_repo.id, 999, async_db)
+        await member_service.get_repository_member(async_test_repo.id, uuid.uuid4(), async_db)
 
 
 @pytest.mark.asyncio
@@ -83,7 +84,7 @@ async def test_add_repository_member_missing_user_id(async_db: AsyncSession, asy
 async def test_add_repository_member_user_not_found(async_db: AsyncSession, async_test_repo: Repository):
     """测试添加不存在的用户"""
     with pytest.raises(NotFoundException):
-        await member_service.add_repository_member(async_test_repo.id, {"user_id": 999}, async_db)
+        await member_service.add_repository_member(async_test_repo.id, {"user_id": uuid.uuid4()}, async_db)
 
 
 @pytest.mark.asyncio
@@ -113,7 +114,7 @@ async def test_update_repository_member_not_found(async_db: AsyncSession, async_
     """测试更新不存在的成员"""
     with pytest.raises(NotFoundException):
         await member_service.update_repository_member(
-            async_test_repo.id, 999, {"role": "admin"}, async_db
+            async_test_repo.id, uuid.uuid4(), {"role": "admin"}, async_db
         )
 
 
@@ -130,7 +131,7 @@ async def test_remove_repository_member(async_db: AsyncSession, async_test_repo:
 async def test_remove_repository_member_not_found(async_db: AsyncSession, async_test_repo: Repository):
     """测试删除不存在的成员"""
     with pytest.raises(NotFoundException):
-        await member_service.remove_repository_member(async_test_repo.id, 999, async_db)
+        await member_service.remove_repository_member(async_test_repo.id, uuid.uuid4(), async_db)
 
 
 @pytest.mark.asyncio
@@ -173,7 +174,7 @@ async def test_check_member_permission_member(async_db: AsyncSession, async_test
 async def test_check_member_permission_no_member(async_db: AsyncSession, async_test_repo: Repository):
     """测试检查非成员权限"""
     result = await member_service.check_member_permission(
-        async_test_repo.id, 999, "readonly", async_db
+        async_test_repo.id, uuid.uuid4(), "readonly", async_db
     )
     assert result is False
 
@@ -182,7 +183,7 @@ async def test_check_member_permission_no_member(async_db: AsyncSession, async_t
 async def test_check_member_permission_repo_not_found(async_db: AsyncSession):
     """测试检查不存在仓库的权限"""
     with pytest.raises(NotFoundException):
-        await member_service.check_member_permission(999, 1, "readonly", async_db)
+        await member_service.check_member_permission(uuid.uuid4(), uuid.uuid4(), "readonly", async_db)
 
 
 @pytest.mark.asyncio

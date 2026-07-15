@@ -23,6 +23,7 @@ from services.commit_service import (
     get_commits_by_author as service_get_commits_by_author
 )
 from services.branch_service import get_branch as service_get_branch
+import uuid
 
 # 创建路由实例
 router = APIRouter(prefix=get_route_prefix("commits"), tags=["commits"])
@@ -30,7 +31,7 @@ router = APIRouter(prefix=get_route_prefix("commits"), tags=["commits"])
 
 @router.get("/{repo_id}/commits/history")
 async def get_commit_history(
-    repo_id: int,
+    repo_id: uuid.UUID,
     branch_name: str = None,
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_async_db)
@@ -51,7 +52,7 @@ async def get_commit_history(
 
 
 @router.get("/{repo_id}/commits/count")
-async def count_repo_commits(repo_id: int, db: AsyncSession = Depends(get_async_db)):
+async def count_repo_commits(repo_id: uuid.UUID, db: AsyncSession = Depends(get_async_db)):
     """
     统计仓库的提交数量
     
@@ -68,7 +69,7 @@ async def count_repo_commits(repo_id: int, db: AsyncSession = Depends(get_async_
 
 @router.get("/{repo_id}/commits/search")
 async def search_commits(
-    repo_id: int,
+    repo_id: uuid.UUID,
     query: str = Query(..., min_length=1),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_async_db)
@@ -90,7 +91,7 @@ async def search_commits(
 
 @router.get("/{repo_id}/commits/author")
 async def get_commits_by_author(
-    repo_id: int,
+    repo_id: uuid.UUID,
     author_email: str = Query(..., description="作者邮箱"),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_async_db)
@@ -111,7 +112,7 @@ async def get_commits_by_author(
 
 
 @router.get("/{repo_id}/commits/latest")
-async def get_latest_commit(repo_id: int, branch_name: str = None, db: AsyncSession = Depends(get_async_db)):
+async def get_latest_commit(repo_id: uuid.UUID, branch_name: str = None, db: AsyncSession = Depends(get_async_db)):
     """
     获取仓库的最新提交
     
@@ -134,7 +135,7 @@ async def get_latest_commit(repo_id: int, branch_name: str = None, db: AsyncSess
 
 
 @router.get("/{repo_id}/commits/{commit_hash}")
-async def get_commit_by_hash(repo_id: int, commit_hash: str, db: AsyncSession = Depends(get_async_db)):
+async def get_commit_by_hash(repo_id: uuid.UUID, commit_hash: str, db: AsyncSession = Depends(get_async_db)):
     """
     根据提交哈希获取提交详情
     
@@ -155,7 +156,7 @@ async def get_commit_by_hash(repo_id: int, commit_hash: str, db: AsyncSession = 
 @router.post("/{repo_id}/commits")
 async def create_commit(
     request: Request,
-    repo_id: int,
+    repo_id: uuid.UUID,
     commit_data: dict,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -185,7 +186,7 @@ async def create_commit(
 
 @router.get("/{repo_id}/branches/{branch_name}/commits")
 async def get_branch_commits(
-    repo_id: int,
+    repo_id: uuid.UUID,
     branch_name: str,
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
@@ -212,7 +213,7 @@ async def get_branch_commits(
 
 
 @router.get("/{repo_id}/branches/{branch_name}/commits/count")
-async def count_branch_commits(repo_id: int, branch_name: str, db: AsyncSession = Depends(get_async_db)):
+async def count_branch_commits(repo_id: uuid.UUID, branch_name: str, db: AsyncSession = Depends(get_async_db)):
     """
     统计特定分支的提交数量
     

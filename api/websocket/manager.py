@@ -10,6 +10,7 @@ WebSocket连接管理器
 """
 import asyncio
 import json
+import uuid
 from typing import Dict, List, Optional, Set, Any, Callable
 from datetime import datetime, timedelta
 from fastapi import WebSocket, WebSocketDisconnect
@@ -28,9 +29,9 @@ class Connection:
     def __init__(self, websocket: WebSocket, connection_id: str):
         self.websocket = websocket
         self.connection_id = connection_id
-        self.user_id: Optional[int] = None
+        self.user_id: Optional[uuid.UUID] = None
         self.username: Optional[str] = None
-        self.repository_ids: Set[int] = set()  # 用户关注的仓库ID列表
+        self.repository_ids: Set[uuid.UUID] = set()  # 用户关注的仓库ID列表
         self.connected_at: datetime = datetime.now()
         self.last_ping: datetime = datetime.now()
         self.is_alive: bool = True
@@ -54,18 +55,18 @@ class Connection:
             self.is_alive = False
             return False
     
-    def bind_user(self, user_id: int, username: str) -> None:
+    def bind_user(self, user_id: uuid.UUID, username: str) -> None:
         """绑定用户到连接"""
         self.user_id = user_id
         self.username = username
         logger.info(f"用户绑定 connection_id={self.connection_id}, user_id={user_id}, username={username}")
     
-    def subscribe_repository(self, repository_id: int) -> None:
+    def subscribe_repository(self, repository_id: uuid.UUID) -> None:
         """订阅仓库消息"""
         self.repository_ids.add(repository_id)
         logger.debug(f"订阅仓库 connection_id={self.connection_id}, repository_id={repository_id}")
     
-    def unsubscribe_repository(self, repository_id: int) -> None:
+    def unsubscribe_repository(self, repository_id: uuid.UUID) -> None:
         """取消订阅仓库消息"""
         self.repository_ids.discard(repository_id)
         logger.debug(f"取消订阅仓库 connection_id={self.connection_id}, repository_id={repository_id}")
@@ -116,13 +117,13 @@ class ConnectionManager:
         self._connections: Dict[str, Connection] = {}
         
         # 用户索引: user_id -> set of connection_ids
-        self._user_index: Dict[int, Set[str]] = {}
+        self._user_index: Dict[uuid.UUID, Set[str]] = {}
         
         # 仓库索引: repository_id -> set of connection_ids
-        self._repository_index: Dict[int, Set[str]] = {}
+        self._repository_index: Dict[uuid.UUID, Set[str]] = {}
 
         # 房间索引: room_id -> set of connection_ids
-        self._room_index: Dict[int, Set[str]] = {}
+        self._room_index: Dict[uuid.UUID, Set[str]] = {}
         
         # 连接ID计数器
         self._connection_counter: int = 0
@@ -219,7 +220,7 @@ class ConnectionManager:
 
         logger.debug(f"WebSocket断开: {connection_id}, 当前连接数: {len(self._connections)}")
     
-    async def bind_user(self, connection: Connection, user_id: int, username: str) -> None:
+    async def bind_user(self, connection: Connection, user_id: uuid.UUID, username: str) -> None:
         """
         将连接绑定到用户
         
@@ -243,7 +244,7 @@ class ConnectionManager:
                 self._user_index[user_id] = set()
             self._user_index[user_id].add(connection.connection_id)
     
-    async def subscribe_repository(self, connection: Connection, repository_id: int) -> None:
+    async def subscribe_repository(self, connection: Connection, repository_id: uuid.UUID) -> None:
         """
         订阅仓库消息
         
@@ -259,7 +260,7 @@ class ConnectionManager:
                 self._repository_index[repository_id] = set()
             self._repository_index[repository_id].add(connection.connection_id)
     
-    async def unsubscribe_repository(self, connection: Connection, repository_id: int) -> None:
+    async def unsubscribe_repository(self, connection: Connection, repository_id: uuid.UUID) -> None:
         """
         取消订阅仓库消息
         
@@ -278,7 +279,7 @@ class ConnectionManager:
     
     # ==================== 房间管理方法 ====================
 
-    async def subscribe_room(self, connection: Connection, room_id: int) -> None:
+    async def subscribe_room(self, connection: Connection, room_id: uuid.UUID) -> None:
         """
         订阅房间消息
 
@@ -291,7 +292,7 @@ class ConnectionManager:
                 self._room_index[room_id] = set()
             self._room_index[room_id].add(connection.connection_id)
 
-    async def unsubscribe_room(self, connection: Connection, room_id: int) -> None:
+    async def unsubscribe_room(self, connection: Connection, room_id: uuid.UUID) -> None:
         """
         取消订阅房间消息
 
@@ -305,7 +306,7 @@ class ConnectionManager:
                 if not self._room_index[room_id]:
                     del self._room_index[room_id]
 
-    async def send_to_room(self, room_id: int, message: Dict[str, Any], exclude_user_id: Optional[int] = None) -> int:
+    async def send_to_room(self, room_id: uuid.UUID, message: Dict[str, Any], exclude_user_id: Optional[uuid.UUID] = None) -> int:
         """
         发送消息到房间的所有订阅者
 
@@ -351,7 +352,7 @@ class ConnectionManager:
             return await connection.send(message)
         return False
     
-    async def send_to_user(self, user_id: int, message: Dict[str, Any]) -> int:
+    async def send_to_user(self, user_id: uuid.UUID, message: Dict[str, Any]) -> int:
         """
         发送消息给用户的所有连接
         
@@ -372,7 +373,7 @@ class ConnectionManager:
         
         return success_count
     
-    async def send_to_repository(self, repository_id: int, message: Dict[str, Any], exclude_user_id: Optional[int] = None) -> int:
+    async def send_to_repository(self, repository_id: uuid.UUID, message: Dict[str, Any], exclude_user_id: Optional[uuid.UUID] = None) -> int:
         """
         广播消息到仓库的所有订阅者
         
@@ -504,7 +505,7 @@ class ConnectionManager:
         return self._connections
 
     @property
-    def user_connections(self) -> Dict[int, Set[str]]:
+    def user_connections(self) -> Dict[uuid.UUID, Set[str]]:
         """获取用户连接索引"""
         return self._user_index
     
@@ -525,7 +526,7 @@ class ConnectionManager:
                 pass
             await self.disconnect(connection)
     
-    async def get_room_connections(self, room_id: int) -> List['Connection']:
+    async def get_room_connections(self, room_id: uuid.UUID) -> List['Connection']:
         """获取房间的所有活跃连接"""
         async with self._lock:
             conn_ids = set(self._room_index.get(room_id, set()))
@@ -534,7 +535,7 @@ class ConnectionManager:
                 if cid in self._connections and self._connections[cid].is_alive
             ]
 
-    async def get_room_online_users(self, room_id: int) -> List[Dict[str, Any]]:
+    async def get_room_online_users(self, room_id: uuid.UUID) -> List[Dict[str, Any]]:
         """获取房间的在线用户列表（按用户去重）"""
         connections = await self.get_room_connections(room_id)
         seen: Dict[int, Dict[str, Any]] = {}
@@ -563,7 +564,7 @@ class ConnectionManager:
                 "connections": [conn.to_dict() for conn in self._connections.values()],
             }
     
-    async def get_user_connections(self, user_id: int) -> List[Dict[str, Any]]:
+    async def get_user_connections(self, user_id: uuid.UUID) -> List[Dict[str, Any]]:
         """
         获取用户的所有连接信息
         

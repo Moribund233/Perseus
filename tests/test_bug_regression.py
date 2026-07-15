@@ -26,18 +26,10 @@ def test_commits_endpoint_no_auth_returns_non_401(test_client: TestClient, db):
     - browser 版本已添加 await
     - 无认证调用应返回有效的非 401 响应
     """
-    from models.repository import Repository
+    from tests.test_helpers import create_test_repo
     from utils.git_utils import init_bare_repo, get_repository_storage_path
 
-    repo = Repository(
-        name="bug-test-repo",
-        path="testuser/bug-test-repo",
-        owner_id=1,
-        is_public=True
-    )
-    db.add(repo)
-    db.commit()
-    db.refresh(repo)
+    repo = create_test_repo(db, name="bug-test-repo", path="testuser/bug-test-repo")
     physical_path = get_repository_storage_path(repo.path)
     init_bare_repo(physical_path)
 

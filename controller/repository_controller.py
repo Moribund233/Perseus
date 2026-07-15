@@ -6,6 +6,7 @@
 from fastapi import APIRouter, Depends, Path, Request, status, HTTPException
 from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
+import uuid
 
 from api.routes_config import get_route_prefix
 from models.async_db import get_async_db
@@ -72,7 +73,7 @@ async def get_public_repositories(db: AsyncSession = Depends(get_async_db)):
 
 @router.get("/user/{user_id}")
 async def get_repositories_by_user(
-    user_id: int,
+    user_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -122,7 +123,7 @@ async def get_repository_by_path(
 
 @router.get("/{repo_id}")
 async def get_repository(
-    repo_id: int,
+    repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -189,7 +190,7 @@ async def create_repository(
 @router.put("/{repo_id}")
 async def update_repository(
     request: Request,
-    repo_id: int,
+    repo_id: uuid.UUID,
     repo: dict,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -221,7 +222,7 @@ async def update_repository(
 @router.delete("/{repo_id}")
 async def delete_repository(
     request: Request,
-    repo_id: int,
+    repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -250,8 +251,8 @@ async def delete_repository(
 
 @router.get("/{repo_id}/access")
 async def check_repository_access(
-    repo_id: int,
-    user_id: int,
+    repo_id: uuid.UUID,
+    user_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -276,7 +277,7 @@ async def check_repository_access(
 
 @router.post("/{repo_id}/archive", summary="归档仓库")
 async def archive_repository(
-    repo_id: int,
+    repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -303,7 +304,7 @@ async def archive_repository(
 
 @router.post("/{repo_id}/unarchive", summary="取消归档仓库")
 async def unarchive_repository(
-    repo_id: int,
+    repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):

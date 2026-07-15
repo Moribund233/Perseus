@@ -1,3 +1,4 @@
+import uuid
 """
 SSH Key 服务测试
 
@@ -148,7 +149,7 @@ async def test_delete_ssh_key_success(async_db: AsyncSession, async_test_user):
 async def test_delete_ssh_key_not_found(async_db: AsyncSession, async_test_user):
     """测试删除不存在的 SSH Key"""
     with pytest.raises(NotFoundException) as exc_info:
-        await delete_ssh_key(async_db, 99999, async_test_user.id)
+        await delete_ssh_key(async_db, uuid.UUID("00000000-0000-0000-0000-000000000000"), async_test_user.id)
     assert "not found" in str(exc_info.value)
 
 

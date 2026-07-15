@@ -9,23 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.repository import Repository
-
-
-def create_test_repo(db, owner_id: int, name: str = "test-repo") -> Repository:
-    """创建测试仓库（同步操作，在 auth_headers fixture 的 db 会话中执行）"""
-    repo = Repository(
-        name=name,
-        path=f"testuser/{name}",
-        description="Test repository",
-        is_public=True,
-        owner_id=owner_id,
-        default_branch="main"
-    )
-    db.add(repo)
-    db.commit()
-    db.refresh(repo)
-    return repo
+from tests.test_helpers import create_test_repo
 
 
 # =============================================================================
@@ -44,7 +28,7 @@ async def test_create_webhook_endpoint(
     2. 返回正确的 WebHook 信息
     """
     # 先创建测试仓库（auth_headers 中的用户是 owner_id=1）
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/webhooks",
@@ -79,7 +63,7 @@ async def test_list_webhooks_endpoint(
     1. 可以获取仓库的 WebHook 列表
     2. 返回分页结果
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
     # 先创建两个 WebHook
     for i in range(2):
@@ -117,7 +101,7 @@ async def test_get_webhook_endpoint(
     1. 可以获取单个 WebHook 详情
     2. 返回完整的 WebHook 信息
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
     # 创建 WebHook
     create_resp = test_client.post(
@@ -154,7 +138,7 @@ async def test_update_webhook_endpoint(
     验证点：
     1. 可以更新 WebHook 的 url 和 events
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
     create_resp = test_client.post(
         f"/api/v1/repositories/{repo.id}/webhooks",
@@ -195,7 +179,7 @@ async def test_delete_webhook_endpoint(
     1. 可以删除 WebHook
     2. 删除后返回 204
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
     create_resp = test_client.post(
         f"/api/v1/repositories/{repo.id}/webhooks",
@@ -236,7 +220,7 @@ async def test_create_webhook_unauthorized(test_client: TestClient, db):
     验证点：
     1. 未认证用户应该收到 401 错误
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/webhooks",
@@ -261,7 +245,7 @@ async def test_create_webhook_invalid_url(
     验证点：
     1. 无效 URL 应该返回 400 错误
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/webhooks",
@@ -287,7 +271,7 @@ async def test_create_webhook_empty_events(
     验证点：
     1. 空事件列表应该返回 400 错误
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/webhooks",
@@ -313,10 +297,10 @@ async def test_delete_webhook_not_found(
     验证点：
     1. 删除不存在的 WebHook 应该返回 404
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
     response = test_client.delete(
-        f"/api/v1/repositories/{repo.id}/webhooks/99999",
+        f"/api/v1/repositories/{repo.id}/webhooks/00000000-0000-0000-0000-000000000000",
         headers=auth_headers
     )
     assert response.status_code == 404
@@ -338,7 +322,7 @@ async def test_webhook_test_endpoint(
     验证点：
     1. 测试端点返回投递结果
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
     create_resp = test_client.post(
         f"/api/v1/repositories/{repo.id}/webhooks",

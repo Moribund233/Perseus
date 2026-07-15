@@ -4,6 +4,7 @@ Token 认证服务
 提供基于 JWT 的 Token 认证功能，替代 Basic Auth
 """
 from datetime import datetime, timedelta, timezone
+import uuid
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 import logging
@@ -27,7 +28,7 @@ def _get_security_config():
 
 class TokenData:
     """Token 数据类"""
-    def __init__(self, user_id: int, username: str, scopes: list = None, oauth_provider: Optional[str] = None):
+    def __init__(self, user_id: uuid.UUID, username: str, scopes: list = None, oauth_provider: Optional[str] = None):
         self.user_id = user_id
         self.username = username
         self.scopes = scopes or []
@@ -183,14 +184,11 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
             logger.warning("Token missing required claims: sub or username")
             return None
 
-        # 验证 user_id 是有效的整数
+        # 验证 user_id 是有效的 UUID
         try:
-            user_id = int(user_id)
-            if user_id <= 0:
-                logger.warning(f"Invalid user_id: {user_id}")
-                return None
+            user_id = uuid.UUID(user_id)
         except (ValueError, TypeError):
-            logger.warning(f"user_id is not a valid integer: {user_id}")
+            logger.warning(f"user_id is not a valid UUID: {user_id}")
             return None
 
         # 验证 username 是非空字符串

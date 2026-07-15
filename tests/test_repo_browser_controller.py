@@ -26,19 +26,12 @@ logger = get_named_logger("test_browser")
 
 # ============ 辅助函数 ============
 
-def create_repo_with_content(db, name: str, owner_id: int = 1) -> tuple:
+def create_repo_with_content(db, name: str, owner_id=None) -> tuple:
     """创建数据库记录 + 物理 git 仓库，返回 (repo, physical_path)"""
-    from models.repository import Repository
+    from tests.test_helpers import create_test_repo
 
-    repo = Repository(
-        name=name,
-        path=f"testuser/{name}",
-        description=f"Test repo {name}",
-        owner_id=owner_id,
-        is_public=True,
-        default_branch="master",
-    )
-    db.add(repo)
+    repo = create_test_repo(db, name=name, owner_id=owner_id, path=f"testuser/{name}")
+    repo.default_branch = "master"
     db.commit()
     db.refresh(repo)
 
@@ -124,7 +117,7 @@ class TestTreeEndpoint:
         assert response.status_code != 401
 
     def test_tree_repo_not_found(self, test_client: TestClient):
-        response = test_client.get("/api/v1/repositories/99999/tree")
+        response = test_client.get("/api/v1/repositories/00000000-0000-0000-0000-000000000000/tree")
         assert response.status_code == 404
 
     def test_tree_bad_ref(self, test_client: TestClient, db):
@@ -182,18 +175,9 @@ class TestBlobEndpoint:
 
     def test_blob_empty_repo(self, test_client: TestClient, db):
         """空仓库（无提交）的 blob 请求"""
-        from models.repository import Repository
-        from utils.git_utils import get_repository_storage_path
+        from tests.test_helpers import create_test_repo
 
-        repo = Repository(
-            name="blob-empty",
-            path="testuser/blob-empty",
-            owner_id=1, is_public=True,
-        )
-        db.add(repo)
-        db.commit()
-        db.refresh(repo)
-
+        repo = create_test_repo(db, name="blob-empty", path="testuser/blob-empty")
         physical_path = get_repository_storage_path(repo.path)
         init_bare_repo(physical_path)
 
@@ -261,7 +245,7 @@ class TestReadmeEndpoint:
             assert not data.get("found", True)  # found=False
 
     def test_readme_repo_not_found(self, test_client: TestClient):
-        response = test_client.get("/api/v1/repositories/99999/readme")
+        response = test_client.get("/api/v1/repositories/00000000-0000-0000-0000-000000000000/readme")
         assert response.status_code == 404
 
     def test_readme_no_auth(self, test_client: TestClient, db):

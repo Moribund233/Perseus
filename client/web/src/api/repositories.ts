@@ -116,10 +116,16 @@ export const repositoriesApi = {
   checkAccess: (repoId: number) =>
     apiRequest<{ has_access: boolean; role?: string }>(`/api/v1/repositories/${repoId}/access`),
 
-  getTree: async (repoId: number, ref?: string) => {
-    const qs = ref ? `?ref=${encodeURIComponent(ref)}` : '';
+  getTree: async (repoId: number, ref?: string, path?: string) => {
+    const params = new URLSearchParams();
+    if (ref) params.set('ref', ref);
+    if (path) params.set('path', path);
+    const qs = params.toString() ? `?${params.toString()}` : '';
     const data = await apiRequest<{ entries: RepoFile[] }>(`/api/v1/repositories/${repoId}/tree${qs}`);
-    return data.entries;
+    return data.entries.map((e) => ({
+      ...e,
+      type: e.type === 'tree' ? 'directory' as const : e.type === 'blob' ? 'file' as const : e.type,
+    }));
   },
 
   getBlob: (repoId: number, path: string, ref?: string) => {
@@ -133,8 +139,12 @@ export const repositoriesApi = {
   },
 
   getCommits: (repoId: number, params?: { page?: number; per_page?: number; branch?: string }) => {
-    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
-    return apiRequest<RepoCommit[]>(`/api/v1/repositories/${repoId}/commits${qs}`);
+    const qparams: Record<string, string> = {};
+    if (params?.page) qparams['page'] = String(params.page);
+    if (params?.per_page) qparams['per_page'] = String(params.per_page);
+    if (params?.branch) qparams['ref'] = params.branch;
+    const qs = Object.keys(qparams).length ? '?' + new URLSearchParams(qparams).toString() : '';
+    return apiRequest<{ commits: RepoCommit[]; pagination: { page: number; per_page: number } }>(`/api/v1/repositories/${repoId}/commits${qs}`);
   },
 
   getCommitHistory: (repoId: number, params?: { page?: number; per_page?: number; branch?: string }) => {

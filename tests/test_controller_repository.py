@@ -52,7 +52,7 @@ def test_get_repository(test_client, auth_headers):
 
 
 def test_get_repository_not_found(test_client, auth_headers):
-    response = test_client.get("/api/v1/repositories/99999", headers=auth_headers)
+    response = test_client.get("/api/v1/repositories/00000000-0000-0000-0000-000000000000", headers=auth_headers)
     assert response.status_code == 404
 
 

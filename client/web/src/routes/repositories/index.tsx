@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, type ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Layout, Button, Avatar, Tabs, Select, message } from 'antd';
+import { Layout, Button, Avatar, Tabs, Select, Spin, message } from 'antd';
 import type { TabsProps } from 'antd';
 import {
   FolderOutlined,
@@ -18,11 +18,12 @@ import {
   AppstoreOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
+import { useSpring, animated } from '@react-spring/web';
 import RepositoriesSkeleton from '../../components/skeleton/RepositoriesSkeleton';
 import { useRepositoriesStore } from '../../stores/repositories';
 import { useAuthStore } from '../../stores/auth';
 import { repositoriesApi } from '../../api/repositories';
-import type { RepoFile } from '../../api/repositories';
+import type { RepoFile, RepoBlob } from '../../api/repositories';
 
 const { Sider, Content } = Layout;
 
@@ -92,8 +93,11 @@ function buildTree(files: RepoFile[]): TreeNode[] {
       } else {
         const parentPath = parts.slice(0, i).join('/');
         const parent = treeMap.get(parentPath);
-        if (parent && parent.children && !parent.children.find((c) => c.key === node.key)) {
-          parent.children.push(node);
+        if (parent) {
+          if (!parent.children) parent.children = [];
+          if (!parent.children.find((c) => c.key === node.key)) {
+            parent.children.push(node);
+          }
         }
       }
     }
@@ -116,6 +120,16 @@ function getIconColor(name: string): string | undefined {
     case 'html': return '#e34c26';
     default: return undefined;
   }
+}
+
+function FadeBlock({ children, ...rest }: { children: React.ReactNode; [key: string]: unknown }) {
+  const style = useSpring({
+    from: { opacity: 0 },
+    to: { opacity: 1 },
+    reset: true,
+    config: { tension: 280, friction: 30 },
+  });
+  return <animated.div style={style} {...rest}>{children}</animated.div>;
 }
 
 function ActionButton({ icon, children, onClick }: { icon: ReactNode; children: ReactNode; onClick?: () => void }) {
@@ -166,24 +180,38 @@ function TreeNodeView({
   selectedKey,
   onSelect,
   branchName,
+  repoId,
+  branchRef,
 }: {
   node: TreeNode;
   depth: number;
   selectedKey: string;
   onSelect: (key: string) => void;
   branchName?: string;
+  repoId?: number;
+  branchRef?: string;
 }) {
   const isSelected = selectedKey === node.key;
   const hasChildren = node.children && node.children.length > 0;
   const [expanded, setExpanded] = useState(hasChildren);
+  const [loading, setLoading] = useState(false);
+  const fetchTree = useRepositoriesStore((s) => s.fetchTree);
+
+  const handleClick = async () => {
+    onSelect(node.key);
+    if (node.type !== 'folder') return;
+    if (!hasChildren && !loading && repoId) {
+      setLoading(true);
+      await fetchTree(repoId, branchRef, node.key);
+      setLoading(false);
+    }
+    setExpanded((v) => !v);
+  };
 
   return (
     <div>
       <div
-        onClick={() => {
-          onSelect(node.key);
-          if (hasChildren) setExpanded(!expanded);
-        }}
+        onClick={handleClick}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -210,7 +238,11 @@ function TreeNodeView({
           }
         }}
       >
-        <TreeIcon type={node.type} iconColor={node.iconColor} />
+        {(loading && node.type === 'folder') ? (
+          <Spin size="small" style={{ width: 16, height: 16, flexShrink: 0 }} />
+        ) : (
+          <TreeIcon type={node.type} iconColor={node.iconColor} />
+        )}
         <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{node.name}</span>
         {depth === 0 && branchName && (
           <span
@@ -229,7 +261,7 @@ function TreeNodeView({
       {expanded && hasChildren && (
         <div>
           {node.children!.map((child) => (
-            <TreeNodeView key={child.key} node={child} depth={depth + 1} selectedKey={selectedKey} onSelect={onSelect} branchName={branchName} />
+            <TreeNodeView key={child.key} node={child} depth={depth + 1} selectedKey={selectedKey} onSelect={onSelect} branchName={branchName} repoId={repoId} branchRef={branchRef} />
           ))}
         </div>
       )}
@@ -265,6 +297,8 @@ export default function RepositoriesPage() {
 
   const [activeTab, setActiveTab] = useState('code');
   const [selectedTreeKey, setSelectedTreeKey] = useState('');
+  const [selectedFileContent, setSelectedFileContent] = useState<RepoBlob | null>(null);
+  const [fileLoading, setFileLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [isStarred, setIsStarred] = useState(false);
   const [repoFilter, setRepoFilter] = useState<'mine' | 'all'>('mine');
@@ -285,6 +319,20 @@ export default function RepositoriesPage() {
     };
   }, [owner, repo, user?.id, repoFilter]);
 
+  useEffect(() => {
+    if (!selectedTreeKey || !currentRepo) return;
+    const file = storeFiles.find((f) => f.path === selectedTreeKey && f.type === 'file');
+    if (!file) {
+      setSelectedFileContent(null);
+      return;
+    }
+    setFileLoading(true);
+    repositoriesApi.getBlob(currentRepo.id, selectedTreeKey, currentRepo.default_branch)
+      .then((blob) => setSelectedFileContent(blob))
+      .catch(() => setSelectedFileContent(null))
+      .finally(() => setFileLoading(false));
+  }, [selectedTreeKey, currentRepo?.id]);
+
   const isRepoEmpty = !!currentRepo && !currentRepo.status?.initialized;
 
   useEffect(() => {
@@ -294,7 +342,7 @@ export default function RepositoriesPage() {
       fetchTree(currentRepo.id, ref);
       fetchReadme(currentRepo.id, ref);
       fetchBranches(currentRepo.id);
-      fetchCommits(currentRepo.id);
+      fetchCommits(currentRepo.id, { branch: ref });
       repositoriesApi.getStarStatus(currentRepo.id).then((res) => {
         setIsStarred(res.starred);
       }).catch(() => {});
@@ -338,7 +386,7 @@ export default function RepositoriesPage() {
     }
   }, [currentRepo, isStarred, starRepository, unstarRepository]);
 
-  if (isLoading) return <RepositoriesSkeleton />;
+  if (isLoading && repositories.length === 0) return <RepositoriesSkeleton />;
 
   if (!repo || !owner) {
     return (
@@ -367,8 +415,8 @@ export default function RepositoriesPage() {
                 style={{ width: 180 }}
                 size="small"
                 variant="borderless"
-                dropdownStyle={{ background: '#1c2128' }}
-                popupClassName="repo-filter-dropdown"
+                styles={{ popup: { root: { background: '#1c2128' } } }}
+                classNames={{ popup: { root: 'repo-filter-dropdown' } }}
               >
                 <Select.Option value="mine">{t('app.repositories.filter.mine')}</Select.Option>
                 <Select.Option value="all">{t('app.repositories.filter.all')}</Select.Option>
@@ -418,6 +466,7 @@ export default function RepositoriesPage() {
               {error}
             </div>
           )}
+          <FadeBlock key={`${repoFilter}-${viewMode}`}>
           {viewMode === 'list' ? (
             <div>
               {repositories.map((r) => {
@@ -515,6 +564,7 @@ export default function RepositoriesPage() {
               })}
             </div>
           )}
+          </FadeBlock>
           {repositories.length === 0 && !isLoading && !error && (
             <p style={{ color: textSecondary, textAlign: 'center', padding: 40 }}>{t('app.repositories.noRepos')}</p>
           )}
@@ -672,6 +722,8 @@ export default function RepositoriesPage() {
                 selectedKey={selectedTreeKey}
                 onSelect={(key) => setSelectedTreeKey(key)}
                 branchName={currentRepo.default_branch}
+                repoId={currentRepo.id}
+                branchRef={currentRepo.default_branch}
               />
             ))
           ) : (
@@ -756,7 +808,13 @@ export default function RepositoriesPage() {
           {displayFiles.map((file, index) => (
             <div
               key={file.path}
-              onClick={() => file.type === 'directory' && navigate(`/editor/${owner}/${repo}`)}
+              onClick={() => {
+                if (file.type === 'directory') {
+                  navigate(`/editor/${owner}/${repo}`);
+                } else {
+                  setSelectedTreeKey(file.path);
+                }
+              }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -764,7 +822,7 @@ export default function RepositoriesPage() {
                 padding: '8px 16px',
                 borderBottom: index === displayFiles.length - 1 ? 'none' : `1px solid ${borderColor}`,
                 fontSize: 13,
-                cursor: file.type === 'directory' ? 'pointer' : 'default',
+                cursor: 'pointer',
                 transition: 'background 0.15s',
               }}
               onMouseEnter={(e) => {
@@ -799,6 +857,57 @@ export default function RepositoriesPage() {
             </div>
           )}
         </div>
+
+        {selectedFileContent && (
+          <div
+            style={{
+              border: `1px solid ${borderColor}`,
+              borderRadius: 12,
+              overflow: 'hidden',
+              background: bgSecondary,
+              marginBottom: 20,
+            }}
+          >
+            <div
+              style={{
+                padding: '12px 16px',
+                background: bgTertiary,
+                borderBottom: `1px solid ${borderColor}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 13,
+                fontWeight: 500,
+                color: textPrimary,
+              }}
+            >
+              <FileTextOutlined style={{ fontSize: 16 }} />
+              {selectedFileContent.path}
+              <span style={{ marginLeft: 'auto', color: textTertiary, fontSize: 12, fontWeight: 400 }}>
+                {selectedFileContent.size} bytes
+              </span>
+            </div>
+            <pre style={{
+              margin: 0,
+              padding: 16,
+              fontSize: 13,
+              lineHeight: 1.5,
+              color: textPrimary,
+              overflow: 'auto',
+              maxHeight: 600,
+              background: '#0d1117',
+              fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+            }}>
+              {selectedFileContent.content}
+            </pre>
+          </div>
+        )}
+
+        {fileLoading && (
+          <div style={{ textAlign: 'center', padding: 40, color: textSecondary }}>
+            <Spin />
+          </div>
+        )}
 
         {readme && (
           <div

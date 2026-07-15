@@ -5,6 +5,7 @@
 """
 import os
 import shutil
+import uuid
 from typing import Optional, Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -19,8 +20,8 @@ from utils.response_builder import build_pagination_response
 
 async def fork_repository(
     db: AsyncSession,
-    source_repository_id: int,
-    user_id: int,
+    source_repository_id: uuid.UUID,
+    user_id: uuid.UUID,
     name: Optional[str] = None,
     description: Optional[str] = None,
     is_public: Optional[bool] = None,
@@ -123,8 +124,8 @@ async def fork_repository(
             repo_root = config.storage.repo_root
 
         # 创建物理仓库（通过 clone --bare）
-        source_repo_path = get_repository_storage_path(source_repo.path)
-        forked_repo_path = get_repository_storage_path(new_path)
+        source_repo_path = get_repository_storage_path(source_repo.path, repo_root=repo_root)
+        forked_repo_path = get_repository_storage_path(new_path, repo_root=repo_root)
 
         # 确保父目录存在
         os.makedirs(os.path.dirname(forked_repo_path), exist_ok=True)
@@ -179,7 +180,7 @@ async def fork_repository(
 
 async def get_repository_forks(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     page: int = 1,
     limit: int = 20
 ) -> Dict[str, Any]:
@@ -223,7 +224,7 @@ async def get_repository_forks(
 
 async def get_user_forks(
     db: AsyncSession,
-    user_id: int,
+    user_id: uuid.UUID,
     page: int = 1,
     limit: int = 20
 ) -> Dict[str, Any]:
@@ -258,7 +259,7 @@ async def get_user_forks(
 
 async def get_fork_source(
     db: AsyncSession,
-    repository_id: int
+    repository_id: uuid.UUID
 ) -> Optional[dict]:
     """
     获取 Fork 的源仓库
@@ -303,8 +304,8 @@ async def get_fork_source(
 
 async def sync_fork(
     db: AsyncSession,
-    repository_id: int,
-    user_id: int,
+    repository_id: uuid.UUID,
+    user_id: uuid.UUID,
     repo_root: Optional[str] = None
 ) -> dict:
     """
@@ -358,8 +359,8 @@ async def sync_fork(
         config = get_config()
         repo_root = config.storage.repo_root
 
-    fork_repo_path = await get_repository_path(db, repository_id)
-    source_repo_path = await get_repository_path(db, source_repo.id)
+    fork_repo_path = await get_repository_path(db, repository_id, repo_root=repo_root)
+    source_repo_path = await get_repository_path(db, source_repo.id, repo_root=repo_root)
 
     # 执行 git fetch
     import subprocess
@@ -384,8 +385,8 @@ async def sync_fork(
 
 async def _get_user_fork(
     db: AsyncSession,
-    source_repository_id: int,
-    user_id: int
+    source_repository_id: uuid.UUID,
+    user_id: uuid.UUID
 ) -> Optional[Repository]:
     """
     检查用户是否已 Fork 过指定仓库

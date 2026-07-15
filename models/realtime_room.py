@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint, Uuid as SAUuid
 from sqlalchemy.orm import relationship
 from models.base import BaseModel
 
@@ -6,7 +6,7 @@ from models.base import BaseModel
 class RealtimeRoom(BaseModel):
     __tablename__ = "realtime_rooms"
 
-    repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False, unique=True, index=True)
+    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False, unique=True, index=True)
     name = Column(String(100), nullable=False)
     topic = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
@@ -20,8 +20,8 @@ class RealtimeRoom(BaseModel):
 class RoomMember(BaseModel):
     __tablename__ = "room_members"
 
-    room_id = Column(Integer, ForeignKey("realtime_rooms.id"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    room_id = Column(SAUuid(as_uuid=True), ForeignKey("realtime_rooms.id"), nullable=False, index=True)
+    user_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     role = Column(String(20), nullable=False, default="member")
     joined_at = Column(DateTime(timezone=True), nullable=False)
     last_read_at = Column(DateTime(timezone=True), nullable=True)

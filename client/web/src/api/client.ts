@@ -31,7 +31,15 @@ export async function apiRequest<T>(
   });
 
   if (!res.ok) {
-    throw new ApiError(res.status, await res.text());
+    const body = await res.text();
+    let message = body;
+    try {
+      const json = JSON.parse(body);
+      message = json.detail || json.error?.message || res.statusText;
+    } catch {
+      message = body || res.statusText;
+    }
+    throw new ApiError(res.status, message);
   }
 
   if (res.status === 204) {

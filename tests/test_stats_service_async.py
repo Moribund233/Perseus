@@ -1,3 +1,4 @@
+import uuid
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -55,4 +56,4 @@ async def test_repo_stats_empty(async_db, async_test_user):
 @pytest.mark.asyncio
 async def test_repo_stats_not_found(async_db):
     with pytest.raises(NotFoundException):
-        await stats_service.get_repo_stats(99999, async_db)
+        await stats_service.get_repo_stats(uuid.UUID("00000000-0000-0000-0000-000000000000"), async_db)

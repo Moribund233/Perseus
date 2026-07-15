@@ -70,5 +70,5 @@ def test_get_avatar_success(test_client, auth_headers):
 
 def test_get_avatar_not_found(test_client):
     """获取不存在的头像返回 404"""
-    response = test_client.get("/api/v1/users/99999/avatar")
+    response = test_client.get("/api/v1/users/00000000-0000-0000-0000-000000000000/avatar")
     assert response.status_code == 404

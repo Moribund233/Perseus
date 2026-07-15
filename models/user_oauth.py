@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint, Uuid as SAUuid
 from sqlalchemy.orm import relationship
 from models.base import BaseModel
 
@@ -8,7 +8,7 @@ class UserOAuthAccount(BaseModel):
 
     __tablename__ = "user_oauth_accounts"
 
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     """关联的用户 ID"""
 
     provider = Column(String(50), nullable=False)

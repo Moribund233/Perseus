@@ -163,7 +163,7 @@ async def test_delete_ssh_key_not_found(test_client: TestClient, auth_headers: d
     验证点：
     1. 删除不存在的 key 应该返回 404
     """
-    response = test_client.delete("/api/v1/keys/99999", headers=auth_headers)
+    response = test_client.delete("/api/v1/keys/00000000-0000-0000-0000-000000000000", headers=auth_headers)
     assert response.status_code == 404
 
     print("✓ test_delete_ssh_key_not_found 通过")

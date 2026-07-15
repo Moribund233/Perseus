@@ -4,6 +4,7 @@ WebHook 服务层异步测试
 测试 WebHook 的创建、管理、触发和投递功能
 """
 import pytest
+import uuid
 import pytest_asyncio
 import json
 from datetime import datetime
@@ -122,7 +123,7 @@ async def test_get_webhook_not_found(async_db: AsyncSession, async_test_repo, as
         await webhook_service.get_webhook(
             db=async_db,
             repository_id=async_test_repo.id,
-            webhook_id=99999,
+            webhook_id=uuid.uuid4(),
             user_id=async_test_user.id
         )
 
@@ -290,7 +291,7 @@ def test_build_delivery_response():
     """测试投递记录响应构建"""
     delivery = WebHookDelivery(
         id=1,
-        webhook_id=1,
+        webhook_id=uuid.uuid4(),
         event="push",
         payload='{"ref": "main"}',
         is_success=True,

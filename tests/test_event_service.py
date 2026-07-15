@@ -1,5 +1,6 @@
 """F-203/F-040 Business Events Push — service tests"""
 import pytest
+import uuid
 from unittest.mock import MagicMock, AsyncMock, patch
 
 from api.websocket.manager import Connection, ConnectionManager
@@ -28,22 +29,24 @@ class TestEventService:
         from services.realtime.event_service import broadcast_event
         manager = ConnectionManager()
         manager.send_to_room = AsyncMock(return_value=2)
+        room_id = uuid.uuid4()
+        exclude_id = uuid.uuid4()
         with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
             count = await broadcast_event(
-                room_id=1,
+                room_id=room_id,
                 event_type="pr_opened",
                 event_data={"pr_id": 42, "title": "Fix bug"},
-                exclude_user_id=5,
+                exclude_user_id=exclude_id,
             )
         assert count == 2
         manager.send_to_room.assert_called_once()
         call_args = manager.send_to_room.call_args
-        assert call_args[0][0] == 1
+        assert call_args[0][0] == room_id
         payload = call_args[0][1]
         assert payload["type"] == "event"
         assert payload["event"] == "pr_opened"
         assert payload["data"]["pr_id"] == 42
-        assert call_args[1]["exclude_user_id"] == 5
+        assert call_args[1]["exclude_user_id"] == exclude_id
 
     @pytest.mark.asyncio
     async def test_broadcast_event_default_exclude_none(self):
@@ -52,7 +55,7 @@ class TestEventService:
         manager.send_to_room = AsyncMock(return_value=1)
         with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
             count = await broadcast_event(
-                room_id=1,
+                room_id=uuid.uuid4(),
                 event_type="issue_created",
                 event_data={"issue_id": 10},
             )
@@ -65,15 +68,17 @@ class TestEventService:
         from services.realtime.event_service import broadcast_pr_opened
         manager = ConnectionManager()
         manager.send_to_room = AsyncMock(return_value=1)
+        opener_id = uuid.uuid4()
+        pr_id = uuid.uuid4()
         with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
             count = await broadcast_pr_opened(
-                room_id=1, pr_id=100, title="New feature",
-                opener_id=3, opener_username="alice",
+                room_id=uuid.uuid4(), pr_id=pr_id, title="New feature",
+                opener_id=opener_id, opener_username="alice",
             )
         assert count == 1
         payload = manager.send_to_room.call_args[0][1]
         assert payload["event"] == "pr_opened"
-        assert payload["data"]["pr_id"] == 100
+        assert payload["data"]["pr_id"] == pr_id
         assert payload["data"]["opener"]["username"] == "alice"
 
     @pytest.mark.asyncio
@@ -83,8 +88,8 @@ class TestEventService:
         manager.send_to_room = AsyncMock(return_value=1)
         with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
             count = await broadcast_pr_merged(
-                room_id=1, pr_id=100, title="Bugfix",
-                merger_id=3, merger_username="bob",
+                room_id=uuid.uuid4(), pr_id=uuid.uuid4(), title="Bugfix",
+                merger_id=uuid.uuid4(), merger_username="bob",
             )
         assert count == 1
         payload = manager.send_to_room.call_args[0][1]
@@ -96,15 +101,16 @@ class TestEventService:
         from services.realtime.event_service import broadcast_issue_created
         manager = ConnectionManager()
         manager.send_to_room = AsyncMock(return_value=1)
+        issue_id = uuid.uuid4()
         with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
             count = await broadcast_issue_created(
-                room_id=1, issue_id=5, title="Documentation bug",
-                creator_id=2, creator_username="carol",
+                room_id=uuid.uuid4(), issue_id=issue_id, title="Documentation bug",
+                creator_id=uuid.uuid4(), creator_username="carol",
             )
         assert count == 1
         payload = manager.send_to_room.call_args[0][1]
         assert payload["event"] == "issue_created"
-        assert payload["data"]["issue_id"] == 5
+        assert payload["data"]["issue_id"] == issue_id
 
     @pytest.mark.asyncio
     async def test_broadcast_push(self):
@@ -113,8 +119,8 @@ class TestEventService:
         manager.send_to_room = AsyncMock(return_value=3)
         with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
             count = await broadcast_push(
-                room_id=1, branch="main", commit_count=3,
-                pusher_id=1, pusher_username="alice",
+                room_id=uuid.uuid4(), branch="main", commit_count=3,
+                pusher_id=uuid.uuid4(), pusher_username="alice",
             )
         assert count == 3
         payload = manager.send_to_room.call_args[0][1]
@@ -132,8 +138,8 @@ class TestPREvents:
         manager.send_to_room = AsyncMock(return_value=1)
         with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
             count = await broadcast_pr_closed(
-                room_id=1, pr_id=100, title="Close bugfix",
-                closer_id=3, closer_username="alice",
+                room_id=uuid.uuid4(), pr_id=uuid.uuid4(), title="Close bugfix",
+                closer_id=uuid.uuid4(), closer_username="alice",
             )
         assert count == 1
         payload = manager.send_to_room.call_args[0][1]
@@ -147,8 +153,8 @@ class TestPREvents:
         manager.send_to_room = AsyncMock(return_value=1)
         with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
             count = await broadcast_pr_reopened(
-                room_id=1, pr_id=100, title="Reopen feature",
-                reopens_id=3, reopens_username="bob",
+                room_id=uuid.uuid4(), pr_id=uuid.uuid4(), title="Reopen feature",
+                reopens_id=uuid.uuid4(), reopens_username="bob",
             )
         assert count == 1
         payload = manager.send_to_room.call_args[0][1]
@@ -159,16 +165,17 @@ class TestPREvents:
         from services.realtime.event_service import broadcast_pr_comment_added
         manager = ConnectionManager()
         manager.send_to_room = AsyncMock(return_value=1)
+        comment_id = uuid.uuid4()
         with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
             count = await broadcast_pr_comment_added(
-                room_id=1, pr_id=100, comment_id=5,
-                commenter_id=2, commenter_username="carol",
+                room_id=uuid.uuid4(), pr_id=uuid.uuid4(), comment_id=comment_id,
+                commenter_id=uuid.uuid4(), commenter_username="carol",
                 content="LGTM!",
             )
         assert count == 1
         payload = manager.send_to_room.call_args[0][1]
         assert payload["event"] == "pr_comment_added"
-        assert payload["data"]["comment_id"] == 5
+        assert payload["data"]["comment_id"] == comment_id
         assert payload["data"]["commenter"]["username"] == "carol"
 
     @pytest.mark.asyncio
@@ -178,8 +185,8 @@ class TestPREvents:
         manager.send_to_room = AsyncMock(return_value=1)
         with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
             count = await broadcast_pr_review_submitted(
-                room_id=1, pr_id=100, review_id=10,
-                reviewer_id=2, reviewer_username="dave",
+                room_id=uuid.uuid4(), pr_id=uuid.uuid4(), review_id=uuid.uuid4(),
+                reviewer_id=uuid.uuid4(), reviewer_username="dave",
                 state="approved",
             )
         assert count == 1
@@ -193,14 +200,16 @@ class TestPREvents:
         """F-040 acceptance: PR event reaches room subscribers"""
         from services.realtime.event_service import broadcast_pr_opened
         manager = ConnectionManager()
-        conn_alice, mock_alice = await _register_connection(manager, user_id=1, username="alice")
-        conn_bob, mock_bob = await _register_connection(manager, user_id=2, username="bob")
-        await manager.subscribe_room(conn_alice, 1)
-        await manager.subscribe_room(conn_bob, 1)
+        room_id = uuid.uuid4()
+        alice_id = uuid.uuid4()
+        conn_alice, mock_alice = await _register_connection(manager, user_id=alice_id, username="alice")
+        conn_bob, mock_bob = await _register_connection(manager, user_id=uuid.uuid4(), username="bob")
+        await manager.subscribe_room(conn_alice, room_id)
+        await manager.subscribe_room(conn_bob, room_id)
         mock_bob.send_json.reset_mock()
         count = await broadcast_pr_opened(
-            room_id=1, pr_id=100, title="Test PR",
-            opener_id=1, opener_username="alice",
+            room_id=room_id, pr_id=uuid.uuid4(), title="Test PR",
+            opener_id=alice_id, opener_username="alice",
         )
         # alice excluded (opener), bob should receive
         assert count == 1

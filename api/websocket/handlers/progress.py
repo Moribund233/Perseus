@@ -4,6 +4,7 @@
 处理操作进度推送相关的WebSocket消息
 """
 import asyncio
+import uuid
 from typing import Dict, Any, Optional
 from datetime import datetime
 from api.websocket.manager import Connection, manager
@@ -123,7 +124,7 @@ async def handle_progress_query(connection: Connection, message: Dict[str, Any])
 # ==================== 服务端主动推送方法 ====================
 
 async def push_progress(
-    user_id: int,
+    user_id: uuid.UUID,
     operation_id: str,
     operation_type: str,
     progress: int,
@@ -170,13 +171,13 @@ async def push_progress(
 
 
 async def push_progress_to_repository(
-    repository_id: int,
+    repository_id: uuid.UUID,
     operation_id: str,
     operation_type: str,
     progress: int,
     message: str = "",
     details: Optional[Dict[str, Any]] = None,
-    exclude_user_id: Optional[int] = None
+    exclude_user_id: Optional[uuid.UUID] = None
 ) -> int:
     """
     向仓库订阅者推送进度更新
@@ -208,7 +209,7 @@ async def push_progress_to_repository(
 
 
 async def notify_operation_completed(
-    user_id: int,
+    user_id: uuid.UUID,
     operation_id: str,
     operation_type: str,
     result: Optional[Dict[str, Any]] = None
@@ -244,7 +245,7 @@ async def notify_operation_completed(
 
 
 async def notify_operation_failed(
-    user_id: int,
+    user_id: uuid.UUID,
     operation_id: str,
     operation_type: str,
     error: str
@@ -279,7 +280,7 @@ async def notify_operation_failed(
     return await manager.send_to_user(user_id, message)
 
 
-def get_active_operations(user_id: Optional[int] = None) -> Dict[str, Dict[str, Any]]:
+def get_active_operations(user_id: Optional[uuid.UUID] = None) -> Dict[str, Dict[str, Any]]:
     """
     获取活跃的操作列表
     

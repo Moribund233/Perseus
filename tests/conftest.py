@@ -105,8 +105,9 @@ def db(test_engine):
         session.close()
         # 清理物理仓库目录（测试间隔离）
         import shutil
-        from utils.git_utils import get_repository_storage_path
-        repo_root = get_repository_storage_path("")
+        from core.config import get_config
+        config = get_config()
+        repo_root = config.storage.repo_root if hasattr(config, 'storage') else "./repositories"
         if repo_root and os.path.exists(repo_root):
             for item in os.listdir(repo_root):
                 item_path = os.path.join(repo_root, item)
@@ -116,6 +117,40 @@ def db(test_engine):
                     os.remove(item_path)
         # 清理物理仓库存在状态缓存
         _repo_exists_cache.clear()
+
+
+@pytest.fixture
+def test_user(db):
+    from models.user import User
+    user = User(
+        username="testuser",
+        email="test@example.com",
+        password="hashed_password_string",
+        full_name="Test User",
+        is_active=True,
+        is_admin=False
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@pytest.fixture
+def admin_user(db):
+    from models.user import User
+    user = User(
+        username="adminuser",
+        email="admin@example.com",
+        password="hashed_admin_password",
+        full_name="Admin User",
+        is_active=True,
+        is_admin=True
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @pytest_asyncio.fixture
@@ -164,8 +199,9 @@ async def async_db(test_engine):
 
     # 清理物理仓库目录（测试间隔离）
     import shutil
-    from utils.git_utils import get_repository_storage_path
-    repo_root = get_repository_storage_path("")
+    from core.config import get_config
+    config = get_config()
+    repo_root = config.storage.repo_root if hasattr(config, 'storage') else "./repositories"
     if repo_root and os.path.exists(repo_root):
         for item in os.listdir(repo_root):
             item_path = os.path.join(repo_root, item)
@@ -201,32 +237,16 @@ def test_client(test_engine):
 
 
 @pytest.fixture
-def auth_headers(db):
+def auth_headers(test_user):
     """
     创建认证用的请求头
 
-    创建一个测试用户并生成访问令牌
-
-    Args:
-        db: 数据库会话
+    使用 test_user fixture 生成访问令牌
 
     Returns:
         dict: 包含Authorization头的字典
     """
-    from models.user import User
-
-    test_user = User(
-        username="testuser",
-        email="test@example.com",
-        password="hashed_password_string",
-        full_name="Test User",
-        is_active=True,
-        is_admin=False
-    )
-
-    db.add(test_user)
-    db.commit()
-    db.refresh(test_user)
+    from services.token_service import create_access_token
 
     token = create_access_token({
         "sub": str(test_user.id),
@@ -240,30 +260,14 @@ def auth_headers(db):
 
 
 @pytest.fixture
-def admin_headers(db):
+def admin_headers(admin_user):
     """
     创建管理员认证用的请求头
-
-    Args:
-        db: 数据库会话
 
     Returns:
         dict: 包含Authorization头的字典
     """
-    from models.user import User
-
-    admin_user = User(
-        username="adminuser",
-        email="admin@example.com",
-        password="hashed_admin_password",
-        full_name="Admin User",
-        is_active=True,
-        is_admin=True
-    )
-
-    db.add(admin_user)
-    db.commit()
-    db.refresh(admin_user)
+    from services.token_service import create_access_token
 
     token = create_access_token({
         "sub": str(admin_user.id),

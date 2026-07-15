@@ -5,6 +5,7 @@ F-020: SSH 认证集成
 处理 SSH Key 相关的 HTTP 请求
 """
 from typing import List
+import uuid
 from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,7 @@ from core.exception import ValidationException, NotFoundException, Authorization
 from models.async_db import get_async_db
 from models.user import User
 from services import key_service
+import uuid
 
 # 创建路由实例
 router = APIRouter(prefix=get_route_prefix("keys"), tags=["keys"])
@@ -28,11 +30,11 @@ class AddSSHKeyRequest(BaseModel):
 
 class SSHKeyResponse(BaseModel):
     """SSH Key 响应体"""
-    id: int
+    id: uuid.UUID
     name: str
     public_key: str
     fingerprint: str
-    user_id: int
+    user_id: uuid.UUID
     created_at: str
 
     class Config:
@@ -110,7 +112,7 @@ async def list_ssh_keys(
 )
 async def delete_ssh_key(
     request: Request,
-    key_id: int,
+    key_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):

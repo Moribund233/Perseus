@@ -1,4 +1,5 @@
 import pytest
+import uuid
 from datetime import datetime
 from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,7 +35,7 @@ async def test_create_notification_with_repo(async_db: AsyncSession, async_test_
         message="New issue in repo",
         repository_id=async_test_repo.id,
         target_type="issue",
-        target_id=1,
+        target_id=uuid.uuid4(),
     )
     assert notif["repository_id"] == async_test_repo.id
 
@@ -85,7 +86,7 @@ async def test_mark_as_read(async_db: AsyncSession, async_test_user):
 async def test_mark_as_read_not_found(async_db: AsyncSession, async_test_user):
     with pytest.raises(NotFoundException):
         await notification_service.mark_as_read(
-            db=async_db, notification_id=99999, user_id=async_test_user.id
+            db=async_db, notification_id=uuid.uuid4(), user_id=async_test_user.id
         )
 
 
@@ -121,7 +122,7 @@ async def test_delete_notification(async_db: AsyncSession, async_test_user):
 async def test_delete_notification_not_found(async_db: AsyncSession, async_test_user):
     with pytest.raises(NotFoundException):
         await notification_service.delete_notification(
-            db=async_db, notification_id=99999, user_id=async_test_user.id
+            db=async_db, notification_id=uuid.uuid4(), user_id=async_test_user.id
         )
 
 

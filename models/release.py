@@ -3,7 +3,7 @@ Release 数据模型
 
 存储仓库的版本发布信息
 """
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, Boolean, Uuid as SAUuid
 from sqlalchemy.orm import relationship
 
 from models.base import BaseModel
@@ -17,7 +17,7 @@ class Release(BaseModel):
     """
     __tablename__ = "releases"
     
-    repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
+    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
     """所属仓库ID"""
     
     release_number = Column(Integer, nullable=False)
@@ -32,7 +32,7 @@ class Release(BaseModel):
     description = Column(Text, nullable=True)
     """Release 描述（支持 Markdown）"""
     
-    author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    author_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     """创建者ID"""
     
     commit_hash = Column(String(40), nullable=False)
@@ -60,7 +60,7 @@ class ReleaseAsset(BaseModel):
     """
     __tablename__ = "release_assets"
     
-    release_id = Column(Integer, ForeignKey("releases.id"), nullable=False)
+    release_id = Column(SAUuid(as_uuid=True), ForeignKey("releases.id"), nullable=False)
     """所属 Release ID"""
     
     name = Column(String(255), nullable=False)

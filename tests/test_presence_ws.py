@@ -1,5 +1,6 @@
 """F-206 Online Presence — WebSocket handler tests"""
 import pytest
+import uuid
 from unittest.mock import MagicMock, AsyncMock
 from api.websocket.manager import Connection, ConnectionManager
 
@@ -25,14 +26,16 @@ class TestPresenceHelpers:
     @pytest.mark.asyncio
     async def test_get_room_connections_returns_subscribed_connections(self):
         manager = ConnectionManager()
-        conn1, _ = await _register_connection(manager, user_id=1, username="alice")
-        conn2, _ = await _register_connection(manager, user_id=2, username="bob")
+        user1_id = uuid.uuid4()
+        user2_id = uuid.uuid4()
+        conn1, _ = await _register_connection(manager, user_id=user1_id, username="alice")
+        conn2, _ = await _register_connection(manager, user_id=user2_id, username="bob")
         await manager.subscribe_room(conn1, 1)
         await manager.subscribe_room(conn2, 1)
         result = await manager.get_room_connections(1)
         assert len(result) == 2
         user_ids = {c.user_id for c in result}
-        assert user_ids == {1, 2}
+        assert user_ids == {user1_id, user2_id}
 
     @pytest.mark.asyncio
     async def test_get_room_connections_empty_room(self):
@@ -43,24 +46,27 @@ class TestPresenceHelpers:
     @pytest.mark.asyncio
     async def test_get_room_online_users_returns_unique_users(self):
         manager = ConnectionManager()
-        conn1, _ = await _register_connection(manager, user_id=1, username="alice")
-        conn2a, _ = await _register_connection(manager, user_id=2, username="bob")
-        conn2b, _ = await _register_connection(manager, user_id=2, username="bob")
+        user1_id = uuid.uuid4()
+        user2_id = uuid.uuid4()
+        conn1, _ = await _register_connection(manager, user_id=user1_id, username="alice")
+        conn2a, _ = await _register_connection(manager, user_id=user2_id, username="bob")
+        conn2b, _ = await _register_connection(manager, user_id=user2_id, username="bob")
         await manager.subscribe_room(conn1, 1)
         await manager.subscribe_room(conn2a, 1)
         await manager.subscribe_room(conn2b, 1)
         users = await manager.get_room_online_users(1)
         assert len(users) == 2
         user_ids = {u["user_id"] for u in users}
-        assert user_ids == {1, 2}
+        assert user_ids == {user1_id, user2_id}
 
     @pytest.mark.asyncio
     async def test_get_room_online_users_no_duplicates(self):
         manager = ConnectionManager()
-        conn, _ = await _register_connection(manager, user_id=1, username="alice")
+        user_id = uuid.uuid4()
+        conn, _ = await _register_connection(manager, user_id=user_id, username="alice")
         await manager.subscribe_room(conn, 1)
         users = await manager.get_room_online_users(1)
-        alice = [u for u in users if u["user_id"] == 1][0]
+        alice = [u for u in users if u["user_id"] == user_id][0]
         assert alice["username"] == "alice"
 
 
@@ -70,8 +76,9 @@ class TestPresenceHandlers:
     async def test_room_join_broadcasts_presence_change(self):
         from api.websocket.handlers.room import handle_room_join
         manager = ConnectionManager()
-        conn_alice, mock_alice = await _register_connection(manager, user_id=1, username="alice")
-        conn_bob, mock_bob = await _register_connection(manager, user_id=2, username="bob")
+        alice_id = uuid.uuid4()
+        conn_alice, mock_alice = await _register_connection(manager, user_id=alice_id, username="alice")
+        conn_bob, mock_bob = await _register_connection(manager, user_id=uuid.uuid4(), username="bob")
         await manager.subscribe_room(conn_bob, 1)
         await handle_room_join(conn_alice, {"type": "room_join", "room_id": 1})
         presence_calls = [
@@ -79,15 +86,16 @@ class TestPresenceHandlers:
             if c[0][0].get("type") == "presence_join"
         ]
         assert len(presence_calls) == 1
-        assert presence_calls[0][0][0]["user_id"] == 1
+        assert presence_calls[0][0][0]["user_id"] == alice_id
         assert presence_calls[0][0][0]["username"] == "alice"
 
     @pytest.mark.asyncio
     async def test_room_leave_broadcasts_presence_change(self):
         from api.websocket.handlers.room import handle_room_leave
         manager = ConnectionManager()
-        conn_alice, mock_alice = await _register_connection(manager, user_id=1, username="alice")
-        conn_bob, mock_bob = await _register_connection(manager, user_id=2, username="bob")
+        alice_id = uuid.uuid4()
+        conn_alice, mock_alice = await _register_connection(manager, user_id=alice_id, username="alice")
+        conn_bob, mock_bob = await _register_connection(manager, user_id=uuid.uuid4(), username="bob")
         await manager.subscribe_room(conn_alice, 1)
         await manager.subscribe_room(conn_bob, 1)
         mock_bob.send_json.reset_mock()
@@ -97,14 +105,14 @@ class TestPresenceHandlers:
             if c[0][0].get("type") == "presence_leave"
         ]
         assert len(presence_calls) == 1
-        assert presence_calls[0][0][0]["user_id"] == 1
+        assert presence_calls[0][0][0]["user_id"] == alice_id
 
     @pytest.mark.asyncio
     async def test_presence_list_returns_online_users(self):
         from api.websocket.handlers.room import handle_presence_list
         manager = ConnectionManager()
-        conn_alice, mock_alice = await _register_connection(manager, user_id=1, username="alice")
-        conn_bob, _ = await _register_connection(manager, user_id=2, username="bob")
+        conn_alice, mock_alice = await _register_connection(manager, user_id=uuid.uuid4(), username="alice")
+        conn_bob, _ = await _register_connection(manager, user_id=uuid.uuid4(), username="bob")
         await manager.subscribe_room(conn_alice, 1)
         await manager.subscribe_room(conn_bob, 1)
         await handle_presence_list(conn_alice, {"type": "presence_list", "room_id": 1})
@@ -125,8 +133,9 @@ class TestPresenceHandlers:
     @pytest.mark.asyncio
     async def test_disconnect_broadcasts_presence_leave(self):
         manager = ConnectionManager()
-        conn_alice, mock_alice = await _register_connection(manager, user_id=1, username="alice")
-        conn_bob, mock_bob = await _register_connection(manager, user_id=2, username="bob")
+        alice_id = uuid.uuid4()
+        conn_alice, mock_alice = await _register_connection(manager, user_id=alice_id, username="alice")
+        conn_bob, mock_bob = await _register_connection(manager, user_id=uuid.uuid4(), username="bob")
         await manager.subscribe_room(conn_alice, 1)
         await manager.subscribe_room(conn_bob, 1)
         mock_bob.send_json.reset_mock()
@@ -137,4 +146,4 @@ class TestPresenceHandlers:
         ]
         assert len(presence_calls) >= 1
         last_leave = presence_calls[-1][0][0]
-        assert last_leave["user_id"] == 1
+        assert last_leave["user_id"] == alice_id

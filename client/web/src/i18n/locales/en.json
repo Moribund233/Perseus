@@ -124,7 +124,8 @@
       "empty": {
         "title": "This repository is empty",
         "description": "Push your first commit to get started.",
-        "noFiles": "No files yet"
+        "noFiles": "No files yet",
+        "noCommits": "No commits yet"
       }
     },
     "dashboard": {

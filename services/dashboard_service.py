@@ -3,6 +3,7 @@
 
 为当前登录用户提供跨仓库的统计、动态、最近 PR/Issue 聚合数据。
 """
+import uuid
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +16,7 @@ from services.repository_service import get_accessible_repository_ids
 from utils.response_builder import build_pr_response, build_issue_response
 
 
-async def get_user_dashboard(db: AsyncSession, user_id: int, limit: int = 10) -> dict:
+async def get_user_dashboard(db: AsyncSession, user_id: uuid.UUID, limit: int = 10) -> dict:
     """
     获取当前用户的 Dashboard 聚合数据
 

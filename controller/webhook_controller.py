@@ -18,6 +18,7 @@ from models.repository import Repository
 from models.user import User
 from core.exception import NotFoundException
 from services import webhook_service
+import uuid
 
 # 创建路由实例
 router = APIRouter(prefix=get_route_prefix("webhooks"), tags=["webhooks"])
@@ -41,7 +42,7 @@ class UpdateWebhookRequest(BaseModel):
     is_active: Optional[bool] = Field(None, description="是否激活")
 
 
-async def _get_repo(repo_id: int, db: AsyncSession) -> Repository:
+async def _get_repo(repo_id: uuid.UUID, db: AsyncSession) -> Repository:
     """
     获取仓库实例
 
@@ -64,7 +65,7 @@ async def _get_repo(repo_id: int, db: AsyncSession) -> Repository:
 
 @router.post("/{repo_id}/webhooks", status_code=status.HTTP_201_CREATED)
 async def create_webhook(
-    repo_id: int,
+    repo_id: uuid.UUID,
     data: CreateWebhookRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -96,7 +97,7 @@ async def create_webhook(
 
 @router.get("/{repo_id}/webhooks")
 async def list_webhooks(
-    repo_id: int,
+    repo_id: uuid.UUID,
     page: int = Query(1, ge=1, description="页码"),
     limit: int = Query(20, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_async_db),
@@ -127,8 +128,8 @@ async def list_webhooks(
 
 @router.get("/{repo_id}/webhooks/{webhook_id}")
 async def get_webhook(
-    repo_id: int,
-    webhook_id: int,
+    repo_id: uuid.UUID,
+    webhook_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -155,8 +156,8 @@ async def get_webhook(
 
 @router.patch("/{repo_id}/webhooks/{webhook_id}")
 async def update_webhook(
-    repo_id: int,
-    webhook_id: int,
+    repo_id: uuid.UUID,
+    webhook_id: uuid.UUID,
     data: UpdateWebhookRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -190,8 +191,8 @@ async def update_webhook(
 
 @router.delete("/{repo_id}/webhooks/{webhook_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_webhook(
-    repo_id: int,
-    webhook_id: int,
+    repo_id: uuid.UUID,
+    webhook_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -215,8 +216,8 @@ async def delete_webhook(
 
 @router.post("/{repo_id}/webhooks/{webhook_id}/test")
 async def test_webhook(
-    repo_id: int,
-    webhook_id: int,
+    repo_id: uuid.UUID,
+    webhook_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -245,8 +246,8 @@ async def test_webhook(
 
 @router.get("/{repo_id}/webhooks/{webhook_id}/deliveries")
 async def list_webhook_deliveries(
-    repo_id: int,
-    webhook_id: int,
+    repo_id: uuid.UUID,
+    webhook_id: uuid.UUID,
     page: int = Query(1, ge=1, description="页码"),
     limit: int = Query(20, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_async_db),
@@ -279,9 +280,9 @@ async def list_webhook_deliveries(
 
 @router.get("/{repo_id}/webhooks/{webhook_id}/deliveries/{delivery_id}")
 async def get_webhook_delivery(
-    repo_id: int,
-    webhook_id: int,
-    delivery_id: int,
+    repo_id: uuid.UUID,
+    webhook_id: uuid.UUID,
+    delivery_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):

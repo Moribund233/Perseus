@@ -65,7 +65,7 @@ class TestOAuthServiceHandleCallback:
             respx.get("https://api.github.com/user").respond(
                 status_code=200,
                 json={
-                    "id": 99999,
+                    "id": "00000000-0000-0000-0000-000000000000",
                     "login": "oauth_user",
                     "email": "oauth@github.com",
                     "name": "OAuth User",

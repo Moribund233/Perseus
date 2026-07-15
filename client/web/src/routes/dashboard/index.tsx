@@ -261,7 +261,7 @@ export default function DashboardPage() {
             styles={{ body: { padding: '0 20px 20px' } }}
             style={{ border: '1px solid #21262d', background: '#161b22', marginBottom: 16 }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 184, overflowY: 'auto' }}>
               {repos.map((repo) => (
                 <div
                   key={repo.id}

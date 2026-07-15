@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.pull_request import PullRequest, PRComment, PRReview
 from services import pull_request_service
 from core.exception import NotFoundException, ValidationException
+from utils.git_utils import get_repository_storage_path
 
 
 @pytest_asyncio.fixture
@@ -233,6 +234,7 @@ async def test_repo_with_git(async_db: AsyncSession, async_test_user):
     import subprocess
 
     from models.repository import Repository
+    from utils.git_utils import get_repository_storage_path
 
     # 创建临时目录作为仓库根目录
     temp_dir = tempfile.mkdtemp()
@@ -249,9 +251,10 @@ async def test_repo_with_git(async_db: AsyncSession, async_test_user):
     await async_db.commit()
     await async_db.refresh(repo)
 
-    # 创建物理 bare 仓库
-    repo_path = os.path.join(temp_dir, f"{async_test_user.username}", "test-merge-repo.git")
-    os.makedirs(repo_path, exist_ok=True)
+    # 创建物理 bare 仓库（使用临时目录覆盖默认 repo_root）
+    logical_path = repo.path
+    repo_path = get_repository_storage_path(logical_path, repo_root=temp_dir)
+    os.makedirs(os.path.dirname(repo_path), exist_ok=True)
 
     # 初始化 bare 仓库，使用 main 作为默认分支
     subprocess.run(
@@ -300,11 +303,17 @@ async def test_repo_with_git(async_db: AsyncSession, async_test_user):
     )
     subprocess.run(["git", "-C", clone_path, "push", "origin", "feature"], check=True, capture_output=True)
 
-    # 更新仓库路径指向临时目录
-    repo.path = repo_path
+    # 保持 repo.path 为逻辑路径，同时将 GitService.from_repository_id 重定向到临时目录
+    # 通过 monkey-patch get_repository_storage_path 的 repo_root 或修改 config
+    from core.config import get_config
+    config = get_config()
+    original_repo_root = config.storage.repo_root
+    config.storage.repo_root = temp_dir
 
     yield repo
 
+    # 恢复原始配置
+    config.storage.repo_root = original_repo_root
     # 清理临时目录
     import shutil
     shutil.rmtree(temp_dir, ignore_errors=True)
@@ -342,7 +351,7 @@ async def test_merge_pr_performs_git_merge(async_db: AsyncSession, test_repo_wit
     pr_number = pr["pr_number"]
 
     # 使用 GitService 检查合并前的状态
-    git_service = GitService(repo.path)
+    git_service = GitService(get_repository_storage_path(repo.path))
 
     # 验证 feature 分支存在且有提交
     assert git_service.branch_exists("feature"), "feature 分支应该存在"
@@ -366,7 +375,7 @@ async def test_merge_pr_performs_git_merge(async_db: AsyncSession, test_repo_wit
 
     # 验证目标分支现在包含源分支的更改
     # 重新加载 GitService（因为仓库已更改）
-    git_service = GitService(repo.path)
+    git_service = GitService(get_repository_storage_path(repo.path))
     main_commit_after = git_service.get_branch_commit("main")
 
     # main 分支应该有新的提交（合并提交）
@@ -408,7 +417,7 @@ async def test_squash_merge_creates_single_commit(async_db: AsyncSession, test_r
     pr_number = pr["pr_number"]
 
     # 使用 GitService 检查合并前的状态
-    git_service = GitService(repo.path)
+    git_service = GitService(get_repository_storage_path(repo.path))
 
     # 获取合并前的 main 分支提交
     main_commit_before = git_service.get_branch_commit("main")
@@ -424,7 +433,7 @@ async def test_squash_merge_creates_single_commit(async_db: AsyncSession, test_r
     assert merged_pr["merged_commit_hash"] is not None, "应该有合并提交哈希"
 
     # 验证目标分支有新的提交
-    git_service = GitService(repo.path)
+    git_service = GitService(get_repository_storage_path(repo.path))
     main_commit_after = git_service.get_branch_commit("main")
 
     # main 分支应该有新的提交
@@ -470,7 +479,7 @@ async def test_rebase_merge_replays_commits(async_db: AsyncSession, test_repo_wi
     pr_number = pr["pr_number"]
 
     # 使用 GitService 检查合并前的状态
-    git_service = GitService(repo.path)
+    git_service = GitService(get_repository_storage_path(repo.path))
 
     # 获取合并前的 main 分支提交
     main_commit_before = git_service.get_branch_commit("main")
@@ -486,7 +495,7 @@ async def test_rebase_merge_replays_commits(async_db: AsyncSession, test_repo_wi
     assert merged_pr["merged_commit_hash"] is not None, "应该有合并提交哈希"
 
     # 验证目标分支有新的提交
-    git_service = GitService(repo.path)
+    git_service = GitService(get_repository_storage_path(repo.path))
     main_commit_after = git_service.get_branch_commit("main")
 
     # main 分支应该有新的提交
@@ -526,9 +535,9 @@ async def test_repo_with_conflict(async_db: AsyncSession, async_test_user):
     await async_db.commit()
     await async_db.refresh(repo)
 
-    # 创建物理 bare 仓库
-    repo_path = os.path.join(temp_dir, f"{async_test_user.username}", "test-conflict-repo.git")
-    os.makedirs(repo_path, exist_ok=True)
+    # 创建物理 bare 仓库（使用临时目录覆盖默认 repo_root）
+    repo_path = get_repository_storage_path(repo.path, repo_root=temp_dir)
+    os.makedirs(os.path.dirname(repo_path), exist_ok=True)
 
     # 初始化 bare 仓库
     subprocess.run(
@@ -567,9 +576,16 @@ async def test_repo_with_conflict(async_db: AsyncSession, async_test_user):
     subprocess.run(["git", "-C", clone_path, "commit", "-m", "Main change"], check=True)
     subprocess.run(["git", "-C", clone_path, "push", "origin", "main"], check=True)
 
-    repo.path = repo_path
+    # 保持 repo.path 为逻辑路径，同时重定向 GitService 到临时目录
+    from core.config import get_config
+    config = get_config()
+    original_repo_root = config.storage.repo_root
+    config.storage.repo_root = temp_dir
+
     yield repo
 
+    # 恢复原始配置
+    config.storage.repo_root = original_repo_root
     # 清理
     import shutil
     shutil.rmtree(temp_dir, ignore_errors=True)

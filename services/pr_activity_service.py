@@ -1,10 +1,11 @@
 """Pull Request 活动日志服务模块"""
+import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.pr_activity import PRActivity
 
 
-async def record_activity(pr_id: int, actor_id: int, action: str,
+async def record_activity(pr_id: uuid.UUID, actor_id: uuid.UUID, action: str,
                           details: str = None, db: AsyncSession = None) -> dict:
     """
     记录 PR 活动
@@ -34,7 +35,7 @@ async def record_activity(pr_id: int, actor_id: int, action: str,
     }
 
 
-async def list_activities(pr_id: int, db: AsyncSession) -> list[dict]:
+async def list_activities(pr_id: uuid.UUID, db: AsyncSession) -> list[dict]:
     """
     获取 PR 活动日志
 

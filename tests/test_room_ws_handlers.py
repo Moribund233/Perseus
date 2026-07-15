@@ -1,5 +1,6 @@
 """F-201 WebSocket room handler tests"""
 import pytest
+import uuid
 from unittest.mock import MagicMock, AsyncMock
 
 from api.websocket.manager import Connection, ConnectionManager
@@ -76,7 +77,7 @@ class TestRoomHandlers:
     async def test_handle_room_join_subscribes_connection(self):
         from api.websocket.handlers.room import handle_room_join
         manager = ConnectionManager()
-        conn, mock_ws = await _register_connection(manager, user_id=1)
+        conn, mock_ws = await _register_connection(manager, user_id=uuid.uuid4())
         await handle_room_join(conn, {"type": "room_join", "room_id": 1})
         async with manager._lock:
             assert 1 in manager._room_index
@@ -86,7 +87,7 @@ class TestRoomHandlers:
     async def test_handle_room_leave_unsubscribes(self):
         from api.websocket.handlers.room import handle_room_leave
         manager = ConnectionManager()
-        conn, mock_ws = await _register_connection(manager, user_id=1)
+        conn, mock_ws = await _register_connection(manager, user_id=uuid.uuid4())
         await manager.subscribe_room(conn, 1)
         await handle_room_leave(conn, {"type": "room_leave", "room_id": 1})
         async with manager._lock:

@@ -7,6 +7,7 @@ import os
 from typing import List, Optional, Dict, Any, Callable, Awaitable
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+import uuid
 from sqlalchemy.orm import selectinload
 
 from models import Release, ReleaseAsset, Repository, User
@@ -265,7 +266,7 @@ def get_git_tag(repo_path: str, tag_name: str) -> Optional[Dict[str, Any]]:
 
 async def list_releases(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     include_drafts: bool = False,
     include_prereleases: bool = True,
     page: int = 1,
@@ -306,7 +307,7 @@ async def list_releases(
 
 async def get_release(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     release_number: int
 ) -> dict:
     """
@@ -342,7 +343,7 @@ async def get_release(
 
 async def get_release_by_tag(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     tag_name: str
 ) -> dict:
     """
@@ -378,8 +379,8 @@ async def get_release_by_tag(
 
 async def create_release(
     db: AsyncSession,
-    repository_id: int,
-    author_id: int,
+    repository_id: uuid.UUID,
+    author_id: uuid.UUID,
     tag_name: str,
     name: str,
     description: Optional[str] = None,
@@ -486,9 +487,9 @@ async def create_release(
 
 async def update_release(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     release_number: int,
-    user_id: int,
+    user_id: uuid.UUID,
     name: Optional[str] = None,
     description: Optional[str] = None,
     is_draft: Optional[bool] = None,
@@ -555,9 +556,9 @@ async def update_release(
 
 async def delete_release(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     release_number: int,
-    user_id: int,
+    user_id: uuid.UUID,
     delete_git_tag: bool = True,
     repo_path: Optional[str] = None
 ) -> None:
@@ -618,9 +619,9 @@ async def delete_release(
 
 async def add_release_asset(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     release_number: int,
-    user_id: int,
+    user_id: uuid.UUID,
     name: str,
     file_path: str,
     file_size: int,
@@ -683,10 +684,10 @@ async def add_release_asset(
 
 async def delete_release_asset(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     release_number: int,
-    asset_id: int,
-    user_id: int
+    asset_id: uuid.UUID,
+    user_id: uuid.UUID
 ) -> None:
     """
     删除 Release 附件

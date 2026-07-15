@@ -1,3 +1,4 @@
+import uuid
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -55,7 +56,7 @@ async def test_unstar_not_starred(async_db: AsyncSession, async_test_user, test_
 @pytest.mark.asyncio
 async def test_star_nonexistent_repo(async_db: AsyncSession, async_test_user):
     with pytest.raises(NotFoundException):
-        await star_service.star_repository(99999, async_test_user.id, async_db)
+        await star_service.star_repository(uuid.UUID("00000000-0000-0000-0000-000000000000"), async_test_user.id, async_db)
 
 
 @pytest.mark.asyncio

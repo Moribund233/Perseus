@@ -5,12 +5,13 @@
 """
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+import uuid
 from models.branch import Branch
 from models.repository import Repository
 from core.exception import ValidationException, NotFoundException, ConflictException, AuthorizationException
 
 
-async def get_branches(repo_id: int, db: AsyncSession):
+async def get_branches(repo_id: uuid.UUID, db: AsyncSession):
     """
     获取仓库的所有分支
 
@@ -25,7 +26,7 @@ async def get_branches(repo_id: int, db: AsyncSession):
     return result.scalars().all()
 
 
-async def get_branch(repo_id: int, branch_name: str, db: AsyncSession):
+async def get_branch(repo_id: uuid.UUID, branch_name: str, db: AsyncSession):
     """
     获取仓库的特定分支
 
@@ -54,7 +55,7 @@ async def get_branch(repo_id: int, branch_name: str, db: AsyncSession):
     return branch
 
 
-async def get_branch_by_id(branch_id: int, db: AsyncSession):
+async def get_branch_by_id(branch_id: uuid.UUID, db: AsyncSession):
     """
     根据ID获取分支
 
@@ -75,7 +76,7 @@ async def get_branch_by_id(branch_id: int, db: AsyncSession):
     return branch
 
 
-async def create_branch(repo_id: int, branch_data: dict, db: AsyncSession):
+async def create_branch(repo_id: uuid.UUID, branch_data: dict, db: AsyncSession):
     """
     创建新分支
 
@@ -128,7 +129,7 @@ async def create_branch(repo_id: int, branch_data: dict, db: AsyncSession):
     return db_branch
 
 
-async def update_branch(repo_id: int, branch_name: str, branch_data: dict, db: AsyncSession):
+async def update_branch(repo_id: uuid.UUID, branch_name: str, branch_data: dict, db: AsyncSession):
     """
     更新分支信息
 
@@ -161,7 +162,7 @@ async def update_branch(repo_id: int, branch_name: str, branch_data: dict, db: A
     return db_branch
 
 
-async def delete_branch(repo_id: int, branch_name: str, db: AsyncSession):
+async def delete_branch(repo_id: uuid.UUID, branch_name: str, db: AsyncSession):
     """
     删除分支
 
@@ -189,7 +190,7 @@ async def delete_branch(repo_id: int, branch_name: str, db: AsyncSession):
     return {"message": f"Branch '{branch_name}' deleted successfully"}
 
 
-async def set_default_branch(repo_id: int, branch_id: int, db: AsyncSession):
+async def set_default_branch(repo_id: uuid.UUID, branch_id: uuid.UUID, db: AsyncSession):
     """
     设置默认分支
 
@@ -237,7 +238,7 @@ async def set_default_branch(repo_id: int, branch_id: int, db: AsyncSession):
     return {"message": f"Default branch set to '{branch.name}'"}
 
 
-async def protect_branch(repo_id: int, branch_name: str, protection_settings: dict, db: AsyncSession):
+async def protect_branch(repo_id: uuid.UUID, branch_name: str, protection_settings: dict, db: AsyncSession):
     """
     保护分支
 
@@ -266,7 +267,7 @@ async def protect_branch(repo_id: int, branch_name: str, protection_settings: di
     return db_branch
 
 
-async def unprotect_branch(repo_id: int, branch_name: str, db: AsyncSession):
+async def unprotect_branch(repo_id: uuid.UUID, branch_name: str, db: AsyncSession):
     """
     取消分支保护
 
@@ -293,7 +294,7 @@ async def unprotect_branch(repo_id: int, branch_name: str, db: AsyncSession):
     return db_branch
 
 
-async def get_default_branch(repo_id: int, db: AsyncSession):
+async def get_default_branch(repo_id: uuid.UUID, db: AsyncSession):
     """
     获取默认分支
 
@@ -321,7 +322,7 @@ async def get_default_branch(repo_id: int, db: AsyncSession):
     return branch
 
 
-async def check_branch_protection(repo_id: int, branch_name: str, db: AsyncSession):
+async def check_branch_protection(repo_id: uuid.UUID, branch_name: str, db: AsyncSession):
     """
     检查分支保护状态
 

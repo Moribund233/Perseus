@@ -5,12 +5,13 @@
 """
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+import uuid
 from models.repository_member import RepositoryMember
 from core.exception import ValidationException, NotFoundException, ConflictException, AuthorizationException
 from core.constants import ROLE_PRIORITY, VALID_ROLES
 
 
-async def get_repository_members(repo_id: int, db: AsyncSession):
+async def get_repository_members(repo_id: uuid.UUID, db: AsyncSession):
     """
     获取仓库的所有成员
 
@@ -27,7 +28,7 @@ async def get_repository_members(repo_id: int, db: AsyncSession):
     return result.scalars().all()
 
 
-async def get_repository_member(repo_id: int, user_id: int, db: AsyncSession):
+async def get_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession):
     """
     获取仓库的特定成员
 
@@ -56,7 +57,7 @@ async def get_repository_member(repo_id: int, user_id: int, db: AsyncSession):
     return member
 
 
-async def add_repository_member(repo_id: int, member_data: dict, db: AsyncSession, operator_id: int = None):
+async def add_repository_member(repo_id: uuid.UUID, member_data: dict, db: AsyncSession, operator_id: uuid.UUID = None):
     """
     添加仓库成员
 
@@ -112,7 +113,7 @@ async def add_repository_member(repo_id: int, member_data: dict, db: AsyncSessio
     return db_member
 
 
-async def update_repository_member(repo_id: int, user_id: int, member_data: dict, db: AsyncSession, operator_id: int = None):
+async def update_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, member_data: dict, db: AsyncSession, operator_id: uuid.UUID = None):
     """
     更新仓库成员信息
 
@@ -142,7 +143,7 @@ async def update_repository_member(repo_id: int, user_id: int, member_data: dict
     return db_member
 
 
-async def remove_repository_member(repo_id: int, user_id: int, db: AsyncSession, operator_id: int = None):
+async def remove_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, operator_id: uuid.UUID = None):
     """
     删除仓库成员
 
@@ -171,7 +172,7 @@ async def remove_repository_member(repo_id: int, user_id: int, db: AsyncSession,
     return {"message": "Member removed successfully"}
 
 
-async def update_member_role(repo_id: int, user_id: int, role: str, db: AsyncSession, operator_id: int = None):
+async def update_member_role(repo_id: uuid.UUID, user_id: uuid.UUID, role: str, db: AsyncSession, operator_id: uuid.UUID = None):
     """
     更新成员角色
 
@@ -196,7 +197,7 @@ async def update_member_role(repo_id: int, user_id: int, role: str, db: AsyncSes
     return await update_repository_member(repo_id, user_id, {"role": role}, db, operator_id=operator_id)
 
 
-async def get_user_repositories(user_id: int, db: AsyncSession):
+async def get_user_repositories(user_id: uuid.UUID, db: AsyncSession):
     """
     获取用户参与的所有仓库
 
@@ -219,7 +220,7 @@ async def get_user_repositories(user_id: int, db: AsyncSession):
     return result.scalars().all()
 
 
-async def check_member_permission(repo_id: int, user_id: int, required_role: str, db: AsyncSession):
+async def check_member_permission(repo_id: uuid.UUID, user_id: uuid.UUID, required_role: str, db: AsyncSession):
     """
     检查用户在仓库中的权限
 
@@ -266,7 +267,7 @@ async def check_member_permission(repo_id: int, user_id: int, required_role: str
     return user_role_priority >= required_role_priority
 
 
-async def activate_repository_member(repo_id: int, user_id: int, db: AsyncSession, operator_id: int = None):
+async def activate_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, operator_id: uuid.UUID = None):
     """
     激活仓库成员
 
@@ -285,7 +286,7 @@ async def activate_repository_member(repo_id: int, user_id: int, db: AsyncSessio
     return await update_repository_member(repo_id, user_id, {"is_active": True}, db, operator_id=operator_id)
 
 
-async def deactivate_repository_member(repo_id: int, user_id: int, db: AsyncSession, operator_id: int = None):
+async def deactivate_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, operator_id: uuid.UUID = None):
     """
     停用仓库成员
 

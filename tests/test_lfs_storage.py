@@ -1,5 +1,6 @@
 """LFS 存储后端测试"""
 import os
+import uuid
 import pytest
 import tempfile
 import shutil
@@ -17,7 +18,7 @@ def temp_lfs_path():
 @pytest.fixture
 def local_storage(temp_lfs_path):
     """创建本地存储实例"""
-    return LocalFSStorage(temp_lfs_path, repo_id=1)
+    return LocalFSStorage(temp_lfs_path, repo_id=uuid.uuid4())
 
 
 class TestLocalFSStorage:
@@ -67,11 +68,11 @@ class TestLocalFSStorage:
         await local_storage.delete("sha256:nonexistent")
 
     @pytest.mark.asyncio
-    async def test_storage_path_structure(self, local_storage: LocalFSStorage, temp_lfs_path):
+    async def test_storage_path_structure(self, local_storage: LocalFSStorage):
         oid = "sha256:abcdef1234567890"
         await local_storage.upload(oid, b"data")
-        # 验证路径结构: 前2位/2-4位/完整oid
-        expected_path = os.path.join(temp_lfs_path, "1", "ab", "cd", "abcdef1234567890")
+        # 验证路径结构: base/repo_id/前2位/2-4位/完整oid
+        expected_path = local_storage.base_path / "ab" / "cd" / "abcdef1234567890"
         assert os.path.exists(expected_path)
 
 

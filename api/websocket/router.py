@@ -12,6 +12,7 @@ import json as _json
 from api.websocket.manager import manager, Connection
 from api.websocket.auth import authenticate_websocket
 from api.websocket.handlers import register_all_handlers
+import uuid
 
 # WebSocket 消息大小限制（256KB）
 MAX_WS_MESSAGE_SIZE = 262144
@@ -308,7 +309,7 @@ async def notifications_websocket(
 @router.websocket("/repository/{repository_id}")
 async def repository_websocket(
     websocket: WebSocket,
-    repository_id: int,
+    repository_id: uuid.UUID,
     token: Optional[str] = Query(None, description="认证token（可选）")
 ):
     """

@@ -23,7 +23,7 @@ interface RepositoriesState {
   deleteRepository: (repoId: number) => Promise<void>;
   archiveRepository: (repoId: number) => Promise<void>;
   unarchiveRepository: (repoId: number) => Promise<void>;
-  fetchTree: (repoId: number, ref?: string) => Promise<void>;
+  fetchTree: (repoId: number, ref?: string, path?: string) => Promise<void>;
   fetchBlob: (repoId: number, path: string, ref?: string) => Promise<void>;
   fetchReadme: (repoId: number, ref?: string) => Promise<void>;
   fetchBranches: (repoId: number) => Promise<void>;
@@ -138,10 +138,18 @@ export const useRepositoriesStore = create<RepositoriesState>((set, get) => ({
     }
   },
 
-  fetchTree: async (repoId, ref) => {
+  fetchTree: async (repoId, ref, path) => {
     try {
-      const files = await repositoriesApi.getTree(repoId, ref);
-      set({ files });
+      const entries = await repositoriesApi.getTree(repoId, ref, path);
+      if (path) {
+        set((state) => {
+          const merged = new Map(state.files.map((f) => [f.path, f]));
+          for (const e of entries) merged.set(e.path, e);
+          return { files: Array.from(merged.values()) };
+        });
+      } else {
+        set({ files: entries });
+      }
     } catch (e) {
       set({ error: (e as Error).message });
     }
@@ -159,7 +167,7 @@ export const useRepositoriesStore = create<RepositoriesState>((set, get) => ({
   fetchReadme: async (repoId, ref) => {
     try {
       const result = await repositoriesApi.getReadme(repoId, ref);
-      set({ readme: atob(result.content) });
+      set({ readme: result.content });
     } catch {
       set({ readme: null });
     }
@@ -176,7 +184,16 @@ export const useRepositoriesStore = create<RepositoriesState>((set, get) => ({
 
   fetchCommits: async (repoId, params) => {
     try {
-      const commits = await repositoriesApi.getCommitHistory(repoId, params);
+      const data = await repositoriesApi.getCommits(repoId, params);
+      const result = 'commits' in data ? (data as { commits: RepoCommit[] }).commits : data as RepoCommit[];
+      const commits = result.map((c: Record<string, unknown>) => ({
+        id: 0,
+        hash: (c.sha || c.hash) as string,
+        message: c.message as string,
+        author_name: ((c.author as { name?: string })?.name || c.author_name) as string,
+        author_email: ((c.author as { email?: string })?.email || c.author_email) as string,
+        author_date: ((c.author as { date?: string })?.date || c.author_date) as string,
+      }));
       set({ commits });
     } catch (e) {
       set({ error: (e as Error).message });

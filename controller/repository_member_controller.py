@@ -5,6 +5,7 @@
 """
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+import uuid
 
 from api.routes_config import get_route_prefix
 from models.async_db import get_async_db
@@ -32,7 +33,7 @@ router = APIRouter(prefix=get_route_prefix("repository_members"), tags=["reposit
 
 @router.get("/{repo_id}/members")
 async def get_repository_members(
-    repo_id: int,
+    repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -53,8 +54,8 @@ async def get_repository_members(
 
 @router.get("/{repo_id}/members/{user_id}")
 async def get_repository_member(
-    repo_id: int,
-    user_id: int,
+    repo_id: uuid.UUID,
+    user_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -79,7 +80,7 @@ async def get_repository_member(
 
 @router.post("/{repo_id}/members")
 async def add_repository_member(
-    repo_id: int,
+    repo_id: uuid.UUID,
     member_data: dict,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
@@ -107,8 +108,8 @@ async def add_repository_member(
 
 @router.put("/{repo_id}/members/{user_id}")
 async def update_repository_member(
-    repo_id: int,
-    user_id: int,
+    repo_id: uuid.UUID,
+    user_id: uuid.UUID,
     member_data: dict,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
@@ -135,8 +136,8 @@ async def update_repository_member(
 
 @router.delete("/{repo_id}/members/{user_id}")
 async def remove_repository_member(
-    repo_id: int,
-    user_id: int,
+    repo_id: uuid.UUID,
+    user_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -161,8 +162,8 @@ async def remove_repository_member(
 
 @router.put("/{repo_id}/members/{user_id}/role")
 async def update_member_role(
-    repo_id: int,
-    user_id: int,
+    repo_id: uuid.UUID,
+    user_id: uuid.UUID,
     role_data: dict,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
@@ -191,8 +192,8 @@ async def update_member_role(
 
 @router.put("/{repo_id}/members/{user_id}/activate")
 async def activate_repository_member(
-    repo_id: int,
-    user_id: int,
+    repo_id: uuid.UUID,
+    user_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -217,8 +218,8 @@ async def activate_repository_member(
 
 @router.put("/{repo_id}/members/{user_id}/deactivate")
 async def deactivate_repository_member(
-    repo_id: int,
-    user_id: int,
+    repo_id: uuid.UUID,
+    user_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -244,8 +245,8 @@ async def deactivate_repository_member(
 
 @router.get("/{repo_id}/members/{user_id}/permission")
 async def check_member_permission(
-    repo_id: int,
-    user_id: int,
+    repo_id: uuid.UUID,
+    user_id: uuid.UUID,
     permission: str,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),

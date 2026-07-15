@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+import uuid
 from models import User
 from core.exception import ValidationException, NotFoundException, ConflictException, AuthenticationException
 from services.token_service import create_token_pair
@@ -59,7 +60,7 @@ async def get_users(db: AsyncSession):
     return [user_to_dict(user) for user in users]
 
 
-async def get_user_by_id(user_id: int, db: AsyncSession):
+async def get_user_by_id(user_id: uuid.UUID, db: AsyncSession):
     """
     根据ID获取用户
 
@@ -123,7 +124,7 @@ async def create_user(user_data: dict, db: AsyncSession):
     return user_to_dict(db_user)
 
 
-async def update_user(user_id: int, user_data: dict, db: AsyncSession, current_user: User = None):
+async def update_user(user_id: uuid.UUID, user_data: dict, db: AsyncSession, current_user: User = None):
     """
     更新用户信息
 
@@ -169,7 +170,7 @@ async def update_user(user_id: int, user_data: dict, db: AsyncSession, current_u
     return user_to_dict(db_user)
 
 
-async def delete_user(user_id: int, db: AsyncSession):
+async def delete_user(user_id: uuid.UUID, db: AsyncSession):
     """
     删除用户
 
@@ -300,7 +301,7 @@ async def authenticate_user(username: str, password: str, db: AsyncSession) -> U
     return None
 
 
-def _get_avatar_file_path(user_id: int, ext: str) -> Path:
+def _get_avatar_file_path(user_id: uuid.UUID, ext: str) -> Path:
     """获取头像文件存储路径"""
     AVATAR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     return AVATAR_UPLOAD_DIR / f"{user_id}{ext}"
@@ -370,7 +371,7 @@ async def update_user_avatar(
     return build_user_response(user)
 
 
-async def get_user_avatar(user_id: int) -> tuple[Path, str]:
+async def get_user_avatar(user_id: uuid.UUID) -> tuple[Path, str]:
     """
     获取用户头像文件
 

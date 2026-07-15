@@ -13,51 +13,7 @@ from models.repository import Repository
 from models.user import User
 from services import issue_service
 from core.exception import NotFoundException, ValidationException
-
-
-# ============ 辅助函数 ============
-
-async def create_test_issue(
-    db: AsyncSession,
-    repo_id: int,
-    author_id: int,
-    issue_number: int,
-    title: str,
-    status: str = "open",
-    priority: str = "medium",
-    assignee_id: int = None,
-    labels: list = None
-):
-    """创建测试 Issue"""
-    issue = Issue(
-        repository_id=repo_id,
-        issue_number=issue_number,
-        title=title,
-        description=f"Description for {title}",
-        author_id=author_id,
-        status=status,
-        priority=priority,
-        assignee_id=assignee_id
-    )
-    if labels:
-        issue.labels = labels
-    db.add(issue)
-    await db.commit()
-    await db.refresh(issue)
-    return issue
-
-
-async def create_test_label(db: AsyncSession, repo_id: int, name: str, color: str = "#ff0000"):
-    """创建测试标签"""
-    label = Label(
-        name=name,
-        color=color,
-        repository_id=repo_id
-    )
-    db.add(label)
-    await db.commit()
-    await db.refresh(label)
-    return label
+from tests.test_helpers import async_create_test_issue, async_create_test_label
 
 
 # ============ F-025: Issue 高级筛选测试 ============
@@ -66,9 +22,9 @@ async def create_test_label(db: AsyncSession, repo_id: int, name: str, color: st
 async def test_filter_issues_by_single_status(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
     """测试按单个状态筛选 Issue"""
     # 创建不同状态的 Issue
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Open Issue 1", status="open")
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Open Issue 2", status="open")
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 3, "Closed Issue", status="closed")
+    await async_create_test_issue(async_db, async_test_repo.id, 1, "Open Issue 1", status="open")
+    await async_create_test_issue(async_db, async_test_repo.id, 2, "Open Issue 2", status="open")
+    await async_create_test_issue(async_db, async_test_repo.id, 3, "Closed Issue", status="closed")
 
     result = await issue_service.filter_issues(
         async_db, async_test_repo.id,
@@ -83,9 +39,9 @@ async def test_filter_issues_by_single_status(async_db: AsyncSession, async_test
 @pytest.mark.asyncio
 async def test_filter_issues_by_priority(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
     """测试按优先级筛选 Issue"""
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "High Priority", priority="high")
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Low Priority", priority="low")
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 3, "Critical Priority", priority="critical")
+    await async_create_test_issue(async_db, async_test_repo.id, 1, "High Priority", priority="high")
+    await async_create_test_issue(async_db, async_test_repo.id, 2, "Low Priority", priority="low")
+    await async_create_test_issue(async_db, async_test_repo.id, 3, "Critical Priority", priority="critical")
 
     result = await issue_service.filter_issues(
         async_db, async_test_repo.id,
@@ -102,8 +58,8 @@ async def test_filter_issues_by_priority(async_db: AsyncSession, async_test_repo
 @pytest.mark.asyncio
 async def test_filter_issues_by_multiple_status(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
     """测试按多个状态筛选 Issue"""
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Open Issue", status="open")
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Closed Issue", status="closed")
+    await async_create_test_issue(async_db, async_test_repo.id, 1, "Open Issue", status="open")
+    await async_create_test_issue(async_db, async_test_repo.id, 2, "Closed Issue", status="closed")
 
     result = await issue_service.filter_issues(
         async_db, async_test_repo.id,
@@ -116,9 +72,9 @@ async def test_filter_issues_by_multiple_status(async_db: AsyncSession, async_te
 @pytest.mark.asyncio
 async def test_filter_issues_by_assignee(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User, async_another_user: User):
     """测试按指派人筛选 Issue"""
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Assigned to user1", assignee_id=async_test_user.id)
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Assigned to user2", assignee_id=async_another_user.id)
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 3, "Unassigned")
+    await async_create_test_issue(async_db, async_test_repo.id, 1, "Assigned to user1", assignee_id=async_test_user.id)
+    await async_create_test_issue(async_db, async_test_repo.id, 2, "Assigned to user2", assignee_id=async_another_user.id)
+    await async_create_test_issue(async_db, async_test_repo.id, 3, "Unassigned")
 
     result = await issue_service.filter_issues(
         async_db, async_test_repo.id,
@@ -132,8 +88,8 @@ async def test_filter_issues_by_assignee(async_db: AsyncSession, async_test_repo
 @pytest.mark.asyncio
 async def test_filter_issues_by_multiple_assignees(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User, async_another_user: User):
     """测试按多个指派人筛选 Issue"""
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Assigned to user1", assignee_id=async_test_user.id)
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Assigned to user2", assignee_id=async_another_user.id)
+    await async_create_test_issue(async_db, async_test_repo.id, 1, "Assigned to user1", assignee_id=async_test_user.id)
+    await async_create_test_issue(async_db, async_test_repo.id, 2, "Assigned to user2", assignee_id=async_another_user.id)
 
     result = await issue_service.filter_issues(
         async_db, async_test_repo.id,
@@ -147,8 +103,8 @@ async def test_filter_issues_by_multiple_assignees(async_db: AsyncSession, async
 async def test_filter_issues_by_author(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User, async_another_user: User):
     """测试按作者筛选 Issue"""
     # 创建另一个用户作为作者
-    issue1 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "By user1")
-    issue2 = await create_test_issue(async_db, async_test_repo.id, async_another_user.id, 2, "By user2")
+    issue1 = await async_create_test_issue(async_db, async_test_repo.id, 1, "By user1")
+    issue2 = await async_create_test_issue(async_db, async_test_repo.id, 2, "By user2", author_id=async_another_user.id)
 
     result = await issue_service.filter_issues(
         async_db, async_test_repo.id,
@@ -162,12 +118,12 @@ async def test_filter_issues_by_author(async_db: AsyncSession, async_test_repo: 
 @pytest.mark.asyncio
 async def test_filter_issues_by_labels(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
     """测试按标签筛选 Issue"""
-    bug_label = await create_test_label(async_db, async_test_repo.id, "bug", "#ff0000")
-    feature_label = await create_test_label(async_db, async_test_repo.id, "feature", "#00ff00")
+    bug_label = await async_create_test_label(async_db, async_test_repo.id, "bug", "#ff0000")
+    feature_label = await async_create_test_label(async_db, async_test_repo.id, "feature", "#00ff00")
 
-    issue1 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Bug issue", labels=[bug_label])
-    issue2 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Feature issue", labels=[feature_label])
-    issue3 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 3, "Bug and feature", labels=[bug_label, feature_label])
+    issue1 = await async_create_test_issue(async_db, async_test_repo.id, 1, "Bug issue", labels=[bug_label])
+    issue2 = await async_create_test_issue(async_db, async_test_repo.id, 2, "Feature issue", labels=[feature_label])
+    issue3 = await async_create_test_issue(async_db, async_test_repo.id, 3, "Bug and feature", labels=[bug_label, feature_label])
 
     result = await issue_service.filter_issues(
         async_db, async_test_repo.id,
@@ -183,11 +139,11 @@ async def test_filter_issues_by_labels(async_db: AsyncSession, async_test_repo: 
 @pytest.mark.asyncio
 async def test_filter_issues_by_multiple_labels(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
     """测试按多个标签筛选 Issue（AND 关系）"""
-    bug_label = await create_test_label(async_db, async_test_repo.id, "bug")
-    urgent_label = await create_test_label(async_db, async_test_repo.id, "urgent")
+    bug_label = await async_create_test_label(async_db, async_test_repo.id, "bug")
+    urgent_label = await async_create_test_label(async_db, async_test_repo.id, "urgent")
 
-    issue1 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Just bug", labels=[bug_label])
-    issue2 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Bug and urgent", labels=[bug_label, urgent_label])
+    issue1 = await async_create_test_issue(async_db, async_test_repo.id, 1, "Just bug", labels=[bug_label])
+    issue2 = await async_create_test_issue(async_db, async_test_repo.id, 2, "Bug and urgent", labels=[bug_label, urgent_label])
 
     # 筛选同时有 bug 和 urgent 标签的 Issue
     result = await issue_service.filter_issues(
@@ -203,14 +159,14 @@ async def test_filter_issues_by_multiple_labels(async_db: AsyncSession, async_te
 @pytest.mark.asyncio
 async def test_filter_issues_combined_criteria(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User, async_another_user: User):
     """测试组合多个筛选条件"""
-    bug_label = await create_test_label(async_db, async_test_repo.id, "bug")
+    bug_label = await async_create_test_label(async_db, async_test_repo.id, "bug")
 
     # 创建多个 Issue
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1,
+    await async_create_test_issue(async_db, async_test_repo.id, 1,
                            "Open high bug", status="open", priority="high", labels=[bug_label])
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2,
+    await async_create_test_issue(async_db, async_test_repo.id, 2,
                            "Closed high bug", status="closed", priority="high", labels=[bug_label])
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 3,
+    await async_create_test_issue(async_db, async_test_repo.id, 3,
                            "Open low bug", status="open", priority="low", labels=[bug_label])
 
     result = await issue_service.filter_issues(
@@ -229,9 +185,9 @@ async def test_filter_issues_combined_criteria(async_db: AsyncSession, async_tes
 @pytest.mark.asyncio
 async def test_filter_issues_by_search_keyword(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
     """测试按搜索关键词筛选 Issue"""
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Login button not working")
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Logout functionality broken")
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 3, "Database connection error")
+    await async_create_test_issue(async_db, async_test_repo.id, 1, "Login button not working")
+    await async_create_test_issue(async_db, async_test_repo.id, 2, "Logout functionality broken")
+    await async_create_test_issue(async_db, async_test_repo.id, 3, "Database connection error")
 
     result = await issue_service.filter_issues(
         async_db, async_test_repo.id,
@@ -258,11 +214,11 @@ async def test_filter_issues_sort_by_created_desc(async_db: AsyncSession, async_
     older_time = datetime.utcnow() - timedelta(seconds=10)
     newer_time = datetime.utcnow()
 
-    issue1 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 100, f"{unique_prefix}Older")
+    issue1 = await async_create_test_issue(async_db, async_test_repo.id, 100, f"{unique_prefix}Older")
     issue1.created_at = older_time
     await async_db.commit()
 
-    issue2 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 101, f"{unique_prefix}Newer")
+    issue2 = await async_create_test_issue(async_db, async_test_repo.id, 101, f"{unique_prefix}Newer")
     issue2.created_at = newer_time
     await async_db.commit()
 
@@ -288,9 +244,9 @@ async def test_filter_issues_sort_by_created_desc(async_db: AsyncSession, async_
 @pytest.mark.asyncio
 async def test_filter_issues_sort_by_priority(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
     """测试按优先级排序"""
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Low", priority="low")
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Critical", priority="critical")
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 3, "High", priority="high")
+    await async_create_test_issue(async_db, async_test_repo.id, 1, "Low", priority="low")
+    await async_create_test_issue(async_db, async_test_repo.id, 2, "Critical", priority="critical")
+    await async_create_test_issue(async_db, async_test_repo.id, 3, "High", priority="high")
 
     result = await issue_service.filter_issues(
         async_db, async_test_repo.id,
@@ -306,7 +262,7 @@ async def test_filter_issues_sort_by_priority(async_db: AsyncSession, async_test
 async def test_filter_issues_pagination(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
     """测试筛选结果分页"""
     for i in range(5):
-        await create_test_issue(async_db, async_test_repo.id, async_test_user.id, i + 1, f"Issue {i + 1}")
+        await async_create_test_issue(async_db, async_test_repo.id, i + 1, f"Issue {i + 1}")
 
     result = await issue_service.filter_issues(
         async_db, async_test_repo.id,
@@ -323,7 +279,7 @@ async def test_filter_issues_pagination(async_db: AsyncSession, async_test_repo:
 @pytest.mark.asyncio
 async def test_filter_issues_no_results(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
     """测试筛选无结果"""
-    await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Open issue", status="open")
+    await async_create_test_issue(async_db, async_test_repo.id, 1, "Open issue", status="open")
 
     result = await issue_service.filter_issues(
         async_db, async_test_repo.id,
@@ -339,8 +295,8 @@ async def test_filter_issues_no_results(async_db: AsyncSession, async_test_repo:
 @pytest.mark.asyncio
 async def test_batch_update_issue_status(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
     """测试批量更新 Issue 状态"""
-    issue1 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Issue 1", status="open")
-    issue2 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Issue 2", status="open")
+    issue1 = await async_create_test_issue(async_db, async_test_repo.id, 1, "Issue 1", status="open")
+    issue2 = await async_create_test_issue(async_db, async_test_repo.id, 2, "Issue 2", status="open")
 
     result = await issue_service.batch_update_issues(
         async_db, async_test_repo.id, async_test_user.id,
@@ -361,8 +317,8 @@ async def test_batch_update_issue_status(async_db: AsyncSession, async_test_repo
 @pytest.mark.asyncio
 async def test_batch_update_issue_assignee(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User, async_another_user: User):
     """测试批量更新 Issue 指派人"""
-    issue1 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Issue 1")
-    issue2 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Issue 2")
+    issue1 = await async_create_test_issue(async_db, async_test_repo.id, 1, "Issue 1")
+    issue2 = await async_create_test_issue(async_db, async_test_repo.id, 2, "Issue 2")
 
     result = await issue_service.batch_update_issues(
         async_db, async_test_repo.id, async_test_user.id,
@@ -384,8 +340,8 @@ async def test_batch_update_issue_assignee(async_db: AsyncSession, async_test_re
 @pytest.mark.asyncio
 async def test_batch_update_issue_priority(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
     """测试批量更新 Issue 优先级"""
-    issue1 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Issue 1", priority="low")
-    issue2 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Issue 2", priority="medium")
+    issue1 = await async_create_test_issue(async_db, async_test_repo.id, 1, "Issue 1", priority="low")
+    issue2 = await async_create_test_issue(async_db, async_test_repo.id, 2, "Issue 2", priority="medium")
 
     result = await issue_service.batch_update_issues(
         async_db, async_test_repo.id, async_test_user.id,
@@ -402,9 +358,9 @@ async def test_batch_update_issue_priority(async_db: AsyncSession, async_test_re
 @pytest.mark.asyncio
 async def test_batch_update_issue_labels(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
     """测试批量更新 Issue 标签"""
-    bug_label = await create_test_label(async_db, async_test_repo.id, "bug")
-    issue1 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Issue 1")
-    issue2 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Issue 2")
+    bug_label = await async_create_test_label(async_db, async_test_repo.id, "bug")
+    issue1 = await async_create_test_issue(async_db, async_test_repo.id, 1, "Issue 1")
+    issue2 = await async_create_test_issue(async_db, async_test_repo.id, 2, "Issue 2")
 
     result = await issue_service.batch_update_issues(
         async_db, async_test_repo.id, async_test_user.id,
@@ -423,7 +379,7 @@ async def test_batch_update_issue_labels(async_db: AsyncSession, async_test_repo
 async def test_batch_update_partial_failure(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User, async_another_user: User):
     """测试批量更新部分失败（用户有权限更新自己的，但无法更新不存在的）"""
     # 创建 Issue
-    issue1 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "My issue")
+    issue1 = await async_create_test_issue(async_db, async_test_repo.id, 1, "My issue")
 
     result = await issue_service.batch_update_issues(
         async_db, async_test_repo.id, async_test_user.id,
@@ -451,8 +407,8 @@ async def test_batch_update_empty_list(async_db: AsyncSession, async_test_repo: 
 @pytest.mark.asyncio
 async def test_batch_close_issues(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
     """测试批量关闭 Issue"""
-    issue1 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Issue 1", status="open")
-    issue2 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Issue 2", status="open")
+    issue1 = await async_create_test_issue(async_db, async_test_repo.id, 1, "Issue 1", status="open")
+    issue2 = await async_create_test_issue(async_db, async_test_repo.id, 2, "Issue 2", status="open")
 
     result = await issue_service.batch_close_issues(
         async_db, async_test_repo.id, async_test_user.id,
@@ -468,8 +424,8 @@ async def test_batch_close_issues(async_db: AsyncSession, async_test_repo: Repos
 @pytest.mark.asyncio
 async def test_batch_reopen_issues(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
     """测试批量重新打开 Issue"""
-    issue1 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Issue 1", status="closed")
-    issue2 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Issue 2", status="closed")
+    issue1 = await async_create_test_issue(async_db, async_test_repo.id, 1, "Issue 1", status="closed")
+    issue2 = await async_create_test_issue(async_db, async_test_repo.id, 2, "Issue 2", status="closed")
 
     result = await issue_service.batch_reopen_issues(
         async_db, async_test_repo.id, async_test_user.id,
@@ -485,11 +441,11 @@ async def test_batch_reopen_issues(async_db: AsyncSession, async_test_repo: Repo
 @pytest.mark.asyncio
 async def test_batch_add_labels(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
     """测试批量添加标签"""
-    bug_label = await create_test_label(async_db, async_test_repo.id, "bug")
-    urgent_label = await create_test_label(async_db, async_test_repo.id, "urgent")
+    bug_label = await async_create_test_label(async_db, async_test_repo.id, "bug")
+    urgent_label = await async_create_test_label(async_db, async_test_repo.id, "urgent")
 
-    issue1 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Issue 1")
-    issue2 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Issue 2")
+    issue1 = await async_create_test_issue(async_db, async_test_repo.id, 1, "Issue 1")
+    issue2 = await async_create_test_issue(async_db, async_test_repo.id, 2, "Issue 2")
 
     result = await issue_service.batch_add_labels(
         async_db, async_test_repo.id, async_test_user.id,
@@ -506,10 +462,10 @@ async def test_batch_add_labels(async_db: AsyncSession, async_test_repo: Reposit
 @pytest.mark.asyncio
 async def test_batch_remove_labels(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
     """测试批量移除标签"""
-    bug_label = await create_test_label(async_db, async_test_repo.id, "bug")
+    bug_label = await async_create_test_label(async_db, async_test_repo.id, "bug")
 
-    issue1 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 1, "Issue 1", labels=[bug_label])
-    issue2 = await create_test_issue(async_db, async_test_repo.id, async_test_user.id, 2, "Issue 2", labels=[bug_label])
+    issue1 = await async_create_test_issue(async_db, async_test_repo.id, 1, "Issue 1", labels=[bug_label])
+    issue2 = await async_create_test_issue(async_db, async_test_repo.id, 2, "Issue 2", labels=[bug_label])
 
     result = await issue_service.batch_remove_labels(
         async_db, async_test_repo.id, async_test_user.id,

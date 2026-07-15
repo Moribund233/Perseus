@@ -10,6 +10,7 @@ import base64
 import os
 import logging
 from typing import List, Dict
+import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -87,7 +88,7 @@ def _validate_ssh_key(public_key: str) -> bool:
 
 async def add_ssh_key(
     db: AsyncSession,
-    user_id: int,
+    user_id: uuid.UUID,
     name: str,
     public_key: str
 ) -> Dict:
@@ -141,7 +142,7 @@ async def add_ssh_key(
     return ssh_key.to_dict()
 
 
-async def list_user_ssh_keys(db: AsyncSession, user_id: int) -> List[Dict]:
+async def list_user_ssh_keys(db: AsyncSession, user_id: uuid.UUID) -> List[Dict]:
     """
     列出用户的所有 SSH Keys
 
@@ -161,8 +162,8 @@ async def list_user_ssh_keys(db: AsyncSession, user_id: int) -> List[Dict]:
 
 async def delete_ssh_key(
     db: AsyncSession,
-    key_id: int,
-    user_id: int
+    key_id: uuid.UUID,
+    user_id: uuid.UUID
 ) -> None:
     """
     删除 SSH Key

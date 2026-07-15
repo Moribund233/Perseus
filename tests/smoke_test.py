@@ -175,8 +175,8 @@ def test_repository_crud():
     assert_status(r, 200, "GET /api/v1/repositories/public -> 200")
 
     # 404 测试
-    r = request("GET", "/api/v1/repositories/9999999", headers=headers)
-    assert_status(r, 404, "GET /repositories/9999999 -> 404")
+    r = request("GET", "/api/v1/repositories/00000000-0000-0000-0000-000000000000", headers=headers)
+    assert_status(r, 404, "GET /repositories/nil-uuid -> 404")
 
 
 # ── 4. 分支端点（无认证） ────────────────────────────────

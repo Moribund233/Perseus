@@ -7,13 +7,14 @@ from models.user import User
 from api.dependencies import get_current_user
 from services import label_service
 from utils.permission_utils import require_repository_owner_or_admin
+import uuid
 
 router = APIRouter(prefix=get_route_prefix("repositories"), tags=["repo-labels"])
 
 
 @router.get("/{repo_id}/labels")
 async def get_labels(
-    repo_id: int,
+    repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -22,7 +23,7 @@ async def get_labels(
 
 @router.post("/{repo_id}/labels", status_code=201)
 async def create_label(
-    repo_id: int,
+    repo_id: uuid.UUID,
     label_data: dict,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
@@ -33,8 +34,8 @@ async def create_label(
 
 @router.put("/{repo_id}/labels/{label_id}")
 async def update_label(
-    repo_id: int,
-    label_id: int,
+    repo_id: uuid.UUID,
+    label_id: uuid.UUID,
     label_data: dict,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
@@ -45,8 +46,8 @@ async def update_label(
 
 @router.delete("/{repo_id}/labels/{label_id}")
 async def delete_label(
-    repo_id: int,
-    label_id: int,
+    repo_id: uuid.UUID,
+    label_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -56,8 +57,8 @@ async def delete_label(
 
 @router.post("/{repo_id}/labels/{label_id}/add")
 async def add_label_to_repository(
-    repo_id: int,
-    label_id: int,
+    repo_id: uuid.UUID,
+    label_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -67,8 +68,8 @@ async def add_label_to_repository(
 
 @router.post("/{repo_id}/labels/{label_id}/remove")
 async def remove_label_from_repository(
-    repo_id: int,
-    label_id: int,
+    repo_id: uuid.UUID,
+    label_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):

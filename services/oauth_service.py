@@ -1,6 +1,7 @@
 import logging
 import secrets
 import time
+import uuid
 from typing import Optional
 
 from sqlalchemy import select
@@ -152,7 +153,7 @@ class OAuthService:
     async def list_linked_accounts(
         self,
         db: AsyncSession,
-        user_id: int,
+        user_id: uuid.UUID,
     ) -> list[dict]:
         result = await db.execute(
             select(UserOAuthAccount).where(UserOAuthAccount.user_id == user_id)
@@ -170,7 +171,7 @@ class OAuthService:
     async def unlink_account(
         self,
         db: AsyncSession,
-        user_id: int,
+        user_id: uuid.UUID,
         provider: str,
     ) -> None:
         result = await db.execute(

@@ -8,6 +8,7 @@ from models.repository import Repository
 from api.dependencies import get_current_user, get_current_admin_user
 from services.realtime.room_service import RoomService
 from services.repository_service import get_repository_by_id
+import uuid
 
 
 router = APIRouter(tags=["rooms"])
@@ -15,7 +16,7 @@ router = APIRouter(tags=["rooms"])
 
 @router.get("/api/v1/repositories/{repo_id}/room")
 async def get_repository_room(
-    repo_id: int,
+    repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -34,7 +35,7 @@ async def get_repository_room(
 
 @router.get("/api/v1/rooms/{room_id}/members")
 async def get_room_members(
-    room_id: int,
+    room_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -47,7 +48,7 @@ async def get_room_members(
 
 @router.delete("/api/v1/rooms/{room_id}")
 async def delete_room(
-    room_id: int,
+    room_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_admin_user)
 ):

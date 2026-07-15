@@ -1,31 +1,18 @@
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.repository import Repository
 from services.build_service import BuildService
 from core.exception import NotFoundException
-
-
-def create_test_repo(db, owner_id: int, name: str = "test-build-repo") -> Repository:
-    repo = Repository(
-        name=name,
-        path=f"testuser/{name}",
-        description="Test repository for builds",
-        is_public=True,
-        owner_id=owner_id,
-        default_branch="main"
-    )
-    db.add(repo)
-    db.commit()
-    db.refresh(repo)
-    return repo
+from tests.test_helpers import create_test_repo
 
 
 class TestBuildService:
 
     async def test_create_build(self, async_db: AsyncSession, async_test_user):
-        repo_id = 1
+        repo_id = uuid.uuid4()
         build = await BuildService.create_build(
             db=async_db,
             repo_id=repo_id,
@@ -45,7 +32,7 @@ class TestBuildService:
     async def test_create_build_sets_timestamps(self, async_db: AsyncSession, async_test_user):
         build = await BuildService.create_build(
             db=async_db,
-            repo_id=1,
+            repo_id=uuid.uuid4(),
             branch="main",
             commit_sha="abc",
             triggered_by=async_test_user.id,
@@ -57,7 +44,7 @@ class TestBuildService:
     async def test_get_build_success(self, async_db: AsyncSession, async_test_user):
         build = await BuildService.create_build(
             db=async_db,
-            repo_id=1,
+            repo_id=uuid.uuid4(),
             branch="main",
             commit_sha="abc",
             triggered_by=async_test_user.id,
@@ -69,10 +56,10 @@ class TestBuildService:
 
     async def test_get_build_not_found(self, async_db: AsyncSession):
         with pytest.raises(NotFoundException):
-            await BuildService.get_build(db=async_db, build_id=99999)
+            await BuildService.get_build(db=async_db, build_id=uuid.uuid4())
 
     async def test_list_builds_for_repository(self, async_db: AsyncSession, async_test_user):
-        repo_id = 42
+        repo_id = uuid.uuid4()
         for i in range(3):
             await BuildService.create_build(
                 db=async_db,
@@ -89,11 +76,11 @@ class TestBuildService:
             assert builds[i].created_at >= builds[i + 1].created_at
 
     async def test_list_builds_empty_repo(self, async_db: AsyncSession):
-        builds = await BuildService.get_builds_for_repository(db=async_db, repo_id=999)
+        builds = await BuildService.get_builds_for_repository(db=async_db, repo_id=uuid.uuid4())
         assert builds == []
 
     async def test_list_builds_with_limit(self, async_db: AsyncSession, async_test_user):
-        repo_id = 7
+        repo_id = uuid.uuid4()
         for i in range(5):
             await BuildService.create_build(
                 db=async_db,
@@ -110,7 +97,7 @@ class TestBuildService:
     async def test_update_build_status_to_running(self, async_db: AsyncSession, async_test_user):
         build = await BuildService.create_build(
             db=async_db,
-            repo_id=1,
+            repo_id=uuid.uuid4(),
             branch="main",
             commit_sha="abc",
             triggered_by=async_test_user.id,
@@ -124,7 +111,7 @@ class TestBuildService:
     async def test_update_build_status_to_success(self, async_db: AsyncSession, async_test_user):
         build = await BuildService.create_build(
             db=async_db,
-            repo_id=1,
+            repo_id=uuid.uuid4(),
             branch="main",
             commit_sha="abc",
             triggered_by=async_test_user.id,
@@ -139,7 +126,7 @@ class TestBuildService:
     async def test_update_build_invalid_status(self, async_db: AsyncSession, async_test_user):
         build = await BuildService.create_build(
             db=async_db,
-            repo_id=1,
+            repo_id=uuid.uuid4(),
             branch="main",
             commit_sha="abc",
             triggered_by=async_test_user.id,
@@ -153,7 +140,7 @@ class TestBuildService:
 class TestBuildController:
 
     def test_create_build_via_api(self, test_client: TestClient, auth_headers: dict, db):
-        repo = create_test_repo(db, owner_id=1)
+        repo = create_test_repo(db)
         response = test_client.post(
             f"/api/v1/repositories/{repo.id}/builds",
             json={
@@ -171,7 +158,7 @@ class TestBuildController:
         assert data["commit_message"] == "Test commit"
 
     def test_list_builds_via_api(self, test_client: TestClient, auth_headers: dict, db):
-        repo = create_test_repo(db, owner_id=1)
+        repo = create_test_repo(db)
         for i in range(3):
             test_client.post(
                 f"/api/v1/repositories/{repo.id}/builds",
@@ -187,7 +174,7 @@ class TestBuildController:
         assert len(data) == 3
 
     def test_get_build_via_api(self, test_client: TestClient, auth_headers: dict, db):
-        repo = create_test_repo(db, owner_id=1)
+        repo = create_test_repo(db)
         create_resp = test_client.post(
             f"/api/v1/repositories/{repo.id}/builds",
             json={"branch": "main", "commit_sha": "abc", "commit_message": "Test"},
@@ -202,7 +189,7 @@ class TestBuildController:
         assert response.json()["id"] == build_id
 
     def test_update_build_status_via_api(self, test_client: TestClient, auth_headers: dict, db):
-        repo = create_test_repo(db, owner_id=1)
+        repo = create_test_repo(db)
         create_resp = test_client.post(
             f"/api/v1/repositories/{repo.id}/builds",
             json={"branch": "main", "commit_sha": "abc"},
@@ -218,7 +205,7 @@ class TestBuildController:
         assert response.json()["status"] == "running"
 
     def test_create_build_requires_auth(self, test_client: TestClient, db):
-        repo = create_test_repo(db, owner_id=1)
+        repo = create_test_repo(db)
         response = test_client.post(
             f"/api/v1/repositories/{repo.id}/builds",
             json={"branch": "main", "commit_sha": "abc"},
@@ -226,14 +213,14 @@ class TestBuildController:
         assert response.status_code == 401
 
     def test_list_builds_requires_auth(self, test_client: TestClient, db):
-        repo = create_test_repo(db, owner_id=1)
+        repo = create_test_repo(db)
         response = test_client.get(f"/api/v1/repositories/{repo.id}/builds")
         assert response.status_code == 401
 
     def test_get_build_not_found(self, test_client: TestClient, auth_headers: dict, db):
-        repo = create_test_repo(db, owner_id=1)
+        repo = create_test_repo(db)
         response = test_client.get(
-            f"/api/v1/repositories/{repo.id}/builds/99999",
+            f"/api/v1/repositories/{repo.id}/builds/00000000-0000-0000-0000-000000000000",
             headers=auth_headers,
         )
         assert response.status_code == 404

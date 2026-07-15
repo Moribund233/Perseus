@@ -1,3 +1,4 @@
+import uuid
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,7 +30,7 @@ async def test_list_activities_by_repo(async_db, test_repo, async_test_user):
         test_repo.id, async_test_user.id, "repository", test_repo.id, "created", None, async_db
     )
     await activity_service.record_activity(
-        test_repo.id, async_test_user.id, "pull_request", 1, "created", "PR opened", async_db
+        test_repo.id, async_test_user.id, "pull_request", uuid.uuid4(), "created", "PR opened", async_db
     )
     result = await activity_service.list_activities(repository_id=test_repo.id, db=async_db)
     assert len(result["items"]) == 2
@@ -42,7 +43,7 @@ async def test_list_activities_filter_by_entity(async_db, test_repo, async_test_
         test_repo.id, async_test_user.id, "repository", test_repo.id, "created", None, async_db
     )
     await activity_service.record_activity(
-        test_repo.id, async_test_user.id, "pull_request", 1, "created", None, async_db
+        test_repo.id, async_test_user.id, "pull_request", uuid.uuid4(), "created", None, async_db
     )
     result = await activity_service.list_activities(
         repository_id=test_repo.id, entity_type="pull_request", db=async_db

@@ -8,42 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.repository import Repository
-
-
-def create_test_repo(db, owner_id: int, name: str = "test-repo") -> Repository:
-    """创建测试仓库"""
-    repo = Repository(
-        name=name,
-        path=f"testuser/{name}",
-        description="Test repository",
-        is_public=True,
-        owner_id=owner_id,
-        default_branch="main"
-    )
-    db.add(repo)
-    db.commit()
-    db.refresh(repo)
-    return repo
-
-
-def create_test_issue(db, repo_id: int, author_id: int, issue_number: int,
-                      title: str, status: str = "open", priority: str = "medium"):
-    """创建测试 Issue（同步）"""
-    from models.issue import Issue
-    issue = Issue(
-        repository_id=repo_id,
-        issue_number=issue_number,
-        title=title,
-        description=f"Description for {title}",
-        author_id=author_id,
-        status=status,
-        priority=priority
-    )
-    db.add(issue)
-    db.commit()
-    db.refresh(issue)
-    return issue
+from tests.test_helpers import create_test_repo, create_test_issue
 
 
 # =============================================================================
@@ -61,13 +26,13 @@ async def test_filter_issues_api_basic(
     1. 可以按多个条件筛选 Issue
     2. 返回符合条件的结果
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
     # 创建测试数据
     for i in range(5):
         status = "open" if i < 3 else "closed"
         priority = "high" if i % 2 == 0 else "low"
-        create_test_issue(db, repo.id, author_id=1, issue_number=i + 1,
+        create_test_issue(db, repo.id, issue_number=i + 1,
                           title=f"Issue {i + 1}", status=status, priority=priority)
 
     # 按状态筛选
@@ -97,13 +62,13 @@ async def test_filter_issues_api_multi_criteria(
     验证点：
     1. 可以按状态 + 优先级组合筛选
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
     # 创建测试数据
     for i in range(5):
         status = "open" if i < 4 else "closed"
         priority = "high" if i % 2 == 0 else "low"
-        create_test_issue(db, repo.id, author_id=1, issue_number=i + 1,
+        create_test_issue(db, repo.id, issue_number=i + 1,
                           title=f"Issue {i + 1}", status=status, priority=priority)
 
     # 按状态 + 优先级组合筛选
@@ -133,11 +98,11 @@ async def test_filter_issues_api_search(
     验证点：
     1. 可以按关键词搜索标题和描述
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
-    create_test_issue(db, repo.id, author_id=1, issue_number=1,
+    create_test_issue(db, repo.id, issue_number=1,
                       title="Bug: Login fails")
-    create_test_issue(db, repo.id, author_id=1, issue_number=2,
+    create_test_issue(db, repo.id, issue_number=2,
                       title="Feature: Add dark mode")
 
     response = test_client.post(
@@ -165,13 +130,13 @@ async def test_filter_issues_api_sort_by_priority(
     验证点：
     1. 可以按优先级排序
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
-    create_test_issue(db, repo.id, author_id=1, issue_number=1,
+    create_test_issue(db, repo.id, issue_number=1,
                       title="Low priority", priority="low")
-    create_test_issue(db, repo.id, author_id=1, issue_number=2,
+    create_test_issue(db, repo.id, issue_number=2,
                       title="Critical", priority="critical")
-    create_test_issue(db, repo.id, author_id=1, issue_number=3,
+    create_test_issue(db, repo.id, issue_number=3,
                       title="High priority", priority="high")
 
     response = test_client.post(
@@ -204,11 +169,11 @@ async def test_batch_close_issues_api(
     验证点：
     1. 可以批量关闭多个 Issue
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
-    create_test_issue(db, repo.id, author_id=1, issue_number=1, title="Issue 1")
-    create_test_issue(db, repo.id, author_id=1, issue_number=2, title="Issue 2")
-    create_test_issue(db, repo.id, author_id=1, issue_number=3, title="Issue 3")
+    create_test_issue(db, repo.id, issue_number=1, title="Issue 1")
+    create_test_issue(db, repo.id, issue_number=2, title="Issue 2")
+    create_test_issue(db, repo.id, issue_number=3, title="Issue 3")
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/issues/batch/close",
@@ -234,11 +199,11 @@ async def test_batch_reopen_issues_api(
     验证点：
     1. 可以批量重新打开多个 Issue
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
-    create_test_issue(db, repo.id, author_id=1, issue_number=1,
+    create_test_issue(db, repo.id, issue_number=1,
                       title="Issue 1", status="closed")
-    create_test_issue(db, repo.id, author_id=1, issue_number=2,
+    create_test_issue(db, repo.id, issue_number=2,
                       title="Issue 2", status="closed")
 
     response = test_client.post(
@@ -265,10 +230,10 @@ async def test_batch_update_issues_api(
     验证点：
     1. 可以批量更新 Issue 的优先级
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
-    create_test_issue(db, repo.id, author_id=1, issue_number=1, title="Issue 1")
-    create_test_issue(db, repo.id, author_id=1, issue_number=2, title="Issue 2")
+    create_test_issue(db, repo.id, issue_number=1, title="Issue 1")
+    create_test_issue(db, repo.id, issue_number=2, title="Issue 2")
 
     response = test_client.patch(
         f"/api/v1/repositories/{repo.id}/issues/batch",
@@ -297,7 +262,7 @@ async def test_batch_update_issues_unauthorized(
     验证点：
     1. 未认证用户收到 401
     """
-    repo = create_test_repo(db, owner_id=1)
+    repo = create_test_repo(db)
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/issues/batch/close",

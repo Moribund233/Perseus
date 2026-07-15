@@ -18,6 +18,7 @@ from utils.response_builder import (
     build_label_response,
     build_pagination_response
 )
+import uuid
 from utils.db_utils import paginate, get_next_sequence_number, get_issue_or_404
 from services.realtime.event_service import broadcast_issue_created
 from services.realtime.room_service import RoomService
@@ -28,11 +29,11 @@ logger = logging.getLogger(__name__)
 
 async def list_issues(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     status: Optional[str] = None,
     label: Optional[str] = None,
-    assignee_id: Optional[int] = None,
-    author_id: Optional[int] = None,
+    assignee_id: Optional[uuid.UUID] = None,
+    author_id: Optional[uuid.UUID] = None,
     page: int = 1,
     limit: int = 20
 ) -> Dict[str, Any]:
@@ -86,7 +87,7 @@ async def list_issues(
 
 async def list_issues_for_user(
     db: AsyncSession,
-    user_id: int,
+    user_id: uuid.UUID,
     status: Optional[str] = None,
     page: int = 1,
     limit: int = 20
@@ -144,7 +145,7 @@ async def list_issues_for_user(
 
 async def get_issue(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     issue_number: int,
     include_details: bool = False
 ) -> dict:
@@ -191,13 +192,13 @@ async def get_issue(
 
 async def create_issue(
     db: AsyncSession,
-    repository_id: int,
-    author_id: int,
+    repository_id: uuid.UUID,
+    author_id: uuid.UUID,
     title: str,
     description: Optional[str] = None,
     priority: str = "medium",
-    assignee_id: Optional[int] = None,
-    label_ids: Optional[List[int]] = None
+    assignee_id: Optional[uuid.UUID] = None,
+    label_ids: Optional[List[uuid.UUID]] = None
 ) -> dict:
     """
     创建 Issue
@@ -278,7 +279,7 @@ async def create_issue(
 
 async def filter_issues(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     filters: Optional[Dict[str, Any]] = None,
     sort_by: str = "created_at",
     sort_order: str = "desc",
@@ -295,9 +296,9 @@ async def filter_issues(
         filters: 筛选条件字典
             - statuses: List[str] - 状态列表
             - priorities: List[str] - 优先级列表
-            - assignee_ids: List[int] - 指派人ID列表
-            - author_ids: List[int] - 作者ID列表
-            - label_ids: List[int] - 标签ID列表
+            - assignee_ids: List[uuid.UUID] - 指派人ID列表
+            - author_ids: List[uuid.UUID] - 作者ID列表
+            - label_ids: List[uuid.UUID] - 标签ID列表
             - search: str - 搜索关键词（标题和描述）
         sort_by: 排序字段 (created_at, updated_at, priority)
         sort_order: 排序方向 (asc, desc)
@@ -388,8 +389,8 @@ async def filter_issues(
 
 async def batch_update_issues(
     db: AsyncSession,
-    repository_id: int,
-    user_id: int,
+    repository_id: uuid.UUID,
+    user_id: uuid.UUID,
     issue_numbers: List[int],
     updates: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -404,8 +405,8 @@ async def batch_update_issues(
         updates: 更新字段字典
             - status: str - 状态
             - priority: str - 优先级
-            - assignee_id: int - 指派人ID
-            - label_ids: List[int] - 标签ID列表
+            - assignee_id: uuid.UUID - 指派人ID
+            - label_ids: List[uuid.UUID] - 标签ID列表
 
     Returns:
         dict: 操作结果统计
@@ -465,8 +466,8 @@ async def batch_update_issues(
 
 async def batch_close_issues(
     db: AsyncSession,
-    repository_id: int,
-    user_id: int,
+    repository_id: uuid.UUID,
+    user_id: uuid.UUID,
     issue_numbers: List[int]
 ) -> Dict[str, Any]:
     """
@@ -515,8 +516,8 @@ async def batch_close_issues(
 
 async def batch_reopen_issues(
     db: AsyncSession,
-    repository_id: int,
-    user_id: int,
+    repository_id: uuid.UUID,
+    user_id: uuid.UUID,
     issue_numbers: List[int]
 ) -> Dict[str, Any]:
     """
@@ -565,10 +566,10 @@ async def batch_reopen_issues(
 
 async def batch_add_labels(
     db: AsyncSession,
-    repository_id: int,
-    user_id: int,
+    repository_id: uuid.UUID,
+    user_id: uuid.UUID,
     issue_numbers: List[int],
-    label_ids: List[int]
+    label_ids: List[uuid.UUID]
 ) -> Dict[str, Any]:
     """
     批量为 Issue 添加标签
@@ -621,10 +622,10 @@ async def batch_add_labels(
 
 async def batch_remove_labels(
     db: AsyncSession,
-    repository_id: int,
-    user_id: int,
+    repository_id: uuid.UUID,
+    user_id: uuid.UUID,
     issue_numbers: List[int],
-    label_ids: List[int]
+    label_ids: List[uuid.UUID]
 ) -> Dict[str, Any]:
     """
     批量从 Issue 移除标签
@@ -677,14 +678,14 @@ async def batch_remove_labels(
 
 async def update_issue(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     issue_number: int,
-    user_id: int,
+    user_id: uuid.UUID,
     title: Optional[str] = None,
     description: Optional[str] = None,
     priority: Optional[str] = None,
-    assignee_id: Optional[int] = None,
-    label_ids: Optional[List[int]] = None
+    assignee_id: Optional[uuid.UUID] = None,
+    label_ids: Optional[List[uuid.UUID]] = None
 ) -> dict:
     """
     更新 Issue
@@ -738,9 +739,9 @@ async def update_issue(
 
 async def close_issue(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     issue_number: int,
-    user_id: int
+    user_id: uuid.UUID
 ) -> dict:
     """
     关闭 Issue
@@ -788,9 +789,9 @@ async def close_issue(
 
 async def reopen_issue(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     issue_number: int,
-    user_id: int
+    user_id: uuid.UUID
 ) -> dict:
     """
     重新打开 Issue
@@ -838,9 +839,9 @@ async def reopen_issue(
 
 async def create_issue_comment(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     issue_number: int,
-    author_id: int,
+    author_id: uuid.UUID,
     content: str
 ) -> dict:
     """
@@ -877,7 +878,7 @@ async def create_issue_comment(
 
 async def list_issue_comments(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     issue_number: int
 ) -> List[dict]:
     """
@@ -910,7 +911,7 @@ async def list_issue_comments(
 
 async def list_labels(
     db: AsyncSession,
-    repository_id: int
+    repository_id: uuid.UUID
 ) -> List[dict]:
     """
     获取仓库标签列表
@@ -929,7 +930,7 @@ async def list_labels(
 
 async def create_label(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     name: str,
     color: str,
     description: Optional[str] = None
@@ -981,8 +982,8 @@ async def create_label(
 
 async def update_label(
     db: AsyncSession,
-    repository_id: int,
-    label_id: int,
+    repository_id: uuid.UUID,
+    label_id: uuid.UUID,
     name: Optional[str] = None,
     color: Optional[str] = None,
     description: Optional[str] = None
@@ -1029,8 +1030,8 @@ async def update_label(
 
 async def delete_label(
     db: AsyncSession,
-    repository_id: int,
-    label_id: int
+    repository_id: uuid.UUID,
+    label_id: uuid.UUID
 ) -> None:
     """
     删除标签
@@ -1057,10 +1058,10 @@ async def delete_label(
 
 async def add_label_to_issue(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     issue_number: int,
-    label_id: int,
-    user_id: int
+    label_id: uuid.UUID,
+    user_id: uuid.UUID
 ) -> dict:
     """
     为 Issue 添加标签
@@ -1128,10 +1129,10 @@ async def add_label_to_issue(
 
 async def remove_label_from_issue(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     issue_number: int,
-    label_id: int,
-    user_id: int
+    label_id: uuid.UUID,
+    user_id: uuid.UUID
 ) -> dict:
     """
     从 Issue 移除标签

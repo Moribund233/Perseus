@@ -8,43 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.repository import Repository
-
-
-def create_test_repo(db, owner_id: int, name: str = "test-repo") -> Repository:
-    """创建测试仓库"""
-    repo = Repository(
-        name=name,
-        path=f"testuser/{name}",
-        description="Test repository",
-        is_public=True,
-        owner_id=owner_id,
-        default_branch="main"
-    )
-    db.add(repo)
-    db.commit()
-    db.refresh(repo)
-    return repo
-
-
-def create_test_pr(db, repo_id: int, author_id: int, pr_number: int,
-                   title: str, status: str = "open"):
-    """创建测试 PR"""
-    from models.pull_request import PullRequest
-    pr = PullRequest(
-        repository_id=repo_id,
-        pr_number=pr_number,
-        title=title,
-        description=f"Description for {title}",
-        source_branch="feature",
-        target_branch="main",
-        author_id=author_id,
-        status=status
-    )
-    db.add(pr)
-    db.commit()
-    db.refresh(pr)
-    return pr
+from tests.test_helpers import create_test_repo, create_test_pr
 
 
 # =============================================================================
@@ -62,8 +26,8 @@ async def test_create_pr_comment_api(
     1. 可以创建 PR 评论
     2. 返回正确的评论信息
     """
-    repo = create_test_repo(db, owner_id=1)
-    pr = create_test_pr(db, repo.id, author_id=1, pr_number=1, title="Test PR")
+    repo = create_test_repo(db)
+    pr = create_test_pr(db, repo.id, 1, "Test PR")
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/pull-requests/{pr.pr_number}/comments",
@@ -92,8 +56,8 @@ async def test_create_inline_comment_api(
     1. 可以创建针对特定文件/行的评论
     2. 返回包含文件路径和行号的信息
     """
-    repo = create_test_repo(db, owner_id=1)
-    pr = create_test_pr(db, repo.id, author_id=1, pr_number=1, title="Test PR")
+    repo = create_test_repo(db)
+    pr = create_test_pr(db, repo.id, 1, "Test PR")
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/pull-requests/{pr.pr_number}/comments",
@@ -126,8 +90,8 @@ async def test_list_pr_comments_api(
     验证点：
     1. 可以获取 PR 的所有评论
     """
-    repo = create_test_repo(db, owner_id=1)
-    pr = create_test_pr(db, repo.id, author_id=1, pr_number=1, title="Test PR")
+    repo = create_test_repo(db)
+    pr = create_test_pr(db, repo.id, 1, "Test PR")
 
     # 创建两个评论
     for i in range(2):
@@ -160,8 +124,8 @@ async def test_create_pr_comment_empty_content(
     验证点：
     1. 空内容应该返回 400 错误
     """
-    repo = create_test_repo(db, owner_id=1)
-    pr = create_test_pr(db, repo.id, author_id=1, pr_number=1, title="Test PR")
+    repo = create_test_repo(db)
+    pr = create_test_pr(db, repo.id, 1, "Test PR")
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/pull-requests/{pr.pr_number}/comments",
@@ -184,8 +148,8 @@ async def test_create_pr_comment_unauthorized(
     验证点：
     1. 未认证用户收到 401
     """
-    repo = create_test_repo(db, owner_id=1)
-    pr = create_test_pr(db, repo.id, author_id=1, pr_number=1, title="Test PR")
+    repo = create_test_repo(db)
+    pr = create_test_pr(db, repo.id, 1, "Test PR")
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/pull-requests/{pr.pr_number}/comments",
@@ -211,8 +175,8 @@ async def test_approve_pr_review_api(
     验证点：
     1. 可以提交 approved 审查
     """
-    repo = create_test_repo(db, owner_id=1)
-    pr = create_test_pr(db, repo.id, author_id=1, pr_number=1, title="Test PR")
+    repo = create_test_repo(db)
+    pr = create_test_pr(db, repo.id, 1, "Test PR")
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/pull-requests/{pr.pr_number}/reviews",
@@ -241,8 +205,8 @@ async def test_request_changes_review_api(
     验证点：
     1. 可以提交 changes_requested 审查
     """
-    repo = create_test_repo(db, owner_id=1)
-    pr = create_test_pr(db, repo.id, author_id=1, pr_number=1, title="Test PR")
+    repo = create_test_repo(db)
+    pr = create_test_pr(db, repo.id, 1, "Test PR")
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/pull-requests/{pr.pr_number}/reviews",
@@ -271,8 +235,8 @@ async def test_review_update_existing(
     验证点：
     1. 同用户再次审查会更新已有记录而非新建
     """
-    repo = create_test_repo(db, owner_id=1)
-    pr = create_test_pr(db, repo.id, author_id=1, pr_number=1, title="Test PR")
+    repo = create_test_repo(db)
+    pr = create_test_pr(db, repo.id, 1, "Test PR")
 
     # 先提交 changes_requested
     test_client.post(
@@ -312,8 +276,8 @@ async def test_review_invalid_status(
     验证点：
     1. 无效状态返回 400
     """
-    repo = create_test_repo(db, owner_id=1)
-    pr = create_test_pr(db, repo.id, author_id=1, pr_number=1, title="Test PR")
+    repo = create_test_repo(db)
+    pr = create_test_pr(db, repo.id, 1, "Test PR")
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/pull-requests/{pr.pr_number}/reviews",
@@ -339,8 +303,8 @@ async def test_review_unauthorized(
     验证点：
     1. 未认证用户收到 401
     """
-    repo = create_test_repo(db, owner_id=1)
-    pr = create_test_pr(db, repo.id, author_id=1, pr_number=1, title="Test PR")
+    repo = create_test_repo(db)
+    pr = create_test_pr(db, repo.id, 1, "Test PR")
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/pull-requests/{pr.pr_number}/reviews",

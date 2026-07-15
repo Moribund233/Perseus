@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Index
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Index, Uuid as SAUuid
 from sqlalchemy.orm import relationship
 from sqlalchemy import JSON
 
@@ -8,11 +8,11 @@ from models.base import BaseModel
 class ChatMessage(BaseModel):
     __tablename__ = "chat_messages"
 
-    room_id = Column(Integer, ForeignKey("realtime_rooms.id", ondelete="CASCADE"), nullable=False, index=True)
-    sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    room_id = Column(SAUuid(as_uuid=True), ForeignKey("realtime_rooms.id", ondelete="CASCADE"), nullable=False, index=True)
+    sender_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     message_type = Column(String(20), default="text", nullable=False)
     content = Column(Text, nullable=False)
-    reply_to_id = Column(Integer, ForeignKey("chat_messages.id"), nullable=True)
+    reply_to_id = Column(SAUuid(as_uuid=True), ForeignKey("chat_messages.id"), nullable=True)
     edited_at = Column(DateTime, nullable=True)
     metadata_ = Column("metadata", JSON, nullable=True)
 

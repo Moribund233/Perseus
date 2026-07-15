@@ -1,5 +1,6 @@
 """LFS 服务层测试"""
 import pytest
+import uuid
 import tempfile
 import shutil
 from unittest.mock import AsyncMock, patch
@@ -17,7 +18,7 @@ def temp_lfs_path():
 
 @pytest.fixture
 def lfs_service(temp_lfs_path):
-    storage = LocalFSStorage(temp_lfs_path, repo_id=1)
+    storage = LocalFSStorage(temp_lfs_path, repo_id=uuid.uuid4())
     return LFSService(storage)
 
 

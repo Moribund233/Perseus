@@ -8,21 +8,12 @@ from fastapi.testclient import TestClient
 
 from models.repository import Repository
 from utils.git_utils import init_bare_repo, get_repository_storage_path
+from tests.test_helpers import create_test_repo as _create_test_repo
 
 
-def create_test_repo(db, owner_id: int, name: str = "source-repo") -> Repository:
+def create_test_repo(db, name: str = "source-repo") -> Repository:
     """创建测试仓库（含物理 Git 仓库初始化）"""
-    repo = Repository(
-        name=name,
-        path=f"testuser/{name}",
-        description="Source repository",
-        is_public=True,
-        owner_id=owner_id,
-        default_branch="main"
-    )
-    db.add(repo)
-    db.commit()
-    db.refresh(repo)
+    repo = _create_test_repo(db, name=name)
     physical_path = get_repository_storage_path(repo.path)
     init_bare_repo(physical_path)
     return repo
@@ -34,7 +25,7 @@ def create_test_repo(db, owner_id: int, name: str = "source-repo") -> Repository
 
 def test_fork_repository_with_custom_name(test_client: TestClient, auth_headers: dict, db):
     """测试使用自定义名称 Fork 仓库"""
-    repo = create_test_repo(db, 1, name="src-repo-1")
+    repo = create_test_repo(db, name="src-repo-1")
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/forks",
@@ -47,12 +38,12 @@ def test_fork_repository_with_custom_name(test_client: TestClient, auth_headers:
     assert data["name"] == "my-fork"
     assert data["description"] == "My fork"
     assert data["is_fork"] is True
-    assert data["forked_from_id"] == repo.id
+    assert data["forked_from_id"] == str(repo.id)
 
 
 def test_fork_repository_requires_auth(test_client: TestClient, db):
     """测试未认证用户不能 Fork 仓库"""
-    repo = create_test_repo(db, 1, name="src-repo-2")
+    repo = create_test_repo(db, name="src-repo-2")
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/forks",
@@ -65,7 +56,7 @@ def test_fork_repository_requires_auth(test_client: TestClient, db):
 def test_fork_repository_not_found(test_client: TestClient, auth_headers: dict):
     """测试 Fork 不存在的仓库返回 404"""
     response = test_client.post(
-        "/api/v1/repositories/99999/forks",
+        "/api/v1/repositories/00000000-0000-0000-0000-000000000000/forks",
         json={"name": "fork-1"},
         headers=auth_headers
     )
@@ -75,7 +66,7 @@ def test_fork_repository_not_found(test_client: TestClient, auth_headers: dict):
 
 def test_fork_duplicate_forbidden(test_client: TestClient, auth_headers: dict, db):
     """测试重复 Fork 同一仓库返回错误"""
-    repo = create_test_repo(db, 1, name="src-repo-3")
+    repo = create_test_repo(db, name="src-repo-3")
 
     # 第一次 Fork 成功
     response1 = test_client.post(
@@ -100,7 +91,7 @@ def test_fork_duplicate_forbidden(test_client: TestClient, auth_headers: dict, d
 
 def test_list_repository_forks(test_client: TestClient, auth_headers: dict, db):
     """测试获取仓库的 Fork 列表"""
-    repo = create_test_repo(db, 1, name="src-repo-4")
+    repo = create_test_repo(db, name="src-repo-4")
 
     # Fork 一次
     test_client.post(
@@ -122,7 +113,7 @@ def test_list_repository_forks(test_client: TestClient, auth_headers: dict, db):
 
 def test_list_forks_empty(test_client: TestClient, auth_headers: dict, db):
     """测试没有 Fork 时返回空列表"""
-    repo = create_test_repo(db, 1, name="src-repo-5")
+    repo = create_test_repo(db, name="src-repo-5")
 
     response = test_client.get(
         f"/api/v1/repositories/{repo.id}/forks",
@@ -141,7 +132,7 @@ def test_list_forks_empty(test_client: TestClient, auth_headers: dict, db):
 
 def test_get_fork_source(test_client: TestClient, auth_headers: dict, db):
     """测试获取 Fork 的源仓库"""
-    source_repo = create_test_repo(db, 1, name="original-repo")
+    source_repo = create_test_repo(db, name="original-repo")
 
     # Fork 仓库
     fork_resp = test_client.post(
@@ -160,13 +151,13 @@ def test_get_fork_source(test_client: TestClient, auth_headers: dict, db):
     assert response.status_code == 200
     data = response.json()
     assert data is not None
-    assert data["id"] == source_repo.id
+    assert data["id"] == str(source_repo.id)
     assert data["name"] == "original-repo"
 
 
 def test_get_fork_source_not_fork(test_client: TestClient, auth_headers: dict, db):
     """测试非 Fork 仓库的源仓库返回 None"""
-    repo = create_test_repo(db, 1, name="src-repo-6")
+    repo = create_test_repo(db, name="src-repo-6")
 
     response = test_client.get(
         f"/api/v1/repositories/{repo.id}/forks/source",

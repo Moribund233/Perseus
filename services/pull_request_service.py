@@ -8,6 +8,7 @@ import asyncio
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
+import uuid
 from sqlalchemy import select
 
 from models import PullRequest, PRComment, PRReview, User
@@ -36,9 +37,9 @@ logger = logging.getLogger(__name__)
 
 async def list_pull_requests(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     status: Optional[str] = None,
-    author_id: Optional[int] = None,
+    author_id: Optional[uuid.UUID] = None,
     page: int = 1,
     limit: int = 20
 ) -> Dict[str, Any]:
@@ -77,7 +78,7 @@ async def list_pull_requests(
 
 async def list_pull_requests_for_user(
     db: AsyncSession,
-    user_id: int,
+    user_id: uuid.UUID,
     status: Optional[str] = None,
     page: int = 1,
     limit: int = 20
@@ -125,7 +126,7 @@ async def list_pull_requests_for_user(
 
 async def get_pull_request(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     pr_number: int,
     include_details: bool = False
 ) -> dict:
@@ -173,8 +174,8 @@ async def get_pull_request(
 
 async def create_pull_request(
     db: AsyncSession,
-    repository_id: int,
-    author_id: int,
+    repository_id: uuid.UUID,
+    author_id: uuid.UUID,
     title: str,
     description: Optional[str],
     source_branch: str,
@@ -242,7 +243,7 @@ async def create_pull_request(
     return build_pr_response(pr)
 
 
-async def publish_draft(repo_id: int, pr_number: int, user_id: int, db: AsyncSession) -> dict:
+async def publish_draft(repo_id: uuid.UUID, pr_number: int, user_id: uuid.UUID, db: AsyncSession) -> dict:
     """发布草稿 PR 为正式 PR"""
     from utils.db_utils import get_pull_request_or_404
     from utils.permission_utils import check_resource_author_or_admin
@@ -272,9 +273,9 @@ async def publish_draft(repo_id: int, pr_number: int, user_id: int, db: AsyncSes
 
 async def update_pull_request(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     pr_number: int,
-    user_id: int,
+    user_id: uuid.UUID,
     title: Optional[str] = None,
     description: Optional[str] = None
 ) -> dict:
@@ -322,9 +323,9 @@ async def update_pull_request(
 
 async def close_pull_request(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     pr_number: int,
-    user_id: int
+    user_id: uuid.UUID
 ) -> dict:
     """
     关闭 Pull Request
@@ -370,9 +371,9 @@ async def close_pull_request(
 
 async def merge_pull_request(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     pr_number: int,
-    merger_id: int,
+    merger_id: uuid.UUID,
     merge_method: str = "merge"
 ) -> dict:
     """
@@ -515,14 +516,14 @@ async def merge_pull_request(
 
 async def create_pr_comment(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     pr_number: int,
-    author_id: int,
+    author_id: uuid.UUID,
     content: str,
     file_path: Optional[str] = None,
     line_number: Optional[int] = None,
     commit_hash: Optional[str] = None,
-    parent_id: Optional[int] = None
+    parent_id: Optional[uuid.UUID] = None
 ) -> dict:
     """
     创建 PR 评论
@@ -586,9 +587,9 @@ async def create_pr_comment(
 
 async def create_pr_review(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     pr_number: int,
-    reviewer_id: int,
+    reviewer_id: uuid.UUID,
     status: str,
     comment: Optional[str] = None
 ) -> dict:
@@ -659,7 +660,7 @@ async def create_pr_review(
 
 async def list_pr_comments(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     pr_number: int
 ) -> List[dict]:
     """
@@ -694,7 +695,7 @@ async def list_pr_comments(
 
 async def get_pr_diff(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     pr_number: int
 ) -> dict:
     """
@@ -758,7 +759,7 @@ async def get_pr_diff(
 
 async def get_pr_file_diff(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     pr_number: int,
     file_path: str
 ) -> dict:

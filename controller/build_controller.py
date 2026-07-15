@@ -1,4 +1,5 @@
 from typing import List, Optional
+import uuid
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +12,7 @@ from models.user import User
 from core.exception import NotFoundException
 from services.build_service import BuildService
 from models.build_status import VALID_STATUSES
+import uuid
 
 router = APIRouter(prefix=get_route_prefix("builds"), tags=["builds"])
 
@@ -28,13 +30,13 @@ class UpdateBuildRequest(BaseModel):
 
 
 class BuildResponse(BaseModel):
-    id: int
-    repo_id: int
+    id: uuid.UUID
+    repo_id: uuid.UUID
     branch: str
     commit_sha: str
     commit_message: Optional[str]
     status: str
-    triggered_by: int
+    triggered_by: uuid.UUID
     started_at: Optional[str] = None
     finished_at: Optional[str] = None
     details_url: Optional[str] = None
@@ -44,7 +46,7 @@ class BuildResponse(BaseModel):
         from_attributes = True
 
 
-async def _get_repo(repo_id: int, db: AsyncSession) -> Repository:
+async def _get_repo(repo_id: uuid.UUID, db: AsyncSession) -> Repository:
     from sqlalchemy import select
     result = await db.execute(select(Repository).filter(Repository.id == repo_id))
     repo = result.scalar_one_or_none()
@@ -71,7 +73,7 @@ def _build_to_response(build) -> BuildResponse:
 
 @router.post("/{repo_id}/builds", status_code=status.HTTP_201_CREATED)
 async def create_build(
-    repo_id: int,
+    repo_id: uuid.UUID,
     data: CreateBuildRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
@@ -90,7 +92,7 @@ async def create_build(
 
 @router.get("/{repo_id}/builds")
 async def list_builds(
-    repo_id: int,
+    repo_id: uuid.UUID,
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_async_db),
@@ -105,8 +107,8 @@ async def list_builds(
 
 @router.get("/{repo_id}/builds/{build_id}")
 async def get_build(
-    repo_id: int,
-    build_id: int,
+    repo_id: uuid.UUID,
+    build_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -119,8 +121,8 @@ async def get_build(
 
 @router.patch("/{repo_id}/builds/{build_id}")
 async def update_build(
-    repo_id: int,
-    build_id: int,
+    repo_id: uuid.UUID,
+    build_id: uuid.UUID,
     data: UpdateBuildRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
@@ -138,8 +140,8 @@ async def update_build(
 
 @router.get("/{repo_id}/builds/{build_id}/logs")
 async def get_build_logs(
-    repo_id: int,
-    build_id: int,
+    repo_id: uuid.UUID,
+    build_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):

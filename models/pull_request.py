@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, String, Text, ForeignKey
+from sqlalchemy import Boolean, Column, Integer, String, Text, ForeignKey, Uuid as SAUuid
 from sqlalchemy.orm import relationship, backref
 from models.base import BaseModel
 
@@ -11,7 +11,7 @@ class PullRequest(BaseModel):
     """
     __tablename__ = "pull_requests"
     
-    repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
+    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
     """所属仓库ID"""
     
     pr_number = Column(Integer, nullable=False)
@@ -29,7 +29,7 @@ class PullRequest(BaseModel):
     target_branch = Column(String(100), nullable=False)
     """目标分支（合并到的分支）"""
     
-    author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    author_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     """创建者ID"""
     
     status = Column(String(20), default="open")
@@ -39,7 +39,7 @@ class PullRequest(BaseModel):
     """是否为草稿 PR"""
     
     # 合并相关信息
-    merged_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    merged_by = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     """合并者ID"""
     
     merged_commit_hash = Column(String(40), nullable=True)
@@ -63,10 +63,10 @@ class PRComment(BaseModel):
     """
     __tablename__ = "pr_comments"
     
-    pull_request_id = Column(Integer, ForeignKey("pull_requests.id"), nullable=False)
+    pull_request_id = Column(SAUuid(as_uuid=True), ForeignKey("pull_requests.id"), nullable=False)
     """所属 PR ID"""
     
-    author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    author_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     """评论作者ID"""
     
     content = Column(Text, nullable=False)
@@ -82,7 +82,7 @@ class PRComment(BaseModel):
     commit_hash = Column(String(40), nullable=True)
     """评论针对的提交哈希"""
     
-    parent_id = Column(Integer, ForeignKey("pr_comments.id"), nullable=True)
+    parent_id = Column(SAUuid(as_uuid=True), ForeignKey("pr_comments.id"), nullable=True)
     """父评论ID（支持回复）"""
     
     # 关联关系
@@ -99,10 +99,10 @@ class PRReview(BaseModel):
     """
     __tablename__ = "pr_reviews"
     
-    pull_request_id = Column(Integer, ForeignKey("pull_requests.id"), nullable=False)
+    pull_request_id = Column(SAUuid(as_uuid=True), ForeignKey("pull_requests.id"), nullable=False)
     """所属 PR ID"""
     
-    reviewer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    reviewer_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     """审查者ID"""
     
     status = Column(String(20), nullable=False, default="pending")

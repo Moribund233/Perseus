@@ -2,6 +2,7 @@
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
+import uuid
 
 import aiofiles
 import aiofiles.os
@@ -66,7 +67,7 @@ class LFSStorageBackend(ABC):
 class LocalFSStorage(LFSStorageBackend):
     """本地文件系统存储"""
 
-    def __init__(self, base_path: str, repo_id: int):
+    def __init__(self, base_path: str, repo_id: uuid.UUID):
         self.base_path = Path(base_path) / str(repo_id)
 
     def _get_path(self, oid: str) -> Path:

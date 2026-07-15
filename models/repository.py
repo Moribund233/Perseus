@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, Integer, Text, ForeignKey
+from sqlalchemy import Column, String, Boolean, Integer, Text, ForeignKey, Uuid as SAUuid
 from sqlalchemy.orm import relationship
 from models.base import BaseModel
 
@@ -23,14 +23,14 @@ class Repository(BaseModel):
     is_public = Column(Boolean, default=True)
     """是否公开仓库，默认为True"""
     
-    owner_id = Column(Integer, nullable=False)
+    owner_id = Column(SAUuid(as_uuid=True), nullable=False)
     """仓库所有者ID，关联用户表"""
     
     default_branch = Column(String(50), default="master")
     """默认分支名称，默认为master"""
     
     # Fork 相关字段
-    forked_from_id = Column(Integer, ForeignKey("repositories.id"), nullable=True)
+    forked_from_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=True)
     """Fork 来源仓库ID，为空表示不是 Fork"""
     
     fork_count = Column(Integer, default=0)

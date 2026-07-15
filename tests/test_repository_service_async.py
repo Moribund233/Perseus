@@ -1,3 +1,4 @@
+import uuid
 """
 仓库服务层异步功能测试
 
@@ -163,7 +164,7 @@ async def test_get_repository_by_id(async_db: AsyncSession, test_user):
 async def test_get_repository_by_id_not_found(async_db: AsyncSession):
     """测试获取不存在的仓库"""
     with pytest.raises(NotFoundException) as exc_info:
-        await repository_service.get_repository_by_id(99999, async_db)
+        await repository_service.get_repository_by_id(uuid.UUID("00000000-0000-0000-0000-000000000000"), async_db)
     
     assert "Repository not found" in str(exc_info.value)
     print("✓ test_get_repository_by_id_not_found 通过")
@@ -201,7 +202,7 @@ async def test_update_repository(async_db: AsyncSession, test_user):
 async def test_update_repository_not_found(async_db: AsyncSession):
     """测试更新不存在的仓库"""
     with pytest.raises(NotFoundException) as exc_info:
-        await repository_service.update_repository(99999, {"name": "new-name"}, async_db)
+        await repository_service.update_repository(uuid.UUID("00000000-0000-0000-0000-000000000000"), {"name": "new-name"}, async_db)
     
     assert "Repository not found" in str(exc_info.value)
     print("✓ test_update_repository_not_found 通过")
@@ -236,7 +237,7 @@ async def test_delete_repository(async_db: AsyncSession, test_user):
 async def test_delete_repository_not_found(async_db: AsyncSession):
     """测试删除不存在的仓库"""
     with pytest.raises(NotFoundException) as exc_info:
-        await repository_service.delete_repository(99999, async_db)
+        await repository_service.delete_repository(uuid.UUID("00000000-0000-0000-0000-000000000000"), async_db)
     
     assert "Repository not found" in str(exc_info.value)
     print("✓ test_delete_repository_not_found 通过")
@@ -312,7 +313,7 @@ async def test_check_repository_access(async_db: AsyncSession, test_user):
     
     # 测试公开仓库访问权限（不需要特定角色）
     has_access = await repository_service.check_repository_access(
-        repo_id, 99999, async_db  # 不存在的用户
+        repo_id, uuid.UUID("00000000-0000-0000-0000-000000000000"), async_db  # 不存在的用户
     )
     assert has_access == True
     
@@ -340,7 +341,7 @@ async def test_check_repository_access_private(async_db: AsyncSession, test_user
     
     # 其他用户不应该有访问权限
     has_access = await repository_service.check_repository_access(
-        repo_id, 99999, async_db
+        repo_id, uuid.UUID("00000000-0000-0000-0000-000000000000"), async_db
     )
     assert has_access == False
     
@@ -518,7 +519,7 @@ async def test_physical_status_cache_works(async_db: AsyncSession, test_user):
     _repo_exists_cache.clear()
 
     # 设置缓存值
-    test_repo_id = 99999
+    test_repo_id = uuid.UUID("00000000-0000-0000-0000-000000000000")
     _set_cached_repo_exists(test_repo_id, True)
 
     # 验证缓存命中

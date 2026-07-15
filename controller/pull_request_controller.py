@@ -7,6 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+import uuid
 
 from api.routes_config import get_route_prefix
 from models.async_db import get_async_db
@@ -48,7 +49,7 @@ class PRCommentCreateRequest(BaseModel):
     file_path: Optional[str] = Field(None, description="文件路径（行级评论）")
     line_number: Optional[int] = Field(None, description="行号（行级评论）")
     commit_hash: Optional[str] = Field(None, description="提交哈希（行级评论）")
-    parent_id: Optional[int] = Field(None, description="父评论ID（回复）")
+    parent_id: Optional[uuid.UUID] = Field(None, description="父评论ID（回复）")
 
 
 class PRReviewRequest(BaseModel):
@@ -64,9 +65,9 @@ class PRMergeRequest(BaseModel):
 
 @router.get("/{repo_id}/pull-requests")
 async def list_pull_requests(
-    repo_id: int,
+    repo_id: uuid.UUID,
     status: Optional[str] = Query(None, description="状态筛选：open/merged/closed"),
-    author: Optional[int] = Query(None, description="作者ID筛选"),
+    author: Optional[uuid.UUID] = Query(None, description="作者ID筛选"),
     page: int = Query(1, ge=1, description="页码"),
     limit: int = Query(20, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_async_db)
@@ -97,7 +98,7 @@ async def list_pull_requests(
 
 @router.post("/{repo_id}/pull-requests")
 async def create_pull_request(
-    repo_id: int,
+    repo_id: uuid.UUID,
     data: PRCreateRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -127,7 +128,7 @@ async def create_pull_request(
 
 @router.get("/{repo_id}/pull-requests/{pr_number}")
 async def get_pull_request(
-    repo_id: int,
+    repo_id: uuid.UUID,
     pr_number: int,
     db: AsyncSession = Depends(get_async_db)
 ):
@@ -152,7 +153,7 @@ async def get_pull_request(
 
 @router.patch("/{repo_id}/pull-requests/{pr_number}")
 async def update_pull_request(
-    repo_id: int,
+    repo_id: uuid.UUID,
     pr_number: int,
     data: PRUpdateRequest,
     db: AsyncSession = Depends(get_async_db),
@@ -183,7 +184,7 @@ async def update_pull_request(
 
 @router.post("/{repo_id}/pull-requests/{pr_number}/close")
 async def close_pull_request(
-    repo_id: int,
+    repo_id: uuid.UUID,
     pr_number: int,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -210,7 +211,7 @@ async def close_pull_request(
 
 @router.post("/{repo_id}/pull-requests/{pr_number}/merge")
 async def merge_pull_request(
-    repo_id: int,
+    repo_id: uuid.UUID,
     pr_number: int,
     data: PRMergeRequest,
     db: AsyncSession = Depends(get_async_db),
@@ -242,7 +243,7 @@ async def merge_pull_request(
 
 @router.get("/{repo_id}/pull-requests/{pr_number}/comments")
 async def list_pr_comments(
-    repo_id: int,
+    repo_id: uuid.UUID,
     pr_number: int,
     db: AsyncSession = Depends(get_async_db)
 ):
@@ -266,7 +267,7 @@ async def list_pr_comments(
 
 @router.post("/{repo_id}/pull-requests/{pr_number}/comments")
 async def create_pr_comment(
-    repo_id: int,
+    repo_id: uuid.UUID,
     pr_number: int,
     data: PRCommentCreateRequest,
     db: AsyncSession = Depends(get_async_db),
@@ -302,7 +303,7 @@ async def create_pr_comment(
 
 @router.post("/{repo_id}/pull-requests/{pr_number}/reviews")
 async def create_pr_review(
-    repo_id: int,
+    repo_id: uuid.UUID,
     pr_number: int,
     data: PRReviewRequest,
     db: AsyncSession = Depends(get_async_db),

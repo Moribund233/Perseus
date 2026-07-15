@@ -6,6 +6,7 @@
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import JSONResponse
 from typing import Optional
+import uuid
 from pydantic import BaseModel
 
 from core.config import get_config
@@ -37,7 +38,7 @@ class ErrorLogEntry(BaseModel):
     type: str
     message: str
     path: Optional[str] = None
-    user_id: Optional[int] = None
+    user_id: Optional[uuid.UUID] = None
 
 
 def _should_show_details(is_authenticated: bool = False, is_admin: bool = False) -> bool:

@@ -26,12 +26,13 @@ from services.repository_browser_service import (
 )
 from utils.git_utils import get_repository_storage_path
 from core.exception import NotFoundException
+import uuid
 
 # 创建路由实例
 router = APIRouter(prefix=get_route_prefix("repository_browser"), tags=["repository-browser"])
 
 
-async def _get_repo_path(repo_id: int, db: AsyncSession) -> str:
+async def _get_repo_path(repo_id: uuid.UUID, db: AsyncSession) -> str:
     """
     获取仓库物理路径
 
@@ -55,7 +56,7 @@ async def _get_repo_path(repo_id: int, db: AsyncSession) -> str:
 
 @router.get("/{repo_id}/tree")
 async def get_repository_tree(
-    repo_id: int,
+    repo_id: uuid.UUID,
     ref: str = Query("HEAD", description="分支名或提交SHA"),
     path: str = Query("", description="子目录路径"),
     db: AsyncSession = Depends(get_async_db)
@@ -81,7 +82,7 @@ async def get_repository_tree(
 
 @router.get("/{repo_id}/blob")
 async def get_repository_blob(
-    repo_id: int,
+    repo_id: uuid.UUID,
     path: str = Query(..., description="文件路径"),
     ref: str = Query("HEAD", description="分支名或提交SHA"),
     db: AsyncSession = Depends(get_async_db)
@@ -107,7 +108,7 @@ async def get_repository_blob(
 
 @router.get("/{repo_id}/commits")
 async def get_repository_commits(
-    repo_id: int,
+    repo_id: uuid.UUID,
     ref: str = Query("HEAD", description="分支名"),
     path: Optional[str] = Query(None, description="特定文件路径"),
     page: int = Query(1, ge=1, description="页码"),
@@ -137,7 +138,7 @@ async def get_repository_commits(
 
 @router.get("/{repo_id}/diff")
 async def get_repository_diff(
-    repo_id: int,
+    repo_id: uuid.UUID,
     head: str = Query(..., description="对比提交SHA"),
     base: Optional[str] = Query(None, description="基准提交SHA"),
     path: Optional[str] = Query(None, description="特定文件路径"),
@@ -165,7 +166,7 @@ async def get_repository_diff(
 
 @router.get("/{repo_id}/readme")
 async def get_repository_readme(
-    repo_id: int,
+    repo_id: uuid.UUID,
     ref: str = Query("HEAD", description="分支名或提交SHA"),
     db: AsyncSession = Depends(get_async_db)
 ):
@@ -195,7 +196,7 @@ async def get_repository_readme(
 
 @router.get("/{repo_id}/symbols")
 async def get_repository_file_symbols(
-    repo_id: int,
+    repo_id: uuid.UUID,
     path: str = Query(..., description="文件路径"),
     ref: str = Query("HEAD", description="分支名或提交SHA"),
     db: AsyncSession = Depends(get_async_db)
@@ -231,7 +232,7 @@ async def get_repository_file_symbols(
 
 @router.get("/{repo_id}/language")
 async def detect_repository_file_language(
-    repo_id: int,
+    repo_id: uuid.UUID,
     path: str = Query(..., description="文件路径"),
     db: AsyncSession = Depends(get_async_db)
 ):

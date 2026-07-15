@@ -7,12 +7,14 @@ import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional, Tuple
+import uuid
 import pygit2
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from core.exception import NotFoundException, ValidationException
 from models import Repository
+import uuid
 
 # 创建线程池用于执行同步IO操作
 _git_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="git_utils")
@@ -50,7 +52,7 @@ class GitService:
             raise ValidationException(detail=f"Invalid git repository: {str(e)}")
 
     @classmethod
-    async def from_repository_id(cls, db: AsyncSession, repository_id: int) -> "GitService":
+    async def from_repository_id(cls, db: AsyncSession, repository_id: uuid.UUID) -> "GitService":
         """
         从仓库 ID 创建 Git 服务实例
 
@@ -375,13 +377,14 @@ class GitService:
         return pygit2.Signature(name, email)
 
 
-async def get_repository_path(db: AsyncSession, repository_id: int) -> str:
+async def get_repository_path(db: AsyncSession, repository_id: uuid.UUID, repo_root: Optional[str] = None) -> str:
     """
     获取仓库的物理路径
 
     Args:
         db: 异步数据库会话
         repository_id: 仓库ID
+        repo_root: 仓库根目录（可选，用于测试）
 
     Returns:
         str: 仓库物理路径
@@ -396,7 +399,7 @@ async def get_repository_path(db: AsyncSession, repository_id: int) -> str:
     if not repo:
         raise NotFoundException(detail="Repository not found")
 
-    return get_repository_storage_path(repo.path)
+    return get_repository_storage_path(repo.path, repo_root=repo_root)
 
 
 def check_merge_conflicts(

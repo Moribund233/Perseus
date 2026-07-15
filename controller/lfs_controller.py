@@ -10,9 +10,10 @@ from api.dependencies import get_current_user
 from services.lfs_service import LFSService
 from services.lfs_storage import LocalFSStorage
 from core.config import get_config
+import uuid
 
 
-def get_lfs_service(repo_id: int) -> LFSService:
+def get_lfs_service(repo_id: uuid.UUID) -> LFSService:
     """获取 LFS 服务实例（按 repo_id 隔离）"""
     config = get_config()
     if config.lfs.storage_backend == "local":
@@ -27,7 +28,7 @@ router = APIRouter(prefix=get_route_prefix("repositories"), tags=["lfs"])
 
 @router.post("/{repo_id}/lfs/objects/batch")
 async def batch(
-    repo_id: int,
+    repo_id: uuid.UUID,
     request: Request,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
@@ -50,7 +51,7 @@ async def batch(
 
 @router.put("/{repo_id}/lfs/objects/{oid}", status_code=201)
 async def upload_object(
-    repo_id: int,
+    repo_id: uuid.UUID,
     oid: str,
     request: Request,
     db: AsyncSession = Depends(get_async_db),
@@ -71,7 +72,7 @@ async def upload_object(
 
 @router.get("/{repo_id}/lfs/objects/{oid}")
 async def download_object(
-    repo_id: int,
+    repo_id: uuid.UUID,
     oid: str,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
@@ -91,7 +92,7 @@ async def download_object(
 
 @router.delete("/{repo_id}/lfs/objects/{oid}", status_code=204)
 async def delete_object(
-    repo_id: int,
+    repo_id: uuid.UUID,
     oid: str,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),

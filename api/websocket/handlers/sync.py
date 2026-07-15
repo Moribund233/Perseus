@@ -5,6 +5,7 @@
 """
 from typing import Dict, Any
 from datetime import datetime
+import uuid
 from api.websocket.manager import Connection, manager
 import logging
 
@@ -128,7 +129,7 @@ async def handle_sync_status(connection: Connection, message: Dict[str, Any]) ->
 
 # ==================== 服务端主动推送方法 ====================
 
-async def broadcast_sync_started(repository_id: int, sync_type: str, initiator_id: int, initiator_name: str) -> int:
+async def broadcast_sync_started(repository_id: uuid.UUID, sync_type: str, initiator_id: uuid.UUID, initiator_name: str) -> int:
     """
     广播同步开始事件
     
@@ -156,7 +157,7 @@ async def broadcast_sync_started(repository_id: int, sync_type: str, initiator_i
     return await manager.send_to_repository(repository_id, message, exclude_user_id=initiator_id)
 
 
-async def broadcast_sync_completed(repository_id: int, sync_type: str, result: Dict[str, Any]) -> int:
+async def broadcast_sync_completed(repository_id: uuid.UUID, sync_type: str, result: Dict[str, Any]) -> int:
     """
     广播同步完成事件
     
@@ -180,7 +181,7 @@ async def broadcast_sync_completed(repository_id: int, sync_type: str, result: D
     return await manager.send_to_repository(repository_id, message)
 
 
-async def broadcast_sync_failed(repository_id: int, sync_type: str, error: str) -> int:
+async def broadcast_sync_failed(repository_id: uuid.UUID, sync_type: str, error: str) -> int:
     """
     广播同步失败事件
     
@@ -204,7 +205,7 @@ async def broadcast_sync_failed(repository_id: int, sync_type: str, error: str) 
     return await manager.send_to_repository(repository_id, message)
 
 
-async def broadcast_file_change(repository_id: int, file_changes: list) -> int:
+async def broadcast_file_change(repository_id: uuid.UUID, file_changes: list) -> int:
     """
     广播文件变更事件
     

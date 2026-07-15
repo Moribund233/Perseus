@@ -1,3 +1,4 @@
+import uuid
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +18,7 @@ DEFAULT_PAGE_LIMIT = 50
 class ChatService:
 
     @staticmethod
-    async def _get_room_or_raise(db: AsyncSession, room_id: int) -> RealtimeRoom:
+    async def _get_room_or_raise(db: AsyncSession, room_id: uuid.UUID) -> RealtimeRoom:
         result = await db.execute(
             select(RealtimeRoom).filter(RealtimeRoom.id == room_id)
         )
@@ -29,7 +30,7 @@ class ChatService:
         return room
 
     @staticmethod
-    async def _check_membership(db: AsyncSession, room_id: int, user_id: int) -> None:
+    async def _check_membership(db: AsyncSession, room_id: uuid.UUID, user_id: uuid.UUID) -> None:
         result = await db.execute(
             select(RoomMember).filter(
                 RoomMember.room_id == room_id,
@@ -42,11 +43,11 @@ class ChatService:
     @staticmethod
     async def send_message(
         db: AsyncSession,
-        room_id: int,
-        sender_id: int,
+        room_id: uuid.UUID,
+        sender_id: uuid.UUID,
         content: str,
         message_type: str = "text",
-        reply_to: Optional[int] = None
+        reply_to: Optional[uuid.UUID] = None
     ) -> Dict[str, Any]:
         if not content or not content.strip():
             raise ValidationException("消息内容不能为空")
@@ -89,9 +90,9 @@ class ChatService:
     @staticmethod
     async def get_messages(
         db: AsyncSession,
-        room_id: int,
-        user_id: int,
-        before: Optional[int] = None,
+        room_id: uuid.UUID,
+        user_id: uuid.UUID,
+        before: Optional[uuid.UUID] = None,
         limit: int = DEFAULT_PAGE_LIMIT
     ) -> Dict[str, Any]:
         await ChatService._get_room_or_raise(db, room_id)
@@ -150,8 +151,8 @@ class ChatService:
     @staticmethod
     async def edit_message(
         db: AsyncSession,
-        message_id: int,
-        user_id: int,
+        message_id: uuid.UUID,
+        user_id: uuid.UUID,
         new_content: str
     ) -> Dict[str, Any]:
         result = await db.execute(
@@ -174,8 +175,8 @@ class ChatService:
     @staticmethod
     async def delete_message(
         db: AsyncSession,
-        message_id: int,
-        user_id: int
+        message_id: uuid.UUID,
+        user_id: uuid.UUID
     ) -> bool:
         result = await db.execute(
             select(ChatMessage).filter(ChatMessage.id == message_id)

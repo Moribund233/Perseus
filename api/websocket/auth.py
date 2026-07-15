@@ -9,6 +9,7 @@ WebSocket认证模块
 from typing import Optional, Dict, Any
 from fastapi import WebSocket, HTTPException, status
 from sqlalchemy import select
+import uuid
 import logging
 
 from services.token_service import verify_token as jwt_verify_token
@@ -57,7 +58,7 @@ async def verify_token(token: str) -> Optional[Dict[str, Any]]:
 
         用户信息格式：
         {
-            "user_id": int,
+            "user_id": uuid.UUID,
             "username": str,
             "is_active": bool,
             "is_admin": bool,

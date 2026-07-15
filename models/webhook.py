@@ -6,7 +6,7 @@ WebHook 数据模型
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Uuid as SAUuid
 from sqlalchemy.orm import relationship
 
 from models.base import BaseModel
@@ -52,7 +52,7 @@ class WebHook(BaseModel):
     """
     __tablename__ = "webhooks"
     
-    repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
+    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
     """所属仓库ID"""
     
     url = Column(String(500), nullable=False)
@@ -140,7 +140,7 @@ class WebHookDelivery(BaseModel):
     """
     __tablename__ = "webhook_deliveries"
     
-    webhook_id = Column(Integer, ForeignKey("webhooks.id"), nullable=False)
+    webhook_id = Column(SAUuid(as_uuid=True), ForeignKey("webhooks.id"), nullable=False)
     """WebHook ID"""
     
     event = Column(String(100), nullable=False)

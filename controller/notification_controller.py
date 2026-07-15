@@ -7,6 +7,7 @@ from api.dependencies import get_current_user
 from models.async_db import get_async_db
 from models.user import User
 from services import notification_service, notification_preference_service
+import uuid
 
 router = APIRouter(prefix=get_route_prefix("notifications"), tags=["notifications"])
 
@@ -15,9 +16,9 @@ class CreateNotificationRequest(BaseModel):
     type: str = Field(..., description="通知类型: pull_request, issue, review, comment")
     title: str = Field(..., description="通知标题")
     message: str = Field(..., description="通知内容")
-    repository_id: Optional[int] = Field(None, description="关联仓库 ID")
+    repository_id: Optional[uuid.UUID] = Field(None, description="关联仓库 ID")
     target_type: Optional[str] = Field(None, description="目标类型")
-    target_id: Optional[int] = Field(None, description="目标 ID")
+    target_id: Optional[uuid.UUID] = Field(None, description="目标 ID")
 
 
 @router.get("", status_code=status.HTTP_200_OK)
@@ -64,7 +65,7 @@ async def create_notification(
 
 @router.patch("/{notification_id}/read", status_code=status.HTTP_200_OK)
 async def mark_as_read(
-    notification_id: int,
+    notification_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -119,7 +120,7 @@ async def update_preferences(
 
 @router.delete("/{notification_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_notification(
-    notification_id: int,
+    notification_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):

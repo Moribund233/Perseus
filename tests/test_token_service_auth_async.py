@@ -1,3 +1,4 @@
+import uuid
 """
 Token Service 认证功能异步测试
 
@@ -141,13 +142,13 @@ async def test_get_current_user_user_not_found(async_db: AsyncSession, test_user
     """测试令牌有效但用户不存在"""
     # 创建一个指向不存在用户的令牌
     token = token_service.create_access_token({
-        "sub": "99999",  # 不存在的用户ID
+        "sub": "00000000-0000-0000-0000-000000000000",  # 不存在的用户ID
         "username": "nonexistent"
     })
     token_data = token_service.verify_token(token)
     # 令牌本身是有效的
     assert token_data is not None
-    assert token_data.user_id == 99999
+    assert token_data.user_id == uuid.UUID("00000000-0000-0000-0000-000000000000")
 
 
 @pytest.mark.asyncio

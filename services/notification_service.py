@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from typing import Optional
+import uuid
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.notification import Notification
@@ -30,13 +31,13 @@ def build_notification_response(notif: Notification) -> dict:
 
 async def create_notification(
     db: AsyncSession,
-    user_id: int,
+    user_id: uuid.UUID,
     type: str,
     title: str,
     message: str,
-    repository_id: Optional[int] = None,
+    repository_id: Optional[uuid.UUID] = None,
     target_type: Optional[str] = None,
-    target_id: Optional[int] = None,
+    target_id: Optional[uuid.UUID] = None,
     send_email: bool = False,
 ) -> dict:
     notif = Notification(
@@ -81,7 +82,7 @@ async def create_notification(
 
 async def get_user_notifications(
     db: AsyncSession,
-    user_id: int,
+    user_id: uuid.UUID,
     unread_only: bool = False,
     skip: int = 0,
     limit: int = 20,
@@ -107,7 +108,7 @@ async def get_user_notifications(
     }
 
 
-async def get_unread_count(db: AsyncSession, user_id: int) -> int:
+async def get_unread_count(db: AsyncSession, user_id: uuid.UUID) -> int:
     stmt = select(func.count(Notification.id)).where(
         Notification.user_id == user_id,
         Notification.is_read == False,
@@ -116,7 +117,7 @@ async def get_unread_count(db: AsyncSession, user_id: int) -> int:
     return result.scalar()
 
 
-async def mark_as_read(db: AsyncSession, notification_id: int, user_id: int) -> dict:
+async def mark_as_read(db: AsyncSession, notification_id: uuid.UUID, user_id: uuid.UUID) -> dict:
     stmt = select(Notification).where(
         Notification.id == notification_id,
         Notification.user_id == user_id,
@@ -133,7 +134,7 @@ async def mark_as_read(db: AsyncSession, notification_id: int, user_id: int) -> 
     return build_notification_response(notif)
 
 
-async def mark_all_as_read(db: AsyncSession, user_id: int) -> int:
+async def mark_all_as_read(db: AsyncSession, user_id: uuid.UUID) -> int:
     stmt = select(Notification).where(
         Notification.user_id == user_id,
         Notification.is_read == False,
@@ -149,7 +150,7 @@ async def mark_all_as_read(db: AsyncSession, user_id: int) -> int:
     return len(notifications)
 
 
-async def delete_notification(db: AsyncSession, notification_id: int, user_id: int) -> bool:
+async def delete_notification(db: AsyncSession, notification_id: uuid.UUID, user_id: uuid.UUID) -> bool:
     stmt = select(Notification).where(
         Notification.id == notification_id,
         Notification.user_id == user_id,

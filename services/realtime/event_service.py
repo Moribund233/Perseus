@@ -1,4 +1,5 @@
 """F-203 Business Events Push — broadcast business events to room subscribers"""
+import uuid
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 from api.websocket.manager import ConnectionManager
@@ -13,10 +14,10 @@ def _get_manager() -> ConnectionManager:
 
 
 async def broadcast_event(
-    room_id: int,
+    room_id: uuid.UUID,
     event_type: str,
     event_data: Dict[str, Any],
-    exclude_user_id: Optional[int] = None,
+    exclude_user_id: Optional[uuid.UUID] = None,
 ) -> int:
     """Generic event broadcast to a room"""
     mgr = _get_manager()
@@ -33,10 +34,10 @@ async def broadcast_event(
 
 
 async def broadcast_pr_opened(
-    room_id: int,
-    pr_id: int,
+    room_id: uuid.UUID,
+    pr_id: uuid.UUID,
     title: str,
-    opener_id: int,
+    opener_id: uuid.UUID,
     opener_username: str,
 ) -> int:
     """Broadcast PR opened event"""
@@ -48,10 +49,10 @@ async def broadcast_pr_opened(
 
 
 async def broadcast_pr_merged(
-    room_id: int,
-    pr_id: int,
+    room_id: uuid.UUID,
+    pr_id: uuid.UUID,
     title: str,
-    merger_id: int,
+    merger_id: uuid.UUID,
     merger_username: str,
 ) -> int:
     """Broadcast PR merged event"""
@@ -63,10 +64,10 @@ async def broadcast_pr_merged(
 
 
 async def broadcast_issue_created(
-    room_id: int,
-    issue_id: int,
+    room_id: uuid.UUID,
+    issue_id: uuid.UUID,
     title: str,
-    creator_id: int,
+    creator_id: uuid.UUID,
     creator_username: str,
 ) -> int:
     """Broadcast issue created event"""
@@ -78,10 +79,10 @@ async def broadcast_issue_created(
 
 
 async def broadcast_pr_closed(
-    room_id: int,
-    pr_id: int,
+    room_id: uuid.UUID,
+    pr_id: uuid.UUID,
     title: str,
-    closer_id: int,
+    closer_id: uuid.UUID,
     closer_username: str,
 ) -> int:
     """Broadcast PR closed event"""
@@ -93,10 +94,10 @@ async def broadcast_pr_closed(
 
 
 async def broadcast_pr_reopened(
-    room_id: int,
-    pr_id: int,
+    room_id: uuid.UUID,
+    pr_id: uuid.UUID,
     title: str,
-    reopens_id: int,
+    reopens_id: uuid.UUID,
     reopens_username: str,
 ) -> int:
     """Broadcast PR reopened event"""
@@ -108,10 +109,10 @@ async def broadcast_pr_reopened(
 
 
 async def broadcast_pr_comment_added(
-    room_id: int,
-    pr_id: int,
-    comment_id: int,
-    commenter_id: int,
+    room_id: uuid.UUID,
+    pr_id: uuid.UUID,
+    comment_id: uuid.UUID,
+    commenter_id: uuid.UUID,
     commenter_username: str,
     content: str,
 ) -> int:
@@ -125,10 +126,10 @@ async def broadcast_pr_comment_added(
 
 
 async def broadcast_pr_review_submitted(
-    room_id: int,
-    pr_id: int,
-    review_id: int,
-    reviewer_id: int,
+    room_id: uuid.UUID,
+    pr_id: uuid.UUID,
+    review_id: uuid.UUID,
+    reviewer_id: uuid.UUID,
     reviewer_username: str,
     state: str,
 ) -> int:
@@ -142,10 +143,10 @@ async def broadcast_pr_review_submitted(
 
 
 async def broadcast_push(
-    room_id: int,
+    room_id: uuid.UUID,
     branch: str,
     commit_count: int,
-    pusher_id: int,
+    pusher_id: uuid.UUID,
     pusher_username: str,
     repo_path: Optional[str] = None,
 ) -> int:

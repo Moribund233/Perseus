@@ -7,11 +7,12 @@ from typing import Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services import webhook_service
+import uuid
 
 
 async def trigger_push_event(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     ref: str,
     before: str,
     after: str,
@@ -44,7 +45,7 @@ async def trigger_push_event(
 
 async def tag_push_event(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     ref: str,
     after: str,
     pusher: Dict[str, Any]
@@ -71,7 +72,7 @@ async def tag_push_event(
 
 async def trigger_pull_request_event(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     event: str,  # opened, updated, merged, closed, reopened
     pull_request: Dict[str, Any],
     sender: Dict[str, Any]
@@ -101,7 +102,7 @@ async def trigger_pull_request_event(
 
 async def trigger_release_event(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     event: str,  # created, published, updated, deleted
     release: Dict[str, Any],
     sender: Dict[str, Any]
@@ -130,7 +131,7 @@ async def trigger_release_event(
 
 async def trigger_issue_event(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     event: str,  # opened, closed, reopened, updated
     issue: Dict[str, Any],
     sender: Dict[str, Any]
@@ -159,7 +160,7 @@ async def trigger_issue_event(
 
 async def trigger_repository_event(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     event: str,  # created, deleted, forked
     repository: Dict[str, Any],
     sender: Dict[str, Any]
@@ -187,7 +188,7 @@ async def trigger_repository_event(
 
 async def _get_repository_info(
     db: AsyncSession,
-    repository_id: int
+    repository_id: uuid.UUID
 ) -> Dict[str, Any]:
     """
     获取仓库基本信息

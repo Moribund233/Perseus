@@ -4,7 +4,7 @@ SSH Key 模型
 F-019: SSH Key 管理
 """
 
-from sqlalchemy import Column, String, Integer, ForeignKey, Text
+from sqlalchemy import Column, String, Integer, ForeignKey, Text, Uuid as SAUuid
 from sqlalchemy.orm import relationship
 from models.base import BaseModel
 
@@ -26,7 +26,7 @@ class SSHKey(BaseModel):
     fingerprint = Column(String(100), nullable=False, index=True)
     """Key 的 fingerprint，用于唯一标识和查找"""
 
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     """所属用户 ID"""
 
     # 关联关系

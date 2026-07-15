@@ -4,6 +4,7 @@ Issue 控制器层
 处理 Issue 相关的 HTTP 请求
 """
 from typing import Optional, List, Dict, Any
+import uuid
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,8 +39,8 @@ class IssueCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=255, description="标题")
     description: Optional[str] = Field(None, description="描述")
     priority: str = Field(default="medium", description="优先级：low/medium/high/critical")
-    assignee_id: Optional[int] = Field(None, description="指派人ID")
-    label_ids: Optional[List[int]] = Field(None, description="标签ID列表")
+    assignee_id: Optional[uuid.UUID] = Field(None, description="指派人ID")
+    label_ids: Optional[List[uuid.UUID]] = Field(None, description="标签ID列表")
 
 
 class IssueUpdateRequest(BaseModel):
@@ -47,8 +48,8 @@ class IssueUpdateRequest(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255, description="标题")
     description: Optional[str] = Field(None, description="描述")
     priority: Optional[str] = Field(None, description="优先级：low/medium/high/critical")
-    assignee_id: Optional[int] = Field(None, description="指派人ID")
-    label_ids: Optional[List[int]] = Field(None, description="标签ID列表")
+    assignee_id: Optional[uuid.UUID] = Field(None, description="指派人ID")
+    label_ids: Optional[List[uuid.UUID]] = Field(None, description="标签ID列表")
 
 
 class IssueCommentCreateRequest(BaseModel):
@@ -58,11 +59,11 @@ class IssueCommentCreateRequest(BaseModel):
 
 @router.get("/{repo_id}/issues")
 async def list_issues(
-    repo_id: int,
+    repo_id: uuid.UUID,
     status: Optional[str] = Query(None, description="状态筛选：open/closed"),
     label: Optional[str] = Query(None, description="标签名称筛选"),
-    assignee: Optional[int] = Query(None, description="指派人ID筛选"),
-    author: Optional[int] = Query(None, description="作者ID筛选"),
+    assignee: Optional[uuid.UUID] = Query(None, description="指派人ID筛选"),
+    author: Optional[uuid.UUID] = Query(None, description="作者ID筛选"),
     page: int = Query(1, ge=1, description="页码"),
     limit: int = Query(20, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_async_db)
@@ -97,23 +98,11 @@ async def list_issues(
 
 @router.post("/{repo_id}/issues")
 async def create_issue(
-    repo_id: int,
+    repo_id: uuid.UUID,
     data: IssueCreateRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    创建 Issue
-
-    Args:
-        repo_id: 仓库ID
-        data: Issue 创建数据
-        db: 数据库会话
-        current_user: 当前认证用户
-
-    Returns:
-        dict: 创建的 Issue 数据
-    """
     return await service_create_issue(
         db=db,
         repository_id=repo_id,
@@ -133,9 +122,9 @@ class IssueFilterRequest(BaseModel):
     """Issue 筛选请求体"""
     statuses: Optional[List[str]] = Field(None, description="状态列表")
     priorities: Optional[List[str]] = Field(None, description="优先级列表")
-    assignee_ids: Optional[List[int]] = Field(None, description="指派人ID列表")
-    author_ids: Optional[List[int]] = Field(None, description="作者ID列表")
-    label_ids: Optional[List[int]] = Field(None, description="标签ID列表")
+    assignee_ids: Optional[List[uuid.UUID]] = Field(None, description="指派人ID列表")
+    author_ids: Optional[List[uuid.UUID]] = Field(None, description="作者ID列表")
+    label_ids: Optional[List[uuid.UUID]] = Field(None, description="标签ID列表")
     search: Optional[str] = Field(None, description="搜索关键词")
 
 
@@ -153,12 +142,12 @@ class BatchUpdateRequest(BaseModel):
 class BatchLabelsRequest(BaseModel):
     """批量标签操作请求体"""
     issue_numbers: List[int] = Field(..., description="Issue 编号列表", min_length=1)
-    label_ids: List[int] = Field(..., description="标签ID列表", min_length=1)
+    label_ids: List[uuid.UUID] = Field(..., description="标签ID列表", min_length=1)
 
 
 @router.post("/{repo_id}/issues/filter")
 async def filter_issues(
-    repo_id: int,
+    repo_id: uuid.UUID,
     data: IssueFilterRequest,
     sort_by: str = Query("created_at", description="排序字段"),
     sort_order: str = Query("desc", description="排序方向"),
@@ -200,7 +189,7 @@ async def filter_issues(
 
 @router.post("/{repo_id}/issues/batch/close")
 async def batch_close_issues(
-    repo_id: int,
+    repo_id: uuid.UUID,
     data: BatchIssueNumbersRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -227,7 +216,7 @@ async def batch_close_issues(
 
 @router.post("/{repo_id}/issues/batch/reopen")
 async def batch_reopen_issues(
-    repo_id: int,
+    repo_id: uuid.UUID,
     data: BatchIssueNumbersRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -254,7 +243,7 @@ async def batch_reopen_issues(
 
 @router.patch("/{repo_id}/issues/batch")
 async def batch_update_issues(
-    repo_id: int,
+    repo_id: uuid.UUID,
     data: BatchUpdateRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -282,7 +271,7 @@ async def batch_update_issues(
 
 @router.post("/{repo_id}/issues/batch/labels")
 async def batch_add_labels(
-    repo_id: int,
+    repo_id: uuid.UUID,
     data: BatchLabelsRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -310,7 +299,7 @@ async def batch_add_labels(
 
 @router.delete("/{repo_id}/issues/batch/labels")
 async def batch_remove_labels(
-    repo_id: int,
+    repo_id: uuid.UUID,
     data: BatchLabelsRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -338,7 +327,7 @@ async def batch_remove_labels(
 
 @router.get("/{repo_id}/issues/{issue_number}")
 async def get_issue(
-    repo_id: int,
+    repo_id: uuid.UUID,
     issue_number: int,
     db: AsyncSession = Depends(get_async_db)
 ):
@@ -363,7 +352,7 @@ async def get_issue(
 
 @router.patch("/{repo_id}/issues/{issue_number}")
 async def update_issue(
-    repo_id: int,
+    repo_id: uuid.UUID,
     issue_number: int,
     data: IssueUpdateRequest,
     db: AsyncSession = Depends(get_async_db),
@@ -397,7 +386,7 @@ async def update_issue(
 
 @router.post("/{repo_id}/issues/{issue_number}/close")
 async def close_issue(
-    repo_id: int,
+    repo_id: uuid.UUID,
     issue_number: int,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -424,7 +413,7 @@ async def close_issue(
 
 @router.post("/{repo_id}/issues/{issue_number}/reopen")
 async def reopen_issue(
-    repo_id: int,
+    repo_id: uuid.UUID,
     issue_number: int,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -453,7 +442,7 @@ async def reopen_issue(
 
 @router.get("/{repo_id}/issues/{issue_number}/comments")
 async def list_issue_comments(
-    repo_id: int,
+    repo_id: uuid.UUID,
     issue_number: int,
     db: AsyncSession = Depends(get_async_db)
 ):
@@ -477,7 +466,7 @@ async def list_issue_comments(
 
 @router.post("/{repo_id}/issues/{issue_number}/comments")
 async def create_issue_comment(
-    repo_id: int,
+    repo_id: uuid.UUID,
     issue_number: int,
     data: IssueCommentCreateRequest,
     db: AsyncSession = Depends(get_async_db),

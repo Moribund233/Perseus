@@ -6,6 +6,7 @@
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import logging
+import uuid
 
 # 敏感字段列表（默认）
 DEFAULT_SENSITIVE_FIELDS = [
@@ -90,7 +91,7 @@ def mask_string(
 def log_security_event(
     event_type: str,
     description: str,
-    user_id: Optional[int] = None,
+    user_id: Optional[uuid.UUID] = None,
     client_ip: Optional[str] = None,
     details: Optional[Dict[str, Any]] = None,
     level: str = "warning"

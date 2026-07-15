@@ -4,6 +4,7 @@ WebHook 服务层
 处理 WebHook 的创建、管理、触发和投递
 """
 import json
+import uuid
 import hmac
 import hashlib
 import asyncio
@@ -18,6 +19,7 @@ from sqlalchemy.orm import selectinload
 
 from models import WebHook, WebHookDelivery
 from models.webhook import WEBHOOK_EVENTS
+import uuid
 from core.exception import NotFoundException, ValidationException, AuthorizationException
 from utils.permission_utils import check_repository_permission
 from utils.db_utils import paginate
@@ -30,8 +32,8 @@ from utils.response_builder import build_pagination_response
 
 async def list_webhooks(
     db: AsyncSession,
-    repository_id: int,
-    user_id: int,
+    repository_id: uuid.UUID,
+    user_id: uuid.UUID,
     page: int = 1,
     limit: int = 20
 ) -> Dict[str, Any]:
@@ -74,9 +76,9 @@ async def list_webhooks(
 
 async def get_webhook(
     db: AsyncSession,
-    repository_id: int,
-    webhook_id: int,
-    user_id: int
+    repository_id: uuid.UUID,
+    webhook_id: uuid.UUID,
+    user_id: uuid.UUID
 ) -> dict:
     """
     获取 WebHook 详情
@@ -117,8 +119,8 @@ async def get_webhook(
 
 async def create_webhook(
     db: AsyncSession,
-    repository_id: int,
-    user_id: int,
+    repository_id: uuid.UUID,
+    user_id: uuid.UUID,
     url: str,
     events: List[str],
     secret: Optional[str] = None,
@@ -187,9 +189,9 @@ async def create_webhook(
 
 async def update_webhook(
     db: AsyncSession,
-    repository_id: int,
-    webhook_id: int,
-    user_id: int,
+    repository_id: uuid.UUID,
+    webhook_id: uuid.UUID,
+    user_id: uuid.UUID,
     url: Optional[str] = None,
     events: Optional[List[str]] = None,
     secret: Optional[str] = None,
@@ -267,9 +269,9 @@ async def update_webhook(
 
 async def delete_webhook(
     db: AsyncSession,
-    repository_id: int,
-    webhook_id: int,
-    user_id: int
+    repository_id: uuid.UUID,
+    webhook_id: uuid.UUID,
+    user_id: uuid.UUID
 ) -> None:
     """
     删除 WebHook
@@ -308,9 +310,9 @@ async def delete_webhook(
 
 async def test_webhook(
     db: AsyncSession,
-    repository_id: int,
-    webhook_id: int,
-    user_id: int
+    repository_id: uuid.UUID,
+    webhook_id: uuid.UUID,
+    user_id: uuid.UUID
 ) -> dict:
     """
     测试 WebHook
@@ -352,11 +354,11 @@ async def test_webhook(
     test_payload = {
         "event": "test",
         "repository": {
-            "id": repository_id,
+            "id": str(repository_id),
             "name": "test-repo"
         },
         "sender": {
-            "id": user_id,
+            "id": str(user_id),
             "username": "test-user"
         },
         "message": "This is a test event from Perseus"
@@ -380,7 +382,7 @@ async def test_webhook(
 
 async def trigger_webhooks(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     event: str,
     payload: Dict[str, Any]
 ) -> None:
@@ -484,7 +486,12 @@ async def _deliver_webhook(
     }
 
     # 准备请求体
-    payload_json = json.dumps(payload, ensure_ascii=False)
+    class UUIDEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, uuid.UUID):
+                return str(obj)
+            return super().default(obj)
+    payload_json = json.dumps(payload, ensure_ascii=False, cls=UUIDEncoder)
 
     # 如果有密钥，生成签名
     if webhook.secret:
@@ -613,9 +620,9 @@ def _is_valid_event(event: str) -> bool:
 
 async def list_webhook_deliveries(
     db: AsyncSession,
-    repository_id: int,
-    webhook_id: int,
-    user_id: int,
+    repository_id: uuid.UUID,
+    webhook_id: uuid.UUID,
+    user_id: uuid.UUID,
     page: int = 1,
     limit: int = 20
 ) -> Dict[str, Any]:
@@ -668,10 +675,10 @@ async def list_webhook_deliveries(
 
 async def get_webhook_delivery(
     db: AsyncSession,
-    repository_id: int,
-    webhook_id: int,
-    delivery_id: int,
-    user_id: int
+    repository_id: uuid.UUID,
+    webhook_id: uuid.UUID,
+    delivery_id: uuid.UUID,
+    user_id: uuid.UUID
 ) -> dict:
     """
     获取 WebHook 投递记录详情

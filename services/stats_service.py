@@ -5,6 +5,7 @@
 """
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+import uuid
 
 from models.repository import Repository
 from models.pull_request import PullRequest, PRReview
@@ -14,7 +15,7 @@ from models.repository_member import RepositoryMember
 from utils.db_utils import get_or_404
 
 
-async def get_repo_stats(repo_id: int, db: AsyncSession) -> dict:
+async def get_repo_stats(repo_id: uuid.UUID, db: AsyncSession) -> dict:
     """
     获取仓库聚合统计
 

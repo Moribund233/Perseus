@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, Table
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, Table, Uuid as SAUuid
 from sqlalchemy.orm import relationship
 from models.base import BaseModel
 from models import Base
@@ -8,8 +8,8 @@ from models import Base
 issue_label_association = Table(
     "issue_labels",
     Base.metadata,
-    Column("issue_id", Integer, ForeignKey("issues.id")),
-    Column("label_id", Integer, ForeignKey("labels.id"))
+    Column("issue_id", SAUuid(as_uuid=True), ForeignKey("issues.id")),
+    Column("label_id", SAUuid(as_uuid=True), ForeignKey("labels.id"))
 )
 
 
@@ -21,7 +21,7 @@ class Issue(BaseModel):
     """
     __tablename__ = "issues"
     
-    repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
+    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
     """所属仓库ID"""
     
     issue_number = Column(Integer, nullable=False)
@@ -33,7 +33,7 @@ class Issue(BaseModel):
     description = Column(Text, nullable=True)
     """描述（支持 Markdown）"""
     
-    author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    author_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     """创建者ID"""
     
     status = Column(String(20), default="open")
@@ -42,10 +42,10 @@ class Issue(BaseModel):
     priority = Column(String(20), default="medium")
     """优先级：low/medium/high/critical"""
     
-    assignee_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    assignee_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     """指派给的用户ID"""
     
-    closed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    closed_by = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     """关闭者ID"""
     
     # 关联关系
@@ -66,7 +66,7 @@ class Label(BaseModel):
     """
     __tablename__ = "labels"
     
-    repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
+    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
     """所属仓库ID"""
     
     name = Column(String(50), nullable=False)
@@ -88,10 +88,10 @@ class IssueComment(BaseModel):
     """
     __tablename__ = "issue_comments"
     
-    issue_id = Column(Integer, ForeignKey("issues.id"), nullable=False)
+    issue_id = Column(SAUuid(as_uuid=True), ForeignKey("issues.id"), nullable=False)
     """所属 Issue ID"""
     
-    author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    author_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     """作者ID"""
     
     content = Column(Text, nullable=False)

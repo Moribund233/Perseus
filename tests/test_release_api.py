@@ -9,21 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.repository import Repository
 from utils.git_utils import init_bare_repo, get_repository_storage_path
+from tests.test_helpers import create_test_repo as _create_test_repo
 
 
-def create_test_repo(db, owner_id: int, name: str = "test-repo") -> Repository:
+def create_test_repo(db, name: str = "test-repo") -> Repository:
     """创建测试仓库（含物理 Git 仓库初始化）"""
-    repo = Repository(
-        name=name,
-        path=f"testuser/{name}",
-        description="Test repository",
-        is_public=True,
-        owner_id=owner_id,
-        default_branch="main"
-    )
-    db.add(repo)
-    db.commit()
-    db.refresh(repo)
+    repo = _create_test_repo(db, name=name)
     physical_path = get_repository_storage_path(repo.path)
     init_bare_repo(physical_path)
     return repo
@@ -35,7 +26,7 @@ def create_test_repo(db, owner_id: int, name: str = "test-repo") -> Repository:
 
 def test_create_release_success(test_client: TestClient, auth_headers: dict, db):
     """测试成功创建 Release"""
-    repo = create_test_repo(db, 1)
+    repo = create_test_repo(db)
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/releases",
@@ -60,7 +51,7 @@ def test_create_release_success(test_client: TestClient, auth_headers: dict, db)
 
 def test_create_release_requires_auth(test_client: TestClient, db):
     """测试未认证用户不能创建 Release"""
-    repo = create_test_repo(db, 1)
+    repo = create_test_repo(db)
 
     response = test_client.post(
         f"/api/v1/repositories/{repo.id}/releases",
@@ -75,7 +66,7 @@ def test_create_release_requires_auth(test_client: TestClient, db):
 
 def test_create_release_duplicate_tag(test_client: TestClient, auth_headers: dict, db):
     """测试重复标签名创建 Release 失败"""
-    repo = create_test_repo(db, 1)
+    repo = create_test_repo(db)
 
     # 第一次成功
     test_client.post(
@@ -129,7 +120,7 @@ async def test_list_releases(async_db: AsyncSession, async_test_user):
 
 def test_get_release_by_number(test_client: TestClient, auth_headers: dict, db):
     """测试根据编号获取 Release 详情"""
-    repo = create_test_repo(db, 1)
+    repo = create_test_repo(db)
 
     create_resp = test_client.post(
         f"/api/v1/repositories/{repo.id}/releases",
@@ -149,7 +140,7 @@ def test_get_release_by_number(test_client: TestClient, auth_headers: dict, db):
 
 def test_get_release_by_tag(test_client: TestClient, auth_headers: dict, db):
     """测试根据标签名称获取 Release"""
-    repo = create_test_repo(db, 1)
+    repo = create_test_repo(db)
 
     test_client.post(
         f"/api/v1/repositories/{repo.id}/releases",
@@ -168,7 +159,7 @@ def test_get_release_by_tag(test_client: TestClient, auth_headers: dict, db):
 
 def test_update_release(test_client: TestClient, auth_headers: dict, db):
     """测试更新 Release"""
-    repo = create_test_repo(db, 1)
+    repo = create_test_repo(db)
 
     create_resp = test_client.post(
         f"/api/v1/repositories/{repo.id}/releases",
@@ -190,7 +181,7 @@ def test_update_release(test_client: TestClient, auth_headers: dict, db):
 
 def test_delete_release(test_client: TestClient, auth_headers: dict, db):
     """测试删除 Release"""
-    repo = create_test_repo(db, 1)
+    repo = create_test_repo(db)
 
     create_resp = test_client.post(
         f"/api/v1/repositories/{repo.id}/releases",
@@ -209,7 +200,7 @@ def test_delete_release(test_client: TestClient, auth_headers: dict, db):
 
 def test_get_release_not_found(test_client: TestClient, auth_headers: dict, db):
     """测试获取不存在的 Release 返回 404"""
-    repo = create_test_repo(db, 1)
+    repo = create_test_repo(db)
 
     response = test_client.get(
         f"/api/v1/repositories/{repo.id}/releases/99999",
@@ -225,7 +216,7 @@ def test_get_release_not_found(test_client: TestClient, auth_headers: dict, db):
 
 def test_add_release_asset(test_client: TestClient, auth_headers: dict, db):
     """测试添加 Release 附件"""
-    repo = create_test_repo(db, 1)
+    repo = create_test_repo(db)
 
     create_resp = test_client.post(
         f"/api/v1/repositories/{repo.id}/releases",
@@ -254,7 +245,7 @@ def test_add_release_asset(test_client: TestClient, auth_headers: dict, db):
 
 def test_delete_release_asset(test_client: TestClient, auth_headers: dict, db):
     """测试删除 Release 附件"""
-    repo = create_test_repo(db, 1)
+    repo = create_test_repo(db)
 
     create_resp = test_client.post(
         f"/api/v1/repositories/{repo.id}/releases",

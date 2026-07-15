@@ -15,6 +15,7 @@ from models.user import User
 from api.dependencies import get_current_user
 from core.exception import NotFoundException
 from services import release_service
+import uuid
 
 # 创建路由实例
 router = APIRouter(prefix="/api/v1/repositories", tags=["releases"])
@@ -47,7 +48,7 @@ class AddAssetRequest(BaseModel):
     content_type: Optional[str] = Field(None, description="MIME 类型")
 
 
-async def _get_repo(repo_id: int, db: AsyncSession) -> Repository:
+async def _get_repo(repo_id: uuid.UUID, db: AsyncSession) -> Repository:
     """
     获取仓库实例
 
@@ -73,7 +74,7 @@ async def _get_repo(repo_id: int, db: AsyncSession) -> Repository:
 
 @router.get("/{repo_id}/releases")
 async def list_releases(
-    repo_id: int,
+    repo_id: uuid.UUID,
     include_drafts: bool = Query(False, description="是否包含草稿"),
     include_prereleases: bool = Query(True, description="是否包含预发布版本"),
     page: int = Query(1, ge=1, description="页码"),
@@ -107,7 +108,7 @@ async def list_releases(
 
 @router.post("/{repo_id}/releases", status_code=201)
 async def create_release(
-    repo_id: int,
+    repo_id: uuid.UUID,
     data: CreateReleaseRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -141,7 +142,7 @@ async def create_release(
 
 @router.get("/{repo_id}/releases/{release_number}")
 async def get_release(
-    repo_id: int,
+    repo_id: uuid.UUID,
     release_number: int,
     db: AsyncSession = Depends(get_async_db)
 ):
@@ -166,7 +167,7 @@ async def get_release(
 
 @router.patch("/{repo_id}/releases/{release_number}")
 async def update_release(
-    repo_id: int,
+    repo_id: uuid.UUID,
     release_number: int,
     data: UpdateReleaseRequest,
     db: AsyncSession = Depends(get_async_db),
@@ -200,7 +201,7 @@ async def update_release(
 
 @router.delete("/{repo_id}/releases/{release_number}", status_code=204)
 async def delete_release(
-    repo_id: int,
+    repo_id: uuid.UUID,
     release_number: int,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -228,7 +229,7 @@ async def delete_release(
 
 @router.get("/{repo_id}/releases/tag/{tag_name}")
 async def get_release_by_tag(
-    repo_id: int,
+    repo_id: uuid.UUID,
     tag_name: str,
     db: AsyncSession = Depends(get_async_db)
 ):
@@ -256,7 +257,7 @@ async def get_release_by_tag(
 
 @router.post("/{repo_id}/releases/{release_number}/assets", status_code=201)
 async def add_release_asset(
-    repo_id: int,
+    repo_id: uuid.UUID,
     release_number: int,
     data: AddAssetRequest,
     db: AsyncSession = Depends(get_async_db),
@@ -290,9 +291,9 @@ async def add_release_asset(
 
 @router.delete("/{repo_id}/releases/{release_number}/assets/{asset_id}", status_code=204)
 async def delete_release_asset(
-    repo_id: int,
+    repo_id: uuid.UUID,
     release_number: int,
-    asset_id: int,
+    asset_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):

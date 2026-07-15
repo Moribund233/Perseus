@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Index
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Index, Uuid as SAUuid
 from sqlalchemy.orm import relationship
 from models.base import BaseModel
 
@@ -8,7 +8,7 @@ class Notification(BaseModel):
 
     __tablename__ = "notifications"
 
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     """接收通知的用户 ID"""
 
     type = Column(String(50), nullable=False)
@@ -20,13 +20,13 @@ class Notification(BaseModel):
     message = Column(Text, nullable=False)
     """通知内容"""
 
-    repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=True, index=True)
+    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=True, index=True)
     """关联仓库 ID"""
 
     target_type = Column(String(50), nullable=True)
     """目标类型: pull_request, issue"""
 
-    target_id = Column(Integer, nullable=True)
+    target_id = Column(SAUuid(as_uuid=True), nullable=True)
     """目标 ID"""
 
     is_read = Column(Boolean, default=False, nullable=False)

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, App as AntApp, Spin } from 'antd';
 import { perseusTheme } from './styles/theme';
 import { useAuthStore } from './stores/auth';
+import { PageTransition } from './components/PageTransition';
 import AppLayout from './components/layout/AppLayout';
 import LandingLayout from './components/layout/LandingLayout';
 import LandingPage from './routes/landing';
@@ -57,7 +58,7 @@ function AppRoutes() {
           path="/"
           element={
             <PublicRoute>
-              <LandingPage />
+              <PageTransition><LandingPage /></PageTransition>
             </PublicRoute>
           }
         />
@@ -69,14 +70,14 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/repositories" element={<RepositoriesPage />} />
-        <Route path="/repositories/:owner/:repo" element={<RepositoriesPage />} />
-        <Route path="/pulls" element={<PullRequestsPage />} />
-        <Route path="/editor" element={<EditorPage />} />
-        <Route path="/editor/:owner/:repo" element={<EditorPage />} />
-        <Route path="/chat" element={<ChatPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/dashboard" element={<PageTransition><DashboardPage /></PageTransition>} />
+        <Route path="/repositories" element={<PageTransition><RepositoriesPage /></PageTransition>} />
+        <Route path="/repositories/:owner/:repo" element={<PageTransition><RepositoriesPage /></PageTransition>} />
+        <Route path="/pulls" element={<PageTransition><PullRequestsPage /></PageTransition>} />
+        <Route path="/editor" element={<PageTransition><EditorPage /></PageTransition>} />
+        <Route path="/editor/:owner/:repo" element={<PageTransition><EditorPage /></PageTransition>} />
+        <Route path="/chat" element={<PageTransition><ChatPage /></PageTransition>} />
+        <Route path="/settings" element={<PageTransition><SettingsPage /></PageTransition>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

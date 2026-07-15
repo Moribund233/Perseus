@@ -8,13 +8,14 @@ from models.user import User
 from api.dependencies import get_current_user
 from services import pr_label_service
 from utils.permission_utils import require_repository_owner_or_admin
+import uuid
 
 router = APIRouter(prefix=get_route_prefix("repositories"), tags=["pr-labels"])
 
 
 @router.get("/{repo_id}/pr-labels")
 async def get_labels(
-    repo_id: int,
+    repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -23,7 +24,7 @@ async def get_labels(
 
 @router.post("/{repo_id}/pr-labels", status_code=201)
 async def create_label(
-    repo_id: int,
+    repo_id: uuid.UUID,
     data: dict,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
@@ -34,8 +35,8 @@ async def create_label(
 
 @router.put("/{repo_id}/pr-labels/{label_id}")
 async def update_label(
-    repo_id: int,
-    label_id: int,
+    repo_id: uuid.UUID,
+    label_id: uuid.UUID,
     data: dict,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
@@ -46,8 +47,8 @@ async def update_label(
 
 @router.delete("/{repo_id}/pr-labels/{label_id}")
 async def delete_label(
-    repo_id: int,
-    label_id: int,
+    repo_id: uuid.UUID,
+    label_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -57,8 +58,8 @@ async def delete_label(
 
 @router.post("/pull-requests/{pr_id}/labels/{label_id}")
 async def add_label_to_pr(
-    pr_id: int,
-    label_id: int,
+    pr_id: uuid.UUID,
+    label_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -67,8 +68,8 @@ async def add_label_to_pr(
 
 @router.delete("/pull-requests/{pr_id}/labels/{label_id}")
 async def remove_label_from_pr(
-    pr_id: int,
-    label_id: int,
+    pr_id: uuid.UUID,
+    label_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -77,7 +78,7 @@ async def remove_label_from_pr(
 
 @router.get("/pr-labels/{label_id}/pull-requests")
 async def get_prs_by_label(
-    label_id: int,
+    label_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):

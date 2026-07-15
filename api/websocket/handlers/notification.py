@@ -5,6 +5,7 @@
 """
 from typing import Dict, Any
 from datetime import datetime
+import uuid
 from api.websocket.manager import Connection, manager
 import logging
 
@@ -161,7 +162,7 @@ async def handle_broadcast(connection: Connection, message: Dict[str, Any]) -> N
 
 # ==================== 服务端主动推送方法 ====================
 
-async def notify_commit_new(repository_id: int, commit_data: Dict[str, Any], exclude_user_id: int = None) -> int:
+async def notify_commit_new(repository_id: uuid.UUID, commit_data: Dict[str, Any], exclude_user_id: uuid.UUID = None) -> int:
     """
     通知仓库有新提交
     
@@ -184,7 +185,7 @@ async def notify_commit_new(repository_id: int, commit_data: Dict[str, Any], exc
     return await manager.send_to_repository(repository_id, message, exclude_user_id)
 
 
-async def notify_branch_update(repository_id: int, branch_data: Dict[str, Any]) -> int:
+async def notify_branch_update(repository_id: uuid.UUID, branch_data: Dict[str, Any]) -> int:
     """
     通知分支更新
     
@@ -206,7 +207,7 @@ async def notify_branch_update(repository_id: int, branch_data: Dict[str, Any]) 
     return await manager.send_to_repository(repository_id, message)
 
 
-async def notify_repository_event(repository_id: int, event_type: str, event_data: Dict[str, Any]) -> int:
+async def notify_repository_event(repository_id: uuid.UUID, event_type: str, event_data: Dict[str, Any]) -> int:
     """
     通用仓库事件通知
     
@@ -229,7 +230,7 @@ async def notify_repository_event(repository_id: int, event_type: str, event_dat
     return await manager.send_to_repository(repository_id, message)
 
 
-async def notify_user(user_id: int, notification_type: str, data: Dict[str, Any]) -> int:
+async def notify_user(user_id: uuid.UUID, notification_type: str, data: Dict[str, Any]) -> int:
     """
     向用户发送个人通知
     

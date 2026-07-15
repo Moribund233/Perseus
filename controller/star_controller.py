@@ -15,13 +15,14 @@ from api.dependencies import get_current_user
 from services import star_service
 from core.exception import NotFoundException
 from utils.permission_utils import require_repository_permission
+import uuid
 
 router = APIRouter(prefix=get_route_prefix("repositories"), tags=["stars"])
 
 
 @router.post("/{repo_id}/star", status_code=201)
 async def star_repository(
-    repo_id: int,
+    repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -41,7 +42,7 @@ async def star_repository(
 
 @router.delete("/{repo_id}/star")
 async def unstar_repository(
-    repo_id: int,
+    repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -61,7 +62,7 @@ async def unstar_repository(
 
 @router.get("/{repo_id}/star")
 async def get_star_status(
-    repo_id: int,
+    repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -81,7 +82,7 @@ async def get_star_status(
 
 @router.get("/{repo_id}/stargazers")
 async def get_stargazers(
-    repo_id: int,
+    repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):

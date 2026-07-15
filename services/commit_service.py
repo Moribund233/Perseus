@@ -5,12 +5,13 @@
 """
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+import uuid
 from models.commit import Commit
 from models.branch import Branch
 from core.exception import ValidationException, NotFoundException, ConflictException
 
 
-async def get_commits(repo_id: int, db: AsyncSession, limit: int = 100, offset: int = 0):
+async def get_commits(repo_id: uuid.UUID, db: AsyncSession, limit: int = 100, offset: int = 0):
     """
     获取仓库的提交记录
 
@@ -33,7 +34,7 @@ async def get_commits(repo_id: int, db: AsyncSession, limit: int = 100, offset: 
     return result.scalars().all()
 
 
-async def get_commits_by_branch(branch_id: int, db: AsyncSession, limit: int = 100, offset: int = 0):
+async def get_commits_by_branch(branch_id: uuid.UUID, db: AsyncSession, limit: int = 100, offset: int = 0):
     """
     获取特定分支的提交记录
 
@@ -56,7 +57,7 @@ async def get_commits_by_branch(branch_id: int, db: AsyncSession, limit: int = 1
     return result.scalars().all()
 
 
-async def get_commit_by_hash(repo_id: int, commit_hash: str, db: AsyncSession):
+async def get_commit_by_hash(repo_id: uuid.UUID, commit_hash: str, db: AsyncSession):
     """
     根据提交哈希获取提交详情
 
@@ -85,7 +86,7 @@ async def get_commit_by_hash(repo_id: int, commit_hash: str, db: AsyncSession):
     return commit
 
 
-async def get_commit_by_id(commit_id: int, db: AsyncSession):
+async def get_commit_by_id(commit_id: uuid.UUID, db: AsyncSession):
     """
     根据ID获取提交详情
 
@@ -161,7 +162,7 @@ async def create_commit(commit_data: dict, db: AsyncSession):
     return db_commit
 
 
-async def get_commit_history(repo_id: int, db: AsyncSession, branch_name: str = None, limit: int = 50):
+async def get_commit_history(repo_id: uuid.UUID, db: AsyncSession, branch_name: str = None, limit: int = 50):
     """
     获取仓库的提交历史树
 
@@ -192,7 +193,7 @@ async def get_commit_history(repo_id: int, db: AsyncSession, branch_name: str = 
     return result.scalars().all()
 
 
-async def count_repo_commits(repo_id: int, db: AsyncSession):
+async def count_repo_commits(repo_id: uuid.UUID, db: AsyncSession):
     """
     统计仓库的提交数量
 
@@ -209,7 +210,7 @@ async def count_repo_commits(repo_id: int, db: AsyncSession):
     return result.scalar()
 
 
-async def count_branch_commits(branch_id: int, db: AsyncSession):
+async def count_branch_commits(branch_id: uuid.UUID, db: AsyncSession):
     """
     统计分支的提交数量
 
@@ -226,7 +227,7 @@ async def count_branch_commits(branch_id: int, db: AsyncSession):
     return result.scalar()
 
 
-async def get_latest_commit(repo_id: int, db: AsyncSession):
+async def get_latest_commit(repo_id: uuid.UUID, db: AsyncSession):
     """
     获取仓库的最新提交
 
@@ -251,7 +252,7 @@ async def get_latest_commit(repo_id: int, db: AsyncSession):
     return commit
 
 
-async def get_latest_commit_by_branch(branch_id: int, db: AsyncSession):
+async def get_latest_commit_by_branch(branch_id: uuid.UUID, db: AsyncSession):
     """
     获取分支的最新提交
 
@@ -276,7 +277,7 @@ async def get_latest_commit_by_branch(branch_id: int, db: AsyncSession):
     return commit
 
 
-async def search_commits(repo_id: int, search_query: str, db: AsyncSession, limit: int = 50):
+async def search_commits(repo_id: uuid.UUID, search_query: str, db: AsyncSession, limit: int = 50):
     """
     搜索提交记录
 
@@ -301,7 +302,7 @@ async def search_commits(repo_id: int, search_query: str, db: AsyncSession, limi
     return result.scalars().all()
 
 
-async def get_commits_by_author(repo_id: int, author_email: str, db: AsyncSession, limit: int = 50):
+async def get_commits_by_author(repo_id: uuid.UUID, author_email: str, db: AsyncSession, limit: int = 50):
     """
     根据作者邮箱获取提交记录
 

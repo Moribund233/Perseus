@@ -58,7 +58,7 @@ def test_mark_as_read(test_client, auth_headers):
 
 def test_mark_as_read_not_found(test_client, auth_headers):
     response = test_client.patch(
-        "/api/v1/notifications/99999/read", headers=auth_headers
+        "/api/v1/notifications/00000000-0000-0000-0000-000000000000/read", headers=auth_headers
     )
     assert response.status_code == 404
 
@@ -92,7 +92,7 @@ def test_delete_notification(test_client, auth_headers):
 
 def test_delete_notification_not_found(test_client, auth_headers):
     response = test_client.delete(
-        "/api/v1/notifications/99999", headers=auth_headers
+        "/api/v1/notifications/00000000-0000-0000-0000-000000000000", headers=auth_headers
     )
     assert response.status_code == 404
 

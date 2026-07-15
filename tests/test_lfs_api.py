@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from models.repository import Repository
 from utils.git_utils import init_bare_repo, get_repository_storage_path
+from tests.test_helpers import create_test_repo as _create_test_repo
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -23,19 +24,9 @@ def _setup_lfs_temp_path():
         os.environ.pop("PERSEUS_LFS_LOCAL_PATH", None)
 
 
-def create_test_repo(db, owner_id: int, name: str = "lfs-test-repo") -> Repository:
+def create_test_repo(db, name: str = "lfs-test-repo") -> Repository:
     """创建测试仓库（含物理 Git 仓库初始化）"""
-    repo = Repository(
-        name=name,
-        path=f"testuser/{name}",
-        description="LFS test repository",
-        is_public=True,
-        owner_id=owner_id,
-        default_branch="main"
-    )
-    db.add(repo)
-    db.commit()
-    db.refresh(repo)
+    repo = _create_test_repo(db, name=name)
     physical_path = get_repository_storage_path(repo.path)
     init_bare_repo(physical_path)
     return repo
@@ -43,7 +34,7 @@ def create_test_repo(db, owner_id: int, name: str = "lfs-test-repo") -> Reposito
 
 class TestLFSAPI:
     def test_batch_upload_request(self, test_client: TestClient, auth_headers: dict, db):
-        repo = create_test_repo(db, 1, name="lfs-test-repo")
+        repo = create_test_repo(db, name="lfs-test-repo")
 
         response = test_client.post(
             f"/api/v1/repositories/{repo.id}/lfs/objects/batch",
@@ -64,7 +55,7 @@ class TestLFSAPI:
         assert "actions" in data["objects"][0]
 
     def test_batch_download_request(self, test_client: TestClient, auth_headers: dict, db):
-        repo = create_test_repo(db, 1, name="lfs-download-repo")
+        repo = create_test_repo(db, name="lfs-download-repo")
 
         response = test_client.post(
             f"/api/v1/repositories/{repo.id}/lfs/objects/batch",
@@ -81,7 +72,7 @@ class TestLFSAPI:
         assert data["objects"][0]["actions"]["download"]["href"]
 
     def test_upload_object(self, test_client: TestClient, auth_headers: dict, db):
-        repo = create_test_repo(db, 1, name="lfs-upload-repo")
+        repo = create_test_repo(db, name="lfs-upload-repo")
 
         oid = "sha256:4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393"
         response = test_client.put(
@@ -94,7 +85,7 @@ class TestLFSAPI:
         assert data["oid"] == oid
 
     def test_download_object(self, test_client: TestClient, auth_headers: dict, db):
-        repo = create_test_repo(db, 1, name="lfs-dl-repo")
+        repo = create_test_repo(db, name="lfs-dl-repo")
 
         oid = "sha256:download_test"
         # 先上传
@@ -112,7 +103,7 @@ class TestLFSAPI:
         assert response.content == b"Download me"
 
     def test_upload_requires_auth(self, test_client: TestClient, db):
-        repo = create_test_repo(db, 1, name="lfs-noauth-repo")
+        repo = create_test_repo(db, name="lfs-noauth-repo")
 
         oid = "sha256:noauth_test"
         response = test_client.put(
@@ -123,7 +114,7 @@ class TestLFSAPI:
         assert response.status_code == 401
 
     def test_delete_object(self, test_client: TestClient, auth_headers: dict, db):
-        repo = create_test_repo(db, 1, name="lfs-delete-repo")
+        repo = create_test_repo(db, name="lfs-delete-repo")
 
         oid = "sha256:delete_test"
         # 先上传

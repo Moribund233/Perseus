@@ -8,6 +8,7 @@ import shutil
 import asyncio
 import logging
 from typing import Dict, Tuple
+import uuid
 from datetime import datetime, timedelta
 from sqlalchemy import select, asc, desc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,7 +31,7 @@ _repo_exists_cache: Dict[int, Tuple[bool, datetime]] = {}
 _REPO_EXISTS_CACHE_TTL_SECONDS = 30
 
 
-def _get_cached_repo_exists(repo_id: int) -> Tuple[bool, bool]:
+def _get_cached_repo_exists(repo_id: uuid.UUID) -> Tuple[bool, bool]:
     """
     获取缓存的仓库存在状态
 
@@ -49,7 +50,7 @@ def _get_cached_repo_exists(repo_id: int) -> Tuple[bool, bool]:
     return False, False
 
 
-def _set_cached_repo_exists(repo_id: int, exists: bool) -> None:
+def _set_cached_repo_exists(repo_id: uuid.UUID, exists: bool) -> None:
     """
     设置仓库存在状态缓存
 
@@ -169,7 +170,7 @@ async def get_repositories(
     return build_pagination_response(items, total, page, limit)
 
 
-async def get_repository_by_id(repo_id: int, db: AsyncSession):
+async def get_repository_by_id(repo_id: uuid.UUID, db: AsyncSession):
     """
     根据ID获取仓库
 
@@ -217,7 +218,7 @@ async def get_repository_by_path(owner: str, repo_name: str, db: AsyncSession):
     return build_repo_response(repo, physical_exists)
 
 
-async def get_accessible_repository_ids(db: AsyncSession, user_id: int) -> list[int]:
+async def get_accessible_repository_ids(db: AsyncSession, user_id: uuid.UUID) -> list[uuid.UUID]:
     """
     获取指定用户可访问的仓库 ID 列表
 
@@ -251,7 +252,7 @@ async def get_accessible_repository_ids(db: AsyncSession, user_id: int) -> list[
     return [row[0] for row in result.all()]
 
 
-async def get_repositories_by_user(user_id: int, db: AsyncSession):
+async def get_repositories_by_user(user_id: uuid.UUID, db: AsyncSession):
     """
     根据用户ID获取仓库列表
 
@@ -360,7 +361,7 @@ async def create_repository(repo_data: dict, db: AsyncSession):
     return build_repo_response(db_repo, physical_exists)
 
 
-async def update_repository(repo_id: int, repo_data: dict, db: AsyncSession):
+async def update_repository(repo_id: uuid.UUID, repo_data: dict, db: AsyncSession):
     """
     更新仓库信息
 
@@ -398,7 +399,7 @@ async def update_repository(repo_id: int, repo_data: dict, db: AsyncSession):
     return build_repo_response(db_repo, physical_exists)
 
 
-async def delete_repository(repo_id: int, db: AsyncSession):
+async def delete_repository(repo_id: uuid.UUID, db: AsyncSession):
     """
     删除仓库
 
@@ -462,7 +463,7 @@ async def get_public_repositories(db: AsyncSession):
     return await _enrich_repos_with_physical_status(list(repos))
 
 
-async def check_repository_access(repo_id: int, user_id: int, db: AsyncSession, required_role: str = None):
+async def check_repository_access(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, required_role: str = None):
     """
     检查用户对仓库的访问权限
 
@@ -511,7 +512,7 @@ async def check_repository_access(repo_id: int, user_id: int, db: AsyncSession, 
     return True
 
 
-async def archive_repository(repo_id: int, db: AsyncSession) -> dict:
+async def archive_repository(repo_id: uuid.UUID, db: AsyncSession) -> dict:
     """
     归档仓库
 
@@ -538,7 +539,7 @@ async def archive_repository(repo_id: int, db: AsyncSession) -> dict:
     return build_repo_response(repo, physical_exists)
 
 
-async def unarchive_repository(repo_id: int, db: AsyncSession) -> dict:
+async def unarchive_repository(repo_id: uuid.UUID, db: AsyncSession) -> dict:
     """
     取消归档仓库
 

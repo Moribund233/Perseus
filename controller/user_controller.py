@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
+import uuid
 
 from api.routes_config import get_route_prefix
 from models.async_db import get_async_db
@@ -26,6 +27,7 @@ from services.user_service import (
 from services.dashboard_service import get_user_dashboard as service_get_user_dashboard
 from services.pull_request_service import list_pull_requests_for_user as service_list_pull_requests_for_user
 from services.issue_service import list_issues_for_user as service_list_issues_for_user
+import uuid
 
 # 创建路由实例
 router = APIRouter(prefix=get_route_prefix("users"), tags=["users"])
@@ -213,7 +215,7 @@ async def upload_current_user_avatar(
 
 @router.get("/{user_id}/avatar", summary="获取用户头像")
 async def get_user_avatar_file(
-    user_id: int
+    user_id: uuid.UUID
 ):
     """
     获取用户头像文件
@@ -233,7 +235,7 @@ async def get_user_avatar_file(
 
 @router.get("/{user_id}", summary="根据ID获取用户")
 async def get_user(
-    user_id: int,
+    user_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -279,7 +281,7 @@ async def create_user(
 @router.put("/{user_id}")
 async def update_user(
     request: Request,
-    user_id: int,
+    user_id: uuid.UUID,
     user_data: UserUpdateRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -311,7 +313,7 @@ async def update_user(
 @router.delete("/{user_id}")
 async def delete_user(
     request: Request,
-    user_id: int,
+    user_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_admin_user)
 ):

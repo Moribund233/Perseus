@@ -1,3 +1,4 @@
+import uuid
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,9 +18,9 @@ class RoomService:
     @staticmethod
     async def create_room(
         db: AsyncSession,
-        repository_id: int,
+        repository_id: uuid.UUID,
         name: str,
-        created_by_user_id: int
+        created_by_user_id: uuid.UUID
     ) -> RealtimeRoom:
         existing = await RoomService.get_repository_room(db, repository_id)
         if existing:
@@ -46,14 +47,14 @@ class RoomService:
         return room
 
     @staticmethod
-    async def get_room(db: AsyncSession, room_id: int) -> Optional[RealtimeRoom]:
+    async def get_room(db: AsyncSession, room_id: uuid.UUID) -> Optional[RealtimeRoom]:
         result = await db.execute(
             select(RealtimeRoom).filter(RealtimeRoom.id == room_id)
         )
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def get_repository_room(db: AsyncSession, repository_id: int) -> Optional[RealtimeRoom]:
+    async def get_repository_room(db: AsyncSession, repository_id: uuid.UUID) -> Optional[RealtimeRoom]:
         result = await db.execute(
             select(RealtimeRoom).filter(
                 RealtimeRoom.repository_id == repository_id,
@@ -63,7 +64,7 @@ class RoomService:
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def list_rooms(db: AsyncSession, user_id: int) -> List[RealtimeRoom]:
+    async def list_rooms(db: AsyncSession, user_id: uuid.UUID) -> List[RealtimeRoom]:
         result = await db.execute(
             select(RealtimeRoom)
             .join(RoomMember, RoomMember.room_id == RealtimeRoom.id)
@@ -75,7 +76,7 @@ class RoomService:
         return list(result.scalars().all())
 
     @staticmethod
-    async def join_room(db: AsyncSession, room_id: int, user_id: int) -> RoomMember:
+    async def join_room(db: AsyncSession, room_id: uuid.UUID, user_id: uuid.UUID) -> RoomMember:
         result = await db.execute(
             select(RoomMember).filter(
                 RoomMember.room_id == room_id,
@@ -98,7 +99,7 @@ class RoomService:
         return member
 
     @staticmethod
-    async def leave_room(db: AsyncSession, room_id: int, user_id: int) -> bool:
+    async def leave_room(db: AsyncSession, room_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         result = await db.execute(
             select(RoomMember).filter(
                 RoomMember.room_id == room_id,
@@ -113,7 +114,7 @@ class RoomService:
         return True
 
     @staticmethod
-    async def get_members(db: AsyncSession, room_id: int) -> List[Dict[str, Any]]:
+    async def get_members(db: AsyncSession, room_id: uuid.UUID) -> List[Dict[str, Any]]:
         result = await db.execute(
             select(RoomMember)
             .options(selectinload(RoomMember.user))
@@ -136,8 +137,8 @@ class RoomService:
     @staticmethod
     async def update_member_role(
         db: AsyncSession,
-        room_id: int,
-        user_id: int,
+        room_id: uuid.UUID,
+        user_id: uuid.UUID,
         role: str
     ) -> RoomMember:
         if role not in VALID_ROLES:
@@ -159,7 +160,7 @@ class RoomService:
         return member
 
     @staticmethod
-    async def remove_member(db: AsyncSession, room_id: int, user_id: int) -> bool:
+    async def remove_member(db: AsyncSession, room_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         result = await db.execute(
             select(RoomMember).filter(
                 RoomMember.room_id == room_id,
@@ -174,7 +175,7 @@ class RoomService:
         return True
 
     @staticmethod
-    async def delete_room(db: AsyncSession, room_id: int) -> bool:
+    async def delete_room(db: AsyncSession, room_id: uuid.UUID) -> bool:
         result = await db.execute(
             select(RealtimeRoom).filter(RealtimeRoom.id == room_id)
         )

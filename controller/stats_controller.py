@@ -9,13 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.routes_config import get_route_prefix
 from models.async_db import get_async_db
 from services import stats_service
+import uuid
 
 router = APIRouter(prefix=get_route_prefix("repositories"), tags=["repository-stats"])
 
 
 @router.get("/{repo_id}/stats", summary="获取仓库统计")
 async def get_repo_stats(
-    repo_id: int,
+    repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
 ):
     """获取仓库聚合统计"""

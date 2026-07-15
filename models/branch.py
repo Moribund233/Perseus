@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, Integer, ForeignKey
+from sqlalchemy import Column, String, Boolean, Integer, ForeignKey, Uuid as SAUuid
 from sqlalchemy.orm import relationship
 from models.base import BaseModel
 
@@ -14,7 +14,7 @@ class Branch(BaseModel):
     name = Column(String(50), nullable=False)
     """分支名称，长度不超过50个字符"""
     
-    repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
+    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
     """仓库ID，外键关联到repositories表"""
     
     is_protected = Column(Boolean, default=False)

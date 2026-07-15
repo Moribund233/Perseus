@@ -1,4 +1,5 @@
 from typing import List, Optional
+import uuid
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
@@ -12,10 +13,10 @@ class BuildService:
     @staticmethod
     async def create_build(
         db: AsyncSession,
-        repo_id: int,
+        repo_id: uuid.UUID,
         branch: str,
         commit_sha: str,
-        triggered_by: int,
+        triggered_by: uuid.UUID,
         commit_message: Optional[str] = None,
     ) -> BuildStatus:
         build = BuildStatus(
@@ -32,7 +33,7 @@ class BuildService:
         return build
 
     @staticmethod
-    async def get_build(db: AsyncSession, build_id: int) -> BuildStatus:
+    async def get_build(db: AsyncSession, build_id: uuid.UUID) -> BuildStatus:
         result = await db.execute(
             select(BuildStatus).filter(BuildStatus.id == build_id)
         )
@@ -44,7 +45,7 @@ class BuildService:
     @staticmethod
     async def get_builds_for_repository(
         db: AsyncSession,
-        repo_id: int,
+        repo_id: uuid.UUID,
         limit: int = 50,
         offset: int = 0,
     ) -> List[BuildStatus]:
@@ -60,7 +61,7 @@ class BuildService:
     @staticmethod
     async def update_build_status(
         db: AsyncSession,
-        build_id: int,
+        build_id: uuid.UUID,
         status: str,
         details_url: Optional[str] = None,
         logs: Optional[str] = None,

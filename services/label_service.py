@@ -2,6 +2,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+import uuid
 
 from models.repository import Repository
 from models.repo_label import RepoLabel, repo_label_association
@@ -10,7 +11,7 @@ from utils.db_utils import get_or_404
 from utils.response_builder import build_label_response, build_repo_response
 
 
-async def create_label(repo_id: int, label_data: dict, db: AsyncSession) -> dict:
+async def create_label(repo_id: uuid.UUID, label_data: dict, db: AsyncSession) -> dict:
     await get_or_404(db, Repository, {"id": repo_id}, "Repository not found")
 
     existing = await db.execute(
@@ -34,7 +35,7 @@ async def create_label(repo_id: int, label_data: dict, db: AsyncSession) -> dict
     return build_label_response(label)
 
 
-async def get_labels(repo_id: int, db: AsyncSession) -> list[dict]:
+async def get_labels(repo_id: uuid.UUID, db: AsyncSession) -> list[dict]:
     await get_or_404(db, Repository, {"id": repo_id}, "Repository not found")
 
     result = await db.execute(
@@ -45,7 +46,7 @@ async def get_labels(repo_id: int, db: AsyncSession) -> list[dict]:
     return [build_label_response(l) for l in result.scalars().all()]
 
 
-async def update_label(repo_id: int, label_id: int, label_data: dict, db: AsyncSession) -> dict:
+async def update_label(repo_id: uuid.UUID, label_id: uuid.UUID, label_data: dict, db: AsyncSession) -> dict:
     label = await get_or_404(
         db, RepoLabel,
         {"id": label_id, "repository_id": repo_id},
@@ -74,7 +75,7 @@ async def update_label(repo_id: int, label_id: int, label_data: dict, db: AsyncS
     return build_label_response(label)
 
 
-async def delete_label(repo_id: int, label_id: int, db: AsyncSession) -> dict:
+async def delete_label(repo_id: uuid.UUID, label_id: uuid.UUID, db: AsyncSession) -> dict:
     label = await get_or_404(
         db, RepoLabel,
         {"id": label_id, "repository_id": repo_id},
@@ -85,7 +86,7 @@ async def delete_label(repo_id: int, label_id: int, db: AsyncSession) -> dict:
     return {"message": "Label deleted"}
 
 
-async def add_label_to_repository(repo_id: int, label_id: int, db: AsyncSession) -> dict:
+async def add_label_to_repository(repo_id: uuid.UUID, label_id: uuid.UUID, db: AsyncSession) -> dict:
     result = await db.execute(
         select(Repository)
         .filter(Repository.id == repo_id)
@@ -104,7 +105,7 @@ async def add_label_to_repository(repo_id: int, label_id: int, db: AsyncSession)
     return {"message": "Label added to repository"}
 
 
-async def remove_label_from_repository(repo_id: int, label_id: int, db: AsyncSession) -> dict:
+async def remove_label_from_repository(repo_id: uuid.UUID, label_id: uuid.UUID, db: AsyncSession) -> dict:
     result = await db.execute(
         select(Repository)
         .filter(Repository.id == repo_id)
@@ -123,7 +124,7 @@ async def remove_label_from_repository(repo_id: int, label_id: int, db: AsyncSes
     return {"message": "Label removed from repository"}
 
 
-async def get_repositories_by_label(label_id: int, db: AsyncSession) -> list[dict]:
+async def get_repositories_by_label(label_id: uuid.UUID, db: AsyncSession) -> list[dict]:
     result = await db.execute(
         select(RepoLabel)
         .filter(RepoLabel.id == label_id)

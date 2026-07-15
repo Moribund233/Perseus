@@ -1,3 +1,4 @@
+import uuid
 """
 分支服务层异步功能测试
 
@@ -157,7 +158,7 @@ async def test_get_branch_by_id(async_db: AsyncSession, test_repo):
 async def test_get_branch_by_id_not_found(async_db: AsyncSession):
     """测试根据ID获取不存在的分支"""
     with pytest.raises(NotFoundException) as exc_info:
-        await branch_service.get_branch_by_id(99999, async_db)
+        await branch_service.get_branch_by_id(uuid.UUID("00000000-0000-0000-0000-000000000000"), async_db)
     
     assert "Branch not found" in str(exc_info.value)
     print("✓ test_get_branch_by_id_not_found 通过")

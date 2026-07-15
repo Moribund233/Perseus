@@ -1,4 +1,5 @@
 from typing import Dict, Any
+import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.notification_preference import NotificationPreference
@@ -21,7 +22,7 @@ def build_pref_response(pref: NotificationPreference) -> dict:
     }
 
 
-async def get_or_create(db: AsyncSession, user_id: int) -> dict:
+async def get_or_create(db: AsyncSession, user_id: uuid.UUID) -> dict:
     stmt = select(NotificationPreference).where(NotificationPreference.user_id == user_id)
     result = await db.execute(stmt)
     pref = result.scalar_one_or_none()
@@ -35,7 +36,7 @@ async def get_or_create(db: AsyncSession, user_id: int) -> dict:
     return build_pref_response(pref)
 
 
-async def update_preferences(db: AsyncSession, user_id: int, **kwargs) -> dict:
+async def update_preferences(db: AsyncSession, user_id: uuid.UUID, **kwargs) -> dict:
     stmt = select(NotificationPreference).where(NotificationPreference.user_id == user_id)
     result = await db.execute(stmt)
     pref = result.scalar_one_or_none()
@@ -57,7 +58,7 @@ async def update_preferences(db: AsyncSession, user_id: int, **kwargs) -> dict:
     return build_pref_response(pref)
 
 
-async def should_send_email(db: AsyncSession, user_id: int, event_type: str) -> bool:
+async def should_send_email(db: AsyncSession, user_id: uuid.UUID, event_type: str) -> bool:
     prefs = await get_or_create(db, user_id)
     mapping = {
         "mention": prefs["email_on_mention"],
@@ -69,7 +70,7 @@ async def should_send_email(db: AsyncSession, user_id: int, event_type: str) -> 
     return mapping.get(event_type, True)
 
 
-async def should_send_in_app(db: AsyncSession, user_id: int, event_type: str) -> bool:
+async def should_send_in_app(db: AsyncSession, user_id: uuid.UUID, event_type: str) -> bool:
     prefs = await get_or_create(db, user_id)
     mapping = {
         "mention": prefs["in_app_on_mention"],

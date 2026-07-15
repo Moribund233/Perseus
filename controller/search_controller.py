@@ -17,12 +17,13 @@ from services.search_service import SearchService
 from services.repository_service import get_accessible_repository_ids
 from utils.git_utils import get_repository_storage_path
 from core.exception import NotFoundException
+import uuid
 
 router = APIRouter(prefix=get_route_prefix("repositories"), tags=["search"])
 global_search_router = APIRouter(prefix="/api/v1/search", tags=["search"])
 
 
-async def _get_repo_path(repo_id: int, db: AsyncSession) -> str:
+async def _get_repo_path(repo_id: uuid.UUID, db: AsyncSession) -> str:
     """
     获取仓库物理路径
 
@@ -46,7 +47,7 @@ async def _get_repo_path(repo_id: int, db: AsyncSession) -> str:
 
 @router.get("/{repo_id}/search")
 async def search_code(
-    repo_id: int,
+    repo_id: uuid.UUID,
     q: str = Query(..., description="搜索关键词"),
     path: str = Query(None, description="限制搜索目录"),
     db: AsyncSession = Depends(get_async_db),

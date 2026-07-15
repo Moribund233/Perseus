@@ -1,3 +1,4 @@
+import uuid
 """
 测试仓库归档/取消归档功能
 """
@@ -71,7 +72,7 @@ async def test_archive_nonexistent_repo(async_db: AsyncSession):
         async_db: 异步数据库会话
     """
     with pytest.raises(NotFoundException):
-        await repository_service.archive_repository(99999, async_db)
+        await repository_service.archive_repository(uuid.UUID("00000000-0000-0000-0000-000000000000"), async_db)
 
 
 @pytest.mark.asyncio

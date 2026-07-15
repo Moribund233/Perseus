@@ -4,6 +4,7 @@
 测试 Fork 仓库的创建、查询和同步功能
 """
 import pytest
+import uuid
 import pytest_asyncio
 import os
 import tempfile
@@ -31,8 +32,9 @@ async def temp_repo_dir():
 async def source_git_repo(temp_repo_dir):
     """创建源 Git 仓库"""
     import subprocess
+    from utils.git_utils import get_repository_storage_path
 
-    repo_path = os.path.join(temp_repo_dir, "source", "testuser", "test-repo")
+    repo_path = get_repository_storage_path("source/testuser/test-repo", repo_root=temp_repo_dir)
     os.makedirs(repo_path, exist_ok=True)
 
     # 初始化 Git 仓库
@@ -124,7 +126,7 @@ async def test_fork_repository_not_found(async_db: AsyncSession, async_test_user
     with pytest.raises(NotFoundException) as exc_info:
         await fork_service.fork_repository(
             db=async_db,
-            source_repository_id=99999,
+            source_repository_id=uuid.uuid4(),
             user_id=async_test_user.id
         )
 
@@ -247,7 +249,7 @@ async def test_get_repository_forks_not_found(async_db: AsyncSession):
     with pytest.raises(NotFoundException) as exc_info:
         await fork_service.get_repository_forks(
             db=async_db,
-            repository_id=99999
+            repository_id=uuid.uuid4()
         )
 
     assert "Repository not found" in str(exc_info.value)
@@ -318,7 +320,7 @@ async def test_get_fork_source_not_found(async_db: AsyncSession):
     with pytest.raises(NotFoundException) as exc_info:
         await fork_service.get_fork_source(
             db=async_db,
-            repository_id=99999
+            repository_id=uuid.uuid4()
         )
 
     assert "Repository not found" in str(exc_info.value)
@@ -373,39 +375,38 @@ def test_build_fork_response():
     """测试构建 Fork 响应"""
     from datetime import datetime
 
+    source_id = uuid.uuid4()
     fork_repo = Repository(
-        id=1,
         name="forked-repo",
         path="user/forked-repo",
         description="A fork",
         is_public=True,
-        owner_id=2,
+        owner_id=uuid.uuid4(),
         default_branch="main",
-        forked_from_id=10,
+        forked_from_id=source_id,
         created_at=datetime(2024, 1, 1),
         updated_at=datetime(2024, 1, 2)
     )
 
     source_repo = Repository(
-        id=10,
+        id=source_id,
         name="original-repo",
         path="original/original-repo",
-        owner_id=5
+        owner_id=uuid.uuid4()
     )
 
     response = fork_service.build_fork_response(fork_repo, source_repo)
 
-    assert response["id"] == 1
     assert response["name"] == "forked-repo"
     assert response["is_fork"] is True
-    assert response["forked_from_id"] == 10
-    assert response["source"]["id"] == 10
+    assert response["forked_from_id"] == source_id
+    assert response["source"]["id"] == source_id
     assert response["source"]["name"] == "original-repo"
 
 
 def test_repository_is_fork():
     """测试 Repository.is_fork 方法"""
-    fork_repo = Repository(forked_from_id=10)
+    fork_repo = Repository(forked_from_id=uuid.uuid4())
     normal_repo = Repository(forked_from_id=None)
 
     assert fork_repo.is_fork() is True

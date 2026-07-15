@@ -5,6 +5,7 @@
 """
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+import uuid
 
 from api.routes_config import get_route_prefix
 from models.async_db import get_async_db
@@ -29,7 +30,7 @@ router = APIRouter(prefix=get_route_prefix("branches"), tags=["branches"])
 
 @router.get("/{repo_id}/branches")
 async def get_branches(
-    repo_id: int,
+    repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -48,7 +49,7 @@ async def get_branches(
 
 
 @router.get("/{repo_id}/branches/default")
-async def get_default_branch(repo_id: int, db: AsyncSession = Depends(get_async_db)):
+async def get_default_branch(repo_id: uuid.UUID, db: AsyncSession = Depends(get_async_db)):
     """
     获取默认分支
     
@@ -66,7 +67,7 @@ async def get_default_branch(repo_id: int, db: AsyncSession = Depends(get_async_
 
 
 @router.get("/{repo_id}/branches/{branch_name}")
-async def get_branch(repo_id: int, branch_name: str, db: AsyncSession = Depends(get_async_db)):
+async def get_branch(repo_id: uuid.UUID, branch_name: str, db: AsyncSession = Depends(get_async_db)):
     """
     获取仓库的特定分支
     
@@ -87,7 +88,7 @@ async def get_branch(repo_id: int, branch_name: str, db: AsyncSession = Depends(
 @router.post("/{repo_id}/branches")
 async def create_branch(
     request: Request,
-    repo_id: int,
+    repo_id: uuid.UUID,
     branch_data: dict,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -115,7 +116,7 @@ async def create_branch(
 @router.put("/{repo_id}/branches/{branch_name}")
 async def update_branch(
     request: Request,
-    repo_id: int,
+    repo_id: uuid.UUID,
     branch_name: str,
     branch_data: dict,
     db: AsyncSession = Depends(get_async_db),
@@ -144,7 +145,7 @@ async def update_branch(
 @router.delete("/{repo_id}/branches/{branch_name}")
 async def delete_branch(
     request: Request,
-    repo_id: int,
+    repo_id: uuid.UUID,
     branch_name: str,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -172,7 +173,7 @@ async def delete_branch(
 @router.put("/{repo_id}/branches/{branch_name}/default")
 async def set_default_branch(
     request: Request,
-    repo_id: int,
+    repo_id: uuid.UUID,
     branch_name: str,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -199,7 +200,7 @@ async def set_default_branch(
 @router.put("/{repo_id}/branches/{branch_name}/protect")
 async def protect_branch(
     request: Request,
-    repo_id: int,
+    repo_id: uuid.UUID,
     branch_name: str,
     protection_settings: dict = None,
     db: AsyncSession = Depends(get_async_db),
@@ -230,7 +231,7 @@ async def protect_branch(
 @router.put("/{repo_id}/branches/{branch_name}/unprotect")
 async def unprotect_branch(
     request: Request,
-    repo_id: int,
+    repo_id: uuid.UUID,
     branch_name: str,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -256,7 +257,7 @@ async def unprotect_branch(
 
 @router.get("/{repo_id}/branches/{branch_name}/protection")
 async def check_branch_protection(
-    repo_id: int,
+    repo_id: uuid.UUID,
     branch_name: str,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)

@@ -1,11 +1,11 @@
-from sqlalchemy import Column, Integer, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, Boolean, ForeignKey, Uuid as SAUuid
 from models.base import BaseModel
 
 
 class NotificationPreference(BaseModel):
     __tablename__ = "notification_preferences"
 
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    user_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), unique=True, nullable=False, index=True)
 
     # Email preferences
     email_on_mention = Column(Boolean, default=True, nullable=False)

@@ -3,6 +3,7 @@ Token Service 异步测试
 
 测试 Token 认证服务层的所有功能
 """
+import uuid
 import pytest
 import pytest_asyncio
 from datetime import datetime, timedelta, timezone
@@ -81,11 +82,11 @@ def test_verify_password():
 
 def test_verify_token_valid():
     """测试验证有效令牌"""
-    data = {"sub": "1", "username": "testuser"}
+    data = {"sub": "00000000-0000-0000-0000-000000000001", "username": "testuser"}
     token = token_service.create_access_token(data)
     verified = token_service.verify_token(token)
     assert verified is not None
-    assert verified.user_id == 1  # sub 会被转换为 int 类型的 user_id
+    assert verified.user_id == uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
 def test_verify_token_invalid():
@@ -132,7 +133,8 @@ def test_refresh_token_works():
     3. 新的访问令牌是有效的
     """
     # 创建用户数据
-    user_data = {"sub": "42", "username": "refreshtest", "is_admin": False}
+    test_uuid = "00000000-0000-0000-0000-000000000042"
+    user_data = {"sub": test_uuid, "username": "refreshtest", "is_admin": False}
 
     # 创建刷新令牌
     refresh_token = token_service.create_refresh_token(user_data)
@@ -141,7 +143,7 @@ def test_refresh_token_works():
     # 验证刷新令牌
     token_data = token_service.verify_token(refresh_token, token_type="refresh")
     assert token_data is not None, "刷新令牌应该有效"
-    assert token_data.user_id == 42
+    assert token_data.user_id == uuid.UUID(test_uuid)
     assert token_data.username == "refreshtest"
 
     # 使用刷新令牌创建新的访问令牌
@@ -155,7 +157,7 @@ def test_refresh_token_works():
     # 验证新的访问令牌有效
     new_token_data = token_service.verify_token(new_access_token, token_type="access")
     assert new_token_data is not None, "新的访问令牌应该有效"
-    assert new_token_data.user_id == 42
+    assert new_token_data.user_id == uuid.UUID(test_uuid)
     assert new_token_data.username == "refreshtest"
 
 

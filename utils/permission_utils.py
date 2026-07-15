@@ -6,13 +6,14 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from core.exception import AuthorizationException
+import uuid
 
 
 async def check_resource_author_or_admin(
     db: AsyncSession,
-    resource_author_id: int,
-    current_user_id: int,
-    repository_id: int,
+    resource_author_id: uuid.UUID,
+    current_user_id: uuid.UUID,
+    repository_id: uuid.UUID,
     action_description: str = "perform this action"
 ) -> None:
     """
@@ -51,8 +52,8 @@ async def check_resource_author_or_admin(
 
 async def check_repository_owner_or_admin(
     db: AsyncSession,
-    repository_id: int,
-    user_id: int
+    repository_id: uuid.UUID,
+    user_id: uuid.UUID
 ) -> bool:
     """
     检查用户是否是仓库所有者或管理员
@@ -70,8 +71,8 @@ async def check_repository_owner_or_admin(
 
 async def _check_repository_owner_or_admin_internal(
     db: AsyncSession,
-    repository_id: int,
-    user_id: int
+    repository_id: uuid.UUID,
+    user_id: uuid.UUID
 ) -> bool:
     """
     内部函数：检查用户是否是仓库所有者或管理员
@@ -118,8 +119,8 @@ async def _check_repository_owner_or_admin_internal(
 
 async def check_repository_permission(
     db: AsyncSession,
-    repository_id: int,
-    user_id: int,
+    repository_id: uuid.UUID,
+    user_id: uuid.UUID,
     required_roles: list = None
 ) -> bool:
     """
@@ -173,8 +174,8 @@ async def check_repository_permission(
 
 async def require_repository_permission(
     db: AsyncSession,
-    repository_id: int,
-    user_id: int,
+    repository_id: uuid.UUID,
+    user_id: uuid.UUID,
     required_roles: list = None,
     action_description: str = "perform this action on this repository"
 ) -> None:
@@ -201,8 +202,8 @@ async def require_repository_permission(
 
 async def require_repository_owner_or_admin(
     db: AsyncSession,
-    repository_id: int,
-    user_id: int,
+    repository_id: uuid.UUID,
+    user_id: uuid.UUID,
     action_description: str = "perform this action"
 ) -> None:
     """

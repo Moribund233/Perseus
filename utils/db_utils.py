@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exception import NotFoundException
+import uuid
 
 T = TypeVar('T')
 
@@ -207,7 +208,7 @@ async def get_list_with_count(
 
 async def get_issue_or_404(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     issue_number: int
 ):
     """
@@ -250,7 +251,7 @@ async def get_issue_or_404(
 
 async def get_pull_request_or_404(
     db: AsyncSession,
-    repository_id: int,
+    repository_id: uuid.UUID,
     pr_number: int
 ):
     """

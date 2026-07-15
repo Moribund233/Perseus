@@ -1,4 +1,5 @@
 """通用审计日志服务模块"""
+import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.activity import Activity
@@ -7,7 +8,7 @@ from utils.response_builder import build_pagination_response
 
 
 async def record_activity(
-    repository_id: int, actor_id: int, entity_type: str, entity_id: int,
+    repository_id: uuid.UUID, actor_id: uuid.UUID, entity_type: str, entity_id: uuid.UUID,
     action: str, details: str = None, db: AsyncSession = None,
 ) -> dict:
     """记录审计日志"""
@@ -32,8 +33,8 @@ async def record_activity(
 
 
 async def list_activities(
-    repository_id: int, db: AsyncSession,
-    entity_type: str = None, actor_id: int = None,
+    repository_id: uuid.UUID, db: AsyncSession,
+    entity_type: str = None, actor_id: uuid.UUID = None,
     page: int = 1, limit: int = 20,
 ) -> dict:
     """查询审计日志"""

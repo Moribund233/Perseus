@@ -8,6 +8,7 @@ from api.dependencies import get_current_user
 from services.realtime.chat_service import ChatService
 from services.realtime.room_service import RoomService
 from core.exception import NotFoundException, ValidationException
+import uuid
 
 
 router = APIRouter(tags=["chat"])
@@ -15,8 +16,8 @@ router = APIRouter(tags=["chat"])
 
 @router.get("/api/v1/rooms/{room_id}/messages")
 async def get_room_messages(
-    room_id: int,
-    before: Optional[int] = Query(None),
+    room_id: uuid.UUID,
+    before: Optional[uuid.UUID] = Query(None),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -33,8 +34,8 @@ async def get_room_messages(
 
 @router.delete("/api/v1/rooms/{room_id}/messages/{msg_id}")
 async def delete_message(
-    room_id: int,
-    msg_id: int,
+    room_id: uuid.UUID,
+    msg_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):

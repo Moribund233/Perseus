@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey
+from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, Uuid as SAUuid
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from models.base import BaseModel
@@ -15,10 +15,10 @@ class Commit(BaseModel):
     hash = Column(String(40), unique=True, nullable=False)
     """提交哈希值，唯一，长度为40个字符(sha1)"""
     
-    repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
+    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
     """仓库ID，外键关联到repositories表"""
     
-    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False)
+    branch_id = Column(SAUuid(as_uuid=True), ForeignKey("branches.id"), nullable=False)
     """分支ID，外键关联到branches表"""
     
     author_name = Column(String(100), nullable=False)

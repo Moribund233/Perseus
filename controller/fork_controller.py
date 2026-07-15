@@ -15,6 +15,7 @@ from models.user import User
 from api.dependencies import get_current_user
 from core.exception import NotFoundException
 from services import fork_service
+import uuid
 
 # 创建路由实例
 router = APIRouter(prefix="/api/v1/repositories", tags=["forks"])
@@ -27,7 +28,7 @@ class ForkCreateRequest(BaseModel):
     is_public: Optional[bool] = Field(None, description="是否公开（默认为源仓库设置）")
 
 
-async def _get_repo(repo_id: int, db: AsyncSession) -> Repository:
+async def _get_repo(repo_id: uuid.UUID, db: AsyncSession) -> Repository:
     """
     获取仓库实例
 
@@ -50,7 +51,7 @@ async def _get_repo(repo_id: int, db: AsyncSession) -> Repository:
 
 @router.post("/{repo_id}/forks", status_code=201)
 async def fork_repository(
-    repo_id: int,
+    repo_id: uuid.UUID,
     data: ForkCreateRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
@@ -84,7 +85,7 @@ async def fork_repository(
 
 @router.get("/{repo_id}/forks")
 async def list_repository_forks(
-    repo_id: int,
+    repo_id: uuid.UUID,
     page: int = Query(1, ge=1, description="页码"),
     limit: int = Query(20, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_async_db)
@@ -112,7 +113,7 @@ async def list_repository_forks(
 
 @router.get("/{repo_id}/forks/source")
 async def get_fork_source(
-    repo_id: int,
+    repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db)
 ):
     """
@@ -134,7 +135,7 @@ async def get_fork_source(
 
 @router.post("/{repo_id}/forks/sync")
 async def sync_fork(
-    repo_id: int,
+    repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):

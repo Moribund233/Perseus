@@ -5,6 +5,7 @@
 """
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+import uuid
 
 from models.repository import Repository
 from models.stargazer import Stargazer
@@ -12,7 +13,7 @@ from core.exception import NotFoundException, ConflictException, ValidationExcep
 from utils.db_utils import get_or_404
 
 
-async def star_repository(repo_id: int, user_id: int, db: AsyncSession) -> dict:
+async def star_repository(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -> dict:
     """
     Star 仓库
 
@@ -48,7 +49,7 @@ async def star_repository(repo_id: int, user_id: int, db: AsyncSession) -> dict:
     return {"star_count": repo.star_count, "starred": True}
 
 
-async def unstar_repository(repo_id: int, user_id: int, db: AsyncSession) -> dict:
+async def unstar_repository(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -> dict:
     """
     取消 Star 仓库
 
@@ -84,7 +85,7 @@ async def unstar_repository(repo_id: int, user_id: int, db: AsyncSession) -> dic
     return {"star_count": repo.star_count, "starred": False}
 
 
-async def get_star_status(repo_id: int, user_id: int, db: AsyncSession) -> dict:
+async def get_star_status(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -> dict:
     """
     获取当前用户对仓库的 Star 状态
 
@@ -112,7 +113,7 @@ async def get_star_status(repo_id: int, user_id: int, db: AsyncSession) -> dict:
     return {"starred": starred, "star_count": repo.star_count}
 
 
-async def get_stargazers(repo_id: int, db: AsyncSession) -> list[dict]:
+async def get_stargazers(repo_id: uuid.UUID, db: AsyncSession) -> list[dict]:
     """
     获取仓库的 Stargazer 列表
 

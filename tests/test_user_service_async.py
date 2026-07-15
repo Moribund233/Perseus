@@ -1,3 +1,4 @@
+import uuid
 """
 用户服务层异步功能测试
 
@@ -115,7 +116,7 @@ async def test_get_user_by_id(async_db: AsyncSession):
 async def test_get_user_by_id_not_found(async_db: AsyncSession):
     """测试获取不存在的用户"""
     with pytest.raises(NotFoundException) as exc_info:
-        await user_service.get_user_by_id(99999, async_db)
+        await user_service.get_user_by_id(uuid.UUID("00000000-0000-0000-0000-000000000000"), async_db)
     
     assert "User not found" in str(exc_info.value)
     print("✓ test_get_user_by_id_not_found 通过")
@@ -229,7 +230,7 @@ async def test_update_user(async_db: AsyncSession):
 async def test_update_user_not_found(async_db: AsyncSession):
     """测试更新不存在的用户"""
     with pytest.raises(NotFoundException) as exc_info:
-        await user_service.update_user(99999, {"full_name": "New Name"}, async_db)
+        await user_service.update_user(uuid.UUID("00000000-0000-0000-0000-000000000000"), {"full_name": "New Name"}, async_db)
     
     assert "User not found" in str(exc_info.value)
     print("✓ test_update_user_not_found 通过")
@@ -264,7 +265,7 @@ async def test_delete_user(async_db: AsyncSession):
 async def test_delete_user_not_found(async_db: AsyncSession):
     """测试删除不存在的用户"""
     with pytest.raises(NotFoundException) as exc_info:
-        await user_service.delete_user(99999, async_db)
+        await user_service.delete_user(uuid.UUID("00000000-0000-0000-0000-000000000000"), async_db)
     
     assert "User not found" in str(exc_info.value)
     print("✓ test_delete_user_not_found 通过")
