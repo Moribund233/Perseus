@@ -15,23 +15,23 @@ interface RepositoriesState {
 
   fetchRepositories: () => Promise<void>;
   fetchPublicRepositories: () => Promise<void>;
-  fetchRepositoriesByUser: (userId: number) => Promise<void>;
-  fetchRepository: (repoId: number) => Promise<void>;
+  fetchRepositoriesByUser: (userId: string) => Promise<void>;
+  fetchRepository: (repoId: string) => Promise<void>;
   fetchRepositoryByPath: (owner: string, repo: string) => Promise<void>;
   createRepository: (data: { name: string; description?: string; is_public?: boolean }) => Promise<Repository>;
-  updateRepository: (repoId: number, data: Record<string, unknown>) => Promise<void>;
-  deleteRepository: (repoId: number) => Promise<void>;
-  archiveRepository: (repoId: number) => Promise<void>;
-  unarchiveRepository: (repoId: number) => Promise<void>;
-  fetchTree: (repoId: number, ref?: string, path?: string) => Promise<void>;
-  fetchBlob: (repoId: number, path: string, ref?: string) => Promise<void>;
-  fetchReadme: (repoId: number, ref?: string) => Promise<void>;
-  fetchBranches: (repoId: number) => Promise<void>;
-  fetchCommits: (repoId: number, params?: { page?: number; per_page?: number; branch?: string }) => Promise<void>;
-  starRepository: (repoId: number) => Promise<void>;
-  unstarRepository: (repoId: number) => Promise<void>;
-  forkRepository: (repoId: number, data?: { name?: string; description?: string; is_public?: boolean }) => Promise<Repository>;
-  fetchMembers: (repoId: number) => Promise<void>;
+  updateRepository: (repoId: string, data: Record<string, unknown>) => Promise<void>;
+  deleteRepository: (repoId: string) => Promise<void>;
+  archiveRepository: (repoId: string) => Promise<void>;
+  unarchiveRepository: (repoId: string) => Promise<void>;
+  fetchTree: (repoId: string, ref?: string, path?: string) => Promise<void>;
+  fetchBlob: (repoId: string, path: string, ref?: string) => Promise<void>;
+  fetchReadme: (repoId: string, ref?: string) => Promise<void>;
+  fetchBranches: (repoId: string) => Promise<void>;
+  fetchCommits: (repoId: string, params?: { page?: number; per_page?: number; branch?: string }) => Promise<void>;
+  starRepository: (repoId: string) => Promise<void>;
+  unstarRepository: (repoId: string) => Promise<void>;
+  forkRepository: (repoId: string, data?: { name?: string; description?: string; is_public?: boolean }) => Promise<Repository>;
+  fetchMembers: (repoId: string) => Promise<void>;
   clearCurrent: () => void;
 }
 

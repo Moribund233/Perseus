@@ -33,7 +33,7 @@ interface Label {
 }
 
 interface PR {
-  id: number;
+  id: string;
   title: string;
   author: string;
   time: string;
@@ -97,7 +97,7 @@ export default function PullRequestsPage() {
   const { repositories, fetchRepositoriesByUser, isLoading: repoLoading, error: repoError } = useRepositoriesStore();
   const { pullRequests, isLoading: prLoading, error: prError, fetchPullRequests } = usePullRequestsStore();
 
-  const [selectedRepoId, setSelectedRepoId] = useState<number | null>(null);
+  const [selectedRepoId, setSelectedRepoId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'open' | 'merged' | 'closed' | 'all'>('open');
   const [initialLoading, setInitialLoading] = useState(true);
   const { t } = useTranslation();
@@ -172,7 +172,7 @@ export default function PullRequestsPage() {
             {repositories.length > 1 && (
               <select
                 value={activeRepoId ?? ''}
-                onChange={(e) => setSelectedRepoId(Number(e.target.value))}
+                onChange={(e) => setSelectedRepoId(e.target.value)}
                 style={{
                   background: bgSecondary,
                   color: textPrimary,

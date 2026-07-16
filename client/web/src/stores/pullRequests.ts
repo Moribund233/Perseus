@@ -8,15 +8,15 @@ interface PullRequestsState {
   isLoading: boolean;
   error: string | null;
 
-  fetchPullRequests: (repoId: number, status?: string) => Promise<void>;
-  fetchPullRequest: (repoId: number, prNumber: number) => Promise<void>;
-  createPullRequest: (repoId: number, data: { title: string; description?: string; source_branch: string; target_branch: string }) => Promise<PR>;
-  updatePullRequest: (repoId: number, prNumber: number, data: { title?: string; description?: string }) => Promise<void>;
-  closePullRequest: (repoId: number, prNumber: number) => Promise<void>;
-  mergePullRequest: (repoId: number, prNumber: number, mergeMethod?: 'merge' | 'squash' | 'rebase') => Promise<void>;
-  fetchComments: (repoId: number, prNumber: number) => Promise<void>;
-  createComment: (repoId: number, prNumber: number, data: CreatePRCommentRequest) => Promise<PRComment>;
-  createReview: (repoId: number, prNumber: number, data: CreatePRReviewRequest) => Promise<void>;
+  fetchPullRequests: (repoId: string, status?: string) => Promise<void>;
+  fetchPullRequest: (repoId: string, prNumber: number) => Promise<void>;
+  createPullRequest: (repoId: string, data: { title: string; description?: string; source_branch: string; target_branch: string }) => Promise<PR>;
+  updatePullRequest: (repoId: string, prNumber: number, data: { title?: string; description?: string }) => Promise<void>;
+  closePullRequest: (repoId: string, prNumber: number) => Promise<void>;
+  mergePullRequest: (repoId: string, prNumber: number, mergeMethod?: 'merge' | 'squash' | 'rebase') => Promise<void>;
+  fetchComments: (repoId: string, prNumber: number) => Promise<void>;
+  createComment: (repoId: string, prNumber: number, data: CreatePRCommentRequest) => Promise<PRComment>;
+  createReview: (repoId: string, prNumber: number, data: CreatePRReviewRequest) => Promise<void>;
   clearCurrent: () => void;
 }
 

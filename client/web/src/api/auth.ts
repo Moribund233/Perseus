@@ -6,7 +6,7 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  id: number;
+  id: string;
   username: string;
   email: string;
   full_name: string | null;
@@ -24,7 +24,7 @@ export interface RegisterRequest {
 }
 
 export interface UserResponse {
-  id: number;
+  id: string;
   username: string;
   email: string;
   full_name: string | null;

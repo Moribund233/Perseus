@@ -1,8 +1,8 @@
 import { apiRequest } from './client';
 
 export interface Webhook {
-  id: number;
-  repository_id: number;
+  id: string;
+  repository_id: string;
   url: string;
   events: string[];
   secret: string;
@@ -20,8 +20,8 @@ export interface CreateWebhookRequest {
 }
 
 export interface WebhookDelivery {
-  id: number;
-  webhook_id: number;
+  id: string;
+  webhook_id: string;
   event: string;
   payload: string;
   status: string;
@@ -32,37 +32,37 @@ export interface WebhookDelivery {
 }
 
 export const webhooksApi = {
-  list: (repoId: number) =>
+  list: (repoId: string) =>
     apiRequest<Webhook[]>(`/api/v1/repositories/${repoId}/webhooks`),
 
-  get: (repoId: number, webhookId: number) =>
+  get: (repoId: string, webhookId: string) =>
     apiRequest<Webhook>(`/api/v1/repositories/${repoId}/webhooks/${webhookId}`),
 
-  create: (repoId: number, data: CreateWebhookRequest) =>
+  create: (repoId: string, data: CreateWebhookRequest) =>
     apiRequest<Webhook>(`/api/v1/repositories/${repoId}/webhooks`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  update: (repoId: number, webhookId: number, data: Partial<CreateWebhookRequest>) =>
+  update: (repoId: string, webhookId: string, data: Partial<CreateWebhookRequest>) =>
     apiRequest<Webhook>(`/api/v1/repositories/${repoId}/webhooks/${webhookId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
 
-  delete: (repoId: number, webhookId: number) =>
+  delete: (repoId: string, webhookId: string) =>
     apiRequest<void>(`/api/v1/repositories/${repoId}/webhooks/${webhookId}`, {
       method: 'DELETE',
     }),
 
-  test: (repoId: number, webhookId: number) =>
+  test: (repoId: string, webhookId: string) =>
     apiRequest<WebhookDelivery>(`/api/v1/repositories/${repoId}/webhooks/${webhookId}/test`, {
       method: 'POST',
     }),
 
-  listDeliveries: (repoId: number, webhookId: number) =>
+  listDeliveries: (repoId: string, webhookId: string) =>
     apiRequest<WebhookDelivery[]>(`/api/v1/repositories/${repoId}/webhooks/${webhookId}/deliveries`),
 
-  getDelivery: (repoId: number, webhookId: number, deliveryId: number) =>
+  getDelivery: (repoId: string, webhookId: string, deliveryId: string) =>
     apiRequest<WebhookDelivery>(`/api/v1/repositories/${repoId}/webhooks/${webhookId}/deliveries/${deliveryId}`),
 };

@@ -10,9 +10,9 @@ interface NotificationsState {
 
   fetchNotifications: () => Promise<void>;
   fetchUnreadCount: () => Promise<void>;
-  markAsRead: (id: number) => Promise<void>;
+  markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
-  deleteNotification: (id: number) => Promise<void>;
+  deleteNotification: (id: string) => Promise<void>;
   fetchPreferences: () => Promise<void>;
   updatePreferences: (data: Partial<NotificationPreference>) => Promise<void>;
 }

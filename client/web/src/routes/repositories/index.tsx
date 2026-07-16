@@ -188,7 +188,7 @@ function TreeNodeView({
   selectedKey: string;
   onSelect: (key: string) => void;
   branchName?: string;
-  repoId?: number;
+  repoId?: string;
   branchRef?: string;
 }) {
   const isSelected = selectedKey === node.key;
@@ -403,8 +403,8 @@ export default function RepositoriesPage() {
             color: #8b949e;
           }
         `}</style>
-        <Content style={{ padding: '24px 32px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Content style={{ padding: '24px 32px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexShrink: 0 }}>
             <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: textPrimary }}>
               {t('app.repositories.title')}
             </h2>
@@ -462,112 +462,114 @@ export default function RepositoriesPage() {
             </div>
           </div>
           {error && (
-            <div style={{ color: '#f85149', padding: 12, marginBottom: 12, border: `1px solid #f85149`, borderRadius: 8, background: 'rgba(248,81,73,0.1)' }}>
+            <div style={{ color: '#f85149', padding: 12, marginBottom: 12, flexShrink: 0, border: `1px solid #f85149`, borderRadius: 8, background: 'rgba(248,81,73,0.1)' }}>
               {error}
             </div>
           )}
-          <FadeBlock key={`${repoFilter}-${viewMode}`}>
-          {viewMode === 'list' ? (
-            <div>
-              {repositories.map((r) => {
-                const repoOwner = r.path.split('/')[0];
-                return (
-                  <div
-                    key={r.id}
-                    onClick={() => navigate(`/repositories/${repoOwner}/${r.name}`)}
-                    style={{
-                      padding: '12px 16px',
-                      border: `1px solid ${borderColor}`,
-                      borderRadius: 8,
-                      marginBottom: 8,
-                      cursor: 'pointer',
-                      background: bgSecondary,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      transition: 'background 0.15s',
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = bgSecondary; }}
-                  >
-                    <FolderOutlined style={{ fontSize: 20, color: blueLight, flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ color: textPrimary, fontWeight: 600, fontSize: 14 }}>{r.name}</span>
-                      <span style={{ color: textSecondary, marginLeft: 8, fontSize: 12 }}>{repoOwner}</span>
-                    </div>
-                    <span
+          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+            <FadeBlock key={`${repoFilter}-${viewMode}`}>
+            {viewMode === 'list' ? (
+              <div>
+                {repositories.map((r) => {
+                  const repoOwner = r.path.split('/')[0];
+                  return (
+                    <div
+                      key={r.id}
+                      onClick={() => navigate(`/repositories/${repoOwner}/${r.name}`)}
                       style={{
-                        fontSize: 11,
-                        padding: '2px 8px',
+                        padding: '12px 16px',
                         border: `1px solid ${borderColor}`,
-                        borderRadius: 12,
-                        color: textSecondary,
-                        flexShrink: 0,
+                        borderRadius: 8,
+                        marginBottom: 8,
+                        cursor: 'pointer',
+                        background: bgSecondary,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        transition: 'background 0.15s',
                       }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = bgSecondary; }}
                     >
-                      {r.is_public ? 'Public' : 'Private'}
-                    </span>
-                    <span style={{ color: textSecondary, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                      <StarOutlined style={{ fontSize: 12 }} /> {r.star_count}
-                    </span>
-                    <span style={{ color: textSecondary, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                      <ForkOutlined style={{ fontSize: 12 }} /> {r.fork_count}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-              {repositories.map((r) => {
-                const repoOwner = r.path.split('/')[0];
-                return (
-                  <div
-                    key={r.id}
-                    onClick={() => navigate(`/repositories/${repoOwner}/${r.name}`)}
-                    style={{
-                      padding: 16,
-                      border: `1px solid ${borderColor}`,
-                      borderRadius: 8,
-                      cursor: 'pointer',
-                      background: bgSecondary,
-                      transition: 'background 0.15s',
-                      display: 'flex',
-                      flexDirection: 'column',
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = bgSecondary; }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                       <FolderOutlined style={{ fontSize: 20, color: blueLight, flexShrink: 0 }} />
-                      <span style={{ color: textPrimary, fontWeight: 600, fontSize: 14, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
-                      <span style={{ fontSize: 11, padding: '2px 8px', border: `1px solid ${borderColor}`, borderRadius: 12, color: textSecondary, flexShrink: 0 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ color: textPrimary, fontWeight: 600, fontSize: 14 }}>{r.name}</span>
+                        <span style={{ color: textSecondary, marginLeft: 8, fontSize: 12 }}>{repoOwner}</span>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          padding: '2px 8px',
+                          border: `1px solid ${borderColor}`,
+                          borderRadius: 12,
+                          color: textSecondary,
+                          flexShrink: 0,
+                        }}
+                      >
                         {r.is_public ? 'Public' : 'Private'}
                       </span>
-                    </div>
-                    <div style={{ fontSize: 12, color: textSecondary, marginBottom: 10 }}>{repoOwner}</div>
-                    {r.description && (
-                      <div style={{ fontSize: 13, color: textSecondary, marginBottom: 12, lineHeight: 1.4, flex: 1 }}>
-                        {r.description}
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', gap: 16, fontSize: 12, color: textSecondary, marginTop: 'auto' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ color: textSecondary, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                         <StarOutlined style={{ fontSize: 12 }} /> {r.star_count}
                       </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ color: textSecondary, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                         <ForkOutlined style={{ fontSize: 12 }} /> {r.fork_count}
                       </span>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          </FadeBlock>
-          {repositories.length === 0 && !isLoading && !error && (
-            <p style={{ color: textSecondary, textAlign: 'center', padding: 40 }}>{t('app.repositories.noRepos')}</p>
-          )}
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+                {repositories.map((r) => {
+                  const repoOwner = r.path.split('/')[0];
+                  return (
+                    <div
+                      key={r.id}
+                      onClick={() => navigate(`/repositories/${repoOwner}/${r.name}`)}
+                      style={{
+                        padding: 16,
+                        border: `1px solid ${borderColor}`,
+                        borderRadius: 8,
+                        cursor: 'pointer',
+                        background: bgSecondary,
+                        transition: 'background 0.15s',
+                        display: 'flex',
+                        flexDirection: 'column',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = bgSecondary; }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                        <FolderOutlined style={{ fontSize: 20, color: blueLight, flexShrink: 0 }} />
+                        <span style={{ color: textPrimary, fontWeight: 600, fontSize: 14, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+                        <span style={{ fontSize: 11, padding: '2px 8px', border: `1px solid ${borderColor}`, borderRadius: 12, color: textSecondary, flexShrink: 0 }}>
+                          {r.is_public ? 'Public' : 'Private'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: textSecondary, marginBottom: 10 }}>{repoOwner}</div>
+                      {r.description && (
+                        <div style={{ fontSize: 13, color: textSecondary, marginBottom: 12, lineHeight: 1.4, flex: 1 }}>
+                          {r.description}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 16, fontSize: 12, color: textSecondary, marginTop: 'auto' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <StarOutlined style={{ fontSize: 12 }} /> {r.star_count}
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <ForkOutlined style={{ fontSize: 12 }} /> {r.fork_count}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            </FadeBlock>
+            {repositories.length === 0 && !isLoading && !error && (
+              <p style={{ color: textSecondary, textAlign: 'center', padding: 40 }}>{t('app.repositories.noRepos')}</p>
+            )}
+          </div>
         </Content>
       </Layout>
     );
@@ -734,39 +736,42 @@ export default function RepositoriesPage() {
         </div>
       </Sider>
 
-      <Content style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 24, color: blueLight, display: 'flex', alignItems: 'center' }}>
-            <FolderOutlined />
-          </span>
-          <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: textPrimary }}>{currentRepo.name}</h2>
-          <span
-            style={{
-              fontSize: 11,
-              padding: '2px 8px',
-              border: `1px solid ${borderColor}`,
-              borderRadius: 12,
-              color: textSecondary,
-            }}
-          >
-            {currentRepo.is_public ? t('app.repositories.visibility.public') : t('app.repositories.visibility.private')}
-          </span>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            <ActionButton icon={<EyeOutlined />}>{t('app.repositories.actions.watch')}</ActionButton>
-            <ActionButton icon={<StarOutlined style={{ color: isStarred ? '#e3b341' : undefined }} />} onClick={handleStarToggle}>
-              {isStarred ? t('app.repositories.actions.unstar') : t('app.repositories.actions.star')} {currentRepo.star_count}
-            </ActionButton>
-            <ActionButton icon={<ForkOutlined />}>{t('app.repositories.actions.fork')} {currentRepo.fork_count}</ActionButton>
+      <Content style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '24px 24px 0' }}>
+        <div style={{ flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 24, color: blueLight, display: 'flex', alignItems: 'center' }}>
+              <FolderOutlined />
+            </span>
+            <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: textPrimary }}>{currentRepo.name}</h2>
+            <span
+              style={{
+                fontSize: 11,
+                padding: '2px 8px',
+                border: `1px solid ${borderColor}`,
+                borderRadius: 12,
+                color: textSecondary,
+              }}
+            >
+              {currentRepo.is_public ? t('app.repositories.visibility.public') : t('app.repositories.visibility.private')}
+            </span>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              <ActionButton icon={<EyeOutlined />}>{t('app.repositories.actions.watch')}</ActionButton>
+              <ActionButton icon={<StarOutlined style={{ color: isStarred ? '#e3b341' : undefined }} />} onClick={handleStarToggle}>
+                {isStarred ? t('app.repositories.actions.unstar') : t('app.repositories.actions.star')} {currentRepo.star_count}
+              </ActionButton>
+              <ActionButton icon={<ForkOutlined />}>{t('app.repositories.actions.fork')} {currentRepo.fork_count}</ActionButton>
+            </div>
           </div>
+
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            items={tabItems}
+            className="repo-tabs"
+          />
         </div>
 
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={tabItems}
-          className="repo-tabs"
-        />
-
+        <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 24 }}>
         <div
           style={{
             border: `1px solid ${borderColor}`,
@@ -941,6 +946,7 @@ export default function RepositoriesPage() {
             />
           </div>
         )}
+      </div>
       </Content>
       </div>
     </Layout>

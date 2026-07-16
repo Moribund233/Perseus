@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { authApi, type LoginRequest, type RegisterRequest } from '../api/auth';
 
 export interface User {
-  id: number;
+  id: string;
   username: string;
   email: string;
   full_name: string | null;

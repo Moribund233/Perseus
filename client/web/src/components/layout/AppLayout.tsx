@@ -437,7 +437,7 @@ export default function AppLayout() {
             </Button>
           </Space>
         </Header>
-        <Content style={{ padding: 0, overflow: 'auto' }}>
+        <Content style={{ padding: 0, overflow: 'hidden' }}>
           <Outlet />
         </Content>
       </Layout>

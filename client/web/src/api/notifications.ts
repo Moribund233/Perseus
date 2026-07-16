@@ -1,14 +1,14 @@
 import { apiRequest } from './client';
 
 export interface Notification {
-  id: number;
-  user_id: number;
+  id: string;
+  user_id: string;
   type: string;
   title: string;
   message: string;
-  repository_id: number | null;
+  repository_id: string | null;
   target_type: string | null;
-  target_id: number | null;
+  target_id: string | null;
   is_read: boolean;
   created_at: string;
 }
@@ -35,13 +35,13 @@ export const notificationsApi = {
   getUnreadCount: () =>
     apiRequest<{ count: number }>('/api/v1/notifications/unread-count'),
 
-  markAsRead: (id: number) =>
+  markAsRead: (id: string) =>
     apiRequest<void>(`/api/v1/notifications/${id}/read`, { method: 'PATCH' }),
 
   markAllAsRead: () =>
     apiRequest<void>('/api/v1/notifications/read-all', { method: 'POST' }),
 
-  delete: (id: number) =>
+  delete: (id: string) =>
     apiRequest<void>(`/api/v1/notifications/${id}`, { method: 'DELETE' }),
 
   getPreferences: () =>

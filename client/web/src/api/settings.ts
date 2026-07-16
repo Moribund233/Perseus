@@ -1,7 +1,7 @@
 import { apiRequest } from './client';
 
 export interface UserProfile {
-  id: number;
+  id: string;
   username: string;
   email: string;
   full_name: string | null;
@@ -28,7 +28,7 @@ export interface DashboardData {
 }
 
 export interface SSHKey {
-  id: number;
+  id: string;
   name: string;
   public_key: string;
   fingerprint: string;
@@ -47,10 +47,10 @@ export interface OAuthAccount {
 }
 
 export const settingsApi = {
-  getUser: (userId: number) =>
+  getUser: (userId: string) =>
     apiRequest<UserProfile>(`/api/v1/users/${userId}`),
 
-  updateProfile: (userId: number, data: UpdateProfileRequest) =>
+  updateProfile: (userId: string, data: UpdateProfileRequest) =>
     apiRequest<UserProfile>(`/api/v1/users/${userId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -81,7 +81,7 @@ export const settingsApi = {
     });
   },
 
-  getAvatarUrl: (userId: number) =>
+  getAvatarUrl: (userId: string) =>
     `/api/v1/users/${userId}/avatar`,
 
   listSSHKeys: () =>
@@ -93,7 +93,7 @@ export const settingsApi = {
       body: JSON.stringify(data),
     }),
 
-  deleteSSHKey: (keyId: number) =>
+  deleteSSHKey: (keyId: string) =>
     apiRequest<void>(`/api/v1/keys/${keyId}`, { method: 'DELETE' }),
 
   listOAuthAccounts: () =>

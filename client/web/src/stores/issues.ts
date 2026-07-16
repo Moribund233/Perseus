@@ -8,15 +8,15 @@ interface IssuesState {
   isLoading: boolean;
   error: string | null;
 
-  fetchIssues: (repoId: number, status?: string) => Promise<void>;
-  filterIssues: (repoId: number, filter: IssueFilter) => Promise<void>;
-  fetchIssue: (repoId: number, issueNumber: number) => Promise<void>;
-  createIssue: (repoId: number, data: CreateIssueRequest) => Promise<Issue>;
-  updateIssue: (repoId: number, issueNumber: number, data: UpdateIssueRequest) => Promise<void>;
-  closeIssue: (repoId: number, issueNumber: number) => Promise<void>;
-  reopenIssue: (repoId: number, issueNumber: number) => Promise<void>;
-  fetchComments: (repoId: number, issueNumber: number) => Promise<void>;
-  createComment: (repoId: number, issueNumber: number, content: string) => Promise<IssueComment>;
+  fetchIssues: (repoId: string, status?: string) => Promise<void>;
+  filterIssues: (repoId: string, filter: IssueFilter) => Promise<void>;
+  fetchIssue: (repoId: string, issueNumber: number) => Promise<void>;
+  createIssue: (repoId: string, data: CreateIssueRequest) => Promise<Issue>;
+  updateIssue: (repoId: string, issueNumber: number, data: UpdateIssueRequest) => Promise<void>;
+  closeIssue: (repoId: string, issueNumber: number) => Promise<void>;
+  reopenIssue: (repoId: string, issueNumber: number) => Promise<void>;
+  fetchComments: (repoId: string, issueNumber: number) => Promise<void>;
+  createComment: (repoId: string, issueNumber: number, content: string) => Promise<IssueComment>;
   clearCurrent: () => void;
 }
 

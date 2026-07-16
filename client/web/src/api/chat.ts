@@ -1,45 +1,45 @@
 import { apiRequest } from './client';
 
 export interface ChatMessage {
-  id: number;
-  room_id: number;
-  user_id: number;
+  id: string;
+  room_id: string;
+  user_id: string;
   content: string;
   message_type: string;
   metadata: Record<string, unknown> | null;
   created_at: string;
-  user?: { id: number; username: string; full_name: string | null };
+  user?: { id: string; username: string; full_name: string | null };
 }
 
 export interface RoomMember {
-  id: number;
-  room_id: number;
-  user_id: number;
+  id: string;
+  room_id: string;
+  user_id: string;
   role: string;
   joined_at: string;
-  user?: { id: number; username: string; full_name: string | null };
+  user?: { id: string; username: string; full_name: string | null };
 }
 
 export interface RealtimeRoom {
-  id: number;
-  repository_id: number;
+  id: string;
+  repository_id: string;
   name: string;
   topic: string | null;
   is_active: boolean;
 }
 
 export const chatApi = {
-  getRoomMessages: (roomId: number, params?: { limit?: number; before?: number }) => {
+  getRoomMessages: (roomId: string, params?: { limit?: number; before?: number }) => {
     const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
     return apiRequest<ChatMessage[]>(`/api/v1/rooms/${roomId}/messages${qs}`);
   },
 
-  getRoomMembers: (roomId: number) =>
+  getRoomMembers: (roomId: string) =>
     apiRequest<RoomMember[]>(`/api/v1/rooms/${roomId}/members`),
 
-  deleteMessage: (roomId: number, msgId: number) =>
+  deleteMessage: (roomId: string, msgId: string) =>
     apiRequest<void>(`/api/v1/rooms/${roomId}/messages/${msgId}`, { method: 'DELETE' }),
 
-  getRepositoryRoom: (repoId: number) =>
+  getRepositoryRoom: (repoId: string) =>
     apiRequest<RealtimeRoom>(`/api/v1/repositories/${repoId}/room`),
 };
