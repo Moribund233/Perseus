@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   FolderOutlined,
   MessageOutlined,
@@ -11,8 +11,24 @@ import {
 } from '@ant-design/icons';
 import { useTranslation, Trans } from 'react-i18next';
 import { useAuthStore } from '../../stores/auth';
+import { statsApi, type PlatformStats } from '../../api/stats';
 import AuthModal from './AuthModal';
 import './landing.css';
+
+function formatCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+function formatUptime(seconds: number): string {
+  const days = Math.floor(seconds / 86400);
+  if (days > 0) return `${days}d`;
+  const hours = Math.floor(seconds / 3600);
+  if (hours > 0) return `${hours}h`;
+  const mins = Math.floor(seconds / 60);
+  return `${mins}m`;
+}
 
 const featureBase = [
   {
@@ -56,8 +72,21 @@ const featureBase = [
 export default function LandingPage() {
   const [authOpen, setAuthOpen] = useState(false);
   const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
+  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const { t, i18n } = useTranslation();
+
+  useEffect(() => {
+    let cancelled = false;
+    statsApi.getPlatformStats()
+      .then((data) => {
+        if (!cancelled) setPlatformStats(data);
+      })
+      .catch(() => {
+        // 静默失败，保持原有占位数据
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const openAuth = (tab: 'login' | 'register') => {
     setAuthTab(tab);
@@ -131,10 +160,10 @@ export default function LandingPage() {
             <button className="l-btn-hero-secondary" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>{t('landing.hero.learnMore')}</button>
           </div>
           <div className="l-hero-stats">
-            <div className="l-hero-stat"><div className="num">24</div><div className="label">{t('landing.hero.stats.repositories')}</div></div>
-            <div className="l-hero-stat"><div className="num">1.8K</div><div className="label">{t('landing.hero.stats.commits')}</div></div>
-            <div className="l-hero-stat"><div className="num">8</div><div className="label">{t('landing.hero.stats.teamMembers')}</div></div>
-            <div className="l-hero-stat"><div className="num">99.9%</div><div className="label">{t('landing.hero.stats.uptime')}</div></div>
+            <div className="l-hero-stat"><div className="num">{platformStats ? formatCount(platformStats.repository_count) : '24'}</div><div className="label">{t('landing.hero.stats.repositories')}</div></div>
+            <div className="l-hero-stat"><div className="num">{platformStats ? formatCount(platformStats.commit_count) : '1.8K'}</div><div className="label">{t('landing.hero.stats.commits')}</div></div>
+            <div className="l-hero-stat"><div className="num">{platformStats ? formatCount(platformStats.user_count) : '8'}</div><div className="label">{t('landing.hero.stats.teamMembers')}</div></div>
+            <div className="l-hero-stat"><div className="num">{platformStats ? formatUptime(platformStats.uptime_seconds) : '99.9%'}</div><div className="label">{t('landing.hero.stats.uptime')}</div></div>
           </div>
         </div>
       </section>

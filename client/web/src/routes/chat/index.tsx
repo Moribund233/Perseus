@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Layout, Input, Button, Avatar, Tooltip } from 'antd';
 import {
   NumberOutlined,
@@ -16,6 +16,10 @@ import {
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import ChatSkeleton from '../../components/skeleton/ChatSkeleton';
+import { useRepositoriesStore } from '../../stores/repositories';
+import { useAuthStore } from '../../stores/auth';
+import { chatApi, type ChatMessage, type RoomMember, type RealtimeRoom } from '../../api/chat';
+import type { Repository } from '../../api/repositories';
 
 const { Sider, Content } = Layout;
 
@@ -31,6 +35,8 @@ const bgSecondary = '#161b22';
 const bgTertiary = '#1c2128';
 const green = '#3fb950';
 const yellow = '#d29922';
+
+const avatarColors = ['#1f6feb', '#3fb950', '#58a6ff', '#bc8cff', '#d29922', '#f85149', '#f0883e', '#7956d9'];
 
 interface Channel {
   id: string;
@@ -48,7 +54,7 @@ interface DM {
 }
 
 interface Message {
-  id: number;
+  id: string;
   author: string;
   initials: string;
   color: string;
@@ -65,39 +71,30 @@ interface Member {
   color: string;
 }
 
-const channels: Channel[] = [
-  { id: 'general', name: 'general', type: 'public', unread: 0 },
-  { id: 'frontend', name: 'frontend', type: 'public', unread: 3 },
-  { id: 'backend', name: 'backend', type: 'public', unread: 0 },
-  { id: 'design', name: 'design', type: 'private', unread: 1 },
-];
+function getInitials(name: string): string {
+  return name.split(/[\s_-]/).map((n) => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+}
 
-const dms: DM[] = [
-  { id: 'lw', name: 'Li Wei', status: 'online', initials: 'LW', color: '#3fb950' },
-  { id: 'cm', name: 'Chen Mei', status: 'online', initials: 'CM', color: '#58a6ff' },
-  { id: 'wj', name: 'Wang Jun', status: 'away', initials: 'WJ', color: '#d29922' },
-  { id: 'hy', name: 'Huang Yan', status: 'offline', initials: 'HY', color: '#6e7681' },
-];
+function getAvatarColor(initials: string): string {
+  let hash = 0;
+  for (let i = 0; i < initials.length; i++) {
+    hash = initials.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return avatarColors[Math.abs(hash) % avatarColors.length];
+}
 
-const messages: Message[] = [
-  { id: 1, author: 'Li Wei', initials: 'LW', color: '#3fb950', time: '09:23', text: 'Morning team! The new repo page is looking great.', reactions: [{ emoji: '👍', count: 2, active: true }] },
-  { id: 2, author: 'Chen Mei', initials: 'CM', color: '#58a6ff', time: '09:25', text: 'Can we also add a filter for archived repos? <code>is:archived</code> would be handy.' },
-  { id: 3, author: 'You', initials: 'ZL', color: '#1f6feb', time: '09:27', text: 'Good idea, I’ll add it to the backlog.' },
-];
+function formatMessageTime(dateStr: string | null): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 
-const members: Member[] = [
-  { name: 'Zhang Lei', role: 'Admin', status: 'online', initials: 'ZL', color: '#1f6feb' },
-  { name: 'Li Wei', role: 'Maintainer', status: 'online', initials: 'LW', color: '#3fb950' },
-  { name: 'Chen Mei', role: 'Maintainer', status: 'online', initials: 'CM', color: '#58a6ff' },
-  { name: 'Wang Jun', role: 'Contributor', status: 'away', initials: 'WJ', color: '#d29922' },
-  { name: 'Huang Yan', role: 'Contributor', status: 'offline', initials: 'HY', color: '#6e7681' },
-];
-
-const statusColor = (status: string) => {
+function statusColor(status: string) {
   if (status === 'online') return green;
   if (status === 'away') return yellow;
   return '#6e7681';
-};
+}
 
 function StatusDot({ status, size = 8 }: { status: string; size?: number }) {
   return (
@@ -116,17 +113,135 @@ function StatusDot({ status, size = 8 }: { status: string; size?: number }) {
 
 export default function ChatPage() {
   const [loading, setLoading] = useState(true);
-  const [activeChannel, setActiveChannel] = useState('frontend');
+  const [activeChannel, setActiveChannel] = useState<string | null>(null);
+  const [activeRepoId, setActiveRepoId] = useState<string | null>(null);
+  const [room, setRoom] = useState<RealtimeRoom | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [dms, setDms] = useState<DM[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const { t } = useTranslation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const { user } = useAuthStore();
+  const { repositories, fetchRepositoriesByUser } = useRepositoriesStore();
+
+  const channels: Channel[] = useMemo(() =>
+    repositories.map((r: Repository) => ({
+      id: r.id,
+      name: r.name,
+      type: r.is_public ? 'public' : 'private',
+      unread: 0,
+    })),
+    [repositories]
+  );
+
+  // Fetch user repositories on mount
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(timer);
+    if (user?.id) {
+      fetchRepositoriesByUser(user.id);
+    }
+  }, [user?.id, fetchRepositoriesByUser]);
+
+  // Load room, messages and members when channel changes
+  const loadChannel = useCallback(async (repoId: string, options?: { selectOnSuccess?: boolean }) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const roomData = await chatApi.getRepositoryRoom(repoId);
+      setRoom(roomData);
+      setActiveRepoId(repoId);
+      const [messagesRes, membersRes] = await Promise.all([
+        chatApi.getRoomMessages(roomData.id, { limit: 50 }),
+        chatApi.getRoomMembers(roomData.id),
+      ]);
+
+      const mappedMessages: Message[] = messagesRes.messages.map((msg: ChatMessage) => {
+        const author = msg.sender_username || 'unknown';
+        const initials = getInitials(author);
+        return {
+          id: msg.id,
+          author,
+          initials,
+          color: getAvatarColor(initials),
+          time: formatMessageTime(msg.created_at),
+          text: msg.content,
+        };
+      }).reverse();
+
+      const mappedMembers: Member[] = membersRes.map((m: RoomMember) => {
+        const name = m.username || m.user_id;
+        const initials = getInitials(name);
+        return {
+          name,
+          role: m.role === 'admin' ? 'Admin' : 'Member',
+          status: 'online',
+          initials,
+          color: getAvatarColor(initials),
+        };
+      });
+
+      const mappedDms: DM[] = membersRes.map((m: RoomMember) => {
+        const name = m.username || m.user_id;
+        const initials = getInitials(name);
+        return {
+          id: m.user_id,
+          name,
+          status: 'online',
+          initials,
+          color: getAvatarColor(initials),
+        };
+      });
+
+      setMessages(mappedMessages);
+      setMembers(mappedMembers);
+      setDms(mappedDms);
+      if (options?.selectOnSuccess) {
+        setActiveChannel(repoId);
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  if (loading) return <ChatSkeleton />;
+  // Auto-select first channel
+  useEffect(() => {
+    if (!activeChannel && channels.length > 0) {
+      const first = channels[0];
+      // 通过微任务延迟加载，避免在 effect 同步体中触发状态更新
+      Promise.resolve().then(() => {
+        loadChannel(first.id, { selectOnSuccess: true });
+      });
+    }
+  }, [channels, activeChannel, loadChannel]);
+
+  const handleChannelClick = useCallback((channelId: string) => {
+    if (channelId === activeChannel) return;
+    setActiveChannel(channelId);
+    loadChannel(channelId);
+  }, [activeChannel, loadChannel]);
+
+  const activeChannelName = useMemo(() =>
+    channels.find((c) => c.id === activeChannel)?.name || room?.name || '—',
+    [channels, activeChannel, room]
+  );
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  if (loading && !activeRepoId) return <ChatSkeleton />;
+
+  if (error) {
+    return (
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: textSecondary }}>
+        {error}
+      </div>
+    );
+  }
 
   const onlineMembers = members.filter((m) => m.status !== 'offline');
   const offlineMembers = members.filter((m) => m.status === 'offline');
@@ -171,7 +286,7 @@ export default function ChatPage() {
             return (
               <div
                 key={ch.id}
-                onClick={() => setActiveChannel(ch.id)}
+                onClick={() => handleChannelClick(ch.id)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -294,9 +409,9 @@ export default function ChatPage() {
                 color: textPrimary,
               }}
             >
-              <NumberOutlined style={{ color: textSecondary }} /> #{activeChannel}
+              <NumberOutlined style={{ color: textSecondary }} /> #{activeChannelName}
             </h3>
-            <p style={{ fontSize: 12, color: textSecondary, margin: '2px 0 0' }}>3 members online</p>
+            <p style={{ fontSize: 12, color: textSecondary, margin: '2px 0 0' }}>{onlineMembers.length} members online</p>
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
             <Tooltip title="View channel details">
@@ -336,6 +451,11 @@ export default function ChatPage() {
               {t('app.teamChat.today')}
             </span>
           </div>
+          {messages.length === 0 && !loading && (
+            <div style={{ textAlign: 'center', color: textTertiary, fontSize: 13, marginTop: 32 }}>
+              No messages yet. Start the conversation!
+            </div>
+          )}
           {messages.map((msg) => (
             <div
               key={msg.id}
@@ -430,7 +550,7 @@ export default function ChatPage() {
             <Input.TextArea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={t('app.teamChat.placeholder', { channel: activeChannel })}
+              placeholder={t('app.teamChat.placeholder', { channel: activeChannelName })}
               autoSize={{ minRows: 1, maxRows: 4 }}
               style={{
                 background: 'transparent',

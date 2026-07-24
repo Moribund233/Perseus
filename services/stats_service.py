@@ -58,3 +58,41 @@ async def get_repo_stats(repo_id: uuid.UUID, db: AsyncSession) -> dict:
         "star_count": star_count or 0,
         "member_count": member_count or 0,
     }
+
+
+async def get_platform_stats(db: AsyncSession) -> dict:
+    """
+    获取平台级公开统计
+
+    Args:
+        db: 异步数据库会话
+
+    Returns:
+        dict: 包含 repository_count, commit_count, user_count
+    """
+    from models.commit import Commit
+    from models.user import User
+
+    repo_count = (await db.execute(
+        select(func.count()).select_from(Repository).filter(Repository.is_public.is_(True))
+    )).scalar() or 0
+
+    commit_count = 0
+    if repo_count:
+        public_repo_ids = (await db.execute(
+            select(Repository.id).filter(Repository.is_public.is_(True))
+        )).scalars().all()
+        if public_repo_ids:
+            commit_count = (await db.execute(
+                select(func.count()).select_from(Commit).filter(Commit.repository_id.in_(public_repo_ids))
+            )).scalar() or 0
+
+    user_count = (await db.execute(
+        select(func.count()).select_from(User)
+    )).scalar() or 0
+
+    return {
+        "repository_count": repo_count,
+        "commit_count": commit_count,
+        "user_count": user_count,
+    }

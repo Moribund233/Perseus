@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { pullRequestsApi, type PR, type PRComment, type CreatePRCommentRequest, type CreatePRReviewRequest } from '../api/pullRequests';
+import { pullRequestsApi, type PR, type PRComment, type CreatePRCommentRequest, type CreatePRReviewRequest, type PaginationResponse } from '../api/pullRequests';
 
 interface PullRequestsState {
   pullRequests: PR[];
@@ -31,7 +31,7 @@ export const usePullRequestsStore = create<PullRequestsState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const data = await pullRequestsApi.list(repoId, status ? { status } : undefined);
-      const pullRequests = Array.isArray(data) ? data : (data as { items: PR[] }).items;
+      const pullRequests = Array.isArray(data) ? data : (data as PaginationResponse<PR>).items;
       set({ pullRequests, isLoading: false });
     } catch (e) {
       set({ error: (e as Error).message, isLoading: false });

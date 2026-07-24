@@ -3,21 +3,29 @@ import { apiRequest } from './client';
 export interface ChatMessage {
   id: string;
   room_id: string;
-  user_id: string;
-  content: string;
+  sender_id: string;
+  sender_username: string;
   message_type: string;
-  metadata: Record<string, unknown> | null;
-  created_at: string;
-  user?: { id: string; username: string; full_name: string | null };
+  content: string;
+  reply_to: string | null;
+  edited_at: string | null;
+  created_at: string | null;
 }
 
 export interface RoomMember {
   id: string;
   room_id: string;
   user_id: string;
+  username: string;
   role: string;
-  joined_at: string;
-  user?: { id: string; username: string; full_name: string | null };
+  joined_at: string | null;
+  is_muted: boolean;
+}
+
+export interface MessagesResponse {
+  messages: ChatMessage[];
+  has_more: boolean;
+  next_before: string | null;
 }
 
 export interface RealtimeRoom {
@@ -26,12 +34,13 @@ export interface RealtimeRoom {
   name: string;
   topic: string | null;
   is_active: boolean;
+  created_at: string | null;
 }
 
 export const chatApi = {
-  getRoomMessages: (roomId: string, params?: { limit?: number; before?: number }) => {
+  getRoomMessages: (roomId: string, params?: { limit?: number; before?: string }) => {
     const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
-    return apiRequest<ChatMessage[]>(`/api/v1/rooms/${roomId}/messages${qs}`);
+    return apiRequest<MessagesResponse>(`/api/v1/rooms/${roomId}/messages${qs}`);
   },
 
   getRoomMembers: (roomId: string) =>

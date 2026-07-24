@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Layout, Avatar, Button, Tag } from 'antd';
 import {
   PullRequestOutlined,
@@ -99,7 +99,6 @@ export default function PullRequestsPage() {
 
   const [selectedRepoId, setSelectedRepoId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'open' | 'merged' | 'closed' | 'all'>('open');
-  const [initialLoading, setInitialLoading] = useState(true);
   const { t } = useTranslation();
 
   const activeRepoId = selectedRepoId ?? repositories[0]?.id;
@@ -117,10 +116,9 @@ export default function PullRequestsPage() {
     }
   }, [activeRepoId, fetchPullRequests]);
 
-  useEffect(() => {
-    if (pullRequests.length > 0 || prError || (!prLoading && !repoLoading)) {
-      setInitialLoading(false);
-    }
+  const initialLoading = useMemo(() => {
+    if (pullRequests.length > 0 || prError) return false;
+    return prLoading || repoLoading;
   }, [pullRequests.length, prError, prLoading, repoLoading]);
 
   if (initialLoading) {
@@ -131,7 +129,7 @@ export default function PullRequestsPage() {
     const authorName = pr.author?.full_name || pr.author?.username || 'Unknown';
     const initials = getInitials(authorName);
     return {
-      id: pr.pr_number,
+      id: String(pr.pr_number),
       title: pr.title,
       author: authorName,
       time: relativeTime(pr.created_at),

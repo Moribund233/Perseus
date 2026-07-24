@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { repositoriesApi, type Repository, type RepoFile, type RepoBlob, type RepoBranch, type RepoCommit, type RepoMember } from '../api/repositories';
+import { repositoriesApi, type Repository, type RepoFile, type RepoBlob, type RepoBranch, type RepoCommit, type RepoMember, type PaginationResponse } from '../api/repositories';
 
 interface RepositoriesState {
   repositories: Repository[];
@@ -51,7 +51,7 @@ export const useRepositoriesStore = create<RepositoriesState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const data = await repositoriesApi.list();
-      const repositories = Array.isArray(data) ? data : (data as { items: Repository[] }).items;
+      const repositories = Array.isArray(data) ? data : (data as PaginationResponse<Repository>).items;
       set({ repositories, isLoading: false });
     } catch (e) {
       set({ error: (e as Error).message, isLoading: false });
@@ -62,7 +62,7 @@ export const useRepositoriesStore = create<RepositoriesState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const data = await repositoriesApi.listPublic();
-      const repositories = Array.isArray(data) ? data : (data as { items: Repository[] }).items;
+      const repositories = Array.isArray(data) ? data : (data as PaginationResponse<Repository>).items;
       set({ repositories, isLoading: false });
     } catch (e) {
       set({ error: (e as Error).message, isLoading: false });
@@ -73,7 +73,7 @@ export const useRepositoriesStore = create<RepositoriesState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const data = await repositoriesApi.listByUser(userId);
-      const repositories = Array.isArray(data) ? data : (data as { items: Repository[] }).items;
+      const repositories = Array.isArray(data) ? data : (data as PaginationResponse<Repository>).items;
       set({ repositories, isLoading: false });
     } catch (e) {
       set({ error: (e as Error).message, isLoading: false });
@@ -185,14 +185,14 @@ export const useRepositoriesStore = create<RepositoriesState>((set, get) => ({
   fetchCommits: async (repoId, params) => {
     try {
       const data = await repositoriesApi.getCommits(repoId, params);
-      const result = 'commits' in data ? (data as { commits: RepoCommit[] }).commits : data as RepoCommit[];
-      const commits = result.map((c: Record<string, unknown>) => ({
-        id: 0,
-        hash: (c.sha || c.hash) as string,
-        message: c.message as string,
-        author_name: ((c.author as { name?: string })?.name || c.author_name) as string,
-        author_email: ((c.author as { email?: string })?.email || c.author_email) as string,
-        author_date: ((c.author as { date?: string })?.date || c.author_date) as string,
+      const result = data.commits;
+      const commits = result.map((c) => ({
+        id: c.sha,
+        hash: c.sha,
+        message: c.message,
+        author_name: c.author.name,
+        author_email: c.author.email,
+        author_date: c.author.date,
       }));
       set({ commits });
     } catch (e) {

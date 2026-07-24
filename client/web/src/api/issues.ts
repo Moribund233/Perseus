@@ -10,7 +10,7 @@ export interface Issue {
   status: 'open' | 'closed';
   priority: 'low' | 'medium' | 'high' | 'critical';
   assignee_id: string | null;
-  closed_by: string | null;
+  closed_by: { id: string; username: string; full_name: string | null } | null;
   created_at: string;
   updated_at: string;
   author?: { id: string; username: string; full_name: string | null };
@@ -57,14 +57,24 @@ export interface IssueFilter {
   search?: string;
 }
 
+export interface PaginationResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
 export const issuesApi = {
   list: (repoId: string, params?: { status?: string; page?: number; per_page?: number }) => {
     const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
-    return apiRequest<Issue[]>(`/api/v1/repositories/${repoId}/issues${qs}`);
+    return apiRequest<PaginationResponse<Issue>>(`/api/v1/repositories/${repoId}/issues${qs}`);
   },
 
   filter: (repoId: string, data: IssueFilter) =>
-    apiRequest<Issue[]>(`/api/v1/repositories/${repoId}/issues/filter`, {
+    apiRequest<PaginationResponse<Issue>>(`/api/v1/repositories/${repoId}/issues/filter`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),

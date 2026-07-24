@@ -51,7 +51,7 @@ export interface CreatePRCommentRequest {
   file_path?: string;
   line_number?: number;
   commit_hash?: string;
-  parent_id?: number;
+  parent_id?: string;
 }
 
 export interface PRReview {
@@ -69,10 +69,20 @@ export interface CreatePRReviewRequest {
   comment: string;
 }
 
+export interface PaginationResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
 export const pullRequestsApi = {
   list: (repoId: string, params?: { status?: string; page?: number; per_page?: number }) => {
     const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
-    return apiRequest<PR[]>(`/api/v1/repositories/${repoId}/pull-requests${qs}`);
+    return apiRequest<PaginationResponse<PR>>(`/api/v1/repositories/${repoId}/pull-requests${qs}`);
   },
 
   get: (repoId: string, prNumber: number) =>
@@ -125,13 +135,13 @@ export const pullRequestsApi = {
       body: JSON.stringify(data),
     }),
 
-  addLabel: (prId: string, labelId: string) =>
-    apiRequest<void>(`/pull-requests/${prId}/labels/${labelId}`, {
+  addLabel: (repoId: string, prNumber: number, labelId: string) =>
+    apiRequest<void>(`/api/v1/repositories/${repoId}/pull-requests/${prNumber}/labels/${labelId}`, {
       method: 'POST',
     }),
 
-  removeLabel: (prId: string, labelId: string) =>
-    apiRequest<void>(`/pull-requests/${prId}/labels/${labelId}`, {
+  removeLabel: (repoId: string, prNumber: number, labelId: string) =>
+    apiRequest<void>(`/api/v1/repositories/${repoId}/pull-requests/${prNumber}/labels/${labelId}`, {
       method: 'DELETE',
     }),
 };

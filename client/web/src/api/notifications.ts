@@ -16,20 +16,23 @@ export interface Notification {
 export interface NotificationPreference {
   email_on_mention: boolean;
   email_on_pr_review: boolean;
+  email_on_issue_comment: boolean;
   email_on_pr_merge: boolean;
-  email_on_issue_assign: boolean;
-  email_on_build_status: boolean;
-  push_on_mention: boolean;
-  push_on_pr_review: boolean;
-  push_on_pr_merge: boolean;
-  push_on_issue_assign: boolean;
-  push_on_build_status: boolean;
+  email_on_release: boolean;
+  in_app_on_mention: boolean;
+  in_app_on_pr_review: boolean;
+  in_app_on_issue_comment: boolean;
+}
+
+export interface NotificationListResponse {
+  notifications: Notification[];
+  total: number;
 }
 
 export const notificationsApi = {
   list: (params?: { page?: number; per_page?: number; unread_only?: boolean }) => {
     const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
-    return apiRequest<Notification[]>(`/api/v1/notifications${qs}`);
+    return apiRequest<NotificationListResponse>(`/api/v1/notifications${qs}`);
   },
 
   getUnreadCount: () =>

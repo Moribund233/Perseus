@@ -72,10 +72,43 @@ export interface RepoMember {
   user?: { id: string; username: string; full_name: string | null };
 }
 
+export interface PaginationResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
+export interface CommitListResponse {
+  commits: Array<{
+    sha: string;
+    message: string;
+    author: { name: string; email: string; date: string };
+    committer?: { name: string; email: string; date: string };
+    parents?: string[];
+  }>;
+  pagination: { page: number; per_page: number };
+}
+
+export interface CodeSearchResult {
+  path: string;
+  line: number;
+  content: string;
+}
+
+export interface CodeSearchResponse {
+  results: CodeSearchResult[];
+  total_count: number;
+  truncated: boolean;
+}
+
 export const repositoriesApi = {
   list: (params?: { page?: number; per_page?: number }) => {
     const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
-    return apiRequest<Repository[]>(`/api/v1/repositories${qs}`);
+    return apiRequest<PaginationResponse<Repository>>(`/api/v1/repositories${qs}`);
   },
 
   listPublic: (params?: { page?: number; per_page?: number }) => {
@@ -113,18 +146,20 @@ export const repositoriesApi = {
   unarchive: (repoId: string) =>
     apiRequest<void>(`/api/v1/repositories/${repoId}/unarchive`, { method: 'POST' }),
 
-  checkAccess: (repoId: string) =>
-    apiRequest<{ has_access: boolean; role?: string }>(`/api/v1/repositories/${repoId}/access`),
+  checkAccess: (repoId: string, userId: string) =>
+    apiRequest<{ has_access: boolean; role?: string }>(`/api/v1/repositories/${repoId}/access?user_id=${encodeURIComponent(userId)}`),
 
   getTree: async (repoId: string, ref?: string, path?: string) => {
     const params = new URLSearchParams();
     if (ref) params.set('ref', ref);
     if (path) params.set('path', path);
     const qs = params.toString() ? `?${params.toString()}` : '';
-    const data = await apiRequest<{ entries: RepoFile[] }>(`/api/v1/repositories/${repoId}/tree${qs}`);
+    const data = await apiRequest<{ entries: Array<{ name: string; path: string; type: 'tree' | 'blob' | 'symlink'; size?: number; sha?: string }> }>(
+      `/api/v1/repositories/${repoId}/tree${qs}`
+    );
     return data.entries.map((e) => ({
       ...e,
-      type: e.type === 'tree' ? 'directory' as const : e.type === 'blob' ? 'file' as const : e.type,
+      type: e.type === 'tree' ? ('directory' as const) : e.type === 'blob' ? ('file' as const) : e.type,
     }));
   },
 
@@ -144,7 +179,7 @@ export const repositoriesApi = {
     if (params?.per_page) qparams['per_page'] = String(params.per_page);
     if (params?.branch) qparams['ref'] = params.branch;
     const qs = Object.keys(qparams).length ? '?' + new URLSearchParams(qparams).toString() : '';
-    return apiRequest<{ commits: RepoCommit[]; pagination: { page: number; per_page: number } }>(`/api/v1/repositories/${repoId}/commits${qs}`);
+    return apiRequest<CommitListResponse>(`/api/v1/repositories/${repoId}/commits${qs}`);
   },
 
   getCommitHistory: (repoId: string, params?: { page?: number; per_page?: number; branch?: string }) => {
@@ -203,8 +238,8 @@ export const repositoriesApi = {
   removeMember: (repoId: string, userId: string) =>
     apiRequest<void>(`/api/v1/repositories/${repoId}/members/${userId}`, { method: 'DELETE' }),
 
-  checkMemberPermission: (repoId: string, userId: string) =>
-    apiRequest<{ role: string; permissions: string[] }>(`/api/v1/repositories/${repoId}/members/${userId}/permission`),
+  checkMemberPermission: (repoId: string, userId: string, permission: string) =>
+    apiRequest<{ role: string; permissions: string[] }>(`/api/v1/repositories/${repoId}/members/${userId}/permission?permission=${encodeURIComponent(permission)}`),
 
   getStats: (repoId: string) =>
     apiRequest<Record<string, unknown>>(`/api/v1/repositories/${repoId}/stats`),
@@ -225,6 +260,6 @@ export const repositoriesApi = {
 
   searchCode: (repoId: string, query: string) => {
     const qs = `?q=${encodeURIComponent(query)}`;
-    return apiRequest<{ path: string; line: number; content: string }[]>(`/api/v1/repositories/${repoId}/search${qs}`);
+    return apiRequest<CodeSearchResponse>(`/api/v1/repositories/${repoId}/search${qs}`);
   },
 };

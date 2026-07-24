@@ -317,21 +317,30 @@ export default function RepositoriesPage() {
     return () => {
       if (repo) clearCurrent();
     };
-  }, [owner, repo, user?.id, repoFilter]);
+  }, [owner, repo, user, user?.id, repoFilter, fetchRepositoryByPath, fetchRepositoriesByUser, fetchRepositories, clearCurrent]);
 
   useEffect(() => {
-    if (!selectedTreeKey || !currentRepo) return;
-    const file = storeFiles.find((f) => f.path === selectedTreeKey && f.type === 'file');
-    if (!file) {
-      setSelectedFileContent(null);
-      return;
-    }
-    setFileLoading(true);
-    repositoriesApi.getBlob(currentRepo.id, selectedTreeKey, currentRepo.default_branch)
-      .then((blob) => setSelectedFileContent(blob))
-      .catch(() => setSelectedFileContent(null))
-      .finally(() => setFileLoading(false));
-  }, [selectedTreeKey, currentRepo?.id]);
+    let cancelled = false;
+    const loadFile = async () => {
+      if (!selectedTreeKey || !currentRepo) return;
+      const file = storeFiles.find((f) => f.path === selectedTreeKey && f.type === 'file');
+      if (!file) {
+        if (!cancelled) setSelectedFileContent(null);
+        return;
+      }
+      if (!cancelled) setFileLoading(true);
+      try {
+        const blob = await repositoriesApi.getBlob(currentRepo.id, selectedTreeKey, currentRepo.default_branch);
+        if (!cancelled) setSelectedFileContent(blob);
+      } catch {
+        if (!cancelled) setSelectedFileContent(null);
+      } finally {
+        if (!cancelled) setFileLoading(false);
+      }
+    };
+    loadFile();
+    return () => { cancelled = true; };
+  }, [selectedTreeKey, currentRepo, storeFiles]);
 
   const isRepoEmpty = !!currentRepo && !currentRepo.status?.initialized;
 
@@ -347,7 +356,7 @@ export default function RepositoriesPage() {
         setIsStarred(res.starred);
       }).catch(() => {});
     }
-  }, [currentRepo?.id]);
+  }, [currentRepo, fetchTree, fetchReadme, fetchBranches, fetchCommits]);
 
   const repoTree = useMemo(() => buildTree(storeFiles), [storeFiles]);
 

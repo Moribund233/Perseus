@@ -56,24 +56,42 @@ async def delete_label(
     return await pr_label_service.delete_label(repo_id, label_id, db)
 
 
-@router.post("/pull-requests/{pr_id}/labels/{label_id}")
+@router.post("/{repo_id}/pull-requests/{pr_number}/labels/{label_id}")
 async def add_label_to_pr(
-    pr_id: uuid.UUID,
+    repo_id: uuid.UUID,
+    pr_number: int,
     label_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await pr_label_service.add_label_to_pr(pr_id, label_id, db)
+    """为指定仓库的 PR 添加标签
+
+    Args:
+        repo_id: 仓库ID
+        pr_number: PR 编号
+        label_id: 标签ID
+    """
+    await require_repository_owner_or_admin(db, repo_id, current_user.id, "add labels to pull requests")
+    return await pr_label_service.add_label_to_pr(repo_id, pr_number, label_id, db)
 
 
-@router.delete("/pull-requests/{pr_id}/labels/{label_id}")
+@router.delete("/{repo_id}/pull-requests/{pr_number}/labels/{label_id}")
 async def remove_label_from_pr(
-    pr_id: uuid.UUID,
+    repo_id: uuid.UUID,
+    pr_number: int,
     label_id: uuid.UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await pr_label_service.remove_label_from_pr(pr_id, label_id, db)
+    """从指定仓库的 PR 移除标签
+
+    Args:
+        repo_id: 仓库ID
+        pr_number: PR 编号
+        label_id: 标签ID
+    """
+    await require_repository_owner_or_admin(db, repo_id, current_user.id, "remove labels from pull requests")
+    return await pr_label_service.remove_label_from_pr(repo_id, pr_number, label_id, db)
 
 
 @router.get("/pr-labels/{label_id}/pull-requests")

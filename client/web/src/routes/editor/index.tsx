@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Layout, Avatar } from 'antd';
 import {
   FolderOutlined,
@@ -18,8 +18,16 @@ import { lintKeymap } from '@codemirror/lint';
 import { closeBrackets, autocompletion, closeBracketsKeymap, completionKeymap } from '@codemirror/autocomplete';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { javascript } from '@codemirror/lang-javascript';
+import { python } from '@codemirror/lang-python';
+import { json } from '@codemirror/lang-json';
+import { html } from '@codemirror/lang-html';
+import { css } from '@codemirror/lang-css';
+import { markdown } from '@codemirror/lang-markdown';
 import { useTranslation } from 'react-i18next';
+import { useParams } from 'react-router-dom';
 import EditorSkeleton from '../../components/skeleton/EditorSkeleton';
+import { useRepositoriesStore } from '../../stores/repositories';
+import type { RepoFile, RepoMember } from '../../api/repositories';
 
 const { Sider, Content } = Layout;
 
@@ -41,140 +49,115 @@ interface TreeNode {
   title: string;
   key: string;
   type: 'folder' | 'file';
-  fileType?: 'ts' | 'json' | 'md' | 'css';
+  fileType?: 'ts' | 'json' | 'md' | 'css' | 'py' | 'html';
   children?: TreeNode[];
 }
 
-const fileTree: TreeNode[] = [
-  {
-    title: 'PERSEUS-CORE',
-    key: 'perseus-core',
-    type: 'folder',
-    children: [
-      {
-        title: 'src',
-        key: 'src',
-        type: 'folder',
-        children: [
-          {
-            title: 'core',
-            key: 'core',
-            type: 'folder',
-            children: [
-              { title: 'engine.ts', key: 'engine.ts', type: 'file', fileType: 'ts' },
-              { title: 'crdt.ts', key: 'crdt.ts', type: 'file', fileType: 'ts' },
-            ],
-          },
-          {
-            title: 'collab',
-            key: 'collab',
-            type: 'folder',
-            children: [
-              { title: 'websocket-client.ts', key: 'websocket-client.ts', type: 'file', fileType: 'ts' },
-              { title: 'presence.ts', key: 'presence.ts', type: 'file', fileType: 'ts' },
-            ],
-          },
-          {
-            title: 'editor',
-            key: 'editor',
-            type: 'folder',
-            children: [
-              { title: 'renderer.ts', key: 'renderer.ts', type: 'file', fileType: 'ts' },
-              { title: 'highlighter.ts', key: 'highlighter.ts', type: 'file', fileType: 'ts' },
-            ],
-          },
-          { title: 'utils', key: 'utils', type: 'folder' },
-        ],
-      },
-      { title: 'package.json', key: 'package.json', type: 'file', fileType: 'json' },
-      { title: 'tsconfig.json', key: 'tsconfig.json', type: 'file', fileType: 'json' },
-      { title: 'README.md', key: 'README.md', type: 'file', fileType: 'md' },
-    ],
-  },
-];
+const avatarColors = ['#1f6feb', '#3fb950', '#58a6ff', '#bc8cff', '#d29922', '#f85149', '#f0883e', '#7956d9'];
 
-const fileTabs = ['engine.ts', 'websocket-client.ts', 'presence.ts'];
+function getInitials(name: string): string {
+  return name.split(/[\s_-]/).map((n) => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+}
 
-const sampleCode = `import { EventEmitter } from 'events';
-import { CRDTDocument, Operation } from './crdt';
-import { PresenceManager, CursorState } from './presence';
-import { MessageHandler, ConnectionState, WSMessage } from './types';
-
-const MAX_RETRY_DELAY = 30000;
-const BASE_RETRY_DELAY = 1000;
-const HEARTBEAT_INTERVAL = 15000;
-
-/**
- * WebSocket client for real-time collaboration.
- * Implements automatic reconnection with exponential
- * backoff and message queuing for offline support.
- */
-export class WebSocketClient extends EventEmitter {
-  private ws: WebSocket | null = null;
-  private url: string;
-  private retryCount = 0;
-  private messageQueue: WSMessage[] = [];
-  private presenceManager: PresenceManager;
-  private heartbeatTimer: NodeJS.Timer | null = null;
-  private state: ConnectionState = 'disconnected';
-
-  constructor(url: string, private doc: CRDTDocument) {
-    super();
-    this.url = url;
-    this.presenceManager = new PresenceManager();
-    this.setupDocumentListeners();
+function getAvatarColor(initials: string): string {
+  let hash = 0;
+  for (let i = 0; i < initials.length; i++) {
+    hash = initials.charCodeAt(i) + ((hash << 5) - hash);
   }
+  return avatarColors[Math.abs(hash) % avatarColors.length];
+}
 
-  /**
-   * Establish WebSocket connection with retry logic.
-   */
-  async connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      try {
-        this.ws = new WebSocket(this.url);
-        this.state = 'connecting';
-        this.emit('stateChange', this.state);
+function getFileType(filename: string): TreeNode['fileType'] | undefined {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  if (ext === 'ts' || ext === 'tsx') return 'ts';
+  if (ext === 'json') return 'json';
+  if (ext === 'md' || ext === 'markdown') return 'md';
+  if (ext === 'css' || ext === 'scss' || ext === 'less') return 'css';
+  if (ext === 'py') return 'py';
+  if (ext === 'html' || ext === 'htm') return 'html';
+  return undefined;
+}
 
-        this.ws.onopen = () => {
-          this.state = 'connected';
-          this.retryCount = 0;
-          this.emit('stateChange', this.state);
-          this.startHeartbeat();
-          this.flushMessageQueue();
-          resolve();
-        };
-      } catch (err) {
-        reject(err);
-      }
-    });
-  }
-
-  private getRetryDelay(): number {
-    const delay = Math.min(
-      BASE_RETRY_DELAY * Math.pow(2, this.retryCount),
-      MAX_RETRY_DELAY
-    );
-    return delay + Math.random() * 1000;
-  }
-
-  /**
-   * Send an operation to all connected peers.
-   */
-  sendOperation(op: Operation): void {
-    const msg: WSMessage = {
-      type: 'operation',
-      payload: op,
-      timestamp: Date.now(),
-      clientId: this.presenceManager.clientId
-    };
-    if (this.state === 'connected') {
-      this.ws!.send(JSON.stringify(msg));
-    } else {
-      this.messageQueue.push(msg);
-    }
+function getLanguageExtension(path: string) {
+  const ext = path.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'js':
+    case 'jsx':
+    case 'mjs':
+      return javascript();
+    case 'ts':
+    case 'tsx':
+      return javascript({ typescript: true });
+    case 'py':
+      return python();
+    case 'json':
+      return json();
+    case 'html':
+    case 'htm':
+      return html();
+    case 'css':
+    case 'scss':
+    case 'less':
+      return css();
+    case 'md':
+    case 'markdown':
+      return markdown();
+    default:
+      return undefined;
   }
 }
-`;
+
+function buildTree(files: RepoFile[]): TreeNode[] {
+  const root: TreeNode = { title: 'root', key: 'root', type: 'folder', children: [] };
+  for (const file of files) {
+    const parts = file.path.split('/');
+    let current = root;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isLast = i === parts.length - 1;
+      const key = parts.slice(0, i + 1).join('/');
+      const existing = current.children?.find((c) => c.key === key);
+      if (existing) {
+        current = existing;
+        continue;
+      }
+      const node: TreeNode = {
+        title: part,
+        key,
+        type: isLast ? (file.type === 'directory' ? 'folder' : 'file') : 'folder',
+        fileType: isLast ? getFileType(part) : undefined,
+        children: isLast ? undefined : [],
+      };
+      current.children!.push(node);
+      current = node;
+    }
+  }
+  return root.children || [];
+}
+
+function findFirstFile(nodes: TreeNode[]): TreeNode | null {
+  for (const node of nodes) {
+    if (node.type === 'file') return node;
+    if (node.children) {
+      const found = findFirstFile(node.children);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function findFileByKey(nodes: TreeNode[], key: string): TreeNode | null {
+  for (const node of nodes) {
+    if (node.key === key) return node;
+    if (node.children) {
+      const found = findFileByKey(node.children, key);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+const sampleCode = `// Select a file from the explorer to view repository contents.`;
 
 const basicSetup = () => [
   lineNumbers(),
@@ -201,24 +184,10 @@ const basicSetup = () => [
   ]),
 ];
 
-const collaborators = [
-  { initials: 'LW', color: '#3fb950', border: '#3fb950', title: 'Li Wei — editing engine.ts' },
-  { initials: 'CM', color: '#58a6ff', border: '#58a6ff', title: 'Chen Mei — viewing websocket-client.ts' },
-  { initials: 'WJ', color: '#bc8cff', border: '#bc8cff', title: 'Wang Jun — idle' },
-  { initials: 'ZL', color: '#d29922', border: '#d29922', title: 'Zhang Lei (you) — editing' },
-];
-
 const discussions = [
   { id: 1, author: 'Li Wei', line: 'Line 11', code: 'handleMessage(msg)', text: 'Should we add error handling for malformed JSON messages? The current parse will throw.', replies: 2, time: '10m ago', icon: '💬' },
   { id: 2, author: 'Chen Mei', line: 'Line 15', code: 'startHeartbeat()', text: 'Should we make the heartbeat interval configurable instead of hardcoded?', replies: 1, time: '25m ago', icon: '💬' },
   { id: 3, author: 'Wang Jun', line: 'Line 34', code: 'getRetryDelay()', text: 'Fixed the jitter calculation — changed Math.random() to use crypto.getRandomValues per review feedback.', replies: 0, time: '1h ago', icon: '✅', resolved: true },
-];
-
-const editors = [
-  { initials: 'LW', color: '#3fb950', name: 'Li Wei', file: 'engine.ts', status: 'editing' },
-  { initials: 'CM', color: '#58a6ff', name: 'Chen Mei', file: 'websocket-client.ts', status: 'viewing' },
-  { initials: 'WJ', color: '#bc8cff', name: 'Wang Jun', file: 'crdt.ts', status: 'viewing' },
-  { initials: 'ZL', color: '#d29922', name: 'Zhang Lei', file: 'websocket-client.ts (you)', status: 'editing' },
 ];
 
 function FileIcon({ type, fileType }: { type: 'folder' | 'file'; fileType?: string }) {
@@ -229,6 +198,8 @@ function FileIcon({ type, fileType }: { type: 'folder' | 'file'; fileType?: stri
       case 'json': color = '#d29922'; break;
       case 'md': color = blueLight; break;
       case 'css': color = '#563d7c'; break;
+      case 'py': color = '#3572A5'; break;
+      case 'html': color = '#e34c26'; break;
       default: color = textSecondary;
     }
   }
@@ -304,33 +275,173 @@ function TreeNodeView({
 }
 
 export default function EditorPage() {
+  const { owner, repo } = useParams<{ owner?: string; repo?: string }>();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('websocket-client.ts');
+  const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [openTabs, setOpenTabs] = useState<string[]>([]);
   const [panelTab, setPanelTab] = useState('discussions');
-  const [selectedTreeKey, setSelectedTreeKey] = useState('websocket-client.ts');
+  const [selectedTreeKey, setSelectedTreeKey] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
   const { t } = useTranslation();
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(timer);
-  }, []);
+  const {
+    currentRepo,
+    files,
+    currentBlob,
+    members,
+    fetchRepositoryByPath,
+    fetchTree,
+    fetchBlob,
+    fetchMembers,
+    clearCurrent,
+  } = useRepositoriesStore();
 
+  const fileTree = useMemo(() => buildTree(files), [files]);
+
+  // Load repository
   useEffect(() => {
-    if (loading || !editorRef.current || viewRef.current) return;
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      if (!owner || !repo) {
+        setLoading(false);
+        return;
+      }
+      try {
+        await fetchRepositoryByPath(owner, repo);
+        if (cancelled) return;
+        const repoId = useRepositoriesStore.getState().currentRepo?.id;
+        if (!repoId) {
+          setError('Repository not found');
+          setLoading(false);
+          return;
+        }
+        await Promise.all([fetchTree(repoId), fetchMembers(repoId)]);
+        if (cancelled) return;
+        const tree = useRepositoriesStore.getState().files;
+        const built = buildTree(tree);
+        const readme = findFileByKey(built, 'README.md') || findFileByKey(built, 'readme.md');
+        const defaultFile = readme || findFirstFile(built);
+        if (defaultFile) {
+          setActiveTab(defaultFile.key);
+          setSelectedTreeKey(defaultFile.key);
+          setOpenTabs([defaultFile.key]);
+          await fetchBlob(repoId, defaultFile.key);
+        }
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+      clearCurrent();
+    };
+  }, [owner, repo, fetchRepositoryByPath, fetchTree, fetchBlob, fetchMembers, clearCurrent]);
+
+  const handleSelectFile = useCallback(async (key: string) => {
+    setSelectedTreeKey(key);
+    const node = findFileByKey(fileTree, key);
+    if (!node || node.type !== 'file') return;
+    setActiveTab(key);
+    setOpenTabs((prev) => (prev.includes(key) ? prev : [...prev, key]));
+    const repoId = currentRepo?.id;
+    if (repoId) {
+      try {
+        await fetchBlob(repoId, key);
+      } catch {
+        // 错误已由 store 记录
+      }
+    }
+  }, [fileTree, currentRepo?.id, fetchBlob]);
+
+  const closeTab = useCallback((key: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpenTabs((prev) => {
+      const idx = prev.indexOf(key);
+      const next = prev.filter((k) => k !== key);
+      if (activeTab === key) {
+        const newActive = next[idx] ?? next[idx - 1] ?? null;
+        setActiveTab(newActive);
+        if (newActive) {
+          setSelectedTreeKey(newActive);
+          const repoId = currentRepo?.id;
+          if (repoId) fetchBlob(repoId, newActive);
+        }
+      }
+      return next;
+    });
+  }, [activeTab, currentRepo?.id, fetchBlob]);
+
+  // Initialize / update CodeMirror editor
+  useEffect(() => {
+    if (loading || !editorRef.current) return;
+    if (viewRef.current) {
+      viewRef.current.destroy();
+      viewRef.current = null;
+    }
+    const content = currentBlob?.content ?? sampleCode;
+    const lang = activeTab ? getLanguageExtension(activeTab) : undefined;
+    const extensions = [basicSetup(), oneDark, EditorView.theme({ '&': { height: '100%' }, '.cm-scroller': { overflow: 'auto' } })];
+    if (lang) extensions.push(lang);
+
     const state = EditorState.create({
-      doc: sampleCode,
-      extensions: [basicSetup(), oneDark, javascript(), EditorView.theme({ '&': { height: '100%' }, '.cm-scroller': { overflow: 'auto' } })],
+      doc: content,
+      extensions,
     });
     viewRef.current = new EditorView({ state, parent: editorRef.current });
     return () => {
       viewRef.current?.destroy();
       viewRef.current = null;
     };
-  }, [loading]);
+  }, [loading, activeTab, currentBlob]);
+
+  const collaborators = useMemo(() => {
+    return (members as RepoMember[]).map((m) => {
+      const name = m.user?.username || m.user_id;
+      const initials = getInitials(name);
+      return {
+        initials,
+        color: getAvatarColor(initials),
+        border: getAvatarColor(initials),
+        title: `${name} — ${m.role}`,
+      };
+    });
+  }, [members]);
+
+  const editors = useMemo(() => {
+    return (members as RepoMember[]).map((m) => {
+      const name = m.user?.username || m.user_id;
+      const initials = getInitials(name);
+      return {
+        initials,
+        color: getAvatarColor(initials),
+        name,
+        file: activeTab || '—',
+        status: 'viewing' as const,
+      };
+    });
+  }, [members, activeTab]);
 
   if (loading) return <EditorSkeleton />;
+
+  if (error || !owner || !repo) {
+    return (
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: textSecondary }}>
+        {error || t('app.codeEditor.selectRepository', { defaultValue: '请从仓库列表选择一个仓库以浏览代码' })}
+      </div>
+    );
+  }
+
+  const activeNode = activeTab ? findFileByKey(fileTree, activeTab) : null;
+  const breadcrumb = activeNode ? activeNode.key.split('/') : [];
 
   return (
     <Layout style={{ height: '100%', background: 'transparent' }}>
@@ -363,7 +474,7 @@ export default function EditorPage() {
               fontWeight: 600,
             }}
           >
-            Explorer — perseus-core
+            Explorer — {currentRepo?.name || `${owner}/${repo}`}
           </span>
           <button
             style={{
@@ -389,7 +500,7 @@ export default function EditorPage() {
               node={node}
               depth={0}
               selectedKey={selectedTreeKey}
-              onSelect={setSelectedTreeKey}
+              onSelect={handleSelectFile}
             />
           ))}
         </div>
@@ -399,12 +510,13 @@ export default function EditorPage() {
       <Layout style={{ background: 'transparent' }}>
         {/* Tabs */}
         <div style={{ display: 'flex', background: bgSecondary, borderBottom: `1px solid ${borderColor}`, overflowX: 'auto', flexShrink: 0 }}>
-          {fileTabs.map((tab) => {
+          {openTabs.map((tab) => {
             const isActive = activeTab === tab;
+            const tabNode = findFileByKey(fileTree, tab);
             return (
               <div
                 key={tab}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => handleSelectFile(tab)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -422,7 +534,7 @@ export default function EditorPage() {
                 }}
               >
                 <FileTextOutlined style={{ fontSize: 14, color: '#3178c6' }} />
-                {tab}
+                {tabNode?.title || tab}
                 <span
                   style={{
                     width: 16,
@@ -437,6 +549,7 @@ export default function EditorPage() {
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = borderColor; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                  onClick={(e) => closeTab(tab, e)}
                 >
                   ×
                 </span>
@@ -472,13 +585,13 @@ export default function EditorPage() {
             flexShrink: 0,
           }}
         >
-          <span style={{ cursor: 'pointer' }}>perseus-core</span>
-          <span>/</span>
-          <span style={{ cursor: 'pointer' }}>src</span>
-          <span>/</span>
-          <span style={{ cursor: 'pointer' }}>collab</span>
-          <span>/</span>
-          <span style={{ color: textPrimary }}>websocket-client.ts</span>
+          <span style={{ cursor: 'pointer' }}>{currentRepo?.name || repo}</span>
+          {breadcrumb.map((part, idx) => (
+            <span key={idx} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span>/</span>
+              <span style={idx === breadcrumb.length - 1 ? { color: textPrimary } : { cursor: 'pointer' }}>{part}</span>
+            </span>
+          ))}
         </div>
 
         {/* Collab Bar */}
@@ -507,9 +620,9 @@ export default function EditorPage() {
             {t('app.codeEditor.online')}
           </div>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            {collaborators.map((c, i) => (
+            {collaborators.slice(0, 6).map((c, i) => (
               <div
-                key={c.initials}
+                key={`${c.initials}-${i}`}
                 style={{
                   marginLeft: i > 0 ? -6 : 0,
                   transition: 'transform 0.15s, box-shadow 0.15s',
@@ -517,6 +630,7 @@ export default function EditorPage() {
                 }}
                 onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.zIndex = '5'; }}
                 onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.zIndex = 'auto'; }}
+                title={c.title}
               >
                 <Avatar
                   size={24}
@@ -534,7 +648,7 @@ export default function EditorPage() {
           </div>
           <div style={{ color: textTertiary, marginLeft: 'auto', fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
             <TeamOutlined style={{ fontSize: 14 }} />
-            <strong style={{ color: textSecondary }}>2</strong> editors viewing this file
+            <strong style={{ color: textSecondary }}>{Math.max(1, members.length)}</strong> editors viewing this file
           </div>
         </div>
 
@@ -556,8 +670,8 @@ export default function EditorPage() {
         >
           <div style={{ display: 'flex', background: bgSecondary, borderBottom: `1px solid ${borderColor}`, padding: '0 8px', flexShrink: 0 }}>
             {[
-              { key: 'discussions', icon: <MessageOutlined style={{ fontSize: 12 }} />, label: t('app.codeEditor.discussions'), count: 3 },
-              { key: 'editors', icon: <TeamOutlined style={{ fontSize: 12 }} />, label: t('app.codeEditor.activity'), count: 4 },
+              { key: 'discussions', icon: <MessageOutlined style={{ fontSize: 12 }} />, label: t('app.codeEditor.discussions'), count: discussions.length },
+              { key: 'editors', icon: <TeamOutlined style={{ fontSize: 12 }} />, label: t('app.codeEditor.activity'), count: editors.length },
             ].map((tab) => (
               <div
                 key={tab.key}
@@ -659,7 +773,7 @@ export default function EditorPage() {
                           width: 6,
                           height: 6,
                           borderRadius: '50%',
-                          background: ed.status === 'editing' ? green : ed.status === 'viewing' ? blueLight : '#d29922',
+                          background: ed.status === 'viewing' ? blueLight : '#d29922',
                         }}
                       />
                       {ed.status}
@@ -687,7 +801,7 @@ export default function EditorPage() {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <BranchesOutlined style={{ fontSize: 12 }} />
-            main
+            {currentRepo?.default_branch || 'main'}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: green, display: 'inline-block', marginRight: 2 }} />
@@ -695,8 +809,8 @@ export default function EditorPage() {
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 16 }}>
             <span>Ln 24, Col 38</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><TeamOutlined style={{ fontSize: 12 }} /> 4 online</span>
-            <span>TypeScript</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><TeamOutlined style={{ fontSize: 12 }} /> {members.length || 1} online</span>
+            <span>{activeNode?.fileType ? activeNode.fileType.toUpperCase() : 'Text'}</span>
             <span>UTF-8</span>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { notificationsApi, type Notification, type NotificationPreference } from '../api/notifications';
+import { notificationsApi, type Notification, type NotificationPreference, type NotificationListResponse } from '../api/notifications';
 
 interface NotificationsState {
   notifications: Notification[];
@@ -27,7 +27,8 @@ export const useNotificationsStore = create<NotificationsState>((set) => ({
   fetchNotifications: async () => {
     set({ isLoading: true, error: null });
     try {
-      const notifications = await notificationsApi.list();
+      const response = await notificationsApi.list();
+      const notifications = (response as NotificationListResponse).notifications ?? (response as unknown as Notification[]);
       set({ notifications, isLoading: false });
     } catch (e) {
       set({ error: (e as Error).message, isLoading: false });

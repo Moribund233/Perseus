@@ -59,3 +59,4 @@ profile = "black"
 testpaths = ["tests"]
 python_files = "test_*.py"
 asyncio_mode = "auto"
+norecursedirs = ["sqlite+aio.*", ".*", "dist", "build", "node_modules"]

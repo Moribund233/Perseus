@@ -15,6 +15,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, Query, Body
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routes_config import get_route_prefix
 from core.config import get_config
@@ -22,6 +23,7 @@ from services.app_service import get_app_service
 from services.config_service import get_config_service
 from api.dependencies import get_current_user
 from models.user import User
+from models.async_db import get_async_db
 from core.exception import AuthorizationException
 
 # 创建路由实例 - 根路由无前缀
@@ -253,6 +255,28 @@ async def get_status_endpoint():
     status = app_service.get_status(requests_info=requests_info)
 
     return StatusResponse(**status)
+
+
+@router.get("/api/v1/stats/platform", tags=["stats"])
+async def get_platform_stats_endpoint(db: AsyncSession = Depends(get_async_db)):
+    """
+    获取平台级公开统计
+
+    Returns:
+        dict: 包含 repository_count, commit_count, user_count, uptime_seconds
+    """
+    from middleware.request_stats import get_request_stats
+    from services import stats_service
+
+    stats = await stats_service.get_platform_stats(db)
+    app_service = get_app_service()
+    requests_info = await get_request_stats().get_stats()
+    status = app_service.get_status(requests_info=requests_info)
+
+    return {
+        **stats,
+        "uptime_seconds": status["uptime_seconds"],
+    }
 
 
 @router.post("/api/app/shutdown", response_model=ActionResponse)

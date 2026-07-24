@@ -32,7 +32,7 @@ export async function apiRequest<T>(
 
   if (!res.ok) {
     const body = await res.text();
-    let message = body;
+    let message: string;
     try {
       const json = JSON.parse(body);
       message = json.detail || json.error?.message || res.statusText;

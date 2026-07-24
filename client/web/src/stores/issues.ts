@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { issuesApi, type Issue, type IssueComment, type CreateIssueRequest, type UpdateIssueRequest, type IssueFilter } from '../api/issues';
+import { issuesApi, type Issue, type IssueComment, type CreateIssueRequest, type UpdateIssueRequest, type IssueFilter, type PaginationResponse } from '../api/issues';
 
 interface IssuesState {
   issues: Issue[];
@@ -30,7 +30,8 @@ export const useIssuesStore = create<IssuesState>((set) => ({
   fetchIssues: async (repoId, status) => {
     set({ isLoading: true, error: null });
     try {
-      const issues = await issuesApi.list(repoId, status ? { status } : undefined);
+      const response = await issuesApi.list(repoId, status ? { status } : undefined);
+      const issues = (response as PaginationResponse<Issue>).items ?? (response as unknown as Issue[]);
       set({ issues, isLoading: false });
     } catch (e) {
       set({ error: (e as Error).message, isLoading: false });
@@ -40,7 +41,8 @@ export const useIssuesStore = create<IssuesState>((set) => ({
   filterIssues: async (repoId, filter) => {
     set({ isLoading: true, error: null });
     try {
-      const issues = await issuesApi.filter(repoId, filter);
+      const response = await issuesApi.filter(repoId, filter);
+      const issues = (response as PaginationResponse<Issue>).items ?? (response as unknown as Issue[]);
       set({ issues, isLoading: false });
     } catch (e) {
       set({ error: (e as Error).message, isLoading: false });

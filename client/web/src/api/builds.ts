@@ -35,5 +35,5 @@ export const buildsApi = {
     }),
 
   getLogs: (repoId: string, buildId: string) =>
-    apiRequest<string[]>(`/api/v1/repositories/${repoId}/builds/${buildId}/logs`),
+    apiRequest<{ logs: string }>(`/api/v1/repositories/${repoId}/builds/${buildId}/logs`),
 };

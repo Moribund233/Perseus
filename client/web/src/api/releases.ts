@@ -28,7 +28,7 @@ export interface ReleaseAsset {
 
 export interface CreateReleaseRequest {
   tag_name: string;
-  name?: string;
+  name: string;
   description?: string;
   commit_hash?: string;
   is_draft?: boolean;
@@ -36,9 +36,19 @@ export interface CreateReleaseRequest {
   create_git_tag?: boolean;
 }
 
+export interface PaginationResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
 export const releasesApi = {
   list: (repoId: string) =>
-    apiRequest<Release[]>(`/api/v1/repositories/${repoId}/releases`),
+    apiRequest<PaginationResponse<Release>>(`/api/v1/repositories/${repoId}/releases`),
 
   get: (repoId: string, releaseNumber: number) =>
     apiRequest<Release>(`/api/v1/repositories/${repoId}/releases/${releaseNumber}`),

@@ -91,18 +91,35 @@ async def delete_label(repo_id: uuid.UUID, label_id: uuid.UUID, db: AsyncSession
     return {"message": "Label deleted"}
 
 
-async def add_label_to_pr(pr_id: uuid.UUID, label_id: uuid.UUID, db: AsyncSession) -> dict:
-    """为 PR 添加标签"""
-    result = await db.execute(
-        select(PullRequest)
-        .filter(PullRequest.id == pr_id)
-        .options(selectinload(PullRequest.pr_labels))
-    )
-    pr = result.scalar_one_or_none()
-    if not pr:
-        raise NotFoundException(detail="Pull request not found")
+async def add_label_to_pr(
+    repository_id: uuid.UUID,
+    pr_number: int,
+    label_id: uuid.UUID,
+    db: AsyncSession,
+) -> dict:
+    """为 PR 添加标签
 
-    label = await get_or_404(db, PRLabel, {"id": label_id}, "Label not found")
+    Args:
+        repository_id: 仓库ID
+        pr_number: PR 编号（仓库内自增）
+        label_id: 标签ID
+        db: 数据库会话
+
+    Returns:
+        dict: 操作结果
+
+    Raises:
+        NotFoundException: PR 或标签不存在
+    """
+    from utils.db_utils import get_pull_request_or_404
+
+    pr = await get_pull_request_or_404(db, repository_id, pr_number)
+    label = await get_or_404(
+        db,
+        PRLabel,
+        {"id": label_id, "repository_id": repository_id},
+        "Label not found",
+    )
 
     if label not in pr.pr_labels:
         pr.pr_labels.append(label)
@@ -111,18 +128,35 @@ async def add_label_to_pr(pr_id: uuid.UUID, label_id: uuid.UUID, db: AsyncSessio
     return {"message": "Label added to pull request"}
 
 
-async def remove_label_from_pr(pr_id: uuid.UUID, label_id: uuid.UUID, db: AsyncSession) -> dict:
-    """从 PR 移除标签"""
-    result = await db.execute(
-        select(PullRequest)
-        .filter(PullRequest.id == pr_id)
-        .options(selectinload(PullRequest.pr_labels))
-    )
-    pr = result.scalar_one_or_none()
-    if not pr:
-        raise NotFoundException(detail="Pull request not found")
+async def remove_label_from_pr(
+    repository_id: uuid.UUID,
+    pr_number: int,
+    label_id: uuid.UUID,
+    db: AsyncSession,
+) -> dict:
+    """从 PR 移除标签
 
-    label = await get_or_404(db, PRLabel, {"id": label_id}, "Label not found")
+    Args:
+        repository_id: 仓库ID
+        pr_number: PR 编号（仓库内自增）
+        label_id: 标签ID
+        db: 数据库会话
+
+    Returns:
+        dict: 操作结果
+
+    Raises:
+        NotFoundException: PR 或标签不存在
+    """
+    from utils.db_utils import get_pull_request_or_404
+
+    pr = await get_pull_request_or_404(db, repository_id, pr_number)
+    label = await get_or_404(
+        db,
+        PRLabel,
+        {"id": label_id, "repository_id": repository_id},
+        "Label not found",
+    )
 
     if label in pr.pr_labels:
         pr.pr_labels.remove(label)
