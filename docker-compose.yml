@@ -64,7 +64,7 @@ services:
           cpus: '0.1'
           memory: 32M
 
-  # OpenResty 网关 — CORS + 反向代理
+  # OpenResty 网关
   gateway:
     image: openresty/openresty:1.31.1.1-0-bookworm-fat
     container_name: perseus-gateway
@@ -75,6 +75,29 @@ services:
       - /etc/localtime:/etc/localtime:ro
     networks:
       - default
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  # SSH 服务器 — Git over SSH
+  sshd:
+    build:
+      context: ./docker/ssh
+    container_name: perseus-sshd
+    ports:
+      - "127.0.0.1:2222:2222"
+    volumes:
+      - repos:/data/repositories
+    environment:
+      PERSEUS_DB_URL: "host=capella-pg dbname=perseus user=perseus password=Perseus_2024!"
+    networks:
+      - default
+      - capella-room_default
     restart: unless-stopped
     depends_on:
       app:
