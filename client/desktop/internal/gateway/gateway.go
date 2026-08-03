@@ -6,16 +6,19 @@ import (
 	"net"
 	"net/http"
 
+	"desktop/internal/git"
 	"desktop/internal/store"
 )
 
 type Config struct {
 	Store          *store.Store
+	Git            *git.Git
 	AllowedOrigins []string
 }
 
 type Gateway struct {
 	store    *store.Store
+	git      *git.Git
 	origins  map[string]bool
 	token    string
 	addr     string
@@ -30,6 +33,7 @@ func New(cfg Config) *Gateway {
 	}
 	g := &Gateway{
 		store:   cfg.Store,
+		git:     cfg.Git,
 		origins: map[string]bool{},
 		token:   newToken(),
 	}
