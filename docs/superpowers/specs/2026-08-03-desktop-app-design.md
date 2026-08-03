@@ -1,7 +1,7 @@
 # Perseus Desktop 应用设计（Spec）
 
 > 日期：2026-08-03
-> 状态：草案（待评审）
+> 状态：已修订（评审通过，待 Phase 1 实施）
 > 范围：`client/desktop` — 基于 Wails v2 的桌面端，定位为"远程 Perseus 客户端 + 本地工作区"的 IDE 优先协作工具
 
 ---
@@ -45,7 +45,7 @@ Perseus 是一个基于 Git 的本地化协作开发平台（FastAPI + pygit2 �
 | 编辑器内核 | Monaco Editor | VS Code 同款，IDE 生态成熟（monaco-languageclient） |
 | LSP 范围 | 先 Python（pyright）+ TS/JS（tsserver），可插拔注册表 | 验证全链路后扩展 |
 | Git 引擎 | 系统 git CLI（porcelain 解析） | 功能全、与服务器 git 生态一致 |
-| 通信模型 | Go 侧本地网关（HTTP + WebSocket）+ Wails 绑定（仅原生能力） | 规避 CORS、离线优先、多服务器代理 |
+| 通信模型 | Go 侧本地网关（HTTP + WebSocket）+ Wails 绑定（仅原生能力） | 规避 CORS、离线优先、多服务器代理；网关配 Origin 白名单 + 会话 token 防本地 CSRF |
 | 服务器连接 | 多服务器注册表 + 系统密钥库 + SSH 支持 | 服务发现、离线缓存 |
 | 凭证存储 | Windows Credential Manager（`go-keyring`） | token 与私钥不落明文 |
 
@@ -94,7 +94,9 @@ Perseus 是一个基于 Git 的本地化协作开发平台（FastAPI + pygit2 �
 
 - 网关端口写入本地 store，供前端读取（`wailsjs` 绑定返回 `{baseURL}`）
 - 生产模式下同样适用（打包后前端资源内嵌，仍通过网关访问服务器 API）
-- 网关自身无 CORS 限制（Go 侧代理天然绕过浏览器同源策略）
+- **CORS（必做，不是"无 CORS"）**：前端页面（dev 源 `http://localhost:34115`、prod 源 `wails://localhost`）相对网关 `http://127.0.0.1:<port>` 是跨源，WebView2 仍强制 CORS。网关必须返回 `Access-Control-Allow-Origin`（白名单仅含应用自身来源，**禁止 `*`**）并处理 `OPTIONS` 预检，否则前端所有 fetch 被拦截。Go→服务器的代理段天然无同源限制，但浏览器→网关这一段必须显式放行。
+- **会话 token（防本地 CSRF）**：网关启动时生成随机 `gatewayToken`，经 Wails 绑定（`{baseURL, gatewayToken}`）交给前端；前端所有请求必须带 `X-Gateway-Token` 头，网关校验失败返回 401。杜绝恶意网页/本地进程借 `127.0.0.1` 网关滥用已存凭据。WS 握手同样校验（query 或首个帧携带）。
+- 本地安全边界：仅绑定 loopback；任何非白名单 Origin / 缺失网关 token 的请求一律拒绝。
 
 ### 3.2 原生能力：Wails 绑定（收窄）
 
@@ -122,6 +124,7 @@ client/desktop/
     │   ├── server.go       # 网关启动/关闭、动态端口
     │   ├── router.go       # 路由注册
     │   ├── proxy.go        # /api/local/proxy/{serverId}/* 反代
+    │   ├── middleware.go   # CORS 白名单 + X-Gateway-Token 会话校验 + 日志
     │   └── ws.go           # /ws/events、/ws/lsp 升级处理
     ├── server/             # 多服务器注册表 + 服务发现
     │   ├── registry.go     # 服务器 CRUD、状态缓存（在线/离线）
@@ -164,7 +167,7 @@ client/desktop/
 - 发现来源：
   1. 手动添加（URL + 账号密码/token，走登录换取 access token）
   2. 导入 `config.toml` / 粘贴服务器列表
-  3. 局域网 mDNS 探测（Perseus 服务器发布 `_perseus._tcp` 服务，desktop 主动发现并列出待连接项）
+  3. 局域网 mDNS 探测（**依赖**：Perseus 服务器需发布 `_perseus._tcp` 服务——当前 FastAPI 后端尚无此能力，属跨项目依赖，需另行排期；在服务端就绪前，mDNS 探测自动降级为不可用，不影响手动添加/导入）
 - 离线：注册表保留服务器元数据与缓存状态，断网时前端仍可显示"离线"信息与本地工作区
 
 **perseus client**
@@ -203,12 +206,14 @@ client/desktop/
 
 前端 `api/client.ts`（拷贝自 web）仅修改 `BASE_URL` 指向网关，并支持按 `serverId` 作用域。路由前缀：
 
+> **鉴权**：除 `GET /api/local/config` 外，所有网关路由（含 WS 握手）要求请求头 `X-Gateway-Token: <gatewayToken>`；网关中间件校验后放行，缺失/错误返回 401。CORS 仅放行白名单来源（dev/prod 应用来源）。
+
 | 路由 | 说明 |
 |------|------|
-| `GET /api/local/config` | 返回 `{ baseURL, defaultServerId }` |
+| `GET /api/local/config` | 返回 `{ baseURL, gatewayToken, defaultServerId }` |
 | `GET/POST/PUT/DELETE /api/local/servers` | 服务器注册表 CRUD |
 | `GET /api/local/servers/{id}/health` | 连通性探测（在线时实时测，离线返回缓存） |
-| `GET /api/local/servers/{id}/discover` | 触发服务发现（mDNS/导入） |
+| `POST /api/local/servers/{id}/discover` | 触发服务发现（mDNS/导入） |
 | `/api/local/proxy/{serverId}/*` | 反向代理到 `server.baseURL/*`（`*` 为服务器完整路径，如 `api/v1/repositories`），Go 注入 token；服务器不可达时返回 `503 { offline: true, cached: {...} }` |
 | `GET/POST /api/local/workspaces` | 工作区列表 / 创建（clone 或添加本地目录） |
 | `GET /api/local/workspaces/{id}` | 工作区详情 |
@@ -222,10 +227,13 @@ client/desktop/
 | `WS /ws/lsp/{workspaceId}` | LSP 双向 JSON-RPC 桥 |
 | `WS /api/local/proxy/{serverId}/ws/{path}` | 服务器 WebSocket 透传：`{path}` 追加到 `baseURL/ws/{path}`（如 `notifications`、`logs`、聊天主连接） |
 
+> **WS 路由匹配**：`/api/local/proxy/{serverId}/ws/{path}` 与 `/api/local/proxy/{serverId}/*`（HTTP catch-all）前缀冲突——网关在 proxy handler 内通过 `Connection: Upgrade` 判断，优先按 WS 透传处理升级请求，否则走 HTTP 反代；避免路由注册冲突。
+
 ### 5.1 错误与离线语义
 
 - 统一错误响应：`{ error: { code, message, offline?: boolean, cached?: any } }`，前端 `apiRequest` 的 `ApiError` 增加 `offline` 与 `cached` 字段
 - 离线定义：目标服务器不可达（连接失败/DNS 失败/超时），与"未登录/无权限"（401/403）区分
+- **离线缓存来源（明确）**：网关代理层维护**只读 GET 响应的内存缓存**（键 = `serverId + 完整路径`，容量上限 LRU，如 200 条 / 10MB，TTL 24h）。每次成功 GET 更新缓存；目标不可达且缓存命中时返回 `503 { offline: true, cached: {...} }`，未命中返回 `503 { offline: true, cached: null }`。写操作（POST/PUT/DELETE）不做缓存，直接返回离线错误。缓存仅限幂等只读接口（仓库列表、PR/Issue 列表等），避免脏数据。
 - 前端降级策略（见 §7）
 
 ---
@@ -237,8 +245,12 @@ client/desktop/
 ```
 client/desktop/frontend/src/
 ├── main.tsx / App.tsx            # Wails runtime 初始化、网关配置读取
-├── api/                          # 拷贝自 web，client.ts 改 BASE_URL + serverId 作用域
+├── api/                          # 拷贝自 web：client.ts 改 BASE_URL + serverId 作用域
+│                                 #   * 移除 web 版 Authorization 注入（client.ts 读 authStore.token 的逻辑删除）
+│                                 #   * 统一由 apiRequest 注入 X-Gateway-Token + serverId 参数
 ├── stores/                       # Zustand：auth/workpace/git/lsp/servers/notifications
+│                                 #   auth store 只存 serverId/登录态元数据，不存 token
+│                                 #   lsp 状态、server 健康等桌面新增状态
 ├── i18n/                         # 拷贝自 web（zh/en）
 ├── styles/                       # 拷贝自 web（GitHub 暗色主题）
 ├── components/                   # 通用组件（拷贝 web 常用组件）
@@ -413,8 +425,9 @@ type LanguageServer struct {
 每个 Phase 对应一份独立 implementation plan。
 
 **Phase 1 — 骨架打通（本地优先）**
-- Go 骨架：store（SQLite + keychain）、gateway 动态端口、Wails 绑定（对话框/密钥库）
-- 工作区：添加本地目录、clone 单仓库、Explorer 文件树、文件读写
+- Go 骨架：store（SQLite + keychain）、gateway 动态端口 + CORS 白名单 + 会话 token、Wails 绑定（对话框/密钥库）
+- 工作区：添加本地目录、clone 单仓库（**Phase 1 最小凭据路径**：手填 git URL + 一次性 token/私有密钥，存密钥库，不入服务器注册表；服务器注册表与登录属 Phase 2）
+- Explorer 文件树、文件读写
 - Monaco 编辑器：标签页、保存、只读、diff 基础
 - git：status/diff/add/commit/push/pull 基础操作
 - 前端：IdeShell 布局 + Welcome + Workspace 视图 + Settings
@@ -441,6 +454,8 @@ type LanguageServer struct {
 
 | 风险 | 对策 |
 |------|------|
+| 本地网关被恶意网页/进程利用（本地 CSRF） | Origin 白名单 + 随机会话 token（`X-Gateway-Token`）+ 仅绑定 loopback（§3.1） |
+| mDNS 发现依赖服务端未发布 `_perseus._tcp` | 手动添加/导入优先；mDNS 为增量能力，服务端就绪前自动降级（§4.1） |
 | LSP 与 Monaco 桥接成本高 | Phase 3 前置最小验证（pyright 诊断链路）；若自研成本过高改用 monaco-languageclient |
 | 大仓库 clone / 大文件性能 | 文件树懒加载、>2MB 文件只读提示、git 操作用 goroutine + 事件回报进度 |
 | tsserver 初始化慢/内存高 | 惰性启动、空闲超时关闭、单工作区共享实例 |
