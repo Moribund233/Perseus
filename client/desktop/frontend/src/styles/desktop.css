@@ -1,0 +1,39 @@
+/* styles/desktop.css */
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: #0d1117;
+  color: #c9d1d9;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.ide { display: flex; flex-direction: row; height: 100vh; }
+.activity-bar {
+  display: flex; flex-direction: column; width: 48px;
+  background: #010409; border-right: 1px solid #21262d; padding-top: 8px;
+}
+.activity-bar button {
+  background: none; border: none; color: #8b949e; font-size: 20px;
+  padding: 10px; cursor: pointer;
+}
+.activity-bar button.active { color: #58a6ff; }
+.sidebar {
+  width: 280px; background: #0d1117; border-right: 1px solid #21262d;
+  overflow: auto; padding: 8px;
+}
+.editor-area { flex: 1; display: flex; flex-direction: column; background: #010409; }
+.editor-tab { flex: 1; display: flex; flex-direction: column; }
+.tab-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  background: #161b22; border-bottom: 1px solid #21262d; padding: 6px 10px;
+}
+.status-bar {
+  background: #161b22; border-top: 1px solid #21262d; padding: 4px 12px;
+  font-size: 12px; color: #8b949e;
+}
+.welcome { padding: 48px 24px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.muted { color: #8b949e; font-size: 12px; margin-left: 8px; }
+.error-text { color: #f85149; padding: 8px; }
+.warn { color: #d29922; font-size: 12px; margin-right: 8px; }
+.empty-editor { padding: 32px; color: #8b949e; }
+.git-panel { padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.git-branch { font-size: 13px; font-weight: 600; }
