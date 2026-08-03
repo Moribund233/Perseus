@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Button, Card, Empty, Input, List, Space } from 'antd';
 import { FolderOpenOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { createWorkspace, listWorkspaces, Workspace } from '../api/workspaces';
 import { useWorkspaceStore } from '../stores/workspace';
 
 export default function Welcome() {
+  const { t } = useTranslation();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const setWorkspaces = useWorkspaceStore((s) => s.setWorkspaces);
   const setCurrent = useWorkspaceStore((s) => s.setCurrent);
@@ -43,35 +45,35 @@ export default function Welcome() {
 
   return (
     <div className="welcome">
-      <h2>欢迎使用 Perseus Desktop</h2>
+      <h2>{t('desktop.app.welcomeTitle')}</h2>
       <Space direction="vertical" size="middle" style={{ width: 520 }}>
-        <Card title="打开本地目录">
+        <Card title={t('desktop.welcome.openLocal')}>
           <Button icon={<FolderOpenOutlined />} loading={busy} onClick={openFolder}>
-            选择文件夹
+            {t('desktop.welcome.chooseFolder')}
           </Button>
         </Card>
-        <Card title="Clone 仓库（手动 URL）">
+        <Card title={t('desktop.welcome.cloneTitle')}>
           <Space.Compact style={{ width: '100%' }}>
             <Input
-              placeholder="https://server/owner/repo.git 或 git@host:owner/repo.git"
+              placeholder={t('desktop.welcome.clonePlaceholder')}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onPressEnter={clone}
             />
             <Button type="primary" loading={busy} onClick={clone}>
-              Clone
+              {t('desktop.welcome.clone')}
             </Button>
           </Space.Compact>
         </Card>
         {error && <div className="error-text">{error}</div>}
-        <Card title="最近工作区">
+        <Card title={t('desktop.welcome.recent')}>
           {workspaces.length === 0 ? (
-            <Empty description="还没有工作区" />
+            <Empty description={t('desktop.welcome.noWorkspaces')} />
           ) : (
             <List
               dataSource={workspaces}
               renderItem={(ws: Workspace) => (
-                <List.Item actions={[<Button size="small" onClick={() => setCurrent(ws)}>打开</Button>]}>
+                <List.Item actions={[<Button size="small" onClick={() => setCurrent(ws)}>{t('desktop.welcome.open')}</Button>]}>
                   {ws.name} <span className="muted">{ws.path}</span>
                 </List.Item>
               )}

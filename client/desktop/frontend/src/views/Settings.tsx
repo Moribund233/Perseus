@@ -1,13 +1,16 @@
 import { Card } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { useGatewayStore } from '../stores/gateway';
 
 export default function Settings() {
+  const { t } = useTranslation();
   const config = useGatewayStore((s) => s.config);
+  const tokenState = config?.gatewayToken ? t('desktop.settings.tokenGenerated') : t('desktop.settings.tokenMissing');
   return (
-    <Card title="设置" style={{ margin: 16 }}>
-      <p>网关地址: {config?.baseURL}</p>
-      <p>会话 token: {config?.gatewayToken ? '已生成（仅内存）' : '未生成'}</p>
-      <p className="muted">Phase 1 占位。数据目录持久化、主题、SSH 密钥等在后续阶段实现。</p>
+    <Card title={t('desktop.settings.title')} style={{ margin: 16 }}>
+      <p>{t('desktop.settings.gateway')}: {config?.baseURL}</p>
+      <p>{t('desktop.settings.token', { state: tokenState })}</p>
+      <p className="muted">{t('desktop.settings.placeholder')}</p>
     </Card>
   );
 }

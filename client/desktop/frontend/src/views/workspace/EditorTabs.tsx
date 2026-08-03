@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import Editor from '@monaco-editor/react';
+import { useTranslation } from 'react-i18next';
 import { readFile, writeFile, FileContent } from '../../api/workspaces';
 
 export default function EditorTabs({ workspaceId, openPath }: { workspaceId: string; openPath: string | null }) {
+  const { t } = useTranslation();
   const [current, setCurrent] = useState<string | null>(null);
   const [content, setContent] = useState<FileContent | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -32,10 +34,10 @@ export default function EditorTabs({ workspaceId, openPath }: { workspaceId: str
   };
 
   if (error) return <div className="error-text">{error}</div>;
-  if (!current || !content) return <div className="empty-editor">选择左侧文件开始编辑</div>;
+  if (!current || !content) return <div className="empty-editor">{t('desktop.editor.selectFile')}</div>;
 
   if (content.binary) {
-    return <div className="empty-editor">二进制文件（{content.size} bytes）不可编辑</div>;
+    return <div className="empty-editor">{t('desktop.editor.binary', { size: content.size })}</div>;
   }
 
   return (
@@ -43,8 +45,8 @@ export default function EditorTabs({ workspaceId, openPath }: { workspaceId: str
       <div className="tab-bar">
         <span className="tab-title">{current}{dirty ? ' ●' : ''}</span>
         <span className="tab-actions">
-          {content.truncated && <span className="warn">文件过大，仅读入前 2MB</span>}
-          <button disabled={!dirty} onClick={save}>保存</button>
+          {content.truncated && <span className="warn">{t('desktop.editor.truncated')}</span>}
+          <button disabled={!dirty} onClick={save}>{t('desktop.editor.save')}</button>
         </span>
       </div>
       <Editor

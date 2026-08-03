@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import * as monaco from 'monaco-editor'
 import { loader } from '@monaco-editor/react'
 import App from './App'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import './i18n'
+import './styles/index.css'
 import './styles/desktop.css'
 
 self.MonacoEnvironment = {
@@ -27,6 +30,8 @@ const container = document.getElementById('root')
 const root = createRoot(container!)
 root.render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>,
 )

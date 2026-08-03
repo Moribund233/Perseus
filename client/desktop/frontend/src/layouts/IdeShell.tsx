@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Workspace } from '../api/workspaces';
 import ExplorerPanel from '../views/workspace/ExplorerPanel';
 import EditorTabs from '../views/workspace/EditorTabs';
@@ -6,6 +7,7 @@ import GitPanel from '../views/workspace/GitPanel';
 import { useGatewayStore } from '../stores/gateway';
 
 export default function IdeShell({ workspace }: { workspace: Workspace }) {
+  const { t } = useTranslation();
   const baseURL = useGatewayStore((s) => s.config?.baseURL);
   const [view, setView] = useState<'explorer' | 'git'>('explorer');
   const [openPath, setOpenPath] = useState<string | null>(null);
@@ -24,7 +26,7 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
         <EditorTabs workspaceId={workspace.id} openPath={openPath} />
       </main>
       <footer className="status-bar">
-        <span>网关: {baseURL ?? '…'}</span>
+        <span>{t('desktop.ide.gateway', { url: baseURL ?? '…' })}</span>
       </footer>
     </div>
   );

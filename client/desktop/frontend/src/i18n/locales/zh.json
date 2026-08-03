@@ -1,0 +1,320 @@
+{
+  "landing": {
+    "nav": {
+      "features": "功能特性",
+      "collaboration": "协同办公",
+      "docs": "文档",
+      "signIn": "登录",
+      "getStarted": "立即开始",
+      "goToDashboard": "进入控制台"
+    },
+    "hero": {
+      "badge": "公开测试版已发布",
+      "title": "编写代码。<1>协同合作。</1>快速交付。",
+      "description": "团队构建优秀软件所需的一切——代码托管、实时协作、团队聊天和代码审查——尽在一个统一平台。",
+      "getStartedFree": "免费开始使用",
+      "learnMore": "了解更多",
+      "stats": {
+        "repositories": "代码仓库",
+        "commits": "提交记录",
+        "teamMembers": "团队成员",
+        "uptime": "正常运行时间"
+      }
+    },
+    "features": {
+      "title": "团队所需的一切",
+      "subtitle": "面向现代开发团队、内置协作工具的自托管 Git 平台。",
+      "codeHosting": {
+        "title": "代码托管",
+        "desc": "自托管 Git 仓库托管，支持分支保护、Webhooks 和精细化访问控制。"
+      },
+      "teamChat": {
+        "title": "团队聊天",
+        "desc": "支持频道、话题和富代码片段的实时消息。让讨论始终围绕上下文展开。"
+      },
+      "codeReview": {
+        "title": "代码审查",
+        "desc": "行内 Pull Request 审查，支持话题讨论、审批工作流和合并检查。"
+      },
+      "realtimeEditing": {
+        "title": "实时编辑",
+        "desc": "基于 CRDT 的协同代码编辑，实时光标、在线感知和冲突解决。"
+      },
+      "issueTracking": {
+        "title": "问题追踪",
+        "desc": "通过标签、里程碑、批量操作管理问题，并与 Git 工作流深度集成。"
+      },
+      "releaseManagement": {
+        "title": "发布管理",
+        "desc": "打标签、上传资源、发布 Release Note，与仓库和 Webhook 系统无缝集成。"
+      }
+    },
+    "collab": {
+      "title": "内置实时协作",
+      "description": "像 Google Docs 一样与团队一起编辑代码。实时查看谁在编辑什么、进行讨论，再也不用担心合并冲突。",
+      "items": [
+        "多光标和在线状态指示器",
+        "行内代码审查与话题讨论",
+        "基于 CRDT 的无冲突同步",
+        "代码旁的实时团队聊天"
+      ]
+    },
+    "footer": {
+      "copyright": "© 2026 Perseus — 自托管代码协作平台",
+      "about": "关于",
+      "privacy": "隐私",
+      "terms": "条款",
+      "github": "GitHub"
+    }
+  },
+  "app": {
+    "nav": {
+      "dashboard": "控制台",
+      "repositories": "仓库",
+      "pullRequests": "Pull Requests",
+      "codeEditor": "代码编辑器",
+      "teamChat": "团队聊天",
+      "theme": "主题",
+      "settings": "设置"
+    },
+    "userMenu": {
+      "profile": "个人资料",
+      "settings": "设置",
+      "signOut": "退出登录"
+    },
+    "topBar": {
+      "searchPlaceholder": "搜索...",
+      "new": "新建"
+    },
+    "repositories": {
+      "title": "仓库",
+      "explorer": "资源管理器",
+      "filter": {
+        "mine": "我的仓库",
+        "all": "所有仓库"
+      },
+      "filters": {
+        "all": "全部",
+        "source": "源码",
+        "config": "配置",
+        "tests": "测试"
+      },
+      "actions": {
+        "watch": "关注",
+        "star": "星标",
+        "fork": "派生"
+      },
+      "visibility": {
+        "public": "公开",
+        "private": "私有"
+      },
+      "tabs": {
+        "code": "代码",
+        "issues": "问题",
+        "pullRequests": "Pull Requests",
+        "settings": "设置"
+      },
+      "fileList": {
+        "lastCommit": "最新提交",
+        "name": "名称",
+        "message": "提交信息",
+        "time": "时间"
+      },
+      "readme": "README",
+      "empty": {
+        "title": "这是一个空仓库",
+        "description": "推送你的第一次提交以开始使用。",
+        "noFiles": "暂无文件",
+        "noCommits": "暂无提交"
+      }
+    },
+    "dashboard": {
+      "welcomeBack": "欢迎回来，{{name}}",
+      "subtitle": "以下是您今天项目的动态概览。",
+      "stats": {
+        "repositories": "仓库",
+        "openPRs": "待处理 PR",
+        "teamMembers": "团队成员",
+        "commits": "提交",
+        "repositoriesChange": "本周新增 3 个",
+        "openPRsChange": "5 个待审查",
+        "teamMembersChange": "新增 2 人",
+        "commitsChange": "本周 142 次提交"
+      },
+      "recentActivity": "最近动态",
+      "viewAll": "查看全部",
+      "yourRepositories": "你的仓库",
+      "contributionActivity": "贡献活动",
+      "contributionsCount": "过去 30 天共 {{count}} 次贡献",
+      "activity": {
+        "mergedPR": "合并了 PR <strong>#{{id}}</strong> 到 <strong>{{repo}}</strong>",
+        "pushedCommits": "推送了 {{count}} 次提交到 <strong>{{branch}}</strong>",
+        "openedPR": "打开了 PR <strong>#{{id}}</strong> — \"{{title}}\"",
+        "reviewedPR": "审查了 PR <strong>#{{id}}</strong> 在 <strong>{{repo}}</strong>",
+        "createdIssue": "创建了 issue <strong>#{{id}}</strong> — \"{{title}}\"",
+        "commentedOnIssue": "评论了 issue <strong>#{{id}}</strong> 在 <strong>{{repo}}</strong>"
+      }
+    },
+    "pullRequests": {
+      "title": "Pull Requests",
+      "filters": {
+        "open": "打开",
+        "merged": "已合并",
+        "closed": "已关闭",
+        "all": "全部"
+      },
+      "openedBy": "#{{id}} 由 {{author}} 于 {{time}} 打开",
+      "comments": "{{count}} 条评论",
+      "reviews": "{{count}} 条审查",
+      "filter": "筛选",
+      "newPullRequest": "新建 Pull Request"
+    },
+    "codeEditor": {
+      "title": "代码编辑器",
+      "online": "在线",
+      "offline": "离线",
+      "discussions": "讨论",
+      "activity": "动态"
+    },
+    "teamChat": {
+      "title": "团队聊天",
+      "channels": "频道",
+      "directMessages": "私信",
+      "members": "成员",
+      "placeholder": "给 #{{channel}} 发送消息...",
+      "today": "今天"
+    },
+    "settings": {
+      "title": "设置",
+      "profile": "个人资料",
+      "account": "账号",
+      "appearance": "外观",
+      "notifications": "通知",
+      "preferences": "偏好设置",
+      "save": "保存",
+      "saveChanges": "保存更改",
+      "cancel": "取消",
+      "changeAvatar": "更换头像",
+      "publicProfile": "公开资料",
+      "publicProfileDesc": "这些信息将公开显示在你的个人资料页。",
+      "name": "姓名",
+      "bio": "简介",
+      "bioPlaceholder": "简单介绍一下你自己。",
+      "company": "公司",
+      "location": "位置",
+      "website": "网站",
+      "accountSettings": "账号设置",
+      "accountSettingsDesc": "更新用户名并管理密码。",
+      "currentPassword": "当前密码",
+      "newPassword": "新密码",
+      "confirmNewPassword": "确认新密码",
+      "changePassword": "修改密码",
+      "appearanceSettings": "外观设置",
+      "appearanceSettingsDesc": "自定义 Perseus 的显示方式。",
+      "theme": "主题",
+      "dark": "深色",
+      "light": "浅色",
+      "system": "跟随系统",
+      "language": "语言",
+      "notificationsSettings": "通知",
+      "notificationsSettingsDesc": "选择你希望接收通知的方式。",
+      "emailNotifications": "邮件通知",
+      "pushNotifications": "推送通知",
+      "emailNotificationsDesc": "接收关于 PR、Issue 和提及的更新。",
+      "pushNotificationsDesc": "接收实时事件的浏览器通知。"
+    }
+  },
+  "auth": {
+    "signIn": "登录",
+    "createAccount": "创建账号",
+    "signInWithGitHub": "使用 GitHub 登录",
+    "signInWithGitLab": "使用 GitLab 登录",
+    "signUpWithGitHub": "使用 GitHub 注册",
+    "signUpWithGitLab": "使用 GitLab 注册",
+    "orContinueWithEmail": "或使用邮箱继续",
+    "orCreateWithEmail": "或使用邮箱创建",
+    "username": "用户名",
+    "password": "密码",
+    "rememberMe": "记住我",
+    "forgotPassword": "忘记密码？",
+    "fullName": "姓名",
+    "email": "邮箱",
+    "confirmPassword": "确认密码",
+    "placeholders": {
+      "username": "用户名",
+      "password": "输入密码",
+      "fullName": "你的姓名",
+      "email": "name@company.com",
+      "confirmPassword": "再次输入密码"
+    },
+    "rules": {
+      "usernameRequired": "请输入用户名",
+      "passwordRequired": "请输入密码",
+      "usernameRequiredRegister": "请输入用户名",
+      "usernameMin": "至少 3 个字符",
+      "emailRequired": "请输入邮箱",
+      "emailInvalid": "邮箱格式不正确",
+      "passwordRequiredRegister": "请输入密码",
+      "passwordMin": "至少 6 个字符",
+      "confirmRequired": "请确认密码",
+      "passwordMismatch": "两次输入的密码不一致"
+    },
+    "messages": {
+      "welcomeBack": "欢迎回来！",
+      "invalidCredentials": "用户名或密码错误。",
+      "accountCreated": "账号创建成功！",
+      "registrationFailed": "注册失败，请重试。"
+    }
+  },
+  "common": {
+    "language": "语言",
+    "english": "English",
+    "chinese": "中文"
+  },
+  "desktop": {
+    "app": {
+      "welcomeTitle": "欢迎使用 Perseus Desktop",
+      "connecting": "正在连接本地网关…",
+      "gatewayError": "网关初始化失败：{{error}}",
+      "retry": "重试"
+    },
+    "welcome": {
+      "openLocal": "打开本地目录",
+      "chooseFolder": "选择文件夹",
+      "cloneTitle": "Clone 仓库（手动 URL）",
+      "clonePlaceholder": "https://server/owner/repo.git 或 git@host:owner/repo.git",
+      "clone": "Clone",
+      "recent": "最近工作区",
+      "noWorkspaces": "还没有工作区",
+      "open": "打开"
+    },
+    "ide": {
+      "gateway": "网关: {{url}}"
+    },
+    "explorer": {
+      "noFiles": "暂无文件"
+    },
+    "editor": {
+      "selectFile": "选择左侧文件开始编辑",
+      "binary": "二进制文件（{{size}} bytes）不可编辑",
+      "truncated": "文件过大，仅读入前 2MB",
+      "save": "保存"
+    },
+    "git": {
+      "loading": "加载状态…",
+      "branch": "分支: {{branch}}（{{ahead}}↑ {{behind}}↓）",
+      "commitMessage": "提交信息",
+      "stage": "暂存",
+      "commit": "提交",
+      "noChanges": "暂无更改"
+    },
+    "settings": {
+      "title": "设置",
+      "gateway": "网关地址",
+      "token": "会话 token: {{state}}",
+      "tokenGenerated": "已生成（仅内存）",
+      "tokenMissing": "未生成",
+      "placeholder": "Phase 1 占位。数据目录持久化、主题、SSH 密钥等在后续阶段实现。"
+    }
+  }
+}

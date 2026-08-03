@@ -1,0 +1,320 @@
+{
+  "landing": {
+    "nav": {
+      "features": "Features",
+      "collaboration": "Collaboration",
+      "docs": "Docs",
+      "signIn": "Sign In",
+      "getStarted": "Get Started",
+      "goToDashboard": "Go to Dashboard"
+    },
+    "hero": {
+      "badge": "Now in Public Beta",
+      "title": "Code. <1>Collaborate.</1> Ship.",
+      "description": "Everything your team needs to build great software — code hosting, real-time collaboration, team chat, and code review — in one unified platform.",
+      "getStartedFree": "Get Started Free",
+      "learnMore": "Learn More",
+      "stats": {
+        "repositories": "Repositories",
+        "commits": "Commits",
+        "teamMembers": "Team Members",
+        "uptime": "Uptime"
+      }
+    },
+    "features": {
+      "title": "Everything your team needs",
+      "subtitle": "Self-hosted Git platform with built-in collaboration tools designed for modern development teams.",
+      "codeHosting": {
+        "title": "Code Hosting",
+        "desc": "Self-hosted Git repository hosting with branch protection, webhooks, and fine-grained access control."
+      },
+      "teamChat": {
+        "title": "Team Chat",
+        "desc": "Real-time messaging with channels, threads, and rich code snippets. Keep discussions in context."
+      },
+      "codeReview": {
+        "title": "Code Review",
+        "desc": "Inline pull request reviews with threaded discussions, approval workflows, and merge checks."
+      },
+      "realtimeEditing": {
+        "title": "Real-time Editing",
+        "desc": "Collaborative code editing with live cursors, presence awareness, and CRDT-based conflict resolution."
+      },
+      "issueTracking": {
+        "title": "Issue Tracking",
+        "desc": "Manage issues with labels, milestones, batch operations, and integrations with your Git workflow."
+      },
+      "releaseManagement": {
+        "title": "Release Management",
+        "desc": "Tag releases, attach assets, publish release notes. Integrated with your repository and webhook system."
+      }
+    },
+    "collab": {
+      "title": "Real-time collaboration, built in",
+      "description": "Edit code together with your team just like Google Docs. See who's working on what, discuss in real-time, and never worry about merge conflicts again.",
+      "items": [
+        "Multiple cursors and presence indicators",
+        "Inline code review with threaded discussions",
+        "CRDT-based conflict-free synchronization",
+        "Real-time team chat alongside your code"
+      ]
+    },
+    "footer": {
+      "copyright": "© 2026 Perseus — Self-hosted Code Collaboration Platform",
+      "about": "About",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "github": "GitHub"
+    }
+  },
+  "app": {
+    "nav": {
+      "dashboard": "Dashboard",
+      "repositories": "Repositories",
+      "pullRequests": "Pull Requests",
+      "codeEditor": "Code Editor",
+      "teamChat": "Team Chat",
+      "theme": "Theme",
+      "settings": "Settings"
+    },
+    "userMenu": {
+      "profile": "Profile",
+      "settings": "Settings",
+      "signOut": "Sign Out"
+    },
+    "topBar": {
+      "searchPlaceholder": "Search...",
+      "new": "New"
+    },
+    "repositories": {
+      "title": "Repositories",
+      "explorer": "Explorer",
+      "filter": {
+        "mine": "My Repositories",
+        "all": "All Repositories"
+      },
+      "filters": {
+        "all": "All",
+        "source": "Source",
+        "config": "Config",
+        "tests": "Tests"
+      },
+      "actions": {
+        "watch": "Watch",
+        "star": "Star",
+        "fork": "Fork"
+      },
+      "visibility": {
+        "public": "Public",
+        "private": "Private"
+      },
+      "tabs": {
+        "code": "Code",
+        "issues": "Issues",
+        "pullRequests": "Pull Requests",
+        "settings": "Settings"
+      },
+      "fileList": {
+        "lastCommit": "Latest commit",
+        "name": "Name",
+        "message": "Message",
+        "time": "Time"
+      },
+      "readme": "README",
+      "empty": {
+        "title": "This repository is empty",
+        "description": "Push your first commit to get started.",
+        "noFiles": "No files yet",
+        "noCommits": "No commits yet"
+      }
+    },
+    "dashboard": {
+      "welcomeBack": "Welcome back, {{name}}",
+      "subtitle": "Here's what's happening with your projects today.",
+      "stats": {
+        "repositories": "Repositories",
+        "openPRs": "Open PRs",
+        "teamMembers": "Team Members",
+        "commits": "Commits",
+        "repositoriesChange": "3 this week",
+        "openPRsChange": "5 need review",
+        "teamMembersChange": "2 new",
+        "commitsChange": "142 this week"
+      },
+      "recentActivity": "Recent Activity",
+      "viewAll": "View all",
+      "yourRepositories": "Your Repositories",
+      "contributionActivity": "Contribution Activity",
+      "contributionsCount": "{{count}} contributions in the last 30 days",
+      "activity": {
+        "mergedPR": "merged PR <strong>#{{id}}</strong> in <strong>{{repo}}</strong>",
+        "pushedCommits": "pushed {{count}} commits to <strong>{{branch}}</strong>",
+        "openedPR": "opened PR <strong>#{{id}}</strong> — \"{{title}}\"",
+        "reviewedPR": "reviewed PR <strong>#{{id}}</strong> in <strong>{{repo}}</strong>",
+        "createdIssue": "created issue <strong>#{{id}}</strong> — \"{{title}}\"",
+        "commentedOnIssue": "commented on issue <strong>#{{id}}</strong> in <strong>{{repo}}</strong>"
+      }
+    },
+    "pullRequests": {
+      "title": "Pull Requests",
+      "filters": {
+        "open": "Open",
+        "merged": "Merged",
+        "closed": "Closed",
+        "all": "All"
+      },
+      "openedBy": "#{{id}} opened by {{author}} {{time}}",
+      "comments": "{{count}} comments",
+      "reviews": "{{count}} reviews",
+      "filter": "Filter",
+      "newPullRequest": "New Pull Request"
+    },
+    "codeEditor": {
+      "title": "Code Editor",
+      "online": "Online",
+      "offline": "Offline",
+      "discussions": "Discussions",
+      "activity": "Activity"
+    },
+    "teamChat": {
+      "title": "Team Chat",
+      "channels": "Channels",
+      "directMessages": "Direct Messages",
+      "members": "Members",
+      "placeholder": "Message #{{channel}}...",
+      "today": "Today"
+    },
+    "settings": {
+      "title": "Settings",
+      "profile": "Profile",
+      "account": "Account",
+      "appearance": "Appearance",
+      "notifications": "Notifications",
+      "preferences": "Preferences",
+      "save": "Save",
+      "saveChanges": "Save Changes",
+      "cancel": "Cancel",
+      "changeAvatar": "Change Avatar",
+      "publicProfile": "Public Profile",
+      "publicProfileDesc": "This information will be displayed publicly on your profile.",
+      "name": "Name",
+      "bio": "Bio",
+      "bioPlaceholder": "Tell us a little about yourself.",
+      "company": "Company",
+      "location": "Location",
+      "website": "Website",
+      "accountSettings": "Account Settings",
+      "accountSettingsDesc": "Update your username and manage your password.",
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "confirmNewPassword": "Confirm New Password",
+      "changePassword": "Change Password",
+      "appearanceSettings": "Appearance Settings",
+      "appearanceSettingsDesc": "Customize how Perseus looks for you.",
+      "theme": "Theme",
+      "dark": "Dark",
+      "light": "Light",
+      "system": "System",
+      "language": "Language",
+      "notificationsSettings": "Notifications",
+      "notificationsSettingsDesc": "Choose how you want to be notified.",
+      "emailNotifications": "Email Notifications",
+      "pushNotifications": "Push Notifications",
+      "emailNotificationsDesc": "Receive updates about PRs, issues and mentions.",
+      "pushNotificationsDesc": "Get browser notifications for real-time events."
+    }
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "createAccount": "Create Account",
+    "signInWithGitHub": "Sign in with GitHub",
+    "signInWithGitLab": "Sign in with GitLab",
+    "signUpWithGitHub": "Sign up with GitHub",
+    "signUpWithGitLab": "Sign up with GitLab",
+    "orContinueWithEmail": "or continue with email",
+    "orCreateWithEmail": "or create with email",
+    "username": "Username",
+    "password": "Password",
+    "rememberMe": "Remember me",
+    "forgotPassword": "Forgot password?",
+    "fullName": "Full Name",
+    "email": "Email",
+    "confirmPassword": "Confirm Password",
+    "placeholders": {
+      "username": "username",
+      "password": "Enter your password",
+      "fullName": "Your name",
+      "email": "name@company.com",
+      "confirmPassword": "Repeat your password"
+    },
+    "rules": {
+      "usernameRequired": "Please enter your username",
+      "passwordRequired": "Please enter your password",
+      "usernameRequiredRegister": "Please enter a username",
+      "usernameMin": "At least 3 characters",
+      "emailRequired": "Please enter your email",
+      "emailInvalid": "Invalid email",
+      "passwordRequiredRegister": "Please enter a password",
+      "passwordMin": "At least 6 characters",
+      "confirmRequired": "Please confirm your password",
+      "passwordMismatch": "Passwords do not match"
+    },
+    "messages": {
+      "welcomeBack": "Welcome back!",
+      "invalidCredentials": "Invalid username or password.",
+      "accountCreated": "Account created successfully!",
+      "registrationFailed": "Registration failed. Please try again."
+    }
+  },
+  "common": {
+    "language": "Language",
+    "english": "English",
+    "chinese": "中文"
+  },
+  "desktop": {
+    "app": {
+      "welcomeTitle": "Welcome to Perseus Desktop",
+      "connecting": "Connecting to local gateway...",
+      "gatewayError": "Gateway init failed: {{error}}",
+      "retry": "Retry"
+    },
+    "welcome": {
+      "openLocal": "Open Local Directory",
+      "chooseFolder": "Choose Folder",
+      "cloneTitle": "Clone Repository (manual URL)",
+      "clonePlaceholder": "https://server/owner/repo.git or git@host:owner/repo.git",
+      "clone": "Clone",
+      "recent": "Recent Workspaces",
+      "noWorkspaces": "No workspaces yet",
+      "open": "Open"
+    },
+    "ide": {
+      "gateway": "Gateway: {{url}}"
+    },
+    "explorer": {
+      "noFiles": "No files"
+    },
+    "editor": {
+      "selectFile": "Select a file on the left to start editing",
+      "binary": "Binary file ({{size}} bytes) is not editable",
+      "truncated": "File too large, only first 2MB loaded",
+      "save": "Save"
+    },
+    "git": {
+      "loading": "Loading status...",
+      "branch": "Branch: {{branch}} ({{ahead}}↑ {{behind}}↓)",
+      "commitMessage": "Commit message",
+      "stage": "Stage",
+      "commit": "Commit",
+      "noChanges": "No changes"
+    },
+    "settings": {
+      "title": "Settings",
+      "gateway": "Gateway URL",
+      "token": "Session token: {{state}}",
+      "tokenGenerated": "Generated (in-memory only)",
+      "tokenMissing": "Not generated",
+      "placeholder": "Phase 1 placeholder. Data directory persistence, themes, and SSH keys arrive in later phases."
+    }
+  }
+}
