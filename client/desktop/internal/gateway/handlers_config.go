@@ -10,5 +10,6 @@ type ConfigResponse struct {
 
 func (g *Gateway) handleConfig(w http.ResponseWriter, r *http.Request) {
 	baseURL := "http://" + g.Addr()
-	writeJSON(w, http.StatusOK, ConfigResponse{BaseURL: baseURL, GatewayToken: g.token})
+	defaultID, _ := g.store.GetSetting("default_server_id")
+	writeJSON(w, http.StatusOK, ConfigResponse{BaseURL: baseURL, GatewayToken: g.token, DefaultServerID: defaultID})
 }

@@ -8,6 +8,7 @@ import (
 
 	"desktop/internal/gateway"
 	"desktop/internal/git"
+	"desktop/internal/server"
 	"desktop/internal/store"
 )
 
@@ -46,8 +47,9 @@ func (a *App) Initialize() error {
 	a.store = st
 	a.keychain = store.NewKeychain()
 	g := gateway.New(gateway.Config{
-		Store: st,
-		Git:   git.NewGit(a.keychain),
+		Store:   st,
+		Git:     git.NewGit(a.keychain),
+		Servers: server.NewRegistry(st, a.keychain),
 	})
 	if err := g.Start(); err != nil {
 		return err

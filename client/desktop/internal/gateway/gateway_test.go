@@ -4,13 +4,18 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"desktop/internal/server"
 	"desktop/internal/store"
 )
 
 func TestConfigRouteAndToken(t *testing.T) {
 	st, _ := store.New("")
 	defer st.Close()
-	g := New(Config{Store: st, AllowedOrigins: []string{"http://localhost:34115"}})
+	g := New(Config{
+		Store:         st,
+		Servers:       server.NewRegistry(st, &store.FakeKeychain{M: map[string]string{}}),
+		AllowedOrigins: []string{"http://localhost:34115"},
+	})
 	h := g.Handler()
 
 	// 无 token 访问 config（放行）
@@ -45,7 +50,11 @@ func TestConfigRouteAndToken(t *testing.T) {
 func TestCORSDisallowedOrigin(t *testing.T) {
 	st, _ := store.New("")
 	defer st.Close()
-	g := New(Config{Store: st, AllowedOrigins: []string{"http://localhost:34115"}})
+	g := New(Config{
+		Store:         st,
+		Servers:       server.NewRegistry(st, &store.FakeKeychain{M: map[string]string{}}),
+		AllowedOrigins: []string{"http://localhost:34115"},
+	})
 	req := httptest.NewRequest("GET", "/api/local/config", nil)
 	req.Header.Set("Origin", "https://evil.example.com")
 	rr := httptest.NewRecorder()

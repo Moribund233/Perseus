@@ -5,26 +5,32 @@ import (
 	"encoding/hex"
 	"net"
 	"net/http"
+	"time"
 
 	"desktop/internal/git"
+	"desktop/internal/server"
 	"desktop/internal/store"
 )
 
 type Config struct {
 	Store          *store.Store
 	Git            *git.Git
+	Servers        *server.Registry
 	AllowedOrigins []string
 }
 
 type Gateway struct {
 	store    *store.Store
 	git      *git.Git
+	servers  *server.Registry
 	origins  map[string]bool
 	token    string
 	addr     string
 	listener net.Listener
 	server   *http.Server
 	handler  http.Handler
+	cache    *proxyCache
+	proxy    *http.Client
 }
 
 func New(cfg Config) *Gateway {
@@ -34,8 +40,11 @@ func New(cfg Config) *Gateway {
 	g := &Gateway{
 		store:   cfg.Store,
 		git:     cfg.Git,
+		servers: cfg.Servers,
 		origins: map[string]bool{},
 		token:   newToken(),
+		cache:   newProxyCache(200, 10<<20, 24*time.Hour),
+		proxy:   &http.Client{Timeout: 30 * time.Second},
 	}
 	for _, o := range cfg.AllowedOrigins {
 		g.origins[o] = true

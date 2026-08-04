@@ -43,6 +43,17 @@ func New(path string) (*Store, error) {
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS servers (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            base_url TEXT NOT NULL,
+            auth_method TEXT NOT NULL,
+            username TEXT NOT NULL DEFAULT '',
+            health TEXT NOT NULL DEFAULT 'unknown',
+            last_checked TEXT NOT NULL DEFAULT '',
+            last_success TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL
+        );
     `); err != nil {
 		db.Close()
 		return nil, err

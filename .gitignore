@@ -159,6 +159,7 @@ migration_*.json
 temp/
 !temp/.gitkeep
 server/
+!client/desktop/internal/server/
 CLAUDE.md
 
 # node_modules

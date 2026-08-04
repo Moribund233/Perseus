@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"desktop/internal/git"
+	"desktop/internal/server"
 	"desktop/internal/store"
 )
 
@@ -17,8 +18,9 @@ func newTestGateway(t *testing.T) (*Gateway, *store.Store) {
 	t.Helper()
 	st, _ := store.New("")
 	g := New(Config{
-		Store: st,
-		Git:   git.NewGit(&store.FakeKeychain{M: map[string]string{}}),
+		Store:   st,
+		Git:     git.NewGit(&store.FakeKeychain{M: map[string]string{}}),
+		Servers: server.NewRegistry(st, &store.FakeKeychain{M: map[string]string{}}),
 		AllowedOrigins: []string{"http://localhost:34115"},
 	})
 	return g, st
