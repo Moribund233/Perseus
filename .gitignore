@@ -148,6 +148,7 @@ sqlite+aio.*/
 *.pid
 repositories/
 !client/web/src/routes/repositories/
+!client/desktop/frontend/src/views/repositories/
 
 # Database migration files
 migration_*.json

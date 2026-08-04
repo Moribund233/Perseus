@@ -1,15 +1,20 @@
 import { useState } from 'react';
-import { Button, Card, Empty, Input, List, Space } from 'antd';
-import { FolderOpenOutlined } from '@ant-design/icons';
+import { Button, Card, Empty, Input, List, Space, Tag } from 'antd';
+import { FolderOpenOutlined, CloudServerOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { createWorkspace, listWorkspaces, Workspace } from '../api/workspaces';
 import { useWorkspaceStore } from '../stores/workspace';
+import { useServersStore } from '../stores/servers';
+
+const healthColor: Record<string, string> = { online: 'success', offline: 'error', unknown: 'default' };
 
 export default function Welcome() {
   const { t } = useTranslation();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const setWorkspaces = useWorkspaceStore((s) => s.setWorkspaces);
   const setCurrent = useWorkspaceStore((s) => s.setCurrent);
+  const servers = useServersStore((s) => s.servers);
+  const setCurrentServer = useServersStore((s) => s.setCurrent);
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +52,29 @@ export default function Welcome() {
     <div className="welcome">
       <h2>{t('desktop.app.welcomeTitle')}</h2>
       <Space direction="vertical" size="middle" style={{ width: 520 }}>
+        <Card title={t('desktop.welcome.servers')}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span className="muted">{t('desktop.welcome.serversDesc')}</span>
+            <Button size="small" onClick={() => setCurrentServer('__manager__')}>
+              {t('desktop.servers.manage')}
+            </Button>
+          </div>
+          {servers.length === 0 ? (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('desktop.servers.empty')} style={{ margin: '12px 0' }} />
+          ) : (
+            <List
+              size="small"
+              dataSource={servers}
+              renderItem={(s) => (
+                <List.Item actions={[<Tag color={healthColor[s.health]}>{t(`desktop.servers.health.${s.health}`)}</Tag>]}>
+                  <Button type="text" icon={<CloudServerOutlined />} onClick={() => setCurrentServer(s.id)}>
+                    {s.name}
+                  </Button>
+                </List.Item>
+              )}
+            />
+          )}
+        </Card>
         <Card title={t('desktop.welcome.openLocal')}>
           <Button icon={<FolderOpenOutlined />} loading={busy} onClick={openFolder}>
             {t('desktop.welcome.chooseFolder')}

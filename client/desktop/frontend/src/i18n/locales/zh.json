@@ -102,7 +102,8 @@
       "actions": {
         "watch": "关注",
         "star": "星标",
-        "fork": "派生"
+        "fork": "复刻",
+        "unstar": "取消星标"
       },
       "visibility": {
         "public": "公开",
@@ -121,6 +122,8 @@
         "time": "时间"
       },
       "readme": "README",
+      "noRepos": "未找到仓库",
+      "notFound": "仓库不存在",
       "empty": {
         "title": "这是一个空仓库",
         "description": "推送你的第一次提交以开始使用。",
@@ -279,6 +282,8 @@
       "retry": "重试"
     },
     "welcome": {
+      "servers": "连接服务器",
+      "serversDesc": "在远程 Perseus 服务器上浏览仓库。",
       "openLocal": "打开本地目录",
       "chooseFolder": "选择文件夹",
       "cloneTitle": "Clone 仓库（手动 URL）",
@@ -315,6 +320,50 @@
       "tokenGenerated": "已生成（仅内存）",
       "tokenMissing": "未生成",
       "placeholder": "Phase 1 占位。数据目录持久化、主题、SSH 密钥等在后续阶段实现。"
+    },
+    "servers": {
+      "title": "服务器",
+      "add": "添加服务器",
+      "manage": "管理服务器",
+      "empty": "尚未连接任何服务器",
+      "name": "名称",
+      "nameRequired": "请输入名称",
+      "namePlaceholder": "如 dev",
+      "baseUrl": "服务器地址",
+      "baseUrlRequired": "请输入服务器地址",
+      "authMethod": "认证方式",
+      "auth": {
+        "password": "用户名 & 密码",
+        "token": "访问令牌"
+      },
+      "username": "用户名",
+      "usernameRequired": "请输入用户名",
+      "password": "密码",
+      "passwordRequired": "请输入密码",
+      "token": "令牌",
+      "tokenRequired": "请输入令牌",
+      "health": {
+        "online": "在线",
+        "offline": "离线",
+        "unknown": "未知"
+      },
+      "healthTag": "健康状态: {{health}}",
+      "refresh": "刷新",
+      "added": "已添加服务器 \"{{name}}\"",
+      "deleteConfirm": "删除服务器 \"{{name}}\"？其存储的令牌也会一并移除。",
+      "loginFailed": "登录失败: {{error}}"
+    },
+    "serverShell": {
+      "back": "返回",
+      "backWorkspace": "工作区",
+      "manageServers": "管理服务器",
+      "noServerSelected": "选择一个服务器以浏览仓库",
+      "clone": "Clone 到工作区",
+      "cloneOk": "已克隆到工作区",
+      "cloneFail": "Clone 失败",
+      "starFail": "更新 star 失败",
+      "comingIn2b": "该视图将在 Phase 2B 提供。",
+      "defaultBranch": "默认分支"
     }
   }
 }

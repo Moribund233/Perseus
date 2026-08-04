@@ -37,8 +37,8 @@ export async function apiRequest<T>(
       const json = await res.json();
       message = json.error?.message || json.detail || message;
       code = json.error?.code;
-      offline = json.error?.offline;
-      cached = json.error?.cached;
+      offline = json.offline;
+      cached = json.cached;
     } catch {
       /* keep statusText */
     }
@@ -47,4 +47,13 @@ export async function apiRequest<T>(
 
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
+}
+
+// proxyRequest 经本地网关代理访问服务器 API，token 在 Go 侧，前端不接触。
+export async function proxyRequest<T>(
+  serverId: string,
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  return apiRequest<T>(`/api/local/proxy/${serverId}${path}`, options);
 }

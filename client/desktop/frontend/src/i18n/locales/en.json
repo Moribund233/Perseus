@@ -102,7 +102,8 @@
       "actions": {
         "watch": "Watch",
         "star": "Star",
-        "fork": "Fork"
+        "fork": "Fork",
+        "unstar": "Unstar"
       },
       "visibility": {
         "public": "Public",
@@ -121,6 +122,8 @@
         "time": "Time"
       },
       "readme": "README",
+      "noRepos": "No repositories found",
+      "notFound": "Repository not found",
       "empty": {
         "title": "This repository is empty",
         "description": "Push your first commit to get started.",
@@ -279,6 +282,8 @@
       "retry": "Retry"
     },
     "welcome": {
+      "servers": "Connect to a Server",
+      "serversDesc": "Browse repositories on a remote Perseus server.",
       "openLocal": "Open Local Directory",
       "chooseFolder": "Choose Folder",
       "cloneTitle": "Clone Repository (manual URL)",
@@ -315,6 +320,50 @@
       "tokenGenerated": "Generated (in-memory only)",
       "tokenMissing": "Not generated",
       "placeholder": "Phase 1 placeholder. Data directory persistence, themes, and SSH keys arrive in later phases."
+    },
+    "servers": {
+      "title": "Servers",
+      "add": "Add Server",
+      "manage": "Manage servers",
+      "empty": "No servers connected yet",
+      "name": "Name",
+      "nameRequired": "Please enter a name",
+      "namePlaceholder": "e.g. dev",
+      "baseUrl": "Server URL",
+      "baseUrlRequired": "Please enter the server URL",
+      "authMethod": "Authentication",
+      "auth": {
+        "password": "Username & password",
+        "token": "Access token"
+      },
+      "username": "Username",
+      "usernameRequired": "Please enter username",
+      "password": "Password",
+      "passwordRequired": "Please enter password",
+      "token": "Token",
+      "tokenRequired": "Please enter token",
+      "health": {
+        "online": "Online",
+        "offline": "Offline",
+        "unknown": "Unknown"
+      },
+      "healthTag": "Health: {{health}}",
+      "refresh": "Refresh",
+      "added": "Added server \"{{name}}\"",
+      "deleteConfirm": "Delete server \"{{name}}\"? Its stored token will also be removed.",
+      "loginFailed": "Login failed: {{error}}"
+    },
+    "serverShell": {
+      "back": "Back",
+      "backWorkspace": "Workspaces",
+      "manageServers": "Manage servers",
+      "noServerSelected": "Select a server to browse repositories",
+      "clone": "Clone to workspace",
+      "cloneOk": "Cloned to workspace",
+      "cloneFail": "Clone failed",
+      "starFail": "Failed to update star",
+      "comingIn2b": "This view ships in Phase 2B.",
+      "defaultBranch": "default branch"
     }
   }
 }
