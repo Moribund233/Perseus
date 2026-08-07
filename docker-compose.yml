@@ -35,11 +35,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
-          memory: 1G
+          cpus: '4'
+          memory: 2G
         reservations:
-          cpus: '0.5'
-          memory: 256M
+          cpus: '1'
+          memory: 512M
 
   # git-http-backend CGI
   git-cgi:
@@ -69,9 +69,10 @@ services:
     image: openresty/openresty:1.31.1.1-0-bookworm-fat
     container_name: perseus-gateway
     ports:
-      - "127.0.0.1:8000:8000"
+      - "8000:8000"
     volumes:
       - ./docker/gateway/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - /var/www/perseus-web:/var/www/perseus-web:ro
       - /etc/localtime:/etc/localtime:ro
     networks:
       - default
