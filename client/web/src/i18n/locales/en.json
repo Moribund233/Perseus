@@ -155,6 +155,51 @@
         "commentedOnIssue": "commented on issue <strong>#{{id}}</strong> in <strong>{{repo}}</strong>"
       }
     },
+    "issues": {
+      "title": "Issues",
+      "backToRepo": "Back to repository",
+      "filters": {
+        "open": "Open",
+        "closed": "Closed",
+        "all": "All"
+      },
+      "newIssue": "New Issue",
+      "noIssues": "No issues match this filter",
+      "openedBy": "#{{id}} opened by {{author}} {{time}}",
+      "created": "Issue created",
+      "creationFailed": "Failed to create issue",
+      "newIssueModal": {
+        "title": "New Issue",
+        "titleLabel": "Title",
+        "titlePlaceholder": "Issue title",
+        "titleRequired": "Please enter a title",
+        "description": "Description",
+        "descriptionPlaceholder": "Add more context...",
+        "priority": "Priority",
+        "priorityLow": "Low",
+        "priorityMedium": "Medium",
+        "priorityHigh": "High",
+        "priorityCritical": "Critical",
+        "create": "Create issue",
+        "cancel": "Cancel"
+      },
+      "detail": {
+        "backToIssues": "Back to issues",
+        "open": "Open",
+        "closed": "Closed",
+        "openedBy": "opened by {{author}}",
+        "assignee": "Assignee: {{name}}",
+        "closeIssue": "Close issue",
+        "reopenIssue": "Reopen issue",
+        "noDescription": "No description provided.",
+        "noLabels": "No labels",
+        "comments": "{{count}} comments",
+        "leaveComment": "Leave a comment",
+        "commentPlaceholder": "Leave a comment",
+        "submitComment": "Comment",
+        "commentFailed": "Failed to post comment"
+      }
+    },
     "pullRequests": {
       "title": "Pull Requests",
       "filters": {
@@ -167,7 +212,26 @@
       "comments": "{{count}} comments",
       "reviews": "{{count}} reviews",
       "filter": "Filter",
-      "newPullRequest": "New Pull Request"
+      "newPullRequest": "New Pull Request",
+      "detail": {
+        "backToPullRequests": "Back to pull requests",
+        "open": "Open",
+        "merged": "Merged",
+        "closed": "Closed",
+        "openedByPR": "opened by {{author}}",
+        "closePR": "Close pull request",
+        "mergePR": "Merge",
+        "mergeMerge": "Create a merge commit",
+        "mergeSquash": "Squash and merge",
+        "mergeRebase": "Rebase and merge",
+        "noDescription": "No description provided.",
+        "comments": "{{count}} comments",
+        "leaveComment": "Leave a comment",
+        "commentPlaceholder": "Leave a comment",
+        "submitComment": "Comment",
+        "commentFailed": "Failed to post comment",
+        "threadClosed": "This pull request is closed. Comments are locked."
+      }
     },
     "codeEditor": {
       "title": "Code Editor",

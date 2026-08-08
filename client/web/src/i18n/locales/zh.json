@@ -155,6 +155,51 @@
         "commentedOnIssue": "评论了 issue <strong>#{{id}}</strong> 在 <strong>{{repo}}</strong>"
       }
     },
+    "issues": {
+      "title": "Issues",
+      "backToRepo": "返回仓库",
+      "filters": {
+        "open": "打开",
+        "closed": "已关闭",
+        "all": "全部"
+      },
+      "newIssue": "新建 Issue",
+      "noIssues": "没有符合筛选条件的 Issue",
+      "openedBy": "#{{id}} 由 {{author}} 于 {{time}} 打开",
+      "created": "Issue 已创建",
+      "creationFailed": "创建 Issue 失败",
+      "newIssueModal": {
+        "title": "新建 Issue",
+        "titleLabel": "标题",
+        "titlePlaceholder": "Issue 标题",
+        "titleRequired": "请输入标题",
+        "description": "描述",
+        "descriptionPlaceholder": "添加更多上下文...",
+        "priority": "优先级",
+        "priorityLow": "低",
+        "priorityMedium": "中",
+        "priorityHigh": "高",
+        "priorityCritical": "严重",
+        "create": "创建 Issue",
+        "cancel": "取消"
+      },
+      "detail": {
+        "backToIssues": "返回 Issues",
+        "open": "打开",
+        "closed": "已关闭",
+        "openedBy": "由 {{author}} 打开",
+        "assignee": "负责人: {{name}}",
+        "closeIssue": "关闭 Issue",
+        "reopenIssue": "重新打开",
+        "noDescription": "未提供描述。",
+        "noLabels": "无标签",
+        "comments": "{{count}} 条评论",
+        "leaveComment": "发表评论",
+        "commentPlaceholder": "发表评论",
+        "submitComment": "评论",
+        "commentFailed": "评论发送失败"
+      }
+    },
     "pullRequests": {
       "title": "Pull Requests",
       "filters": {
@@ -167,7 +212,26 @@
       "comments": "{{count}} 条评论",
       "reviews": "{{count}} 条审查",
       "filter": "筛选",
-      "newPullRequest": "新建 Pull Request"
+      "newPullRequest": "新建 Pull Request",
+      "detail": {
+        "backToPullRequests": "返回 Pull Requests",
+        "open": "打开",
+        "merged": "已合并",
+        "closed": "已关闭",
+        "openedByPR": "由 {{author}} 打开",
+        "closePR": "关闭 Pull Request",
+        "mergePR": "合并",
+        "mergeMerge": "创建合并提交",
+        "mergeSquash": "Squash 合并",
+        "mergeRebase": "Rebase 合并",
+        "noDescription": "未提供描述。",
+        "comments": "{{count}} 条评论",
+        "leaveComment": "发表评论",
+        "commentPlaceholder": "发表评论",
+        "submitComment": "评论",
+        "commentFailed": "评论发送失败",
+        "threadClosed": "该 Pull Request 已关闭，评论已锁定。"
+      }
     },
     "codeEditor": {
       "title": "代码编辑器",
