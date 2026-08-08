@@ -88,7 +88,7 @@ export default function PullRequestDetailPage() {
       fetchPullRequest(currentRepo.id, num);
       fetchComments(currentRepo.id, num);
     }
-  }, [currentRepo?.id, num, fetchPullRequest, fetchComments]);
+  }, [currentRepo, num, fetchPullRequest, fetchComments]);
 
   const authorName = currentPR?.author?.full_name || currentPR?.author?.username || 'Unknown';
 

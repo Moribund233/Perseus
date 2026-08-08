@@ -83,7 +83,7 @@ export default function IssuesPage() {
     if (currentRepo) {
       fetchIssues(currentRepo.id, filter === 'all' ? undefined : filter);
     }
-  }, [currentRepo?.id, filter, fetchIssues]);
+  }, [currentRepo, filter, fetchIssues]);
 
   const filterCounts = useMemo(() => {
     const open = issues.filter((i) => i.status === 'open').length;
