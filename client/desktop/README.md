@@ -42,7 +42,15 @@ wails dev
 
 # 打包（NSIS 安装包 / 可执行文件）
 wails build
+
+# 后端单测（含 store/server/gateway/ws/proxy/offline 语义）
+go test ./...
+
+# 前端类型检查 + 构建
+cd frontend && npm run build
 ```
+
+仓库根目录 `internal/gateway/smoke_test.go` 为 live-backend 冒烟测试：先 `docker compose up -d` 起后端（:8080），再 `go test ./internal/gateway -run TestSmokeLiveBackend -v` 验证注册表 + 代理 + 离线语义。
 
 依赖要求：Go 1.25+、Wails v2.12、Node 20+。
 
