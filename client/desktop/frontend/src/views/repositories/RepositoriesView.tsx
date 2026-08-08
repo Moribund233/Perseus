@@ -18,6 +18,12 @@ import { useServersStore } from '../../stores/servers';
 import { repositoriesApi, type RepoFile, type RepoBlob, type Repository } from '../../api/repositories';
 import { createWorkspace, listWorkspaces } from '../../api/workspaces';
 import { useWorkspaceStore } from '../../stores/workspace';
+import IssuesView from './IssuesView';
+import IssueDetail from './IssueDetail';
+import PullRequestsView from './PullRequestsView';
+import PullRequestDetail from './PullRequestDetail';
+import type { Issue } from '../../api/issues';
+import type { PR } from '../../api/pullRequests';
 
 const { Sider, Content } = Layout;
 
@@ -190,6 +196,8 @@ export default function RepositoriesView() {
   const repositories = useRepositoriesStore((s) => s.repositories);
 
   const [activeTab, setActiveTab] = useState('code');
+  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
+  const [selectedPR, setSelectedPR] = useState<PR | null>(null);
   const [selectedTreeKey, setSelectedTreeKey] = useState('');
   const [selectedFileContent, setSelectedFileContent] = useState<RepoBlob | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
@@ -394,9 +402,30 @@ export default function RepositoriesView() {
           </div>
           <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems}
             style={{ marginBottom: 0 }} />
-          {activeTab !== 'code' && (
-            <div style={{ padding: '24px 0', color: textSecondary, textAlign: 'center' }}>
-              {t('desktop.serverShell.comingIn2b')}
+          {activeTab === 'issues' && (
+            <div style={{ flex: 1, minHeight: 0, padding: '16px 0 0', display: 'flex' }}>
+              {selectedIssue ? (
+                <IssueDetail
+                  repoId={currentRepo.id}
+                  issueNumber={selectedIssue.issue_number}
+                  onBack={() => setSelectedIssue(null)}
+                />
+              ) : (
+                <IssuesView repoId={currentRepo.id} onOpenIssue={setSelectedIssue} />
+              )}
+            </div>
+          )}
+          {activeTab === 'pullRequests' && (
+            <div style={{ flex: 1, minHeight: 0, padding: '16px 0 0', display: 'flex' }}>
+              {selectedPR ? (
+                <PullRequestDetail
+                  repoId={currentRepo.id}
+                  prNumber={selectedPR.pr_number}
+                  onBack={() => setSelectedPR(null)}
+                />
+              ) : (
+                <PullRequestsView repoId={currentRepo.id} onOpenPR={setSelectedPR} />
+              )}
             </div>
           )}
         </div>
