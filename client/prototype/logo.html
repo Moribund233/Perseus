@@ -1,209 +1,518 @@
-<!DOCTYPE svg>
-<svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>珀尔修斯 PERSEUS · 定稿交付 | 品牌标识 V3</title>
+<link href="https://cdn.jsdelivr.net/npm/@fontsource/space-grotesk@5/500.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fontsource/space-grotesk@5/700.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5/400.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5/500.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5/700.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-mono@5/400.css" rel="stylesheet">
+<style>
+:root{
+  --blue:#3D7BFF; --green:#12A38B; --ink:#E9F1FF;
+  --bg:#05070E; --panel:#0A111F;
+  --line:rgba(141,173,255,.13); --line2:rgba(141,173,255,.28);
+  --txt:#DEE7F7; --dim:#8DA1C4; --faint:#5A6B8C;
+  --sans:'Noto Sans SC',system-ui,-apple-system,sans-serif;
+  --disp:'Space Grotesk','Noto Sans SC',sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:var(--sans);font-size:15px;line-height:1.7;overflow-x:hidden}
+::selection{background:rgba(61,123,255,.35)}
+a{color:#9DBBFF;text-decoration:none}
+.sky{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    radial-gradient(circle 1.4px at 12% 22%, rgba(233,241,255,.4), transparent),
+    radial-gradient(circle 1px at 78% 12%, rgba(233,241,255,.3), transparent),
+    radial-gradient(circle 1.2px at 88% 58%, rgba(150,200,255,.32), transparent),
+    radial-gradient(circle 1px at 28% 74%, rgba(233,241,255,.22), transparent),
+    radial-gradient(640px 440px at 85% -5%, rgba(61,123,255,.10), transparent 70%),
+    radial-gradient(520px 420px at 0% 108%, rgba(18,163,139,.08), transparent 70%)}
+.wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:0 28px}
+
+/* ── 头部 / Hero ─────────────────── */
+header{padding:60px 0 26px}
+.topline{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:34px}
+.tag-final{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:#7FD6C4;border:1px solid rgba(18,163,139,.5);padding:6px 14px;border-radius:999px;background:rgba(18,163,139,.09)}
+.meta{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--faint)}
+.hero{display:grid;grid-template-columns:1fr 1fr;gap:30px;align-items:stretch}
+.hero-stage{--blue:#3D7BFF;--green:#12A38B;--ink:#E9F1FF;position:relative;background-color:#081120;border:1px solid var(--line);border-radius:22px;display:grid;place-items:center;min-height:430px;overflow:hidden;
+  background-image:
+    radial-gradient(circle 1.5px at 18% 24%, rgba(233,241,255,.5), transparent),
+    radial-gradient(circle 1px at 76% 14%, rgba(233,241,255,.36), transparent),
+    radial-gradient(circle 1.2px at 86% 74%, rgba(150,200,255,.4), transparent),
+    radial-gradient(circle 1px at 26% 84%, rgba(233,241,255,.28), transparent),
+    radial-gradient(circle 1px at 58% 46%, rgba(233,241,255,.18), transparent),
+    radial-gradient(300px 240px at 72% 22%, rgba(61,123,255,.13), transparent 70%)}
+.hero-mark{width:min(72%,360px);height:auto;filter:drop-shadow(0 0 34px rgba(61,123,255,.28))}
+.stage-btn{position:absolute;left:16px;bottom:14px;font-family:var(--sans);font-size:12px;color:#9DBBFF;background:rgba(10,17,31,.7);border:1px solid rgba(61,123,255,.4);border-radius:999px;padding:6px 15px;cursor:pointer;transition:all .25s;backdrop-filter:blur(4px)}
+.stage-btn:hover{border-color:var(--blue);color:#fff}
+.stage-tag{position:absolute;top:14px;left:16px;font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:rgba(158,180,215,.75);border:1px solid rgba(158,180,215,.25);border-radius:999px;padding:3px 11px}
+.hero-info{display:flex;flex-direction:column;justify-content:center;gap:15px;padding:8px 4px}
+.final-chip{display:inline-flex;align-items:center;gap:8px;align-self:flex-start;font-size:12px;letter-spacing:.14em;color:#7FD6C4;border:1px solid rgba(18,163,139,.45);background:rgba(18,163,139,.09);border-radius:999px;padding:5px 15px}
+.final-chip i{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:blink 1.8s infinite;font-style:normal}
+@keyframes blink{50%{opacity:.3}}
+.hero-info h1{font-family:var(--disp);font-weight:700;font-size:clamp(40px,6vw,64px);line-height:1.08;letter-spacing:-.01em}
+.hero-info h1 small{display:block;font-size:12px;font-weight:400;letter-spacing:.5em;color:var(--faint);margin-top:12px}
+.hero-info .desc{color:var(--dim);font-size:14.5px;max-width:480px}
+.facts{display:grid;grid-template-columns:repeat(3,auto);gap:14px;margin-top:6px}
+.facts div{border:1px solid var(--line);border-radius:13px;padding:11px 16px;background:rgba(10,17,31,.6)}
+.facts b{display:block;font-family:var(--disp);font-size:17px;color:var(--ink);font-weight:700}
+.facts span{font-size:11px;color:var(--faint);letter-spacing:.06em}
+.hero-links{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap}
+.hero-links a{font-size:12.5px;border:1px solid rgba(61,123,255,.4);border-radius:999px;padding:7px 18px;transition:all .25s;letter-spacing:.04em}
+.hero-links a:hover{background:rgba(61,123,255,.14);color:#fff}
+
+/* ── 区块通用 ─────────────────── */
+.sec-head{display:flex;align-items:baseline;gap:16px;margin:56px 0 22px;border-top:1px solid var(--line);padding-top:28px;flex-wrap:wrap}
+.sec-head .idx{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--blue)}
+.sec-head h2{font-size:19px;font-weight:700}
+.sec-head p{margin-left:auto;color:var(--faint);font-size:12.5px}
+
+/* ── 制图规范 ─────────────────── */
+.construct{display:grid;grid-template-columns:1.15fr 1fr;gap:22px}
+.c-stage{background:#081120;border:1px solid var(--line);border-radius:19px;display:grid;place-items:center;padding:30px}
+.c-stage svg{width:min(88%,460px);height:auto}
+.c-info{display:flex;flex-direction:column;gap:12px}
+.c-info h3{font-size:16px}
+.spec-list{list-style:none;display:flex;flex-direction:column;gap:9px}
+.spec-list li{display:flex;gap:12px;align-items:baseline;border:1px solid var(--line);border-radius:11px;padding:10px 15px;background:var(--panel);font-size:12.8px;color:var(--dim)}
+.spec-list li b{font-family:var(--mono);font-size:11px;color:#9DBBFF;letter-spacing:.08em;flex:none;width:96px;font-weight:400}
+.c-note{font-size:12.5px;color:var(--faint);line-height:1.8}
+
+/* ── 色彩变体 ─────────────────── */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px}
+.tile{--blue:#3D7BFF;--green:#12A38B;--ink:#E9F1FF;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--panel);transition:transform .3s,border-color .3s}
+.tile:hover{transform:translateY(-4px);border-color:var(--line2)}
+.tile .pv{aspect-ratio:1/0.92;display:grid;place-items:center;background-color:#081120;
+  background-image:radial-gradient(circle 1px at 24% 30%, rgba(233,241,255,.35), transparent),radial-gradient(circle 1px at 78% 72%, rgba(150,200,255,.3), transparent)}
+.tile .pv svg{width:56%;height:auto}
+.tile figcaption{padding:10px 14px;font-size:11.5px;color:var(--dim);border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.tile figcaption em{font-style:normal;font-family:var(--mono);font-size:9.5px;color:var(--faint);letter-spacing:.06em}
+.tile.light .pv{background-color:#EDF2F8;--ink:#0B1E3B;background-image:none}
+.tile.mono-dark{--blue:#E9F1FF;--green:#E9F1FF;--ink:#E9F1FF}
+.tile.mono-light .pv{background-color:#EDF2F8;--blue:#0A1730;--green:#0A1730;--ink:#0A1730;background-image:none}
+.tile.mono-blue{--blue:#3D7BFF;--green:#3D7BFF;--ink:#3D7BFF}
+
+/* 色板比例 */
+.palette{margin-top:20px;border:1px solid var(--line);border-radius:17px;background:var(--panel);padding:22px 24px}
+.ratio-bar{display:flex;height:44px;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.08)}
+.ratio-bar i{display:block;height:100%}
+.swatches{display:flex;flex-wrap:wrap;gap:11px;margin-top:16px}
+.swatch{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:8px 14px 8px 8px;cursor:pointer;background:#0C1424;transition:border-color .25s,transform .25s;font-family:var(--sans)}
+.swatch:hover{border-color:var(--line2);transform:translateY(-2px)}
+.swatch i{width:30px;height:30px;border-radius:8px;border:1px solid rgba(255,255,255,.12)}
+.swatch .nm{font-size:12px;color:var(--txt);text-align:left;line-height:1.35}
+.swatch .hx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+
+/* ── 组合与尺寸 ─────────────────── */
+.lockup-grid{display:grid;grid-template-columns:280px 1fr;gap:22px}
+.controls{background:var(--panel);border:1px solid var(--line);border-radius:17px;padding:22px}
+.controls label{display:block;font-size:12px;color:var(--faint);margin-bottom:7px;letter-spacing:.06em}
+.controls input{width:100%;background:#0D1628;border:1px solid var(--line);border-radius:10px;color:var(--txt);font-family:var(--sans);font-size:13.5px;padding:10px 13px;outline:none;transition:border-color .25s}
+.controls input:focus{border-color:rgba(61,123,255,.6)}
+.controls .hint{margin-top:14px;font-size:11.5px;color:var(--faint);line-height:1.75}
+.lk-panels{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:16px}
+.panel{--blue:#3D7BFF;--green:#12A38B;--ink:#E9F1FF;border:1px solid var(--line);border-radius:17px;overflow:hidden;display:flex;flex-direction:column;background:var(--panel)}
+.panel .pv{flex:1;display:grid;place-items:center;padding:30px 24px;background-color:#081120;
+  background-image:radial-gradient(circle 1px at 18% 26%, rgba(233,241,255,.35), transparent),radial-gradient(circle 1px at 80% 74%, rgba(150,200,255,.3), transparent)}
+.panel .cap{padding:10px 18px;font-size:11px;color:var(--faint);border-top:1px solid var(--line);font-family:var(--mono);letter-spacing:.12em}
+.lock-row{display:flex;align-items:center;gap:18px}
+.lock-row svg{width:64px;height:64px;flex:none}
+.lock-col{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.lock-col svg{width:84px;height:84px}
+.wordmark{font-family:var(--disp);font-weight:700;font-size:clamp(20px,2.4vw,30px);letter-spacing:.05em;color:var(--ink);text-transform:uppercase;line-height:1.1;word-break:break-all}
+.wordmark.small{font-size:19px}
+.wordmark small{display:block;font-family:var(--mono);font-weight:400;font-size:9px;letter-spacing:.4em;color:#7E93BC;margin-top:7px}
+.mini-grid{display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap}
+.mini-grid figure{display:flex;flex-direction:column;align-items:center;gap:8px}
+.mini-grid figcaption{font-family:var(--mono);font-size:9.5px;color:var(--faint)}
+.avatar-wrap{display:flex;align-items:center;gap:16px}
+.avatar{width:60px;height:60px;border-radius:50%;background:#0D1B33;border:2px solid var(--green);display:grid;place-items:center;box-shadow:0 0 18px rgba(18,163,139,.35)}
+.avatar svg{width:64%;height:64%}
+.avatar-note{font-size:11.5px;color:var(--dim);line-height:1.7}
+
+/* ── 动效 ─────────────────── */
+.motion{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.m-stage{--blue:#3D7BFF;--green:#12A38B;--ink:#E9F1FF;position:relative;background-color:#081120;border:1px solid var(--line);border-radius:19px;display:grid;place-items:center;min-height:330px;
+  background-image:radial-gradient(circle 1px at 22% 26%, rgba(233,241,255,.4), transparent),radial-gradient(circle 1px at 80% 68%, rgba(150,200,255,.35), transparent)}
+.m-stage svg{width:min(62%,300px)}
+.m-stage .stage-btn{left:14px;bottom:12px}
+.motion-spec{display:flex;flex-direction:column;gap:11px}
+.motion-spec h3{font-size:16px}
+
+/* 动画 */
+.anim .w1,.anim .w2,.anim .w3{animation:wavepulse 2.6s cubic-bezier(.3,0,.2,1) infinite}
+.anim .w2{animation-delay:.35s}
+.anim .w3{animation-delay:.7s}
+.anim .echo{animation:wavepulse 2.6s cubic-bezier(.3,0,.2,1) infinite;animation-delay:1.15s}
+.anim .core{transform-box:fill-box;transform-origin:center;animation:corebreathe 2.6s cubic-bezier(.3,0,.2,1) infinite}
+.anim .comp{animation:blink 2.6s infinite}
+@keyframes wavepulse{0%{opacity:.22}16%{opacity:1}48%{opacity:.22}100%{opacity:.22}}
+@keyframes corebreathe{0%,100%{transform:scale(1)}14%{transform:scale(1.09)}40%{transform:scale(1)}}
+.anim.paused *{animation-play-state:paused}
+@media (prefers-reduced-motion:reduce){.anim *{animation:none!important}}
+
+/* ── 规则 / 反例 ─────────────────── */
+.rules{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.clearbox{--blue:#3D7BFF;--green:#12A38B;--ink:#E9F1FF;background:#081120;border:1px solid var(--line);border-radius:19px;display:grid;place-items:center;padding:34px}
+.clear-inner{position:relative;padding:13%;border:1.5px dashed rgba(127,214,196,.55);border-radius:12px}
+.clear-inner svg{width:150px;height:150px;display:block}
+.clear-inner .tick{position:absolute;font-family:var(--mono);font-size:9px;color:#7FD6C4;letter-spacing:.08em}
+.clear-inner .tick.t{top:3px;left:50%;transform:translateX(-50%)}
+.clear-inner .tick.l{left:4px;top:50%;transform:translateY(-50%) rotate(-90deg)}
+.clear-cap{margin-top:16px;font-size:11.5px;color:var(--faint);text-align:center}
+.donts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.dont{--blue:#3D7BFF;--green:#12A38B;--ink:#E9F1FF;position:relative;border:1px solid var(--line);border-radius:15px;overflow:hidden;background:var(--panel)}
+.dont .pv{aspect-ratio:1/0.86;display:grid;place-items:center;background:#081120;overflow:hidden}
+.dont .pv svg{width:52%;transition:none}
+.dont .x{position:absolute;top:9px;right:9px;width:22px;height:22px;border-radius:50%;background:rgba(255,93,93,.15);border:1px solid rgba(255,93,93,.6);color:#FF7B7B;font-size:12px;display:grid;place-items:center;font-weight:700}
+.dont figcaption{padding:8px 12px;font-size:11px;color:var(--dim);border-top:1px solid var(--line)}
+.dont.stretch .pv svg{transform:scaleX(1.45)}
+.dont.recolor{--blue:#B44BFF;--green:#FF5FA2;--ink:#FFD166}
+.dont.glow .pv svg{filter:drop-shadow(0 0 10px #B44BFF) drop-shadow(0 0 22px #3D7BFF)}
+.dont.busy .pv{background:repeating-linear-gradient(45deg,#173059 0 9px,#0A1424 9px 18px)}
+
+/* ── 应用场景 ─────────────────── */
+.term{background:#070D19;border:1px solid var(--line2);border-radius:16px;overflow:hidden;box-shadow:0 30px 70px -34px rgba(0,0,0,.9)}
+.term-bar{display:flex;align-items:center;gap:12px;padding:12px 18px;background:#0B1424;border-bottom:1px solid var(--line)}
+.term-bar .dots{display:flex;gap:7px}
+.term-bar .dots i{width:11px;height:11px;border-radius:50%}
+.term-bar .dots i:nth-child(1){background:#FF5F57}.term-bar .dots i:nth-child(2){background:#FEBC2E}.term-bar .dots i:nth-child(3){background:#28C840}
+.term-title{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:12px;color:var(--dim)}
+.term-title svg{width:17px;height:17px}
+.term-online{margin-left:auto;display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:#7FD6C4}
+.avstack{display:flex}
+.avstack i{width:18px;height:18px;border-radius:50%;border:2px solid #0B1424;margin-left:-6px}
+.avstack i:first-child{margin-left:0;background:var(--blue)}
+.avstack i:last-child{background:var(--green)}
+.term-body{padding:22px 24px;font-family:var(--mono);font-size:12.8px;line-height:2.15;color:#B8C8E8}
+.term-body .p{color:var(--green)}
+.term-body .c{color:#5F7398}
+.term-body .k{color:#9DBBFF}
+.cur{display:inline-block;width:8px;height:15px;vertical-align:-2px;border-radius:2px;animation:blink 1.1s steps(1) infinite}
+.cur.b{background:var(--blue)}.cur.g{background:var(--green)}
+.tag-who{font-size:10px;border-radius:5px;padding:1px 7px;margin-left:8px;letter-spacing:.05em}
+.tag-who.b{background:rgba(61,123,255,.15);color:#9DBBFF;border:1px solid rgba(61,123,255,.4)}
+.tag-who.g{background:rgba(18,163,139,.15);color:#7FD6C4;border:1px solid rgba(18,163,139,.4)}
+
+footer{margin:66px 0 90px;border-top:1px solid var(--line);padding-top:26px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--faint)}
+footer .deliv b{color:var(--dim);font-weight:500}
+.toast{position:fixed;top:24px;left:50%;transform:translate(-50%,-160%);z-index:60;background:#0D1728;border:1px solid rgba(18,163,139,.5);color:var(--txt);font-size:12.5px;border-radius:999px;padding:9px 20px;transition:transform .45s cubic-bezier(.2,.9,.3,1.1)}
+.toast.show{transform:translate(-50%,0)}
+
+@media(max-width:920px){
+  .hero,.construct,.motion,.rules,.lockup-grid{grid-template-columns:1fr}
+  .lk-panels{grid-template-columns:1fr}
+  header{padding-top:44px}
+}
+</style>
+</head>
+<body>
+<div class="sky"></div>
+
+<!-- ══════════ 标志定义（静态引用）══════════ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
 <defs>
-<linearGradient id="blueGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
-<stop offset="0%" stop-color="#58a6ff"/>
-<stop offset="100%" stop-color="#bc8cff"/>
-</linearGradient>
-<linearGradient id="blueGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
-<stop offset="0%" stop-color="#1f6feb"/>
-<stop offset="50%" stop-color="#58a6ff"/>
-<stop offset="100%" stop-color="#bc8cff"/>
-</linearGradient>
-<radialGradient id="glow">
-<stop offset="0%" stop-color="#58a6ff" stop-opacity="0.3"/>
-<stop offset="100%" stop-color="#58a6ff" stop-opacity="0"/>
-</radialGradient>
-<filter id="blur">
-<feGaussianBlur in="SourceGraphic" stdDeviation="2"/>
-</filter>
+<symbol id="p0" viewBox="0 0 120 120">
+  <path d="M43.9 46.1 A24 24 0 0 1 69.9 67.9" fill="none" stroke="var(--blue,#3D7BFF)" stroke-width="9" stroke-linecap="round"/>
+  <path d="M39.7 34.5 A36 36 0 0 1 81.9 73.1" fill="none" stroke="var(--blue,#3D7BFF)" stroke-width="9" stroke-linecap="round"/>
+  <path d="M62.4 24.9 A48 48 0 0 1 92.4 57.6" fill="none" stroke="var(--green,#12A38B)" stroke-width="9" stroke-linecap="round"/>
+  <path d="M37.8 92.6 A24 24 0 0 1 23.4 78.2" fill="none" stroke="var(--ink,#E9F1FF)" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="46" cy="70" r="11" fill="var(--blue,#3D7BFF)"/>
+  <circle cx="10" cy="73" r="4.5" fill="var(--green,#12A38B)"/>
+</symbol>
 </defs>
-
-<rect width="800" height="600" fill="#0d1117"/>
-
-<!-- 标题 -->
-<text x="400" y="40" fill="#e6edf3" font-size="20" font-family="Inter, sans-serif" text-anchor="middle" font-weight="600">Perseus Logo Variations</text>
-
-<!-- Logo 1: 星座连线风格 -->
-<g transform="translate(150, 150)">
-<circle cx="0" cy="0" r="80" fill="url(#glow)" opacity="0.5"/>
-<!-- 星座点 -->
-<circle cx="-30" cy="-40" r="3" fill="#58a6ff"/>
-<circle cx="20" cy="-35" r="2.5" fill="#58a6ff"/>
-<circle cx="35" cy="-10" r="3.5" fill="#bc8cff"/>
-<circle cx="15" cy="25" r="3" fill="#58a6ff"/>
-<circle cx="-25" cy="30" r="2.5" fill="#58a6ff"/>
-<circle cx="-40" cy="5" r="3" fill="#bc8cff"/>
-<circle cx="0" cy="0" r="4" fill="url(#blueGrad1)"/>
-<!-- 连线 -->
-<line x1="-30" y1="-40" x2="20" y2="-35" stroke="#58a6ff" stroke-width="1" opacity="0.6"/>
-<line x1="20" y1="-35" x2="35" y2="-10" stroke="#58a6ff" stroke-width="1" opacity="0.6"/>
-<line x1="35" y1="-10" x2="15" y2="25" stroke="#bc8cff" stroke-width="1" opacity="0.6"/>
-<line x1="15" y1="25" x2="-25" y2="30" stroke="#58a6ff" stroke-width="1" opacity="0.6"/>
-<line x1="-25" y1="30" x2="-40" y2="5" stroke="#58a6ff" stroke-width="1" opacity="0.6"/>
-<line x1="-40" y1="5" x2="-30" y2="-40" stroke="#bc8cff" stroke-width="1" opacity="0.6"/>
-<line x1="0" y1="0" x2="-30" y2="-40" stroke="#58a6ff" stroke-width="0.5" opacity="0.3"/>
-<line x1="0" y1="0" x2="35" y2="-10" stroke="#bc8cff" stroke-width="0.5" opacity="0.3"/>
-<line x1="0" y1="0" x2="-25" y2="30" stroke="#58a6ff" stroke-width="0.5" opacity="0.3"/>
-<!-- 文字 -->
-<text x="0" y="100" fill="#e6edf3" font-size="24" font-family="Inter, sans-serif" text-anchor="middle" font-weight="700">PERSEUS</text>
-<text x="0" y="120" fill="#8b949e" font-size="11" font-family="Inter, sans-serif" text-anchor="middle" letter-spacing="2">CONSTELLATION</text>
-</g>
-
-<!-- Logo 2: 星系旋涡风格 -->
-<g transform="translate(400, 150)">
-<circle cx="0" cy="0" r="80" fill="url(#glow)" opacity="0.5"/>
-<!-- 旋涡点 -->
-<circle cx="0" cy="0" r="4" fill="url(#blueGrad1)"/>
-<circle cx="20" cy="-15" r="2.5" fill="#58a6ff"/>
-<circle cx="35" cy="-5" r="2" fill="#58a6ff"/>
-<circle cx="40" cy="15" r="2.5" fill="#bc8cff"/>
-<circle cx="30" cy="30" r="2" fill="#58a6ff"/>
-<circle cx="10" cy="38" r="2.5" fill="#58a6ff"/>
-<circle cx="-15" cy="35" r="2" fill="#bc8cff"/>
-<circle cx="-32" cy="22" r="2.5" fill="#58a6ff"/>
-<circle cx="-38" cy="0" r="2" fill="#58a6ff"/>
-<circle cx="-30" cy="-22" r="2.5" fill="#bc8cff"/>
-<circle cx="-12" cy="-35" r="2" fill="#58a6ff"/>
-<!-- 旋涡曲线 -->
-<path d="M 0,0 Q 20,-15 35,-5" stroke="#58a6ff" stroke-width="1" fill="none" opacity="0.6"/>
-<path d="M 35,-5 Q 40,15 30,30" stroke="#bc8cff" stroke-width="1" fill="none" opacity="0.6"/>
-<path d="M 30,30 Q 10,38 -15,35" stroke="#58a6ff" stroke-width="1" fill="none" opacity="0.6"/>
-<path d="M -15,35 Q -32,22 -38,0" stroke="#bc8cff" stroke-width="1" fill="none" opacity="0.6"/>
-<path d="M -38,0 Q -30,-22 -12,-35" stroke="#58a6ff" stroke-width="1" fill="none" opacity="0.6"/>
-<path d="M -12,-35 Q 5,-38 20,-15" stroke="#58a6ff" stroke-width="1" fill="none" opacity="0.6"/>
-<!-- 外围小点 -->
-<circle cx="50" cy="-25" r="1.5" fill="#58a6ff" opacity="0.4"/>
-<circle cx="55" cy="25" r="1.5" fill="#bc8cff" opacity="0.4"/>
-<circle cx="-20" cy="50" r="1.5" fill="#58a6ff" opacity="0.4"/>
-<circle cx="-50" cy="-10" r="1.5" fill="#58a6ff" opacity="0.4"/>
-<!-- 文字 -->
-<text x="0" y="100" fill="#e6edf3" font-size="24" font-family="Inter, sans-serif" text-anchor="middle" font-weight="700">PERSEUS</text>
-<text x="0" y="120" fill="#8b949e" font-size="11" font-family="Inter, sans-serif" text-anchor="middle" letter-spacing="2">GALAXY</text>
-</g>
-
-<!-- Logo 3: 网络节点风格 -->
-<g transform="translate(650, 150)">
-<circle cx="0" cy="0" r="80" fill="url(#glow)" opacity="0.5"/>
-<!-- 中心节点 -->
-<circle cx="0" cy="0" r="5" fill="url(#blueGrad1)"/>
-<!-- 内圈节点 -->
-<circle cx="0" cy="-30" r="3" fill="#58a6ff"/>
-<circle cx="26" cy="-15" r="3" fill="#58a6ff"/>
-<circle cx="26" cy="15" r="3" fill="#bc8cff"/>
-<circle cx="0" cy="30" r="3" fill="#58a6ff"/>
-<circle cx="-26" cy="15" r="3" fill="#58a6ff"/>
-<circle cx="-26" cy="-15" r="3" fill="#bc8cff"/>
-<!-- 外圈节点 -->
-<circle cx="0" cy="-55" r="2" fill="#58a6ff" opacity="0.6"/>
-<circle cx="48" cy="-27" r="2" fill="#58a6ff" opacity="0.6"/>
-<circle cx="48" cy="27" r="2" fill="#bc8cff" opacity="0.6"/>
-<circle cx="0" cy="55" r="2" fill="#58a6ff" opacity="0.6"/>
-<circle cx="-48" cy="27" r="2" fill="#58a6ff" opacity="0.6"/>
-<circle cx="-48" cy="-27" r="2" fill="#58a6ff" opacity="0.6"/>
-<!-- 连接线 - 中心到内圈 -->
-<line x1="0" y1="0" x2="0" y2="-30" stroke="#58a6ff" stroke-width="1" opacity="0.5"/>
-<line x1="0" y1="0" x2="26" y2="-15" stroke="#58a6ff" stroke-width="1" opacity="0.5"/>
-<line x1="0" y1="0" x2="26" y2="15" stroke="#bc8cff" stroke-width="1" opacity="0.5"/>
-<line x1="0" y1="0" x2="0" y2="30" stroke="#58a6ff" stroke-width="1" opacity="0.5"/>
-<line x1="0" y1="0" x2="-26" y2="15" stroke="#58a6ff" stroke-width="1" opacity="0.5"/>
-<line x1="0" y1="0" x2="-26" y2="-15" stroke="#bc8cff" stroke-width="1" opacity="0.5"/>
-<!-- 连接线 - 内圈互联 -->
-<line x1="0" y1="-30" x2="26" y2="-15" stroke="#58a6ff" stroke-width="0.8" opacity="0.3"/>
-<line x1="26" y1="-15" x2="26" y2="15" stroke="#58a6ff" stroke-width="0.8" opacity="0.3"/>
-<line x1="26" y1="15" x2="0" y2="30" stroke="#bc8cff" stroke-width="0.8" opacity="0.3"/>
-<line x1="0" y1="30" x2="-26" y2="15" stroke="#58a6ff" stroke-width="0.8" opacity="0.3"/>
-<line x1="-26" y1="15" x2="-26" y2="-15" stroke="#58a6ff" stroke-width="0.8" opacity="0.3"/>
-<line x1="-26" y1="-15" x2="0" y2="-30" stroke="#bc8cff" stroke-width="0.8" opacity="0.3"/>
-<!-- 连接线 - 内圈到外圈 -->
-<line x1="0" y1="-30" x2="0" y2="-55" stroke="#58a6ff" stroke-width="0.5" opacity="0.2"/>
-<line x1="26" y1="-15" x2="48" y2="-27" stroke="#58a6ff" stroke-width="0.5" opacity="0.2"/>
-<line x1="26" y1="15" x2="48" y2="27" stroke="#bc8cff" stroke-width="0.5" opacity="0.2"/>
-<line x1="0" y1="30" x2="0" y2="55" stroke="#58a6ff" stroke-width="0.5" opacity="0.2"/>
-<line x1="-26" y1="15" x2="-48" y2="27" stroke="#58a6ff" stroke-width="0.5" opacity="0.2"/>
-<line x1="-26" y1="-15" x2="-48" y2="-27" stroke="#58a6ff" stroke-width="0.5" opacity="0.2"/>
-<!-- 文字 -->
-<text x="0" y="100" fill="#e6edf3" font-size="24" font-family="Inter, sans-serif" text-anchor="middle" font-weight="700">PERSEUS</text>
-<text x="0" y="120" fill="#8b949e" font-size="11" font-family="Inter, sans-serif" text-anchor="middle" letter-spacing="2">NETWORK</text>
-</g>
-
-<!-- Logo 4: 极简几何风格 -->
-<g transform="translate(150, 400)">
-<circle cx="0" cy="0" r="80" fill="url(#glow)" opacity="0.5"/>
-<!-- 三角形点 -->
-<circle cx="0" cy="-45" r="4" fill="url(#blueGrad1)"/>
-<circle cx="-39" cy="22" r="3.5" fill="#58a6ff"/>
-<circle cx="39" cy="22" r="3.5" fill="#bc8cff"/>
-<!-- 三角形连线 -->
-<line x1="0" y1="-45" x2="-39" y2="22" stroke="url(#blueGrad2)" stroke-width="1.5" opacity="0.7"/>
-<line x1="-39" y1="22" x2="39" y2="22" stroke="url(#blueGrad2)" stroke-width="1.5" opacity="0.7"/>
-<line x1="39" y1="22" x2="0" y2="-45" stroke="url(#blueGrad2)" stroke-width="1.5" opacity="0.7"/>
-<!-- 中心点 -->
-<circle cx="0" cy="0" r="2.5" fill="#58a6ff" opacity="0.6"/>
-<!-- 辅助点 -->
-<circle cx="-20" cy="-12" r="1.5" fill="#58a6ff" opacity="0.4"/>
-<circle cx="20" cy="-12" r="1.5" fill="#bc8cff" opacity="0.4"/>
-<circle cx="0" cy="22" r="1.5" fill="#58a6ff" opacity="0.4"/>
-<!-- 辅助连线 -->
-<line x1="0" y1="-45" x2="0" y2="0" stroke="#58a6ff" stroke-width="0.5" opacity="0.3"/>
-<line x1="-39" y1="22" x2="0" y2="0" stroke="#58a6ff" stroke-width="0.5" opacity="0.3"/>
-<line x1="39" y1="22" x2="0" y2="0" stroke="#bc8cff" stroke-width="0.5" opacity="0.3"/>
-<!-- 文字 -->
-<text x="0" y="80" fill="#e6edf3" font-size="24" font-family="Inter, sans-serif" text-anchor="middle" font-weight="700">PERSEUS</text>
-<text x="0" y="100" fill="#8b949e" font-size="11" font-family="Inter, sans-serif" text-anchor="middle" letter-spacing="2">MINIMAL</text>
-</g>
-
-<!-- Logo 5: 抽象星图风格 -->
-<g transform="translate(400, 400)">
-<circle cx="0" cy="0" r="80" fill="url(#glow)" opacity="0.5"/>
-<!-- 主星点 -->
-<circle cx="-35" cy="-30" r="3.5" fill="#58a6ff"/>
-<circle cx="30" cy="-35" r="3" fill="#58a6ff"/>
-<circle cx="40" cy="10" r="4" fill="url(#blueGrad1)"/>
-<circle cx="10" cy="40" r="3" fill="#bc8cff"/>
-<circle cx="-30" cy="35" r="3.5" fill="#58a6ff"/>
-<circle cx="-45" cy="0" r="3" fill="#58a6ff"/>
-<!-- 主连线 -->
-<path d="M -35,-30 L 30,-35 L 40,10 L 10,40 L -30,35 L -45,0 Z" 
-stroke="url(#blueGrad2)" stroke-width="1.2" fill="none" opacity="0.6"/>
-<!-- 内部连线 -->
-<line x1="-35" y1="-30" x2="40" y2="10" stroke="#58a6ff" stroke-width="0.8" opacity="0.3"/>
-<line x1="30" y1="-35" x2="10" y2="40" stroke="#bc8cff" stroke-width="0.8" opacity="0.3"/>
-<line x1="-45" y1="0" x2="40" y2="10" stroke="#58a6ff" stroke-width="0.8" opacity="0.3"/>
-<!-- 装饰小点 -->
-<circle cx="-10" cy="-15" r="1.5" fill="#58a6ff" opacity="0.5"/>
-<circle cx="20" cy="-10" r="1.5" fill="#bc8cff" opacity="0.5"/>
-<circle cx="5" cy="15" r="1.5" fill="#58a6ff" opacity="0.5"/>
-<circle cx="-20" cy="10" r="1.5" fill="#58a6ff" opacity="0.5"/>
-<!-- 文字 -->
-<text x="0" y="80" fill="#e6edf3" font-size="24" font-family="Inter, sans-serif" text-anchor="middle" font-weight="700">PERSEUS</text>
-<text x="0" y="100" fill="#8b949e" font-size="11" font-family="Inter, sans-serif" text-anchor="middle" letter-spacing="2">STAR MAP</text>
-</g>
-
-<!-- Logo 6: 轨道风格 -->
-<g transform="translate(650, 400)">
-<circle cx="0" cy="0" r="80" fill="url(#glow)" opacity="0.5"/>
-<!-- 中心星 -->
-<circle cx="0" cy="0" r="5" fill="url(#blueGrad1)"/>
-<!-- 轨道1 -->
-<ellipse cx="0" cy="0" rx="50" ry="20" stroke="#58a6ff" stroke-width="0.8" fill="none" opacity="0.4" transform="rotate(-20)"/>
-<circle cx="45" cy="-15" r="2.5" fill="#58a6ff"/>
-<circle cx="-45" cy="15" r="2" fill="#58a6ff" opacity="0.6"/>
-<!-- 轨道2 -->
-<ellipse cx="0" cy="0" rx="40" ry="45" stroke="#bc8cff" stroke-width="0.8" fill="none" opacity="0.4" transform="rotate(30)"/>
-<circle cx="20" cy="40" r="2.5" fill="#bc8cff"/>
-<circle cx="-20" cy="-40" r="2" fill="#bc8cff" opacity="0.6"/>
-<!-- 轨道3 -->
-<ellipse cx="0" cy="0" rx="55" ry="30" stroke="#58a6ff" stroke-width="0.8" fill="none" opacity="0.3" transform="rotate(60)"/>
-<circle cx="-30" cy="-45" r="2" fill="#58a6ff" opacity="0.5"/>
-<circle cx="30" cy="45" r="2.5" fill="#58a6ff"/>
-<!-- 外围小星 -->
-<circle cx="60" cy="-30" r="1.5" fill="#58a6ff" opacity="0.3"/>
-<circle cx="-55" cy="35" r="1.5" fill="#bc8cff" opacity="0.3"/>
-<circle cx="50" cy="40" r="1.5" fill="#58a6ff" opacity="0.3"/>
-<!-- 文字 -->
-<text x="0" y="80" fill="#e6edf3" font-size="24" font-family="Inter, sans-serif" text-anchor="middle" font-weight="700">PERSEUS</text>
-<text x="0" y="100" fill="#8b949e" font-size="11" font-family="Inter, sans-serif" text-anchor="middle" letter-spacing="2">ORBIT</text>
-</g>
-
 </svg>
+
+<header class="wrap">
+  <div class="topline">
+    <span class="tag-final">FINAL DELIVERY · V3.0 — LOCKED: PERSEUS V1</span>
+    <span class="meta">SELF-HOSTED · GIT × REALTIME COLLAB</span>
+  </div>
+
+  <div class="hero">
+    <div class="hero-stage">
+      <span class="stage-tag">PRIMARY MARK · 深空底</span>
+      <!-- 动效主标志：内联路径以便逐层动画 -->
+      <svg class="hero-mark anim" id="heroAnim" viewBox="0 0 120 120">
+        <path class="w1" d="M43.9 46.1 A24 24 0 0 1 69.9 67.9" fill="none" stroke="#12A38B" stroke-width="9" stroke-linecap="round"/>
+        <path class="w2" d="M39.7 34.5 A36 36 0 0 1 81.9 73.1" fill="none" stroke="#3D7BFF" stroke-width="9" stroke-linecap="round"/>
+        <path class="w3" d="M62.4 24.9 A48 48 0 0 1 92.4 57.6" fill="none" stroke="#12A38B" stroke-width="9" stroke-linecap="round"/>
+        <path class="echo" d="M37.8 92.6 A24 24 0 0 1 23.4 78.2" fill="none" stroke="#E9F1FF" stroke-width="8" stroke-linecap="round"/>
+        <circle class="core" cx="46" cy="70" r="11" fill="#3D7BFF"/>
+        <circle class="comp" cx="10" cy="73" r="4.5" fill="#12A38B"/>
+      </svg>
+      <button class="stage-btn" id="heroToggle" type="button">动效 · 开 ⏸</button>
+    </div>
+
+    <div class="hero-info">
+      <span class="final-chip"><i></i>定稿 FINAL — 珀尔修斯标志（R1-06 · 保留稿）</span>
+      <h1>珀尔修斯<small>P E R S E U S</small></h1>
+      <p class="desc">标志取意英仙座流星雨：核心一点是辐射点，三道流星轨迹向右上方层层划出，左下一记回火、一枚伴星余晖。珀尔修斯如约点亮夜空——它是团队灵感的辐射源：<b style="color:#C9D8F5">每一次改动，都实时可达。</b></p>
+      <div class="facts">
+        <div><b>FastAPI</b><span>异步 API 引擎</span></div>
+        <div><b>WebSocket</b><span>实时协作同步</span></div>
+        <div><b>SQLite × PG</b><span>双数据库支持</span></div>
+      </div>
+      <div class="hero-links">
+        <a href="#construct">制图规范</a><a href="#color">色彩与变体</a><a href="#lockup">组合与尺寸</a><a href="#motion">动效参数</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ═══ 01 制图规范 ═══ -->
+  <div class="sec-head" id="construct">
+    <span class="idx">SECTION 01</span><h2>制图规范 · CONSTRUCTION</h2>
+    <p>三层同心波阵面 · 单一圆心</p>
+  </div>
+  <section class="construct">
+    <div class="c-stage">
+      <svg viewBox="-4 -4 128 128">
+        <defs>
+          <pattern id="gp" width="12" height="12" patternUnits="userSpaceOnUse">
+            <path d="M12 0H0V12" fill="none" stroke="rgba(141,173,255,.07)" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+        <rect x="-4" y="-4" width="128" height="128" fill="url(#gp)"/>
+        <!-- 构造线 -->
+        <circle cx="46" cy="70" r="24" fill="none" stroke="rgba(233,241,255,.25)" stroke-width="0.5" stroke-dasharray="2 2.4"/>
+        <circle cx="46" cy="70" r="36" fill="none" stroke="rgba(233,241,255,.25)" stroke-width="0.5" stroke-dasharray="2 2.4"/>
+        <circle cx="46" cy="70" r="48" fill="none" stroke="rgba(233,241,255,.25)" stroke-width="0.5" stroke-dasharray="2 2.4"/>
+        <line x1="46" y1="70" x2="82" y2="27.1" stroke="rgba(127,214,196,.55)" stroke-width="0.6" stroke-dasharray="3 2.4"/>
+        <line x1="46" y1="70" x2="10" y2="73" stroke="rgba(233,241,255,.3)" stroke-width="0.5" stroke-dasharray="2 2.4"/>
+        <!-- 标志本体 -->
+        <path d="M43.9 46.1 A24 24 0 0 1 69.9 67.9" fill="none" stroke="#12A38B" stroke-width="9" stroke-linecap="round"/>
+        <path d="M39.7 34.5 A36 36 0 0 1 81.9 73.1" fill="none" stroke="#3D7BFF" stroke-width="9" stroke-linecap="round"/>
+        <path d="M62.4 24.9 A48 48 0 0 1 92.4 57.6" fill="none" stroke="#12A38B" stroke-width="9" stroke-linecap="round"/>
+        <path d="M37.8 92.6 A24 24 0 0 1 23.4 78.2" fill="none" stroke="#E9F1FF" stroke-width="8" stroke-linecap="round"/>
+        <circle cx="46" cy="70" r="11" fill="#3D7BFF"/>
+        <circle cx="10" cy="73" r="4.5" fill="#12A38B"/>
+        <!-- 标注 -->
+        <g font-family="IBM Plex Mono,monospace" font-size="4.2" fill="#7E93BC" letter-spacing="0.4">
+          <text x="70" y="58">R24</text>
+          <text x="84" y="79">R36</text>
+          <text x="94" y="54">R48</text>
+          <text x="76" y="22" fill="#7FD6C4">主轴 -50°</text>
+          <text x="3" y="86">伴星 d36.1</text>
+          <text x="3" y="116">STROKE 9 / 8 · ROUND CAP · 画布 120</text>
+        </g>
+      </svg>
+    </div>
+    <div class="c-info">
+      <h3>几何骨架说明</h3>
+      <ul class="spec-list">
+        <li><b>GRID</b>120 × 120 画布，核心圆心固定于 (46, 70)，整体视觉重心偏左下，为右上波阵面留出发射空间。</li>
+        <li><b>RADII</b>三层主波半径 24 / 36 / 48，等差 12；跨度角不等长（85° / 105° / 55°），刻意制造参差节奏。</li>
+        <li><b>STROKE</b>主波 9pt、回声 8pt，圆头收笔；全图无渐变、无填充描边混用。</li>
+        <li><b>ECHO</b>左下回火与伴星构成「第二叙事」：灵感双向奔赴，伴星间距 = R36。</li>
+      </ul>
+      <p class="c-note">重绘时请基于上述半径与锚点还原，勿凭视觉仿绘；矢量化交付文件将附带本页构造网格。</p>
+    </div>
+  </section>
+
+  <!-- ═══ 02 色彩与变体 ═══ -->
+  <div class="sec-head" id="color">
+    <span class="idx">SECTION 02</span><h2>色彩与变体 · COLORWAYS</h2>
+    <p>五种官方稿 · 点击色卡复制 HEX</p>
+  </div>
+  <section class="tiles">
+    <figure class="tile"><div class="pv"><svg viewBox="0 0 120 120"><use href="#p0"/></svg></div><figcaption>深空主稿 <em>PRIMARY</em></figcaption></figure>
+    <figure class="tile light"><div class="pv"><svg viewBox="0 0 120 120"><use href="#p0"/></svg></div><figcaption>浅色稿 <em>LIGHT</em></figcaption></figure>
+    <figure class="tile mono-dark"><div class="pv"><svg viewBox="0 0 120 120"><use href="#p0"/></svg></div><figcaption>反白单色 <em>MONO / LIGHT</em></figcaption></figure>
+    <figure class="tile mono-light"><div class="pv"><svg viewBox="0 0 120 120"><use href="#p0"/></svg></div><figcaption>深色单色 <em>MONO / DARK</em></figcaption></figure>
+    <figure class="tile mono-blue"><div class="pv"><svg viewBox="0 0 120 120"><use href="#p0"/></svg></div><figcaption>离子蓝单色 <em>BRANDED</em></figcaption></figure>
+  </section>
+
+  <section class="palette">
+    <div class="ratio-bar" title="品牌色彩用量比例">
+      <i style="width:52%;background:#071021"></i><i style="width:22%;background:#E9F1FF"></i><i style="width:16%;background:#3D7BFF"></i><i style="width:10%;background:#12A38B"></i>
+    </div>
+    <div class="swatches" id="palette">
+      <button class="swatch" data-hex="#071021"><i style="background:#071021"></i><span class="nm">深空 DEEP SPACE · 52%<br><span class="hx">#071021 · 背景主色</span></span></button>
+      <button class="swatch" data-hex="#E9F1FF"><i style="background:#E9F1FF"></i><span class="nm">星尘 STARDUST · 22%<br><span class="hx">#E9F1FF · 文字与回声</span></span></button>
+      <button class="swatch" data-hex="#3D7BFF"><i style="background:#3D7BFF"></i><span class="nm">离子蓝 ION BLUE · 16%<br><span class="hx">#3D7BFF · 核心与主波</span></span></button>
+      <button class="swatch" data-hex="#12A38B"><i style="background:#12A38B"></i><span class="nm">渊绿 ABYSS GREEN · 10%<br><span class="hx">#12A38B · 次波与状态</span></span></button>
+    </div>
+  </section>
+
+  <!-- ═══ 03 组合与尺寸 ═══ -->
+  <div class="sec-head" id="lockup">
+    <span class="idx">SECTION 03</span><h2>组合与尺寸 · LOCKUPS</h2>
+    <p>占位名称可替换为正式项目名</p>
+  </div>
+  <section class="lockup-grid">
+    <div class="controls">
+      <label>项目名称（占位）</label>
+      <input id="nameInput" type="text" value="Perseus" maxlength="18" spellcheck="false">
+      <p class="hint">字标采用几何无衬线（Space Grotesk），全大写 + 5% 字距。横版用于页眉，竖版用于启动页与封面，图标用于 favicon 与头像。</p>
+    </div>
+    <div class="lk-panels">
+      <div class="panel">
+        <div class="pv">
+          <div class="lock-row">
+            <svg viewBox="0 0 120 120"><use href="#p0"/></svg>
+            <div class="wordmark"><span class="wm">PERSEUS</span><small>CODE HOSTING · LIVE COLLAB</small></div>
+          </div>
+        </div>
+        <span class="cap">A · HORIZONTAL 横版组合</span>
+      </div>
+      <div class="panel">
+        <div class="pv">
+          <div class="lock-col">
+            <svg viewBox="0 0 120 120"><use href="#p0"/></svg>
+            <div class="wordmark small"><span class="wm">PERSEUS</span><small>PERSEUS BRAND SYSTEM</small></div>
+          </div>
+        </div>
+        <span class="cap">B · STACKED 竖版组合</span>
+      </div>
+      <div class="panel">
+        <div class="pv">
+          <div class="mini-grid">
+            <figure><svg viewBox="0 0 120 120" width="64" height="64"><use href="#p0"/></svg><figcaption>64px</figcaption></figure>
+            <figure><svg viewBox="0 0 120 120" width="48" height="48"><use href="#p0"/></svg><figcaption>48px</figcaption></figure>
+            <figure><svg viewBox="0 0 120 120" width="32" height="32"><use href="#p0"/></svg><figcaption>32px</figcaption></figure>
+            <figure><svg viewBox="0 0 120 120" width="24" height="24"><use href="#p0"/></svg><figcaption>24px</figcaption></figure>
+            <figure><svg viewBox="0 0 120 120" width="16" height="16"><use href="#p0"/></svg><figcaption>16px</figcaption></figure>
+          </div>
+        </div>
+        <span class="cap">C · MINIMUM 最小尺寸（下限 16px）</span>
+      </div>
+      <div class="panel">
+        <div class="pv">
+          <div class="avatar-wrap">
+            <div class="avatar"><svg viewBox="0 0 120 120"><use href="#p0"/></svg></div>
+            <div class="avatar-note"><b style="color:#C9D8F5">D · 头像 / 应用图标</b><br>圆形容器内标志占 64%，渊绿描边表示「广播中」的在线状态。</div>
+          </div>
+        </div>
+        <span class="cap">D · AVATAR 圆形容器</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 04 动效 ═══ -->
+  <div class="sec-head" id="motion">
+    <span class="idx">SECTION 04</span><h2>动效参数 · MOTION</h2>
+    <p>波阵面循环 · 可暂停</p>
+  </div>
+  <section class="motion">
+    <div class="m-stage">
+      <svg class="anim" id="motionAnim" viewBox="0 0 120 120">
+        <path class="w1" d="M43.9 46.1 A24 24 0 0 1 69.9 67.9" fill="none" stroke="#12A38B" stroke-width="9" stroke-linecap="round"/>
+        <path class="w2" d="M39.7 34.5 A36 36 0 0 1 81.9 73.1" fill="none" stroke="#3D7BFF" stroke-width="9" stroke-linecap="round"/>
+        <path class="w3" d="M62.4 24.9 A48 48 0 0 1 92.4 57.6" fill="none" stroke="#12A38B" stroke-width="9" stroke-linecap="round"/>
+        <path class="echo" d="M37.8 92.6 A24 24 0 0 1 23.4 78.2" fill="none" stroke="#E9F1FF" stroke-width="8" stroke-linecap="round"/>
+        <circle class="core" cx="46" cy="70" r="11" fill="#3D7BFF"/>
+        <circle class="comp" cx="10" cy="73" r="4.5" fill="#12A38B"/>
+      </svg>
+      <button class="stage-btn" id="motionToggle" type="button">动效 · 开 ⏸</button>
+    </div>
+    <div class="motion-spec">
+      <h3>「流星辐射」动效语义</h3>
+      <ul class="spec-list">
+        <li><b>CYCLE</b>单周期 2.6s，无限循环；对应英仙座「如约而至」的品牌隐喻。</li>
+        <li><b>ORDER</b>波阵面由内向外依次点亮：w1 → w2 → w3，间隔 0.35s，回声滞后 1.15s。</li>
+        <li><b>EASING</b>cubic-bezier(.3, 0, .2, 1)；核心同周期呼吸，缩放峰值 1.09。</li>
+        <li><b>QUIET</b>伴星仅做明暗闪烁，不做位移——协作者在场，但不喧哗。</li>
+        <li><b>REDUCE</b>遵循 prefers-reduced-motion：系统开启减弱动效时静态呈现。</li>
+      </ul>
+      <p class="c-note">适用场景：启动页、加载态、协作连接建立瞬间。页面常驻使用时建议仅首屏循环 3 次后静止。</p>
+    </div>
+  </section>
+
+  <!-- ═══ 05 使用规则 ═══ -->
+  <div class="sec-head" id="rules">
+    <span class="idx">SECTION 05</span><h2>使用规则 · USAGE</h2>
+    <p>净空 / 最小尺寸 / 禁用示例</p>
+  </div>
+  <section class="rules">
+    <div>
+      <div class="clearbox">
+        <div>
+          <div class="clear-inner">
+            <span class="tick t">x</span><span class="tick l">x</span>
+            <svg viewBox="0 0 120 120"><use href="#p0"/></svg>
+          </div>
+          <p class="clear-cap">净空 x = 伴星直径（9 单位），任何图文不得侵入虚线区域</p>
+        </div>
+      </div>
+    </div>
+    <div class="donts">
+      <figure class="dont stretch"><div class="pv"><svg viewBox="0 0 120 120"><use href="#p0"/></svg></div><span class="x">✕</span><figcaption>勿拉伸 / 压扁</figcaption></figure>
+      <figure class="dont recolor"><div class="pv"><svg viewBox="0 0 120 120"><use href="#p0"/></svg></div><span class="x">✕</span><figcaption>勿使用规范外配色</figcaption></figure>
+      <figure class="dont glow"><div class="pv"><svg viewBox="0 0 120 120"><use href="#p0"/></svg></div><span class="x">✕</span><figcaption>勿附加投影 / 霓虹发光</figcaption></figure>
+      <figure class="dont busy"><div class="pv"><svg viewBox="0 0 120 120"><use href="#p0"/></svg></div><span class="x">✕</span><figcaption>勿置于复杂纹理背景</figcaption></figure>
+    </div>
+  </section>
+
+  <!-- ═══ 06 应用场景 ═══ -->
+  <div class="sec-head" id="scene">
+    <span class="idx">SECTION 06</span><h2>应用场景 · IN CONTEXT</h2>
+    <p>终端协作现场示意</p>
+  </div>
+  <section class="term">
+    <div class="term-bar">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="term-title"><svg viewBox="0 0 120 120"><use href="#p0"/></svg><span class="wm">perseus</span> — pair session</div>
+      <div class="term-online"><span class="avstack"><i></i><i></i></span>2 人在线 · 广播中</div>
+    </div>
+    <div class="term-body">
+      <div><span class="p">$</span> perseus pair nova/backend <span class="c"># 实时会话</span></div>
+      <div><span class="k">✓</span> 已同步 3 个文件 · 延迟 42ms · 实时稳定</div>
+      <div><span class="p">&gt;</span> def pair_with(team): <span class="cur b"></span><span class="tag-who b">you</span></div>
+      <div><span class="p">…</span> return perseus.radiate(team, every=2.6) <span class="cur g"></span><span class="tag-who g">@nova</span></div>
+      <div class="c">// 光标闪烁处，即协作者所在。两处光标 = 两个在场的人。</div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="deliv"><b>本轮交付：</b>定稿标志（5 种色彩变体）· 制图规范 · 动效参数 · 字标组合 · 使用规则 · 场景示意</div>
+    <div>下一步：Perseus 命名落地 → 输出完整 VI 手册与 SVG/PNG/favicon 资产包</div>
+  </footer>
+</main>
+
+<div class="toast" id="toast">已复制 HEX 色值</div>
+
+<script>
+(function(){
+  /* 动效开关（Hero 与 Motion 两处） */
+  function bindToggle(btnId, animId){
+    var btn = document.getElementById(btnId), anim = document.getElementById(animId);
+    btn.addEventListener('click', function(){
+      var paused = anim.classList.toggle('paused');
+      btn.textContent = paused ? '动效 · 关 ▶' : '动效 · 开 ⏸';
+    });
+  }
+  bindToggle('heroToggle','heroAnim');
+  bindToggle('motionToggle','motionAnim');
+
+  /* 字标名称联动（占位名） */
+  document.getElementById('nameInput').addEventListener('input', function(){
+    var v = (this.value.trim() || 'Perseus').toUpperCase();
+    document.querySelectorAll('.wm').forEach(function(el){ el.textContent = v; });
+  });
+
+  /* 色值复制 */
+  var toast = document.getElementById('toast'), timer = null;
+  document.querySelectorAll('.swatch').forEach(function(sw){
+    sw.addEventListener('click', function(){
+      var hex = sw.dataset.hex;
+      if(navigator.clipboard){ navigator.clipboard.writeText(hex).catch(function(){}); }
+      toast.textContent = '已复制 ' + hex;
+      toast.classList.add('show');
+      clearTimeout(timer);
+      timer = setTimeout(function(){ toast.classList.remove('show'); }, 1400);
+    });
+  });
+})();
+</script>
+</body>
+</html>
