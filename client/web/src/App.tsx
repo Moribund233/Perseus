@@ -9,6 +9,7 @@ import LandingLayout from './components/layout/LandingLayout';
 import LandingPage from './routes/landing';
 import DashboardPage from './routes/dashboard';
 import RepositoriesPage from './routes/repositories';
+import IssuesPage from './routes/issues';
 import PullRequestsPage from './routes/pull-requests';
 import EditorPage from './routes/editor';
 import ChatPage from './routes/chat';
@@ -73,6 +74,8 @@ function AppRoutes() {
         <Route path="/dashboard" element={<PageTransition><DashboardPage /></PageTransition>} />
         <Route path="/repositories" element={<PageTransition><RepositoriesPage /></PageTransition>} />
         <Route path="/repositories/:owner/:repo" element={<PageTransition><RepositoriesPage /></PageTransition>} />
+        <Route path="/repositories/:owner/:repo/issues" element={<PageTransition><IssuesPage /></PageTransition>} />
+        <Route path="/repositories/:owner/:repo/pulls" element={<PageTransition><PullRequestsPage /></PageTransition>} />
         <Route path="/pulls" element={<PageTransition><PullRequestsPage /></PageTransition>} />
         <Route path="/editor" element={<PageTransition><EditorPage /></PageTransition>} />
         <Route path="/editor/:owner/:repo" element={<PageTransition><EditorPage /></PageTransition>} />
