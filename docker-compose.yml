@@ -1,64 +1,27 @@
-# =============================================================================
-# Perseus Docker Compose (生产环境 - 精简版)
-#
-# 适用场景：
-#   外部已运行 PostgreSQL、Redis、Nginx/OpenResty（如 1Panel 管理的服务）
-#   只需启动 Perseus 相关的自定义服务
-#
-# 架构：
-#   外部 Nginx/OpenResty → git-http-backend (CGI) — Git HTTP Smart Protocol
-#   外部 Nginx/OpenResty → FastAPI (proxy)       — API / WebSocket
-#   FastAPI → 外部 PostgreSQL                    — 数据库
-#   FastAPI → 外部 Redis                         — 缓存
-#
-# 前置条件:
-#   1. PostgreSQL 已运行，端口可访问
-#   2. Redis 已运行，端口可访问
-#   3. Nginx/OpenResty 已配置反向代理
-#
-# 使用方式:
-#   docker compose up -d                     # 启动服务
-#   docker compose logs -f app               # 查看后端日志
-#   docker compose down                      # 停止服务
-#
-# 环境变量要求:
-#   DATABASE_URL=postgresql://perseus:password@host.docker.internal:5432/perseus
-#   REDIS_URL=redis://host.docker.internal:6379/0
-#   PERSEUS_SECURITY_SECRET_KEY=<random-secret>
-#
-# 首次部署:
-#   1. 复制 .env.example 到 .env
-#   2. 修改 .env 中的密钥和数据库连接
-#   3. docker compose up -d
-# =============================================================================
-
 services:
-  # =============================================
   # FastAPI 后端
-  # =============================================
   app:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: perseus-app
     environment:
-      # 数据库连接（指向外部 PostgreSQL）
-      DATABASE_URL: ${DATABASE_URL:-postgresql://perseus:perseus_secret@host.docker.internal:5432/perseus}
-      # Redis 连接（指向外部 Redis）
-      REDIS_URL: ${REDIS_URL:-redis://host.docker.internal:6379/0}
+      DATABASE_URL: postgresql://perseus:Perseus_2024!@capella-pg:5432/perseus
+      REDIS_URL: redis://capella-redis:6379/0
       PERSEUS_SECURITY_SECRET_KEY: ${PERSEUS_SECURITY_SECRET_KEY:?必需设置 JWT 密钥}
       PERSEUS_APP_DEBUG: "${PERSEUS_APP_DEBUG:-false}"
       PERSEUS_STRESS_TEST: "false"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
-      # Git 裸仓库根目录（与 git-cgi 共享 volume）
       PERSEUS_STORAGE_REPO_ROOT: /data/repositories
       TZ: Asia/Shanghai
+      PERSEUS_ADMIN_USERNAME: admin
+      PERSEUS_ADMIN_PASSWORD: perseus_admin_2024
+      PERSEUS_ADMIN_EMAIL: admin@perseus.local
     volumes:
       - repos:/data/repositories
       - app-logs:/app/logs
     ports:
-      # 暴露后端端口（供外部 Nginx 反向代理）
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8001:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -66,22 +29,19 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
-    # 使用 host.docker.internal 访问宿主机上的外部服务
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    # 资源限制
+    networks:
+      - default
+      - capella-room_default
     deploy:
       resources:
         limits:
-          cpus: '2'
-          memory: 1G
+          cpus: '4'
+          memory: 2G
         reservations:
-          cpus: '0.5'
-          memory: 256M
+          cpus: '1'
+          memory: 512M
 
-  # =============================================
-  # git-http-backend CGI 容器
-  # =============================================
+  # git-http-backend CGI
   git-cgi:
     build:
       context: ./docker/git-cgi
@@ -93,10 +53,8 @@ services:
       GIT_PROJECT_ROOT: /data/repositories
       GIT_HTTP_EXPORT_ALL: "1"
     ports:
-      # 暴露 FCGI 端口（供外部 Nginx 连接）
       - "127.0.0.1:9000:9000"
     restart: unless-stopped
-    # 资源限制
     deploy:
       resources:
         limits:
@@ -106,14 +64,59 @@ services:
           cpus: '0.1'
           memory: 32M
 
+  # OpenResty 网关
+  gateway:
+    image: openresty/openresty:1.31.1.1-0-bookworm-fat
+    container_name: perseus-gateway
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./docker/gateway/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - /var/www/perseus-web:/var/www/perseus-web:ro
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - default
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  # SSH 服务器 — Git over SSH
+  sshd:
+    build:
+      context: ./docker/ssh
+    container_name: perseus-sshd
+    ports:
+      - "127.0.0.1:2222:2222"
+    volumes:
+      - repos:/data/repositories
+    environment:
+      PERSEUS_DB_URL: "host=capella-pg dbname=perseus user=perseus password=Perseus_2024!"
+    networks:
+      - default
+      - capella-room_default
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
 volumes:
   repos:
     driver: local
   app-logs:
     driver: local
 
-# 网络配置
 networks:
   default:
     name: perseus-network
     driver: bridge
+  capella-room_default:
+    external: true

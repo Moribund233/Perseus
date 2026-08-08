@@ -1,0 +1,9 @@
+#!/bin/sh
+export GIT_PROJECT_ROOT=/data/repositories
+if [ "$1" = "-c" ] && [ -n "$2" ]; then
+  cmd="$2"
+else
+  echo "Welcome to Perseus Git Server"; exit 0
+fi
+eval "set -- $cmd"
+exec /usr/bin/$1 "$GIT_PROJECT_ROOT/${2#/}"
