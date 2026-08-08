@@ -363,7 +363,11 @@
       "cloneFail": "Clone 失败",
       "starFail": "更新 star 失败",
       "comingIn2b": "该视图将在 Phase 2B 提供。",
-      "defaultBranch": "默认分支"
+      "defaultBranch": "默认分支",
+      "roles": {
+        "admin": "管理员",
+        "user": "用户"
+      }
     }
   }
 }

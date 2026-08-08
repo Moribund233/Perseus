@@ -363,7 +363,11 @@
       "cloneFail": "Clone failed",
       "starFail": "Failed to update star",
       "comingIn2b": "This view ships in Phase 2B.",
-      "defaultBranch": "default branch"
+      "defaultBranch": "default branch",
+      "roles": {
+        "admin": "Admin",
+        "user": "User"
+      }
     }
   }
 }
