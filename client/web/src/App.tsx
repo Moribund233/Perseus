@@ -10,7 +10,9 @@ import LandingPage from './routes/landing';
 import DashboardPage from './routes/dashboard';
 import RepositoriesPage from './routes/repositories';
 import IssuesPage from './routes/issues';
+import IssueDetailPage from './routes/issues/[issueNumber]';
 import PullRequestsPage from './routes/pull-requests';
+import PullRequestDetailPage from './routes/pull-requests/[prNumber]';
 import EditorPage from './routes/editor';
 import ChatPage from './routes/chat';
 import SettingsPage from './routes/settings';
@@ -75,7 +77,9 @@ function AppRoutes() {
         <Route path="/repositories" element={<PageTransition><RepositoriesPage /></PageTransition>} />
         <Route path="/repositories/:owner/:repo" element={<PageTransition><RepositoriesPage /></PageTransition>} />
         <Route path="/repositories/:owner/:repo/issues" element={<PageTransition><IssuesPage /></PageTransition>} />
+        <Route path="/repositories/:owner/:repo/issues/:issueNumber" element={<PageTransition><IssueDetailPage /></PageTransition>} />
         <Route path="/repositories/:owner/:repo/pulls" element={<PageTransition><PullRequestsPage /></PageTransition>} />
+        <Route path="/repositories/:owner/:repo/pulls/:prNumber" element={<PageTransition><PullRequestDetailPage /></PageTransition>} />
         <Route path="/pulls" element={<PageTransition><PullRequestsPage /></PageTransition>} />
         <Route path="/editor" element={<PageTransition><EditorPage /></PageTransition>} />
         <Route path="/editor/:owner/:repo" element={<PageTransition><EditorPage /></PageTransition>} />

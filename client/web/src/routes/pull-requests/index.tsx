@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Layout, Avatar, Button, Tag } from 'antd';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   PullRequestOutlined,
   MergeOutlined,
@@ -94,6 +95,8 @@ const statusIcon = (status: string) => {
 
 export default function PullRequestsPage() {
   const { user } = useAuthStore();
+  const { owner, repo } = useParams();
+  const navigate = useNavigate();
   const { repositories, fetchRepositoriesByUser, isLoading: repoLoading, error: repoError } = useRepositoriesStore();
   const { pullRequests, isLoading: prLoading, error: prError, fetchPullRequests } = usePullRequestsStore();
 
@@ -298,6 +301,14 @@ export default function PullRequestsPage() {
                 cursor: 'pointer',
                 transition: 'background 0.15s',
                 alignItems: 'flex-start',
+              }}
+              onClick={() => {
+                const activeRepo = owner && repo
+                  ? repositories.find((r) => r.owner?.username === owner && r.name === repo) || { owner: { username: owner }, name: repo }
+                  : repositories.find((r) => r.id === activeRepoId);
+                if (activeRepo) {
+                  navigate(`/repositories/${activeRepo.owner?.username}/${activeRepo.name}/pulls/${pr.id}`);
+                }
               }}
               onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
