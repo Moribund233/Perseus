@@ -168,8 +168,6 @@ class ConnectionManager:
         Args:
             connection: 要断开的连接对象
         """
-        if not connection.is_alive:
-            return
         connection.is_alive = False
         connection_id = connection.connection_id
 
