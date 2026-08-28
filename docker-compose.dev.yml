@@ -94,6 +94,8 @@ services:
 
   # =============================================
   # 一次性测试容器（运行后自动退出）
+  # 注意: conftest 会在 setup/teardown 清空 PERSEUS_STORAGE_REPO_ROOT
+  # 下的所有内容, 因此必须用独立的仓库根目录, 严禁挂载 repos_dev 卷
   # =============================================
   test:
     build:
@@ -105,12 +107,11 @@ services:
       PERSEUS_SECURITY_SECRET_KEY: test-secret-key-for-testing
       PERSEUS_APP_DEBUG: "true"
       PERSEUS_STRESS_TEST: "false"
-      PERSEUS_STORAGE_REPO_ROOT: /data/repositories
+      PERSEUS_STORAGE_REPO_ROOT: /tmp/perseus-test-repositories
       LOG_LEVEL: error
       TZ: Asia/Shanghai
     volumes:
       - .:/app
-      - repos_dev:/data/repositories
     # 默认命令是跑测试，但可以通过命令行覆盖
     command: ["python", "-m", "pytest", "tests/", "-v"]
     # 不自动重启（一次性任务）
