@@ -40,9 +40,20 @@ async def test_send_message_inactive_room(async_db: AsyncSession, async_test_rep
 
 @pytest.mark.asyncio
 async def test_send_message_not_member(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User, async_test_user2: User):
+    # 私有仓库: 非成员且无仓库访问权, 不能进入房间
+    async_test_repo.is_public = False
+    await async_db.commit()
     room = await RoomService.create_room(async_db, async_test_repo.id, "general", async_test_user.id)
     with pytest.raises(ValidationException):
         await ChatService.send_message(async_db, room.id, async_test_user2.id, "hello")
+
+
+@pytest.mark.asyncio
+async def test_send_message_public_repo_auto_join(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User, async_test_user2: User):
+    # 公开仓库: 非成员首次发言按仓库访问权限自动加入房间
+    room = await RoomService.create_room(async_db, async_test_repo.id, "general", async_test_user.id)
+    msg = await ChatService.send_message(async_db, room.id, async_test_user2.id, "hello")
+    assert msg["content"] == "hello"
 
 
 @pytest.mark.asyncio

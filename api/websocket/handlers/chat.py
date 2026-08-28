@@ -1,7 +1,19 @@
 """F-202 WebSocket chat message handlers"""
 from typing import Dict, Any
+from uuid import UUID
+
 from api.websocket.manager import Connection, ConnectionManager
 from core.exception import ValidationException, NotFoundException
+
+
+def _parse_uuid(value: Any) -> UUID | None:
+    """WS 消息里的 id 是客户端传来的字符串, 转 UUID 供 ORM 使用"""
+    if value is None:
+        return None
+    try:
+        return value if isinstance(value, UUID) else UUID(str(value))
+    except (ValueError, AttributeError):
+        return None
 
 
 def _get_manager():
@@ -17,11 +29,11 @@ async def handle_chat_message(connection: Connection, message: Dict[str, Any]) -
         })
         return
 
-    room_id = message.get("room_id")
+    room_id = _parse_uuid(message.get("room_id"))
     content = message.get("content")
-    reply_to = message.get("reply_to")
+    reply_to = _parse_uuid(message.get("reply_to"))
 
-    if not room_id or not content:
+    if room_id is None or not content:
         await connection.send({
             "type": "error", "error": "缺少必要字段: room_id, content",
             "original_type": "chat_message"

@@ -1,8 +1,17 @@
 """F-206 Online Presence — WebSocket handler tests"""
+import json
+
 import pytest
 import uuid
 from unittest.mock import MagicMock, AsyncMock
 from api.websocket.manager import Connection, ConnectionManager
+
+
+
+def _sent_payload(mock_ws):
+    """manager.send 现在走 send_text(json.dumps(...), default=str), 解析最后一条 payload"""
+    assert mock_ws.send_text.await_count >= 1, "expected at least one send_text call"
+    return json.loads(mock_ws.send_text.await_args[0][0])
 
 
 @pytest.fixture(autouse=True)
@@ -13,7 +22,7 @@ def reset_manager():
 
 async def _register_connection(manager, user_id=None, username=None):
     mock_ws = MagicMock()
-    mock_ws.send_json = AsyncMock(return_value=True)
+    mock_ws.send_text = AsyncMock(return_value=True)
     mock_ws.accept = AsyncMock(return_value=None)
     conn = await manager.connect(mock_ws)
     if user_id is not None:
@@ -82,12 +91,12 @@ class TestPresenceHandlers:
         await manager.subscribe_room(conn_bob, 1)
         await handle_room_join(conn_alice, {"type": "room_join", "room_id": 1})
         presence_calls = [
-            c for c in mock_bob.send_json.call_args_list
-            if c[0][0].get("type") == "presence_join"
+            c for c in mock_bob.send_text.call_args_list
+            if json.loads(c[0][0]).get("type") == "presence_join"
         ]
         assert len(presence_calls) == 1
-        assert presence_calls[0][0][0]["user_id"] == alice_id
-        assert presence_calls[0][0][0]["username"] == "alice"
+        assert json.loads(presence_calls[0][0][0])["user_id"] == str(alice_id)
+        assert json.loads(presence_calls[0][0][0])["username"] == "alice"
 
     @pytest.mark.asyncio
     async def test_room_leave_broadcasts_presence_change(self):
@@ -98,14 +107,14 @@ class TestPresenceHandlers:
         conn_bob, mock_bob = await _register_connection(manager, user_id=uuid.uuid4(), username="bob")
         await manager.subscribe_room(conn_alice, 1)
         await manager.subscribe_room(conn_bob, 1)
-        mock_bob.send_json.reset_mock()
+        mock_bob.send_text.reset_mock()
         await handle_room_leave(conn_alice, {"type": "room_leave", "room_id": 1})
         presence_calls = [
-            c for c in mock_bob.send_json.call_args_list
-            if c[0][0].get("type") == "presence_leave"
+            c for c in mock_bob.send_text.call_args_list
+            if json.loads(c[0][0]).get("type") == "presence_leave"
         ]
         assert len(presence_calls) == 1
-        assert presence_calls[0][0][0]["user_id"] == alice_id
+        assert json.loads(presence_calls[0][0][0])["user_id"] == str(alice_id)
 
     @pytest.mark.asyncio
     async def test_presence_list_returns_online_users(self):
@@ -116,8 +125,7 @@ class TestPresenceHandlers:
         await manager.subscribe_room(conn_alice, 1)
         await manager.subscribe_room(conn_bob, 1)
         await handle_presence_list(conn_alice, {"type": "presence_list", "room_id": 1})
-        mock_alice.send_json.assert_called_once()
-        sent = mock_alice.send_json.call_args[0][0]
+        sent = _sent_payload(mock_alice)
         assert sent["type"] == "presence_list"
         assert len(sent["users"]) == 2
 
@@ -127,8 +135,8 @@ class TestPresenceHandlers:
         manager = ConnectionManager()
         conn, mock_ws = await _register_connection(manager)
         await handle_presence_list(conn, {"type": "presence_list", "room_id": 1})
-        mock_ws.send_json.assert_called_once()
-        assert mock_ws.send_json.call_args[0][0]["type"] == "error"
+        sent = _sent_payload(mock_ws)
+        assert sent["type"] == "error"
 
     @pytest.mark.asyncio
     async def test_disconnect_broadcasts_presence_leave(self):
@@ -138,12 +146,12 @@ class TestPresenceHandlers:
         conn_bob, mock_bob = await _register_connection(manager, user_id=uuid.uuid4(), username="bob")
         await manager.subscribe_room(conn_alice, 1)
         await manager.subscribe_room(conn_bob, 1)
-        mock_bob.send_json.reset_mock()
+        mock_bob.send_text.reset_mock()
         await manager.disconnect(conn_alice)
         presence_calls = [
-            c for c in mock_bob.send_json.call_args_list
-            if c[0][0].get("type") == "presence_leave"
+            c for c in mock_bob.send_text.call_args_list
+            if json.loads(c[0][0]).get("type") == "presence_leave"
         ]
         assert len(presence_calls) >= 1
-        last_leave = presence_calls[-1][0][0]
-        assert last_leave["user_id"] == alice_id
+        last_leave = json.loads(presence_calls[-1][0][0])
+        assert last_leave["user_id"] == str(alice_id)

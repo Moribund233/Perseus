@@ -41,6 +41,56 @@ class ChatService:
             raise ValidationException("你不是该房间的成员")
 
     @staticmethod
+    async def _ensure_membership(db: AsyncSession, room_id: uuid.UUID, user_id: uuid.UUID) -> None:
+        """
+        校验房间访问权限, 已是成员直接放行; 否则按仓库访问权限自动加入房间.
+
+        REST 层没有加入房间的端点, 若仅按 RoomMember 硬性校验,
+        仓库可见的用户永远无法进入房间; 房间归属仓库, 因此以仓库
+        访问权限 (公开 / 所有者 / 仓库成员) 作为自动加入的依据.
+        """
+        from models.repository import Repository
+        from models.repository_member import RepositoryMember
+
+        existing = await db.execute(
+            select(RoomMember).filter(
+                RoomMember.room_id == room_id,
+                RoomMember.user_id == user_id
+            )
+        )
+        if existing.scalar_one_or_none():
+            return
+
+        room = await ChatService._get_room_or_raise(db, room_id)
+        repo_result = await db.execute(
+            select(Repository).filter(Repository.id == room.repository_id)
+        )
+        repo = repo_result.scalar_one_or_none()
+        if repo is None:
+            raise NotFoundException("房间不存在")
+
+        has_access = repo.is_public or repo.owner_id == user_id
+        if not has_access:
+            member_result = await db.execute(
+                select(RepositoryMember).filter(
+                    RepositoryMember.repository_id == repo.id,
+                    RepositoryMember.user_id == user_id,
+                    RepositoryMember.is_active.is_(True)
+                )
+            )
+            has_access = member_result.scalar_one_or_none() is not None
+        if not has_access:
+            raise ValidationException("你不是该房间的成员")
+
+        db.add(RoomMember(
+            room_id=room_id,
+            user_id=user_id,
+            role="member",
+            joined_at=datetime.now(timezone.utc),
+        ))
+        await db.commit()
+
+    @staticmethod
     async def send_message(
         db: AsyncSession,
         room_id: uuid.UUID,
@@ -54,7 +104,7 @@ class ChatService:
         content = content.strip()[:MAX_CONTENT_LENGTH]
 
         await ChatService._get_room_or_raise(db, room_id)
-        await ChatService._check_membership(db, room_id, sender_id)
+        await ChatService._ensure_membership(db, room_id, sender_id)
 
         msg = ChatMessage(
             room_id=room_id,
@@ -96,7 +146,7 @@ class ChatService:
         limit: int = DEFAULT_PAGE_LIMIT
     ) -> Dict[str, Any]:
         await ChatService._get_room_or_raise(db, room_id)
-        await ChatService._check_membership(db, room_id, user_id)
+        await ChatService._ensure_membership(db, room_id, user_id)
 
         limit = min(limit, MAX_PAGE_LIMIT)
 

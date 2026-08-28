@@ -48,7 +48,9 @@ class Connection:
             bool: 发送成功返回True
         """
         try:
-            await self.websocket.send_json(message)
+            # send_json 内部 json.dumps 不支持 UUID 等类型, 消息 payload 中
+            # (user_id, 消息 id 等) 常见 UUID 对象, 统一 default=str 兜底
+            await self.websocket.send_text(json.dumps(message, ensure_ascii=False, default=str))
             return True
         except Exception as e:
             logger.error(f"发送消息失败 connection_id={self.connection_id}: {e}")
