@@ -69,6 +69,8 @@ services:
       - .:/app
       # 仓库数据持久化
       - repos_dev:/data/repositories
+      # LFS 对象存储持久化
+      - lfs_dev:/data/lfs
       # 日志目录
       - ./logs:/app/logs
     ports:
@@ -143,11 +145,39 @@ services:
         limits:
           memory: 128M
 
+  # =============================================
+  # 网关容器（Nginx）：CORS 统一处理 + API/WS/Git 代理
+  # 配置文件: docker/dev/nginx.dev.conf
+  # CORS 白名单: localhost / 127.0.0.1 / 内网段
+  # =============================================
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: perseus-gateway-dev
+    volumes:
+      - ./docker/dev/nginx.dev.conf:/etc/nginx/conf.d/default.conf:ro
+      - repos_dev:/data/repositories
+    ports:
+      # 统一入口: http://localhost:8080 (API / WebSocket / Git HTTP)
+      - "127.0.0.1:8080:80"
+    extra_hosts:
+      # 访问宿主机上的 Vite 开发服务器 (localhost:5173)
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - app
+      - git-cgi
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
 # =============================================
 # 数据卷定义
 # =============================================
 volumes:
   repos_dev:
+    driver: local
+  lfs_dev:
     driver: local
 
 # =============================================
