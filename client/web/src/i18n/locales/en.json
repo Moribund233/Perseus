@@ -86,6 +86,12 @@
       "searchPlaceholder": "Search...",
       "new": "New"
     },
+    "notifications": {
+      "title": "Notifications",
+      "empty": "No notifications",
+      "markAllAsRead": "Mark all as read",
+      "unreadOnly": "{{count}} unread"
+    },
     "repositories": {
       "title": "Repositories",
       "explorer": "Explorer",
@@ -104,6 +110,8 @@
         "star": "Star",
         "fork": "Fork"
       },
+      "forkSuccess": "Repository {{name}} forked",
+      "forkFailed": "Failed to fork repository",
       "visibility": {
         "public": "Public",
         "private": "Private"
@@ -246,7 +254,9 @@
       "directMessages": "Direct Messages",
       "members": "Members",
       "placeholder": "Message #{{channel}}...",
-      "today": "Today"
+      "today": "Today",
+      "noChannels": "No channels available. Create a repository to start chatting.",
+      "disconnected": "Realtime connection lost. Sending is temporarily unavailable."
     },
     "settings": {
       "title": "Settings",

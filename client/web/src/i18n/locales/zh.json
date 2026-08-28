@@ -86,6 +86,12 @@
       "searchPlaceholder": "搜索...",
       "new": "新建"
     },
+    "notifications": {
+      "title": "通知",
+      "empty": "暂无通知",
+      "markAllAsRead": "全部标记为已读",
+      "unreadOnly": "{{count}} 条未读"
+    },
     "repositories": {
       "title": "仓库",
       "explorer": "资源管理器",
@@ -104,6 +110,8 @@
         "star": "星标",
         "fork": "派生"
       },
+      "forkSuccess": "已派生仓库 {{name}}",
+      "forkFailed": "派生仓库失败",
       "visibility": {
         "public": "公开",
         "private": "私有"
@@ -246,7 +254,9 @@
       "directMessages": "私信",
       "members": "成员",
       "placeholder": "给 #{{channel}} 发送消息...",
-      "today": "今天"
+      "today": "今天",
+      "noChannels": "暂无可用频道，创建仓库后即可开始聊天",
+      "disconnected": "实时连接已断开，暂时无法发送消息"
     },
     "settings": {
       "title": "设置",

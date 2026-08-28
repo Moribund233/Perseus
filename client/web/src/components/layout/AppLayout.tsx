@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Input, Button, Avatar, Dropdown, Space, Tooltip } from 'antd';
+import { Layout, Input, Button, Avatar, Dropdown, Space, Tooltip, Popover, Empty } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   DashboardOutlined,
@@ -17,6 +17,8 @@ import {
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/auth';
+import { useNotificationsStore } from '../../stores/notifications';
+import type { Notification } from '../../api/notifications';
 
 const { Header, Sider, Content } = Layout;
 
@@ -29,6 +31,19 @@ const textPrimary = '#e6edf3';
 const blueLight = '#58a6ff';
 const bluePrimary = '#1f6feb';
 const red = '#f85149';
+
+function formatNotificationTime(iso: string, lang: string): string {
+  const date = new Date(iso);
+  const diffMs = Date.now() - date.getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return lang.startsWith('zh') ? '刚刚' : 'just now';
+  if (minutes < 60) return lang.startsWith('zh') ? `${minutes} 分钟前` : `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return lang.startsWith('zh') ? `${hours} 小时前` : `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return lang.startsWith('zh') ? `${days} 天前` : `${days}d ago`;
+  return date.toLocaleDateString(lang.startsWith('zh') ? 'zh-CN' : 'en-US');
+}
 
 interface NavItemDef {
   key: string;
@@ -44,6 +59,39 @@ export default function AppLayout() {
   const location = useLocation();
   const { user, logout } = useAuthStore();
   const { t, i18n } = useTranslation();
+
+  const notifications = useNotificationsStore((s) => s.notifications);
+  const unreadCount = useNotificationsStore((s) => s.unreadCount);
+  const fetchNotifications = useNotificationsStore((s) => s.fetchNotifications);
+  const fetchUnreadCount = useNotificationsStore((s) => s.fetchUnreadCount);
+  const markAsRead = useNotificationsStore((s) => s.markAsRead);
+  const markAllAsRead = useNotificationsStore((s) => s.markAllAsRead);
+  const [notifOpen, setNotifOpen] = useState(false);
+
+  // 登录后拉取未读数并每 60s 轮询
+  useEffect(() => {
+    if (!user) return;
+    fetchUnreadCount();
+    const timer = setInterval(() => fetchUnreadCount(), 60_000);
+    return () => clearInterval(timer);
+  }, [user, fetchUnreadCount]);
+
+  const openNotificationPanel = (open: boolean) => {
+    setNotifOpen(open);
+    if (open) {
+      fetchNotifications();
+      fetchUnreadCount();
+    }
+  };
+
+  const handleNotificationClick = (n: Notification) => {
+    if (!n.is_read) void markAsRead(n.id);
+  };
+
+  const handleMarkAllRead = async () => {
+    await markAllAsRead();
+    await fetchNotifications();
+  };
 
   const navItems: NavItemDef[] = [
     { key: 'dashboard', path: '/dashboard', icon: <DashboardOutlined />, label: t('app.nav.dashboard') },
@@ -349,44 +397,134 @@ export default function AppLayout() {
 
           {/* Actions */}
           <Space size={8} style={{ marginLeft: 'auto' }}>
-            <button
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                border: 'none',
-                background: 'transparent',
-                color: textSecondary,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.2s',
-                position: 'relative',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = hoverBg;
-                e.currentTarget.style.color = textPrimary;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = textSecondary;
-              }}
+            <Popover
+              placement="bottomRight"
+              trigger="click"
+              open={notifOpen}
+              onOpenChange={openNotificationPanel}
+              styles={{ content: { padding: 0, width: 360 } }}
+              content={
+                <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 420 }}>
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      borderBottom: `1px solid ${borderColor}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <span style={{ fontSize: 13, fontWeight: 600, color: textPrimary }}>
+                      {t('app.notifications.title')}
+                      {unreadCount > 0 && (
+                        <span style={{ color: textSecondary, fontWeight: 400, marginLeft: 8, fontSize: 12 }}>
+                          {t('app.notifications.unreadOnly', { count: unreadCount })}
+                        </span>
+                      )}
+                    </span>
+                    <a
+                      onClick={handleMarkAllRead}
+                      style={{ fontSize: 12, color: unreadCount > 0 ? blueLight : '#6e7681', cursor: unreadCount > 0 ? 'pointer' : 'default' }}
+                    >
+                      {t('app.notifications.markAllAsRead')}
+                    </a>
+                  </div>
+                  <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+                    {notifications.length === 0 ? (
+                      <Empty
+                        description={t('app.notifications.empty')}
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        style={{ margin: '32px 0' }}
+                      />
+                    ) : (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          onClick={() => handleNotificationClick(n)}
+                          style={{
+                            padding: '10px 14px',
+                            borderBottom: `1px solid ${borderColor}`,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            gap: 8,
+                            alignItems: 'flex-start',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          <span
+                            style={{
+                              width: 7,
+                              height: 7,
+                              borderRadius: '50%',
+                              marginTop: 6,
+                              flexShrink: 0,
+                              background: n.is_read ? 'transparent' : blueLight,
+                              border: n.is_read ? `1.5px solid ${borderColor}` : 'none',
+                            }}
+                          />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, color: n.is_read ? textSecondary : textPrimary, fontWeight: n.is_read ? 400 : 600 }}>
+                              {n.title}
+                            </div>
+                            {n.message && (
+                              <div style={{ fontSize: 12, color: textSecondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {n.message}
+                              </div>
+                            )}
+                            <div style={{ fontSize: 11, color: '#6e7681', marginTop: 4 }}>
+                              {formatNotificationTime(n.created_at, i18n.language)}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              }
             >
-              <BellOutlined style={{ fontSize: 18 }} />
-              <span
+              <button
                 style={{
-                  position: 'absolute',
-                  top: 6,
-                  right: 6,
-                  width: 7,
-                  height: 7,
-                  background: blueLight,
-                  borderRadius: '50%',
-                  border: `1.5px solid #161b22`,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  border: 'none',
+                  background: 'transparent',
+                  color: textSecondary,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s',
+                  position: 'relative',
                 }}
-              />
-            </button>
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = hoverBg;
+                  e.currentTarget.style.color = textPrimary;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = textSecondary;
+                }}
+              >
+                <BellOutlined style={{ fontSize: 18 }} />
+                {unreadCount > 0 && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: 6,
+                      right: 6,
+                      width: 7,
+                      height: 7,
+                      background: blueLight,
+                      borderRadius: '50%',
+                      border: `1.5px solid #161b22`,
+                    }}
+                  />
+                )}
+              </button>
+            </Popover>
 
             <button
               onClick={toggleLanguage}

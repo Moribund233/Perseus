@@ -208,7 +208,8 @@ export const repositoriesApi = {
   fork: (repoId: string, data?: { name?: string; description?: string; is_public?: boolean }) =>
     apiRequest<Repository>(`/api/v1/repositories/${repoId}/forks`, {
       method: 'POST',
-      body: data ? JSON.stringify(data) : undefined,
+      // FastAPI 对 Pydantic body 参数要求请求体存在, 即使所有字段可选
+      body: JSON.stringify(data ?? {}),
     }),
 
   listForks: (repoId: string) =>

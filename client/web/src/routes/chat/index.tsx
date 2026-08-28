@@ -19,6 +19,7 @@ import ChatSkeleton from '../../components/skeleton/ChatSkeleton';
 import { useRepositoriesStore } from '../../stores/repositories';
 import { useAuthStore } from '../../stores/auth';
 import { chatApi, type ChatMessage, type RoomMember, type RealtimeRoom } from '../../api/chat';
+import { chatSocket, type ChatSocketStatus } from '../../api/chatSocket';
 import type { Repository } from '../../api/repositories';
 
 const { Sider, Content } = Layout;
@@ -96,6 +97,19 @@ function statusColor(status: string) {
   return '#6e7681';
 }
 
+function mapChatMessage(msg: ChatMessage): Message {
+  const author = msg.sender_username || 'unknown';
+  const initials = getInitials(author);
+  return {
+    id: msg.id,
+    author,
+    initials,
+    color: getAvatarColor(initials),
+    time: formatMessageTime(msg.created_at),
+    text: msg.content,
+  };
+}
+
 function StatusDot({ status, size = 8 }: { status: string; size?: number }) {
   return (
     <span
@@ -121,8 +135,13 @@ export default function ChatPage() {
   const [dms, setDms] = useState<DM[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState('');
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [wsStatus, setWsStatus] = useState<ChatSocketStatus>('disconnected');
+  const [channelsLoaded, setChannelsLoaded] = useState(false);
   const { t } = useTranslation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const activeRoomIdRef = useRef<string | null>(null);
+  const joinedRoomIdRef = useRef<string | null>(null);
 
   const { user } = useAuthStore();
   const { repositories, fetchRepositoriesByUser } = useRepositoriesStore();
@@ -137,10 +156,35 @@ export default function ChatPage() {
     [repositories]
   );
 
+  // WebSocket: 连接、房间订阅与实时消息接收
+  useEffect(() => {
+    chatSocket.setHandlers({
+      onStatusChange: setWsStatus,
+      onAck: (msg) => {
+        if (msg.room_id === activeRoomIdRef.current) {
+          setMessages((prev) => [...prev, mapChatMessage(msg)]);
+          setSendError(null);
+        }
+      },
+      onChatMessage: (msg) => {
+        if (msg.room_id === activeRoomIdRef.current) {
+          setMessages((prev) => [...prev, mapChatMessage(msg)]);
+        }
+      },
+      onError: (err, originalType) => {
+        if (originalType === 'chat_message') setSendError(err);
+      },
+    });
+    chatSocket.start();
+    return () => chatSocket.stop();
+  }, []);
+
   // Fetch user repositories on mount
   useEffect(() => {
     if (user?.id) {
-      fetchRepositoriesByUser(user.id);
+      fetchRepositoriesByUser(user.id).finally(() => setChannelsLoaded(true));
+    } else {
+      setChannelsLoaded(true);
     }
   }, [user?.id, fetchRepositoriesByUser]);
 
@@ -152,23 +196,25 @@ export default function ChatPage() {
       const roomData = await chatApi.getRepositoryRoom(repoId);
       setRoom(roomData);
       setActiveRepoId(repoId);
+      activeRoomIdRef.current = roomData.id;
+
+      // 切换房间: 离开旧的, 加入新的以接收实时广播
+      if (joinedRoomIdRef.current !== roomData.id) {
+        if (joinedRoomIdRef.current) {
+          chatSocket.leaveRoom(joinedRoomIdRef.current);
+        }
+        chatSocket.joinRoom(roomData.id);
+        joinedRoomIdRef.current = roomData.id;
+      }
+
       const [messagesRes, membersRes] = await Promise.all([
         chatApi.getRoomMessages(roomData.id, { limit: 50 }),
         chatApi.getRoomMembers(roomData.id),
       ]);
 
-      const mappedMessages: Message[] = messagesRes.messages.map((msg: ChatMessage) => {
-        const author = msg.sender_username || 'unknown';
-        const initials = getInitials(author);
-        return {
-          id: msg.id,
-          author,
-          initials,
-          color: getAvatarColor(initials),
-          time: formatMessageTime(msg.created_at),
-          text: msg.content,
-        };
-      }).reverse();
+      const mappedMessages: Message[] = messagesRes.messages
+        .map(mapChatMessage)
+        .reverse();
 
       const mappedMembers: Member[] = membersRes.map((m: RoomMember) => {
         const name = m.username || m.user_id;
@@ -224,6 +270,20 @@ export default function ChatPage() {
     loadChannel(channelId);
   }, [activeChannel, loadChannel]);
 
+  const handleSend = useCallback(() => {
+    const content = input.trim();
+    if (!content || !room) return;
+    if (wsStatus !== 'connected') return;
+    chatSocket.sendChatMessage(room.id, content);
+    setInput('');
+    setSendError(null);
+  }, [input, room, wsStatus]);
+
+  const handleInputChange = (value: string) => {
+    setInput(value);
+    if (sendError) setSendError(null);
+  };
+
   const activeChannelName = useMemo(() =>
     channels.find((c) => c.id === activeChannel)?.name || room?.name || '—',
     [channels, activeChannel, room]
@@ -233,7 +293,17 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  if (loading && !activeRepoId) return <ChatSkeleton />;
+  if (loading && !activeRepoId) {
+    // 没有任何可用频道时不要永远停在骨架屏
+    if (channelsLoaded && channels.length === 0) {
+      return (
+        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: textSecondary, fontSize: 14 }}>
+          {t('app.teamChat.noChannels')}
+        </div>
+      );
+    }
+    return <ChatSkeleton />;
+  }
 
   if (error) {
     return (
@@ -539,6 +609,9 @@ export default function ChatPage() {
         </Content>
 
         <div style={{ padding: '12px 20px', borderTop: `1px solid ${borderColor}`, flexShrink: 0 }}>
+          {sendError && (
+            <div style={{ fontSize: 12, color: '#f85149', marginBottom: 6 }}>{sendError}</div>
+          )}
           <div
             style={{
               background: bgTertiary,
@@ -549,7 +622,13 @@ export default function ChatPage() {
           >
             <Input.TextArea
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onPressEnter={(e) => {
+                if (!e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
               placeholder={t('app.teamChat.placeholder', { channel: activeChannelName })}
               autoSize={{ minRows: 1, maxRows: 4 }}
               style={{
@@ -575,12 +654,16 @@ export default function ChatPage() {
               <Button type="text" icon={<ItalicOutlined style={{ fontSize: 14, color: textTertiary }} />} size="small" />
               <Button type="text" icon={<CodeOutlined style={{ fontSize: 14, color: textTertiary }} />} size="small" />
               <Button type="text" icon={<LinkOutlined style={{ fontSize: 14, color: textTertiary }} />} size="small" />
-              <Button
-                type="primary"
-                icon={<SendOutlined style={{ fontSize: 14 }} />}
-                size="small"
-                style={{ marginLeft: 'auto', background: bluePrimary, borderColor: bluePrimary }}
-              />
+              <Tooltip title={wsStatus !== 'connected' ? t('app.teamChat.disconnected') : 'Enter'}>
+                <Button
+                  type="primary"
+                  icon={<SendOutlined style={{ fontSize: 14 }} />}
+                  size="small"
+                  onClick={handleSend}
+                  disabled={wsStatus !== 'connected' || !input.trim()}
+                  style={{ marginLeft: 'auto', background: bluePrimary, borderColor: bluePrimary }}
+                />
+              </Tooltip>
             </div>
           </div>
         </div>

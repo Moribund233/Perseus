@@ -292,6 +292,7 @@ export default function RepositoriesPage() {
     fetchCommits,
     starRepository,
     unstarRepository,
+    forkRepository,
     clearCurrent,
   } = useRepositoriesStore();
 
@@ -394,6 +395,17 @@ export default function RepositoriesPage() {
       message.error('Failed to update star');
     }
   }, [currentRepo, isStarred, starRepository, unstarRepository]);
+
+  const handleFork = useCallback(async () => {
+    if (!currentRepo) return;
+    try {
+      const fork = await forkRepository(currentRepo.id);
+      message.success(t('app.repositories.forkSuccess', { name: fork.path }));
+      navigate(`/repositories/${fork.path}`);
+    } catch {
+      message.error(t('app.repositories.forkFailed'));
+    }
+  }, [currentRepo, forkRepository, navigate, t]);
 
   if (isLoading && repositories.length === 0) return <RepositoriesSkeleton />;
 
@@ -768,7 +780,7 @@ export default function RepositoriesPage() {
               <ActionButton icon={<StarOutlined style={{ color: isStarred ? '#e3b341' : undefined }} />} onClick={handleStarToggle}>
                 {isStarred ? t('app.repositories.actions.unstar') : t('app.repositories.actions.star')} {currentRepo.star_count}
               </ActionButton>
-              <ActionButton icon={<ForkOutlined />}>{t('app.repositories.actions.fork')} {currentRepo.fork_count}</ActionButton>
+              <ActionButton icon={<ForkOutlined />} onClick={handleFork}>{t('app.repositories.actions.fork')} {currentRepo.fork_count}</ActionButton>
             </div>
           </div>
 
