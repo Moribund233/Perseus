@@ -26,10 +26,10 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /build
 
-# 针对国内网络环境优化: 配置阿里云 Debian 镜像源
-RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
-    sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || \
-    echo "deb http://mirrors.aliyun.com/debian trixie main contrib non-free" > /etc/apt/sources.list
+# 针对国内网络环境优化: 配置清华 Debian 镜像源
+RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list 2>/dev/null || \
+    echo "deb http://mirrors.tuna.tsinghua.edu.cn/debian trixie main contrib non-free" > /etc/apt/sources.list
 
 # 安装构建依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -59,10 +59,10 @@ RUN uv pip install --system -e .
 # ---- 运行阶段 ----
 FROM python:3.12-slim AS runtime
 
-# 针对国内网络环境优化: 配置阿里云 Debian 镜像源
-RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
-    sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || \
-    echo "deb http://mirrors.aliyun.com/debian trixie main contrib non-free" > /etc/apt/sources.list
+# 针对国内网络环境优化: 配置清华 Debian 镜像源
+RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list 2>/dev/null || \
+    echo "deb http://mirrors.tuna.tsinghua.edu.cn/debian trixie main contrib non-free" > /etc/apt/sources.list
 
 # 安装运行时系统依赖
 # git: 用于程序化 Git 操作（创建 bare repo、分支管理等）

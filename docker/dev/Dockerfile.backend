@@ -34,10 +34,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # 针对国内网络环境优化: 配置镜像源 (必须在 apt-get 之前)
 # =============================================================================
 
-# 配置阿里云 Debian 镜像源
-RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
-    sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || \
-    echo "deb http://mirrors.aliyun.com/debian trixie main contrib non-free" > /etc/apt/sources.list
+# 配置清华 Debian 镜像源
+RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list 2>/dev/null || \
+    echo "deb http://mirrors.tuna.tsinghua.edu.cn/debian trixie main contrib non-free" > /etc/apt/sources.list
 
 # 配置阿里云 PyPI 镜像
 ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
@@ -97,8 +97,8 @@ RUN uv pip install --system -e . && \
 
 # 创建非 root 用户
 RUN groupadd -g 1000 perseus && useradd -u 1000 -m -g perseus perseus \
-    && mkdir -p /data/repositories /app/logs \
-    && chown -R perseus:perseus /app /data/repositories /app/logs
+    && mkdir -p /data/repositories /data/lfs /app/logs \
+    && chown -R perseus:perseus /app /data/repositories /data/lfs /app/logs
 
 # 创建启动脚本 (SQLite 版本 - 无需等待数据库)
 # 以 root 运行初始化（修复挂载卷权限），然后降权到 perseus 用户启动服务
@@ -110,8 +110,9 @@ init_app() {\n\
     echo "Initializing database..."\n\
     mkdir -p /data/repositories\n\
     chmod 755 /data/repositories\n\
+    mkdir -p /data/lfs\n\
     mkdir -p /app/logs\n\
-    chown -R perseus:perseus /app /data/repositories /app/logs\n\
+    chown -R perseus:perseus /app /data/repositories /data/lfs /app/logs\n\
     if [ ! -f /app/config.toml ] && [ -f /app/config.example.toml ]; then\n\
         cp /app/config.example.toml /app/config.toml\n\
         echo "Created config.toml from config.example.toml"\n\
@@ -129,7 +130,9 @@ fi\n\
 \n\
 start_server() {\n\
     echo "Starting development server with hot reload..."\n\
-    su -p perseus -c "cd /app && uvicorn app:create_app --factory \\\n\
+    # 不能用 su -p: -p 会保留 root 的 HOME, libgit2 打开仓库时需 stat $HOME/.gitconfig,\n\
+    # perseus 用户无权访问 /root/.gitconfig, 导致所有仓库打开失败 (Repository not found)\n\
+    su perseus -c "cd /app && uvicorn app:create_app --factory \\\n\
         --host 0.0.0.0 --port 8000 \\\n\
         --reload --reload-dir /app \\\n\
         --log-level debug"\n\
