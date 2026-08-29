@@ -11,6 +11,8 @@
 > - 2026-08-29 批次 A（接线冲刺）：通知点击跳转（按 target_type 导航到仓库 PR/Issue）、
 >   Chat 消息删除（本人 hover 删除）、Editor 文件删除（hover 删除 + 确认弹窗）、
 >   PR 详情标签管理（拉取/添加/移除）、PR 编辑（标题/描述）、PR Review 提交（Approve/Request changes/Comment）
+> - 2026-08-29 批次 B（仓库能力页）：Releases tab（列表/创建/编辑/删除/草稿）、Actions tab 接 Builds（列表/状态筛选/日志）、
+>   仓库 Settings tab（描述/可见性/默认分支 + 协作者管理 + Webhooks CRUD/测试/投递记录）
 
 ---
 
@@ -29,26 +31,20 @@
 
 > 这三块是"接线即用"，优先级最高。
 
-### 2.1 Releases（发行版）— P1
+### 2.1 Releases（发行版）— ✅ 已完成（批次 B）
 
 - **后端**: `release_controller.py` 已实现 list/get/getByTag/create/update/delete
-- **前端**: `api/releases.ts` 已完整封装，**零引用**
-- **建议**: 在仓库页新增 Releases tab，列表 + 创建/编辑弹窗；打 tag 关联 commit SHA
-- **工作量**: 前端 1~2 天
+- **前端**: 仓库页 Releases tab（`components/repo/ReleasesTab.tsx`）：列表 + 创建/编辑/删除 + 草稿/预发布
 
-### 2.2 Webhooks（Web 钩子）— P1
+### 2.2 Webhooks（Web 钩子）— ✅ 已完成（批次 B）
 
 - **后端**: `webhook_controller.py` 已实现 8 个路由（CRUD/test/listDeliveries/getDelivery）
-- **前端**: `api/webhooks.ts` 已完整封装，**零引用**
-- **建议**: 仓库 Settings 子页（若仓库设置页先行，合并开发）；展示投递记录方便调试
-- **工作量**: 前端 1~2 天
+- **前端**: 仓库 Settings tab 内 Webhook 区块（`components/repo/RepoSettingsTab.tsx`）：CRUD + 测试 + 投递记录
 
-### 2.3 Builds / CI（构建）— P1
+### 2.3 Builds / CI（构建）— ✅ 已完成（批次 B）
 
 - **后端**: `build_controller.py` 已实现 list/get/create/getLogs；PR 合并后自动创建 Build（F-046）
-- **前端**: `api/builds.ts` 已完整封装，**零引用**
-- **建议**: 仓库页 Actions tab（当前点击无反应）改为 Builds 列表 + 日志查看；PR 详情页可挂 Build 状态徽标
-- **工作量**: 前端 1~2 天
+- **前端**: 仓库页 Actions tab（`components/repo/BuildsTab.tsx`）：构建列表 + 状态筛选 + 日志查看
 
 ### 2.4 用户中心类 API — P1
 
@@ -77,8 +73,8 @@
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
 | Watch 按钮 | 无 onClick | 后端无 watch API（只有 star/fork）。需新表/字段 + 端点，或先移除该按钮 | P3 |
-| Actions tab | 点击仅高亮，无内容 | 接 Builds（见 2.3） | P1 |
-| Settings tab | 点击仅高亮，无内容 | 仓库设置子路由：改描述/可见性（`repositoriesApi.update` 已封装）、默认分支切换（`branch_controller` 已有）、Webhooks、协作者管理入口 | P1~P2 |
+| Actions tab | ✅ 已接 Builds 列表 + 日志（批次 B） | — | P1 |
+| Settings tab | ✅ 已实现仓库设置子内容：描述/可见性/默认分支、协作者管理、Webhooks（批次 B） | — | P1~P2 |
 | 文件列表"最近提交/时间"两列 | 写死 `-` 和空白 | 需后端按目录聚合每文件最近提交（`get_commits` 逐文件请求开销大），建议后端新增 tree+last-commit 聚合端点 | P3 |
 
 ### 3.3 团队聊天（chat/index.tsx）
@@ -137,7 +133,7 @@
 | 批次 | 内容 | 预估 |
 |---|---|---|
 | **批次 A（接线冲刺）** ✅ | 通知点击跳转、消息删除、文件删除、PR 标签 UI、PR 编辑、PR review 提交 — **已完成** | — |
-| **批次 B（仓库能力页）** | Releases tab（2.1）+ Actions/Builds tab（2.3）+ 仓库 Settings tab（含 Webhooks 2.2、协作者、默认分支） | 前端 3~5 天 |
+| **批次 B（仓库能力页）** ✅ | Releases tab（2.1）+ Actions/Builds tab（2.3）+ 仓库 Settings tab（含 Webhooks 2.2、协作者、默认分支）— **已完成** | — |
 | **批次 C（用户中心）** | SSH Keys、OAuth 账号管理、`/me/*` 聚合展示（2.4）；全局搜索（3.1） | 前端 2~3 天（搜索含少量后端） |
 | **批次 D（实时增强）** | Editor 在线状态（3.4）、聊天 presence/未读数（3.3）—— 共用 presence 基础设施，需后端 WS 扩展 | 前后端 4~6 天 |
 | **批次 E（体验完善）** | 消息 reactions、DM 私聊、文件树 last-commit 聚合、行内评论、亮色主题 | 按需评估，均涉及新后端能力 |

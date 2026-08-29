@@ -47,8 +47,15 @@ export interface PaginationResponse<T> {
 }
 
 export const releasesApi = {
-  list: (repoId: string) =>
-    apiRequest<PaginationResponse<Release>>(`/api/v1/repositories/${repoId}/releases`),
+  list: (repoId: string, params?: { include_drafts?: boolean; include_prereleases?: boolean; page?: number; limit?: number }) => {
+    const qparams: Record<string, string> = {};
+    if (params?.include_drafts) qparams['include_drafts'] = 'true';
+    if (params?.include_prereleases === false) qparams['include_prereleases'] = 'false';
+    if (params?.page) qparams['page'] = String(params.page);
+    if (params?.limit) qparams['limit'] = String(params.limit);
+    const qs = Object.keys(qparams).length ? '?' + new URLSearchParams(qparams).toString() : '';
+    return apiRequest<PaginationResponse<Release>>(`/api/v1/repositories/${repoId}/releases${qs}`);
+  },
 
   get: (repoId: string, releaseNumber: number) =>
     apiRequest<Release>(`/api/v1/repositories/${repoId}/releases/${releaseNumber}`),

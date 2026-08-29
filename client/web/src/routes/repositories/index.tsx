@@ -10,6 +10,7 @@ import {
   ExclamationCircleOutlined,
   SettingOutlined,
   PlayCircleOutlined,
+  TagOutlined,
   EyeOutlined,
   StarOutlined,
   ForkOutlined,
@@ -21,6 +22,9 @@ import { useTranslation } from 'react-i18next';
 import { useSpring, animated } from '@react-spring/web';
 import RepositoriesSkeleton from '../../components/skeleton/RepositoriesSkeleton';
 import Markdown from '../../components/Markdown';
+import ReleasesTab from '../../components/repo/ReleasesTab';
+import BuildsTab from '../../components/repo/BuildsTab';
+import RepoSettingsTab from '../../components/repo/RepoSettingsTab';
 import { useRepositoriesStore } from '../../stores/repositories';
 import { useIssuesStore } from '../../stores/issues';
 import { usePullRequestsStore } from '../../stores/pullRequests';
@@ -620,7 +624,8 @@ export default function RepositoriesPage() {
     { key: 'code', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><FileTextOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.code')}</span> },
     { key: 'pullRequests', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={() => navigate(`/repositories/${owner}/${repo}/pulls`)}><PullRequestOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.pullRequests')}<span className="tab-count">{pullRequests.length}</span></span> },
     { key: 'issues', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={() => navigate(`/repositories/${owner}/${repo}/issues`)}><ExclamationCircleOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.issues')}<span className="tab-count">{issues.length}</span></span> },
-    { key: 'actions', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><PlayCircleOutlined style={{ fontSize: 14 }} />Actions</span> },
+    { key: 'releases', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><TagOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.releases')}</span> },
+    { key: 'actions', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><PlayCircleOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.actions')}</span> },
     { key: 'settings', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><SettingOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.settings')}</span> },
   ];
 
@@ -691,6 +696,7 @@ export default function RepositoriesPage() {
       `}</style>
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      {activeTab === 'code' && (
       <Sider
         width={280}
         style={{
@@ -762,6 +768,7 @@ export default function RepositoriesPage() {
           )}
         </div>
       </Sider>
+      )}
 
       <Content style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '24px 24px 0' }}>
         <div style={{ flexShrink: 0 }}>
@@ -798,6 +805,7 @@ export default function RepositoriesPage() {
           />
         </div>
 
+        {activeTab === 'code' ? (
         <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 24 }}>
         <div
           style={{
@@ -974,6 +982,13 @@ export default function RepositoriesPage() {
           </div>
         )}
       </div>
+      ) : (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0 24px' }}>
+          {activeTab === 'releases' && <ReleasesTab repoId={currentRepo.id} />}
+          {activeTab === 'actions' && <BuildsTab repoId={currentRepo.id} />}
+          {activeTab === 'settings' && <RepoSettingsTab repoId={currentRepo.id} />}
+        </div>
+      )}
       </Content>
       </div>
     </Layout>
