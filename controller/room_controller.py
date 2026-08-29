@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routes_config import get_route_prefix
@@ -8,6 +9,7 @@ from models.repository import Repository
 from api.dependencies import get_current_user, get_current_admin_user
 from services.realtime.room_service import RoomService
 from services.repository_service import get_repository_by_id
+from services.attachment_service import upload_attachment, get_attachment_file
 from core.exception import ValidationException
 import uuid
 
@@ -68,3 +70,38 @@ async def delete_room(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
     success = await RoomService.delete_room(db, room_id)
     return {"success": success}
+
+
+@router.post("/api/v1/rooms/{room_id}/attachments")
+async def upload_room_attachment(
+    room_id: uuid.UUID,
+    file: UploadFile = File(..., description="附件文件（最大 20MB）"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    上传聊天附件
+
+    仅房间成员可上传；返回的 url 可直接作为 Markdown 链接/图片插入消息内容
+    """
+    room = await RoomService.get_room(db, room_id)
+    if not room:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
+
+    members = await RoomService.get_members(db, room_id)
+    member_ids = {str(m["user_id"]) if isinstance(m, dict) else str(m.user_id) for m in members}
+    if str(current_user.id) not in member_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not a member of this room")
+
+    return await upload_attachment(room_id, file)
+
+
+@router.get("/api/v1/attachments/{room_id}/{stored_name}")
+async def download_room_attachment(
+    room_id: uuid.UUID,
+    stored_name: str,
+    current_user: User = Depends(get_current_user),
+):
+    """下载聊天附件（需认证，文件名含随机 token 防遍历/猜测）"""
+    file_path, content_type = await get_attachment_file(room_id, stored_name)
+    return FileResponse(path=str(file_path), media_type=content_type, filename=stored_name.split("_", 1)[1])

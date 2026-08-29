@@ -8,6 +8,7 @@
 - 代码对比
 """
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
@@ -15,6 +16,8 @@ from typing import Optional
 from api.routes_config import get_route_prefix
 from models.async_db import get_async_db
 from models import Repository
+from models.user import User
+from api.dependencies import get_current_user
 from services.repository_browser_service import (
     get_tree_entries,
     get_blob_content,
@@ -22,7 +25,9 @@ from services.repository_browser_service import (
     get_diff,
     get_readme_content,
     get_file_symbols,
-    detect_file_language
+    detect_file_language,
+    commit_file,
+    remove_file
 )
 from utils.git_utils import get_repository_storage_path
 from core.exception import NotFoundException
@@ -104,6 +109,73 @@ async def get_repository_blob(
     """
     repo_path = await _get_repo_path(repo_id, db)
     return await get_blob_content(repo_path, ref=ref, path=path)
+
+
+class FileCommitRequest(BaseModel):
+    """文件提交请求体"""
+    content: str = Field(..., description="文件文本内容")
+    message: Optional[str] = Field(None, description="提交信息, 默认 Update <path>")
+    branch: Optional[str] = Field(None, description="目标分支, 默认仓库默认分支")
+
+
+@router.put("/{repo_id}/contents/{file_path:path}")
+async def update_repository_file(
+    repo_id: uuid.UUID,
+    file_path: str,
+    data: FileCommitRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    在指定分支创建/更新文件并提交 (Editor 保存链路)
+
+    空仓库时创建初始提交并建立默认分支
+    """
+    result = await db.execute(select(Repository).filter(Repository.id == repo_id))
+    repo = result.scalar_one_or_none()
+    if not repo:
+        raise NotFoundException(detail="Repository not found")
+
+    repo_path = await _get_repo_path(repo_id, db)
+    branch = data.branch or repo.default_branch or "main"
+    message = data.message or f"Update {file_path}"
+
+    return await commit_file(
+        repo_path,
+        branch,
+        file_path,
+        data.content,
+        current_user.full_name or current_user.username,
+        current_user.email,
+        message,
+    )
+
+
+@router.delete("/{repo_id}/contents/{file_path:path}")
+async def delete_repository_file(
+    repo_id: uuid.UUID,
+    file_path: str,
+    branch: Optional[str] = Query(None, description="目标分支, 默认仓库默认分支"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user),
+):
+    """在指定分支删除文件并提交"""
+    result = await db.execute(select(Repository).filter(Repository.id == repo_id))
+    repo = result.scalar_one_or_none()
+    if not repo:
+        raise NotFoundException(detail="Repository not found")
+
+    repo_path = await _get_repo_path(repo_id, db)
+    target_branch = branch or repo.default_branch or "main"
+
+    return await remove_file(
+        repo_path,
+        target_branch,
+        file_path,
+        current_user.full_name or current_user.username,
+        current_user.email,
+        f"Delete {file_path}",
+    )
 
 
 @router.get("/{repo_id}/commits")

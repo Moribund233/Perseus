@@ -25,6 +25,11 @@ class GitError(Exception):
     pass
 
 
+def create_signature(name: str, email: str) -> pygit2.Signature:
+    """创建 Git 签名 (模块级便捷封装)"""
+    return pygit2.Signature(name, email)
+
+
 class GitService:
     """
     Git 服务类
@@ -449,7 +454,7 @@ def perform_git_merge(
     return git_service.merge_branches(source_branch, target_branch, signature, message)
 
 
-def init_bare_repo(repo_path: str) -> bool:
+def init_bare_repo(repo_path: str, default_branch: str = "master") -> bool:
     """
     初始化一个 bare Git 仓库（空仓库，无初始提交）
 
@@ -457,6 +462,10 @@ def init_bare_repo(repo_path: str) -> bool:
 
     Args:
         repo_path: 仓库物理路径（含 .git 后缀，如 /data/repositories/admin/Eridanus.git）
+        default_branch: 默认分支名，用于设置 HEAD 符号引用。
+                        默认与 libgit2 行为一致 (master)；
+                        新仓库创建时应显式传入以与 DB 默认分支对齐，
+                        避免用户推送 main 后 HEAD 悬空。
 
     Returns:
         bool: 是否成功创建（True=新创建，False=已存在）
@@ -477,12 +486,54 @@ def init_bare_repo(repo_path: str) -> bool:
             return False
 
         # 创建 bare 仓库（空仓库，无初始提交）
-        pygit2.init_repository(physical_path, bare=True)
+        repo = pygit2.init_repository(physical_path, bare=True)
+
+        # HEAD 对齐默认分支（此时分支尚不存在, HEAD 处于 unborn 状态, 属正常情况）
+        if repo and default_branch and default_branch != "master":
+            repo.set_head(f"refs/heads/{default_branch}")
 
         return True
 
     except Exception as e:
         raise GitError(f"Failed to create bare repository at {physical_path}: {e}")
+
+
+def get_local_branch_names(repo_path: str) -> list:
+    """
+    获取仓库所有本地分支名
+
+    Args:
+        repo_path: 仓库物理路径
+
+    Returns:
+        list[str]: 分支名列表, 仓库不存在时返回空列表
+    """
+    try:
+        repo = pygit2.Repository(repo_path)
+    except Exception:
+        return []
+    return list(repo.branches.local)
+
+
+def set_head_branch(repo_path: str, branch: str) -> bool:
+    """
+    设置 bare 仓库 HEAD 符号引用指向指定分支
+
+    Args:
+        repo_path: 仓库物理路径
+        branch: 分支名
+
+    Returns:
+        bool: 是否设置成功
+    """
+    if not branch or ".." in branch or branch.startswith("/"):
+        return False
+    try:
+        repo = pygit2.Repository(repo_path)
+        repo.set_head(f"refs/heads/{branch}")
+        return True
+    except Exception:
+        return False
 
 
 def enable_receive_pack(repo_path: str) -> None:
@@ -504,11 +555,11 @@ def enable_receive_pack(repo_path: str) -> None:
             capture_output=True, text=True, timeout=10
         )
         if result.returncode != 0:
-            logger.warning(f"Failed to set http.receivepack for {physical_path}: {result.stderr.strip()}")
+            logger.warning(f"Failed to set http.receivepack for {repo_path}: {result.stderr.strip()}")
         else:
-            logger.info(f"Enabled http.receivepack for {physical_path}")
+            logger.info(f"Enabled http.receivepack for {repo_path}")
     except Exception as e:
-        logger.warning(f"Failed to enable receive-pack for {physical_path}: {e}")
+        logger.warning(f"Failed to enable receive-pack for {repo_path}: {e}")
 
 
 
@@ -867,3 +918,138 @@ def get_file_diff(repo_path: str, base_commit: str, head_commit: str, file_path:
 
     except subprocess.SubprocessError as e:
         raise GitError(f"Failed to execute git diff: {e}")
+
+
+def commit_file_changes(
+    repo_path: str,
+    branch: str,
+    file_path: str,
+    content: str,
+    author_name: str,
+    author_email: str,
+    message: str,
+    encoding: str = "utf-8",
+) -> Dict[str, Any]:
+    """
+    在指定分支创建/更新单个文件并提交 (裸仓库)
+
+    空仓库 (无任何分支) 时会创建初始提交并建立该分支。
+
+    Args:
+        repo_path: 仓库物理路径
+        branch: 目标分支名 (不存在则创建)
+        file_path: 文件在仓库内的路径 (如 "src/main.py")
+        content: 文件文本内容
+        author_name / author_email: 提交作者
+        message: 提交信息
+        encoding: 内容编码
+
+    Returns:
+        dict: {commit_id, branch, path}
+    """
+    repo = pygit2.Repository(repo_path)
+
+    file_path = file_path.strip("/")
+    if not file_path or ".." in file_path.split("/"):
+        raise ValidationException(detail="Invalid file path")
+    if not branch or ".." in branch or branch.startswith("/"):
+        raise ValidationException(detail="Invalid branch name")
+
+    parts = file_path.split("/")
+    ref_name = f"refs/heads/{branch}"
+
+    parent_commit = None
+    base_tree = None
+    if repo.branches.local.get(branch) is not None:
+        # Repository.__getitem__ 仅接受 OID, 引用名需用 lookup_reference 解析
+        parent_commit = repo.lookup_reference(ref_name).peel(pygit2.Commit)
+        base_tree = parent_commit.tree
+    elif not repo.head_is_unborn:
+        # 目标分支不存在但仓库已有提交: 基于当前 HEAD fork 新分支,
+        # 避免在非空仓库上创建与既有历史无关的孤儿根提交
+        parent_commit = repo.head.peel(pygit2.Commit)
+        base_tree = parent_commit.tree
+
+    blob_id = repo.create_blob(content.encode(encoding))
+
+    def _upsert(tree: Optional[pygit2.Tree], segments) -> pygit2.Oid:
+        # TreeBuilder 不接受显式 None, 缺省调用以获得空 builder
+        tb = repo.TreeBuilder(tree) if tree is not None else repo.TreeBuilder()
+        name = segments[0]
+        if len(segments) == 1:
+            tb.insert(name, blob_id, pygit2.GIT_FILEMODE_BLOB)
+        else:
+            subtree = None
+            if tree is not None:
+                try:
+                    entry = tree[name]
+                    if entry.type == pygit2.GIT_OBJECT_TREE:
+                        subtree = repo[entry.id]
+                except KeyError:
+                    subtree = None
+            child_id = _upsert(subtree, segments[1:])
+            tb.insert(name, child_id, pygit2.GIT_FILEMODE_TREE)
+        return tb.write()
+
+    tree_id = _upsert(base_tree, parts)
+
+    author = create_signature(author_name, author_email)
+    parents = [parent_commit.id] if parent_commit is not None else []
+    commit_id = repo.create_commit(ref_name, author, author, message, tree_id, parents)
+
+    return {"commit_id": str(commit_id), "branch": branch, "path": file_path}
+
+
+def delete_file_changes(
+    repo_path: str,
+    branch: str,
+    file_path: str,
+    author_name: str,
+    author_email: str,
+    message: str,
+) -> Dict[str, Any]:
+    """
+    在指定分支删除单个文件并提交
+    """
+    repo = pygit2.Repository(repo_path)
+    file_path = file_path.strip("/")
+    if not file_path or ".." in file_path.split("/"):
+        raise ValidationException(detail="Invalid file path")
+
+    ref_name = f"refs/heads/{branch}"
+    if repo.branches.local.get(branch) is None:
+        raise NotFoundException(detail=f"Branch not found: {branch}")
+
+    parent_commit = repo.lookup_reference(ref_name).peel(pygit2.Commit)
+
+    def _remove(tree: pygit2.Tree, segments) -> pygit2.Oid:
+        tb = repo.TreeBuilder(tree)
+        name = segments[0]
+        if len(segments) == 1:
+            # 先确认条目存在 (合成 KeyError → NotFound), 避免 tb.remove 抛 pygit2.GitError 导致 500
+            try:
+                tree[name]
+            except KeyError:
+                raise NotFoundException(detail=f"File not found: {file_path}")
+            tb.remove(name)
+        else:
+            try:
+                entry = tree[name]
+            except KeyError:
+                raise NotFoundException(detail=f"File not found: {file_path}")
+            if entry.type != pygit2.GIT_OBJECT_TREE:
+                raise NotFoundException(detail=f"File not found: {file_path}")
+            child_id = _remove(repo[entry.id], segments[1:])
+            # 子树删空后一并移除该目录项 (git 不会保留空目录)
+            if len(repo[child_id]) == 0:
+                tb.remove(name)
+            else:
+                tb.insert(name, child_id, pygit2.GIT_FILEMODE_TREE)
+        return tb.write()
+
+    tree_id = _remove(parent_commit.tree, file_path.split("/"))
+    author = create_signature(author_name, author_email)
+    commit_id = repo.create_commit(
+        ref_name, author, author, message, tree_id, [parent_commit.id]
+    )
+    return {"commit_id": str(commit_id), "branch": branch, "path": file_path}

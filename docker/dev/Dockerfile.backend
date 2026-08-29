@@ -89,7 +89,7 @@ COPY pyproject.toml README.md ./
 # --system: 安装到系统 Python（不使用虚拟环境）
 # --all-extras: 安装所有额外依赖
 RUN uv pip install --system -e . && \
-    uv pip install --system pytest pytest-asyncio httpx black isort flake8
+    uv pip install --system pytest pytest-asyncio httpx respx black isort flake8
 
 # =============================================================================
 # 创建非 root 用户和启动脚本

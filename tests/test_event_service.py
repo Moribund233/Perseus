@@ -1,4 +1,6 @@
 """F-203/F-040 Business Events Push — service tests"""
+import json
+
 import pytest
 import uuid
 from unittest.mock import MagicMock, AsyncMock, patch
@@ -14,6 +16,8 @@ def reset_manager():
 
 async def _register_connection(manager, user_id=None, username=None):
     mock_ws = MagicMock()
+    # Connection.send 实际调用 send_text (JSON 字符串), send_json 仅为兼容保留
+    mock_ws.send_text = AsyncMock(return_value=True)
     mock_ws.send_json = AsyncMock(return_value=True)
     mock_ws.accept = AsyncMock(return_value=None)
     conn = await manager.connect(mock_ws)
@@ -206,14 +210,15 @@ class TestPREvents:
         conn_bob, mock_bob = await _register_connection(manager, user_id=uuid.uuid4(), username="bob")
         await manager.subscribe_room(conn_alice, room_id)
         await manager.subscribe_room(conn_bob, room_id)
-        mock_bob.send_json.reset_mock()
+        mock_bob.send_text.reset_mock()
         count = await broadcast_pr_opened(
             room_id=room_id, pr_id=uuid.uuid4(), title="Test PR",
             opener_id=alice_id, opener_username="alice",
         )
         # alice excluded (opener), bob should receive
         assert count == 1
-        assert mock_bob.send_json.called
-        sent = mock_bob.send_json.call_args[0][0]
+        assert mock_bob.send_text.called
+        # Connection.send 通过 send_text 发送 JSON 字符串
+        sent = json.loads(mock_bob.send_text.call_args[0][0])
         assert sent["type"] == "event"
         assert sent["event"] == "pr_opened"

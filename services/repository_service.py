@@ -90,6 +90,94 @@ async def _check_physical_repo_exists_async(repo: Repository) -> bool:
         return False
 
 
+async def sync_repository_default_branch(repo: Repository, db: AsyncSession) -> None:
+    """
+    将数据库默认分支与物理仓库实际分支对齐（自愈逻辑）
+
+    背景：早期创建的仓库 DB 默认分支为 master，而用户本地以 main 推送，
+    导致仓库页按 default_branch 查询 commits/tree 时 404/500。
+
+    策略（物理仓库存在且非空时）：
+    - DB 默认分支物理存在：仅修复悬空的物理 HEAD 指向
+    - DB 默认分支物理不存在：采用物理分支（优先 main，否则首个分支），
+      同步 Repository.default_branch 与 Branch 表默认标记
+
+    Args:
+        repo: Repository 模型对象
+        db: 异步数据库会话
+    """
+    from utils.git_utils import get_local_branch_names, set_head_branch
+
+    try:
+        physical_path = get_repository_storage_path(repo.path)
+        branches = await asyncio.to_thread(get_local_branch_names, physical_path)
+        if not branches:
+            return  # 物理仓库不存在或为空，无需处理
+
+        default_branch = repo.default_branch
+        adopted: str | None = None
+
+        if default_branch in branches:
+            # DB 默认分支存在，确保物理 HEAD 指向它（修复悬空 HEAD）
+            await asyncio.to_thread(set_head_branch, physical_path, default_branch)
+        else:
+            # DB 默认分支不存在（如推送的是 main），采用物理分支
+            adopted = "main" if "main" in branches else sorted(branches)[0]
+
+        if adopted is None:
+            # 默认分支已一致，仅同步 Branch 表中缺失的分支行（推送产生的分支）
+            await _sync_branch_rows(repo.id, branches, repo.default_branch, db)
+            return
+
+        repo.default_branch = adopted
+        await asyncio.to_thread(set_head_branch, physical_path, adopted)
+        await _sync_branch_rows(repo.id, branches, adopted, db)
+        await db.commit()
+        logger.info(
+            f"Repository {repo.path}: default branch migrated "
+            f"{default_branch!r} -> {adopted!r} (physical branches: {branches})"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to sync default branch for {repo.path}: {e}")
+
+
+async def _sync_branch_rows(
+    repo_id: uuid.UUID,
+    physical_branches: list,
+    default_branch: str,
+    db: AsyncSession,
+) -> None:
+    """
+    同步 Branch 表：为物理存在的分支补建行，并维护默认分支标记
+
+    不删除物理侧已消失的分支行（可能被 PR 等引用）
+    """
+    result = await db.execute(select(Branch).filter(Branch.repository_id == repo_id))
+    db_branches = result.scalars().all()
+    existing_names = {b.name for b in db_branches}
+
+    changed = False
+    for name in physical_branches:
+        if name not in existing_names:
+            db.add(Branch(
+                name=name,
+                repository_id=repo_id,
+                is_protected=False,
+                is_default=(name == default_branch),
+            ))
+            existing_names.add(name)
+            changed = True
+
+    for b in db_branches:
+        expected = b.name == default_branch
+        if b.is_default != expected:
+            b.is_default = expected
+            changed = True
+
+    if changed:
+        await db.commit()
+
+
 async def _enrich_repos_with_physical_status(repos: list) -> list[dict]:
     """
     为仓库列表添加物理存在状态
@@ -188,6 +276,7 @@ async def get_repository_by_id(repo_id: uuid.UUID, db: AsyncSession):
     repo = result.scalar_one_or_none()
     if repo is None:
         raise NotFoundException(detail="Repository not found")
+    await sync_repository_default_branch(repo, db)
     physical_exists = await _check_physical_repo_exists_async(repo)
     return build_repo_response(repo, physical_exists)
 
@@ -214,6 +303,7 @@ async def get_repository_by_path(owner: str, repo_name: str, db: AsyncSession):
     repo = result.scalar_one_or_none()
     if repo is None:
         raise NotFoundException(detail="Repository not found")
+    await sync_repository_default_branch(repo, db)
     physical_exists = await _check_physical_repo_exists_async(repo)
     return build_repo_response(repo, physical_exists)
 
@@ -311,7 +401,7 @@ async def create_repository(repo_data: dict, db: AsyncSession):
         description=repo_data.get("description"),
         is_public=repo_data.get("is_public", True),
         owner_id=repo_data["owner_id"],
-        default_branch=repo_data.get("default_branch", "master")
+        default_branch=repo_data.get("default_branch") or "main"
     )
 
     db.add(db_repo)
@@ -337,10 +427,10 @@ async def create_repository(repo_data: dict, db: AsyncSession):
     db.add(owner_member)
     await db.commit()
 
-    # 创建物理 Git 仓库（空仓库，无初始提交）
+    # 创建物理 Git 仓库（空仓库，无初始提交），HEAD 与默认分支对齐
     try:
         physical_path = get_repository_storage_path(db_repo.path)
-        init_bare_repo(physical_path)
+        init_bare_repo(physical_path, default_branch=db_repo.default_branch)
         # 启用 HTTP push（git-http-backend 默认禁止 receive-pack）
         enable_receive_pack(physical_path)
     except GitError as e:

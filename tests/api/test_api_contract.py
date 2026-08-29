@@ -9,20 +9,28 @@ from fastapi import FastAPI
 
 @pytest.fixture
 def app() -> FastAPI:
-    """加载主 FastAPI 应用"""
-    from main import app as main_app
+    """加载主 FastAPI 应用（入口为 app.py, 模块级 app 实例）"""
+    from app import app as main_app
 
     return main_app
 
 
+_HTTP_METHODS = {"get", "post", "put", "delete", "patch", "head", "options", "trace"}
+
+
 def _route_paths(app: FastAPI) -> set:
-    """提取应用中所有已注册的路由路径（仅 HTTP 路由）"""
+    """提取应用中所有已注册的路由路径（仅 HTTP 路由）
+
+    新版 FastAPI 的 include_router 采用懒加载 _IncludedRouter，
+    遍历 app.routes 无法展开子路由；改用公开的 OpenAPI schema
+    生成完整路由表（与前端调用的路径一一对应）。
+    """
+    schema = app.openapi()
     paths = set()
-    for route in app.routes:
-        if hasattr(route, "methods") and hasattr(route, "path"):
-            for method in route.methods:
-                if method != "HEAD":
-                    paths.add((method, route.path))
+    for path, methods in schema.get("paths", {}).items():
+        for method in methods:
+            if method.lower() in _HTTP_METHODS:
+                paths.add((method.upper(), path))
     return paths
 
 

@@ -141,8 +141,12 @@ access_token_expire_minutes = 60
         2. 所有必要配置都有合理的默认值
         """
         # 使用不存在的配置文件路径
-        manager = ConfigManager("/nonexistent/config.toml")
-        config = manager.config
+        # 本测试意图是"无 TOML + 无环境变量时的默认值"，
+        # 需屏蔽容器/测试环境注入的 PERSEUS_* 变量（如 PERSEUS_STORAGE_REPO_ROOT）
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("PERSEUS_STORAGE_REPO_ROOT", None)
+            manager = ConfigManager("/nonexistent/config.toml")
+            config = manager.config
 
         # 验证默认值
         assert config.app.title == "Perseus API", "应该有默认应用标题"

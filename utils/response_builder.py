@@ -161,6 +161,7 @@ def build_pr_response(pr, include_details: bool = False) -> Dict[str, Any]:
         "is_draft": pr.is_draft,
         "diff_stats": None,
         "author": build_user_info(pr.author),
+        "labels": [build_label_response(label) for label in pr.pr_labels],
         "created_at": format_datetime(pr.created_at),
         "updated_at": format_datetime(pr.updated_at),
     }

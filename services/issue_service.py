@@ -22,6 +22,7 @@ import uuid
 from utils.db_utils import paginate, get_next_sequence_number, get_issue_or_404
 from services.realtime.event_service import broadcast_issue_created
 from services.realtime.room_service import RoomService
+from services.activity_service import try_record_activity
 import logging
 
 logger = logging.getLogger(__name__)
@@ -271,6 +272,13 @@ async def create_issue(
             )
     except Exception as e:
         logger.warning("Failed to broadcast issue event: %s", e)
+
+    # Dashboard 活动流埋点
+    await try_record_activity(
+        repository_id=repository_id, actor_id=author_id,
+        entity_type="issue", entity_id=issue.id,
+        action="opened", details=issue.title, db=db,
+    )
 
     return build_issue_response(issue)
 
@@ -783,6 +791,13 @@ async def close_issue(
         )
     )
     issue = result.scalar_one()
+
+    # Dashboard 活动流埋点
+    await try_record_activity(
+        repository_id=repository_id, actor_id=user_id,
+        entity_type="issue", entity_id=issue.id,
+        action="closed", details=issue.title, db=db,
+    )
 
     return build_issue_response(issue)
 

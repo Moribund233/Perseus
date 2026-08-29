@@ -1,10 +1,13 @@
 """通用审计日志服务模块"""
+import logging
 import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.activity import Activity
 from utils.db_utils import paginate
 from utils.response_builder import build_pagination_response
+
+logger = logging.getLogger(__name__)
 
 
 async def record_activity(
@@ -30,6 +33,25 @@ async def record_activity(
         "details": activity.details,
         "created_at": activity.created_at.isoformat() if activity.created_at else None,
     }
+
+
+async def try_record_activity(
+    repository_id: uuid.UUID, actor_id: uuid.UUID, entity_type: str, entity_id: uuid.UUID,
+    action: str, details: str = None, db: AsyncSession = None,
+) -> None:
+    """
+    埋点封装：失败仅记日志，绝不影响主业务流程
+
+    供 PR/Issue 等生命周期动作调用，用于填充 Dashboard 活动流。
+    """
+    try:
+        await record_activity(
+            repository_id=repository_id, actor_id=actor_id,
+            entity_type=entity_type, entity_id=entity_id,
+            action=action, details=details, db=db,
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Failed to record activity %s/%s: %s", entity_type, action, e)
 
 
 async def list_activities(

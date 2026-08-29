@@ -12,6 +12,31 @@ from utils.db_utils import get_or_404
 from utils.response_builder import build_label_response, build_pr_response
 
 
+async def _get_pr_with_labels_or_404(
+    db: AsyncSession,
+    repository_id: uuid.UUID,
+    pr_number: int,
+) -> PullRequest:
+    """
+    获取 PR 并预加载 pr_labels 关系
+
+    AsyncSession 下直接访问未预加载的关系会触发同步懒加载
+    (MissingGreenlet)，必须 selectinload 预加载。
+    """
+    result = await db.execute(
+        select(PullRequest)
+        .options(selectinload(PullRequest.pr_labels))
+        .filter(
+            PullRequest.repository_id == repository_id,
+            PullRequest.pr_number == pr_number,
+        )
+    )
+    pr = result.scalar_one_or_none()
+    if not pr:
+        raise NotFoundException(detail=f"Pull Request #{pr_number} not found")
+    return pr
+
+
 async def create_label(repo_id: uuid.UUID, data: dict, db: AsyncSession) -> dict:
     """创建 PR 标签"""
     await get_or_404(db, Repository, {"id": repo_id}, "Repository not found")
@@ -111,9 +136,7 @@ async def add_label_to_pr(
     Raises:
         NotFoundException: PR 或标签不存在
     """
-    from utils.db_utils import get_pull_request_or_404
-
-    pr = await get_pull_request_or_404(db, repository_id, pr_number)
+    pr = await _get_pr_with_labels_or_404(db, repository_id, pr_number)
     label = await get_or_404(
         db,
         PRLabel,
@@ -148,9 +171,7 @@ async def remove_label_from_pr(
     Raises:
         NotFoundException: PR 或标签不存在
     """
-    from utils.db_utils import get_pull_request_or_404
-
-    pr = await get_pull_request_or_404(db, repository_id, pr_number)
+    pr = await _get_pr_with_labels_or_404(db, repository_id, pr_number)
     label = await get_or_404(
         db,
         PRLabel,
@@ -170,7 +191,13 @@ async def get_prs_by_label(label_id: uuid.UUID, db: AsyncSession) -> list[dict]:
     result = await db.execute(
         select(PRLabel)
         .filter(PRLabel.id == label_id)
-        .options(selectinload(PRLabel.labeled_prs))
+        .options(
+            selectinload(PRLabel.labeled_prs).options(
+                selectinload(PullRequest.author),
+                selectinload(PullRequest.merger),
+                selectinload(PullRequest.pr_labels),
+            )
+        )
     )
     label = result.scalar_one_or_none()
     if not label:

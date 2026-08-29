@@ -4,6 +4,7 @@
 为当前登录用户提供跨仓库的统计、动态、最近 PR/Issue 聚合数据。
 """
 import uuid
+from datetime import datetime, timedelta
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +15,8 @@ from models.issue import Issue
 from models.activity import Activity
 from services.repository_service import get_accessible_repository_ids
 from utils.response_builder import build_pr_response, build_issue_response
+
+CONTRIBUTION_DAYS = 30
 
 
 async def get_user_dashboard(db: AsyncSession, user_id: uuid.UUID, limit: int = 10) -> dict:
@@ -62,6 +65,7 @@ async def get_user_dashboard(db: AsyncSession, user_id: uuid.UUID, limit: int = 
     if accessible_ids:
         result = await db.execute(
             select(Activity)
+            .options(selectinload(Activity.actor))
             .filter(Activity.repository_id.in_(accessible_ids))
             .order_by(Activity.created_at.desc())
             .limit(limit)
@@ -72,6 +76,7 @@ async def get_user_dashboard(db: AsyncSession, user_id: uuid.UUID, limit: int = 
                 "id": a.id,
                 "repository_id": a.repository_id,
                 "actor_id": a.actor_id,
+                "actor_username": a.actor.username if a.actor else None,
                 "entity_type": a.entity_type,
                 "entity_id": a.entity_id,
                 "action": a.action,
@@ -81,6 +86,21 @@ async def get_user_dashboard(db: AsyncSession, user_id: uuid.UUID, limit: int = 
             for a in activities
         ]
 
+    # 最近 30 天按日活动聚合（贡献图真实数据）
+    contributions_by_day = {}
+    if accessible_ids:
+        since = datetime.now() - timedelta(days=CONTRIBUTION_DAYS)
+        day_expr = func.date(Activity.created_at)
+        rows = (await db.execute(
+            select(day_expr, func.count())
+            .filter(
+                Activity.repository_id.in_(accessible_ids),
+                Activity.created_at >= since,
+            )
+            .group_by(day_expr)
+        )).all()
+        contributions_by_day = {str(day): count for day, count in rows}
+
     # 我最近创建的 PR
     recent_prs = []
     if accessible_ids:
@@ -89,7 +109,8 @@ async def get_user_dashboard(db: AsyncSession, user_id: uuid.UUID, limit: int = 
         .options(
             selectinload(PullRequest.author),
             selectinload(PullRequest.merger),
-            selectinload(PullRequest.repository)
+            selectinload(PullRequest.repository),
+            selectinload(PullRequest.pr_labels)
         )
         .filter(
             PullRequest.repository_id.in_(accessible_ids),
@@ -128,4 +149,5 @@ async def get_user_dashboard(db: AsyncSession, user_id: uuid.UUID, limit: int = 
         "recent_activities": recent_activities,
         "recent_prs": recent_prs,
         "recent_issues": recent_issues,
+        "contributions_by_day": contributions_by_day,
     }

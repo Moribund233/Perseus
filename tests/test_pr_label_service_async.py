@@ -57,14 +57,18 @@ async def test_create_label_duplicate(async_db, test_repo):
 @pytest.mark.asyncio
 async def test_add_label_to_pr(async_db, test_pr, test_repo):
     label = await pr_label_service.create_label(test_repo.id, {"name": "bug"}, async_db)
-    result = await pr_label_service.add_label_to_pr(test_pr.id, label["id"], async_db)
+    result = await pr_label_service.add_label_to_pr(
+        test_repo.id, test_pr.pr_number, label["id"], async_db
+    )
     assert result["message"] == "Label added to pull request"
 
 
 @pytest.mark.asyncio
 async def test_list_prs_by_label(async_db, test_pr, test_repo):
     label = await pr_label_service.create_label(test_repo.id, {"name": "bug"}, async_db)
-    await pr_label_service.add_label_to_pr(test_pr.id, label["id"], async_db)
+    await pr_label_service.add_label_to_pr(
+        test_repo.id, test_pr.pr_number, label["id"], async_db
+    )
     prs = await pr_label_service.get_prs_by_label(label["id"], async_db)
     assert len(prs) == 1
     assert prs[0]["id"] == test_pr.id

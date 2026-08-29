@@ -67,7 +67,8 @@ class TestConnection:
     async def test_connection_send_marks_dead_on_failure(self):
         """send() sets is_alive=False when sending fails"""
         mock_ws = MagicMock()
-        mock_ws.send_json = AsyncMock(side_effect=Exception("send failed"))
+        # Connection.send 走 websocket.send_text(json.dumps(...))
+        mock_ws.send_text = AsyncMock(side_effect=Exception("send failed"))
         conn = Connection(mock_ws, "test-7")
 
         result = await conn.send({"type": "ping"})
@@ -141,6 +142,8 @@ class TestConnectionManager:
     def _make_mock_ws(self):
         ws = MagicMock()
         ws.accept = AsyncMock()
+        # Connection.send 实际调用 send_text (内部 json.dumps + default=str)
+        ws.send_text = AsyncMock(return_value=True)
         ws.send_json = AsyncMock(return_value=True)
         ws.close = AsyncMock()
         return ws

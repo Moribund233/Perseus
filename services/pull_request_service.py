@@ -25,8 +25,9 @@ from utils.db_utils import paginate, get_next_sequence_number, get_pull_request_
 from utils.git_utils import GitService, get_repository_storage_path
 from services.build_service import BuildService
 from services.search_service import SearchService
+from services.activity_service import try_record_activity
 from services.realtime.event_service import (
-    broadcast_pr_opened, broadcast_pr_merged, broadcast_pr_closed,
+    broadcast_pr_opened, broadcast_pr_closed,
     broadcast_pr_comment_added, broadcast_pr_review_submitted,
 )
 from services.realtime.room_service import RoomService
@@ -57,7 +58,17 @@ async def list_pull_requests(
     Returns:
         dict: 包含 PR 列表和分页信息
     """
-    stmt = select(PullRequest).filter(PullRequest.repository_id == repository_id)
+    stmt = (
+        select(PullRequest)
+        .options(
+            # build_pr_response 会访问 author/merger/pr_labels，
+            # AsyncSession 下未预加载的关联触发同步懒加载会 500
+            selectinload(PullRequest.author),
+            selectinload(PullRequest.merger),
+            selectinload(PullRequest.pr_labels),
+        )
+        .filter(PullRequest.repository_id == repository_id)
+    )
 
     if status:
         stmt = stmt.filter(PullRequest.status == status)
@@ -105,7 +116,12 @@ async def list_pull_requests_for_user(
 
     stmt = (
         select(PullRequest)
-        .options(selectinload(PullRequest.author), selectinload(PullRequest.repository))
+        .options(
+            selectinload(PullRequest.author),
+            selectinload(PullRequest.repository),
+            selectinload(PullRequest.merger),
+            selectinload(PullRequest.pr_labels),
+        )
         .filter(PullRequest.repository_id.in_(accessible_ids))
         .filter(PullRequest.author_id == user_id)
     )
@@ -154,7 +170,8 @@ async def get_pull_request(
     # 预加载关联数据
     stmt = stmt.options(
         joinedload(PullRequest.author),
-        joinedload(PullRequest.merger)
+        joinedload(PullRequest.merger),
+        selectinload(PullRequest.pr_labels)
     )
 
     if include_details:
@@ -226,6 +243,8 @@ async def create_pull_request(
     db.add(pr)
     await db.commit()
     await db.refresh(pr)
+    # 预加载 pr_labels, 供 build_pr_response 序列化 (避免懒加载 MissingGreenlet)
+    await db.refresh(pr, attribute_names=["pr_labels"])
 
     try:
         room = await RoomService.get_repository_room(db, repository_id)
@@ -239,6 +258,13 @@ async def create_pull_request(
             )
     except Exception as e:
         logger.warning("Failed to broadcast PR opened event: %s", e)
+
+    # Dashboard 活动流埋点
+    await try_record_activity(
+        repository_id=repository_id, actor_id=author_id,
+        entity_type="pull_request", entity_id=pr.id,
+        action="opened", details=pr.title, db=db,
+    )
 
     return build_pr_response(pr)
 
@@ -256,17 +282,8 @@ async def publish_draft(repo_id: uuid.UUID, pr_number: int, user_id: uuid.UUID, 
     pr.is_draft = False
     await db.commit()
     await db.refresh(pr)
-
-    try:
-        room = await RoomService.get_repository_room(db, repository_id)
-        if room:
-            merger_username = merger.username if merger else "unknown"
-            await broadcast_pr_merged(
-                room_id=room.id, pr_id=pr.id, title=pr.title,
-                merger_id=merger_id, merger_username=merger_username,
-            )
-    except Exception as e:
-        logger.warning("Failed to broadcast PR merged event: %s", e)
+    # 预加载 pr_labels, 供 build_pr_response 序列化 (避免懒加载 MissingGreenlet)
+    await db.refresh(pr, attribute_names=["pr_labels"])
 
     return build_pr_response(pr)
 
@@ -317,6 +334,8 @@ async def update_pull_request(
 
     await db.commit()
     await db.refresh(pr)
+    # 预加载 pr_labels, 供 build_pr_response 序列化 (避免懒加载 MissingGreenlet)
+    await db.refresh(pr, attribute_names=["pr_labels"])
 
     return build_pr_response(pr)
 
@@ -353,6 +372,8 @@ async def close_pull_request(
     pr.status = "closed"
     await db.commit()
     await db.refresh(pr)
+    # 预加载 pr_labels, 供 build_pr_response 序列化 (避免懒加载 MissingGreenlet)
+    await db.refresh(pr, attribute_names=["pr_labels"])
 
     try:
         room = await RoomService.get_repository_room(db, repository_id)
@@ -365,6 +386,13 @@ async def close_pull_request(
             )
     except Exception as e:
         logger.warning("Failed to broadcast PR closed event: %s", e)
+
+    # Dashboard 活动流埋点
+    await try_record_activity(
+        repository_id=repository_id, actor_id=user_id,
+        entity_type="pull_request", entity_id=pr.id,
+        action="closed", details=pr.title, db=db,
+    )
 
     return build_pr_response(pr)
 
@@ -480,6 +508,8 @@ async def merge_pull_request(
 
     await db.commit()
     await db.refresh(pr)
+    # 预加载 pr_labels, 供 build_pr_response 序列化 (避免懒加载 MissingGreenlet)
+    await db.refresh(pr, attribute_names=["pr_labels"])
 
     # F-046: PR 合并后自动创建 CI Build 记录
     try:
@@ -510,6 +540,13 @@ async def merge_pull_request(
             await asyncio.to_thread(SearchService.rebuild_index, repo_path)
     except Exception as index_err:
         logger.warning(f"Failed to rebuild search index after PR merge: {index_err}")
+
+    # Dashboard 活动流埋点
+    await try_record_activity(
+        repository_id=repository_id, actor_id=merger_id,
+        entity_type="pull_request", entity_id=pr.id,
+        action="merged", details=pr.title, db=db,
+    )
 
     return build_pr_response(pr)
 

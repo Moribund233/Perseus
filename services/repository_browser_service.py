@@ -68,7 +68,9 @@ def _resolve_ref(repo: pygit2.Repository, ref: str) -> Optional[pygit2.Commit]:
             return repo.revparse_single(f"refs/heads/{ref}").peel(pygit2.Commit)
         except (KeyError, ValueError):
             # 检查仓库是否为空（没有提交）
-            if repo.is_empty:
+            # 注意: HEAD 指向 master 以外的 unborn 分支时 libgit2 的
+            # is_empty 会误报 False, head_is_unborn 才是可靠判据
+            if repo.head_is_unborn or repo.is_empty:
                 return None
             raise PathNotFoundException(detail=f"Ref not found: {ref}")
 
@@ -835,3 +837,67 @@ async def get_file_symbols(
         "language": language,
         "symbols": symbols
     }
+
+
+async def commit_file(
+    repo_path: str,
+    branch: str,
+    file_path: str,
+    content: str,
+    author_name: str,
+    author_email: str,
+    message: str,
+) -> Dict[str, Any]:
+    """
+    在指定分支创建/更新文件并提交
+
+    同步 pygit2 操作放线程池执行, 避免阻塞事件循环
+
+    Raises:
+        RepositoryNotFoundException: 仓库不存在
+        ValidationException: 路径或分支名非法
+    """
+    if not repo_exists(repo_path):
+        raise RepositoryNotFoundException(detail=f"Repository not found: {repo_path}")
+
+    import asyncio
+    from utils import git_utils
+
+    return await asyncio.to_thread(
+        git_utils.commit_file_changes,
+        repo_path,
+        branch,
+        file_path,
+        content,
+        author_name,
+        author_email,
+        message,
+    )
+
+
+async def remove_file(
+    repo_path: str,
+    branch: str,
+    file_path: str,
+    author_name: str,
+    author_email: str,
+    message: str,
+) -> Dict[str, Any]:
+    """
+    在指定分支删除文件并提交
+    """
+    if not repo_exists(repo_path):
+        raise RepositoryNotFoundException(detail=f"Repository not found: {repo_path}")
+
+    import asyncio
+    from utils import git_utils
+
+    return await asyncio.to_thread(
+        git_utils.delete_file_changes,
+        repo_path,
+        branch,
+        file_path,
+        author_name,
+        author_email,
+        message,
+    )

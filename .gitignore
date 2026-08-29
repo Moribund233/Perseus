@@ -150,6 +150,9 @@ repositories/
 !client/web/src/routes/repositories/
 !client/desktop/frontend/src/views/repositories/
 
+# Runtime data (uploads/attachments, etc.)
+data/
+
 # Database migration files
 migration_*.json
 *.migration.json
