@@ -1,11 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Card, Row, Col, List, Button, message } from 'antd';
+import { Card, Row, Col, List } from 'antd';
 import {
   AppstoreOutlined,
   PullRequestOutlined,
-  TeamOutlined,
-  ForkOutlined,
-  ArrowUpOutlined,
+  ExclamationCircleOutlined,
   ClockCircleOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -15,33 +13,56 @@ import { useRepositoriesStore } from '../../stores/repositories';
 import { settingsApi, type DashboardData } from '../../api/settings';
 import DashboardSkeleton from '../../components/skeleton/DashboardSkeleton';
 
-type ActivityType = 'mergedPR' | 'pushedCommits' | 'openedPR' | 'reviewedPR' | 'createdIssue' | 'commentedOnIssue';
-
-interface Activity {
-  name: string;
-  initials: string;
-  gradient: string;
-  type: ActivityType;
-  params: Record<string, string | number | undefined>;
-  time: string;
-}
-
 interface Repo {
   id: string;
   name: string;
   path: string;
-  lang: string;
-  color: string;
+  isPublic: boolean;
 }
 
-function GradientAvatar({ initials, gradient, size = 32 }: { initials: string; gradient: string; size?: number }) {
+interface ActivityItem {
+  key: string;
+  actor: string;
+  text: string;
+  time: string;
+}
+
+const avatarColors = ['#1f6feb', '#3fb950', '#58a6ff', '#bc8cff', '#d29922', '#f85149', '#f0883e', '#7956d9'];
+
+function getInitials(name: string): string {
+  return name.split(/[\s_-]/).map((n) => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+}
+
+function getAvatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return avatarColors[Math.abs(hash) % avatarColors.length];
+}
+
+function relativeTime(dateStr: string | null | undefined, t: (key: string, opts?: Record<string, unknown>) => string): string {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  if (Number.isNaN(diff)) return '';
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return t('app.dashboard.timeJustNow');
+  if (minutes < 60) return t('app.dashboard.timeMinutesAgo', { count: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t('app.dashboard.timeHoursAgo', { count: hours });
+  const days = Math.floor(hours / 24);
+  if (days < 30) return t('app.dashboard.timeDaysAgo', { count: days });
+  return new Date(dateStr).toLocaleDateString();
+}
+
+function GradientAvatar({ initials, color, size = 32 }: { initials: string; color: string; size?: number }) {
   return (
     <div
       style={{
         width: size,
         height: size,
         borderRadius: '50%',
-        background: gradient,
+        background: color,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -56,30 +77,41 @@ function GradientAvatar({ initials, gradient, size = 32 }: { initials: string; g
   );
 }
 
-function ContribGraph() {
-  const bars = Array.from({ length: 30 }, (_, i) => {
-    const h = Math.abs(Math.sin(i * 12.9898)) * 100;
-    let bg = '#0d419d';
-    if (h > 70) bg = '#1f6feb';
-    else if (h > 40) bg = '#388bfd';
-    return { key: i, height: Math.max(3, h), bg };
-  });
+/** 近 30 天贡献柱状图，数据来自后端按日活动聚合 */
+function ContribGraph({ contributionsByDay }: { contributionsByDay: Record<string, number> }) {
+  const days = useMemo(() => {
+    const today = new Date();
+    return Array.from({ length: 30 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - (29 - i));
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return { key, count: contributionsByDay[key] ?? 0 };
+    });
+  }, [contributionsByDay]);
+
+  const max = Math.max(1, ...days.map((d) => d.count));
 
   return (
     <div style={{ display: 'flex', alignItems: 'end', gap: 2, height: 60, marginTop: 12 }}>
-      {bars.map((bar) => (
-        <div
-          key={bar.key}
-          style={{
-            flex: 1,
-            background: bar.bg,
-            borderRadius: 2,
-            minHeight: 3,
-            height: `${bar.height}%`,
-            transition: 'all 0.3s',
-          }}
-        />
-      ))}
+      {days.map((day) => {
+        const ratio = day.count / max;
+        let bg = '#1c2128';
+        if (day.count > 0) bg = ratio > 0.66 ? '#1f6feb' : ratio > 0.33 ? '#388bfd' : '#0d419d';
+        return (
+          <div
+            key={day.key}
+            title={`${day.key}: ${day.count}`}
+            style={{
+              flex: 1,
+              background: bg,
+              borderRadius: 2,
+              minHeight: 3,
+              height: `${Math.max(6, ratio * 100)}%`,
+              transition: 'all 0.3s',
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -93,28 +125,30 @@ export default function DashboardPage() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     const loadData = async () => {
       try {
         const [data] = await Promise.all([
           settingsApi.getDashboard(),
           fetchRepositories(),
         ]);
-        setDashboardData(data);
-      } catch (err) {
-        message.error((err as Error).message);
+        if (!cancelled) setDashboardData(data);
+      } catch {
+        // 统计加载失败时展示空态而非报错页
+        if (!cancelled) setDashboardData(null);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     loadData();
-  }, [fetchRepositories, t]);
+    return () => { cancelled = true; };
+  }, [fetchRepositories]);
 
   const stats = useMemo(
     () => [
       {
         label: t('app.dashboard.stats.repositories'),
         value: (dashboardData?.repo_count ?? 0).toLocaleString(),
-        change: t('app.dashboard.stats.repositoriesChange'),
         icon: <AppstoreOutlined />,
         color: '#58a6ff',
         bg: 'rgba(31,111,235,0.15)',
@@ -122,41 +156,43 @@ export default function DashboardPage() {
       {
         label: t('app.dashboard.stats.openPRs'),
         value: (dashboardData?.open_prs ?? 0).toLocaleString(),
-        change: t('app.dashboard.stats.openPRsChange'),
         icon: <PullRequestOutlined />,
         color: '#3fb950',
         bg: 'rgba(63,185,80,0.15)',
       },
       {
-        label: t('app.dashboard.stats.teamMembers'),
+        label: t('app.dashboard.stats.openIssues'),
         value: (dashboardData?.open_issues ?? 0).toLocaleString(),
-        change: t('app.dashboard.stats.teamMembersChange'),
-        icon: <TeamOutlined />,
+        icon: <ExclamationCircleOutlined />,
         color: '#bc8cff',
         bg: 'rgba(188,140,255,0.15)',
-      },
-      {
-        label: t('app.dashboard.stats.commits'),
-        value: (dashboardData?.open_issues ?? 0).toLocaleString(),
-        change: t('app.dashboard.stats.commitsChange'),
-        icon: <ForkOutlined />,
-        color: '#d29922',
-        bg: 'rgba(210,153,34,0.15)',
       },
     ],
     [dashboardData, t]
   );
 
-  const activities: Activity[] = useMemo(
-    () => (dashboardData?.recent_activities ?? []).map((item) => ({
-      name: (item.name as string) ?? 'Unknown',
-      initials: (item.initials as string) ?? '??',
-      gradient: (item.gradient as string) ?? 'linear-gradient(135deg,#58a6ff,#1f6feb)',
-      type: (item.type as ActivityType) ?? 'pushedCommits',
-      params: (item.params as Record<string, string | number | undefined>) ?? {},
-      time: (item.time as string) ?? '',
-    })),
-    [dashboardData?.recent_activities]
+  const activities: ActivityItem[] = useMemo(
+    () => (dashboardData?.recent_activities ?? []).map((item) => {
+      const entityType = String(item.entity_type ?? '');
+      const action = String(item.action ?? '');
+      const details = String(item.details ?? '');
+      const key = `${entityType}_${action}`;
+      const text = t(`app.dashboard.activityText.${key}`, {
+        defaultValue: t('app.dashboard.activityText.fallback', {
+          action,
+          entityType: entityType === 'pull_request' ? 'PR' : entityType,
+        }),
+        details,
+      });
+      const actor = String(item.actor_username ?? 'unknown');
+      return {
+        key: String(item.id ?? `${actor}-${item.created_at}`),
+        actor,
+        text,
+        time: relativeTime(item.created_at as string | undefined, t),
+      };
+    }),
+    [dashboardData?.recent_activities, t]
   );
 
   const repos: Repo[] = useMemo(
@@ -164,17 +200,15 @@ export default function DashboardPage() {
       id: repo.id,
       name: repo.name,
       path: repo.path,
-      lang: '',
-      color: '#58a6ff',
+      isPublic: repo.is_public,
     })),
     [repositories]
   );
 
-  const renderActivityAction = (item: Activity) => {
-    const template = t(`app.dashboard.activity.${item.type}`, item.params);
-    const name = item.name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    return { __html: `<strong>${name}</strong> ${template}` };
-  };
+  const contributions = useMemo(() => {
+    const byDay = (dashboardData?.contributions_by_day ?? {}) as Record<string, number>;
+    return Object.values(byDay).reduce((sum, n) => sum + n, 0);
+  }, [dashboardData?.contributions_by_day]);
 
   if (loading) {
     return <DashboardSkeleton />;
@@ -184,7 +218,7 @@ export default function DashboardPage() {
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 24 }}>
       <div style={{ marginBottom: 24, flexShrink: 0 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4, color: '#e6edf3' }}>
-          {t('app.dashboard.welcomeBack', { name: user?.full_name || user?.username || 'Zhang Lei' })}
+          {t('app.dashboard.welcomeBack', { name: user?.full_name || user?.username || '' })}
         </h1>
         <p style={{ color: '#8b949e', fontSize: 14 }}>{t('app.dashboard.subtitle')}</p>
       </div>
@@ -192,9 +226,8 @@ export default function DashboardPage() {
       <div style={{ marginBottom: 24, flexShrink: 0 }}>
         <Row gutter={[16, 16]}>
           {stats.map((s) => (
-            <Col span={6} key={s.label}>
+            <Col span={8} key={s.label}>
               <Card
-                hoverable
                 styles={{ body: { padding: 20 } }}
                 style={{ border: '1px solid #21262d', background: '#161b22' }}
               >
@@ -216,9 +249,6 @@ export default function DashboardPage() {
                 </div>
                 <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 2, color: '#e6edf3' }}>{s.value}</div>
                 <div style={{ fontSize: 12, color: '#8b949e', textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
-                <div style={{ fontSize: 11, marginTop: 8, display: 'flex', alignItems: 'center', gap: 4, color: '#3fb950' }}>
-                  <ArrowUpOutlined /> {s.change}
-                </div>
               </Card>
             </Col>
           ))}
@@ -230,27 +260,31 @@ export default function DashboardPage() {
           <Col span={16} style={{ height: '100%' }}>
             <Card
               title={<span style={{ fontSize: 14, fontWeight: 600, color: '#e6edf3' }}>{t('app.dashboard.recentActivity')}</span>}
-              extra={<Button type="link" style={{ fontSize: 12, padding: 0 }}>{t('app.dashboard.viewAll')} →</Button>}
               styles={{ body: { padding: '0 20px 20px', flex: 1, overflowY: 'auto' } }}
               style={{ border: '1px solid #21262d', background: '#161b22', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
             >
-              <List
-                dataSource={activities}
-                renderItem={(item) => (
-                  <List.Item style={{ borderBottom: '1px solid #21262d', padding: '10px 0', gap: 12 }}>
-                    <GradientAvatar initials={item.initials} gradient={item.gradient} size={32} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p
-                        style={{ fontSize: 13, lineHeight: 1.5, margin: 0, color: '#8b949e' }}
-                        dangerouslySetInnerHTML={renderActivityAction(item)}
-                      />
-                      <div style={{ fontSize: 11, color: '#6e7681', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <ClockCircleOutlined style={{ fontSize: 10 }} /> {item.time}
+              {activities.length === 0 ? (
+                <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', color: '#6e7681', fontSize: 13 }}>
+                  {t('app.dashboard.emptyActivity')}
+                </div>
+              ) : (
+                <List
+                  dataSource={activities}
+                  renderItem={(item) => (
+                    <List.Item style={{ borderBottom: '1px solid #21262d', padding: '10px 0', gap: 12 }}>
+                      <GradientAvatar initials={getInitials(item.actor)} color={getAvatarColor(item.actor)} size={32} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 13, lineHeight: 1.5, margin: 0, color: '#8b949e' }}>
+                          <strong style={{ color: '#e6edf3' }}>{item.actor}</strong> {item.text}
+                        </p>
+                        <div style={{ fontSize: 11, color: '#6e7681', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <ClockCircleOutlined style={{ fontSize: 10 }} /> {item.time}
+                        </div>
                       </div>
-                    </div>
-                  </List.Item>
-                )}
-              />
+                    </List.Item>
+                  )}
+                />
+              )}
             </Card>
           </Col>
           <Col span={8} style={{ height: '100%' }}>
@@ -258,9 +292,7 @@ export default function DashboardPage() {
               <Card
                 title={<span style={{ fontSize: 14, fontWeight: 600, color: '#e6edf3' }}>{t('app.dashboard.yourRepositories')}</span>}
                 extra={
-                  <Button type="link" style={{ fontSize: 12, padding: 0 }} onClick={() => navigate('/repositories')}>
-                    {t('app.dashboard.viewAll')} →
-                  </Button>
+                  <ButtonLink onClick={() => navigate('/repositories')} label={`${t('app.dashboard.viewAll')} →`} />
                 }
                 styles={{ body: { padding: '0 20px 20px', flex: 1, overflowY: 'auto' } }}
                 style={{ border: '1px solid #21262d', background: '#161b22', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
@@ -287,11 +319,11 @@ export default function DashboardPage() {
                       onMouseEnter={(e) => { e.currentTarget.style.background = '#1c2333'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                     >
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: repo.color }} />
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: repo.isPublic ? '#3fb950' : '#d29922' }} title={repo.isPublic ? 'Public' : 'Private'} />
                       <span style={{ fontSize: 13, fontWeight: 500, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {repo.name}
                       </span>
-                      <span style={{ fontSize: 11, color: '#6e7681' }}>{repo.lang}</span>
+                      <span style={{ fontSize: 11, color: '#6e7681' }}>{repo.isPublic ? 'Public' : 'Private'}</span>
                     </div>
                   ))}
                 </div>
@@ -301,13 +333,38 @@ export default function DashboardPage() {
                 styles={{ body: { padding: '0 20px 20px' } }}
                 style={{ border: '1px solid #21262d', background: '#161b22', flexShrink: 0 }}
               >
-                <p style={{ fontSize: 12, color: '#6e7681', marginBottom: 4 }}>{t('app.dashboard.contributionsCount', { count: 142 })}</p>
-                <ContribGraph />
+                <p style={{ fontSize: 12, color: '#6e7681', marginBottom: 4 }}>
+                  {contributions > 0
+                    ? t('app.dashboard.contributionsCount', { count: contributions })
+                    : t('app.dashboard.noContributions')}
+                </p>
+                <ContribGraph contributionsByDay={(dashboardData?.contributions_by_day ?? {}) as Record<string, number>} />
               </Card>
             </div>
           </Col>
         </Row>
       </div>
     </div>
+  );
+}
+
+function ButtonLink({ onClick, label }: { onClick: () => void; label: string }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        background: 'none',
+        border: 'none',
+        color: hover ? '#58a6ff' : '#8b949e',
+        fontSize: 12,
+        padding: 0,
+        cursor: 'pointer',
+      }}
+    >
+      {label}
+    </button>
   );
 }

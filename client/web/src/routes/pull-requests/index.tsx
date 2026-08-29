@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Layout, Avatar, Button, Tag } from 'antd';
+import { Layout, Avatar, Button, Tag, Modal, Select, Input, Form, message as antdMessage } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   PullRequestOutlined,
@@ -15,6 +15,7 @@ import PullRequestsSkeleton from '../../components/skeleton/PullRequestsSkeleton
 import { usePullRequestsStore } from '../../stores/pullRequests';
 import { useAuthStore } from '../../stores/auth';
 import { useRepositoriesStore } from '../../stores/repositories';
+import { repositoriesApi } from '../../api/repositories';
 
 const { Content } = Layout;
 
@@ -98,7 +99,7 @@ export default function PullRequestsPage() {
   const { owner, repo } = useParams();
   const navigate = useNavigate();
   const { repositories, fetchRepositoriesByUser, isLoading: repoLoading, error: repoError } = useRepositoriesStore();
-  const { pullRequests, isLoading: prLoading, error: prError, fetchPullRequests } = usePullRequestsStore();
+  const { pullRequests, isLoading: prLoading, error: prError, fetchPullRequests, createPullRequest } = usePullRequestsStore();
 
   const [selectedRepoId, setSelectedRepoId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'open' | 'merged' | 'closed' | 'all'>('open');
@@ -118,6 +119,50 @@ export default function PullRequestsPage() {
       fetchPullRequests(activeRepoId);
     }
   }, [activeRepoId, fetchPullRequests]);
+
+  // 新建 PR 弹窗
+  const [createPrOpen, setCreatePrOpen] = useState(false);
+  const [creatingPr, setCreatingPr] = useState(false);
+  const [branchOptions, setBranchOptions] = useState<string[]>([]);
+  const [createPrForm] = Form.useForm();
+
+  const openCreatePrModal = async () => {
+    if (!activeRepoId) return;
+    setCreatePrOpen(true);
+    try {
+      const branches = await repositoriesApi.getBranches(activeRepoId);
+      const names = branches.map((b) => b.name);
+      setBranchOptions(names);
+      createPrForm.setFieldsValue({
+        source_branch: names.find((n) => n !== 'main' && n !== 'master') ?? names[0],
+        target_branch: names.includes('main') ? 'main' : names[0],
+      });
+    } catch {
+      setBranchOptions([]);
+    }
+  };
+
+  const handleCreatePr = async () => {
+    if (!activeRepoId) return;
+    try {
+      const values = await createPrForm.validateFields();
+      setCreatingPr(true);
+      await createPullRequest(activeRepoId, {
+        title: (values.title as string).trim(),
+        description: (values.description as string | undefined)?.trim() || undefined,
+        source_branch: values.source_branch,
+        target_branch: values.target_branch,
+      });
+      antdMessage.success(t('app.pullRequests.created'));
+      setCreatePrOpen(false);
+      createPrForm.resetFields();
+    } catch (err) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return;
+      antdMessage.error((err as Error).message || t('app.pullRequests.createFailed'));
+    } finally {
+      setCreatingPr(false);
+    }
+  };
 
   const initialLoading = useMemo(() => {
     if (pullRequests.length > 0 || prError) return false;
@@ -264,6 +309,7 @@ export default function PullRequestsPage() {
             <Button
               type="primary"
               icon={<PlusOutlined style={{ fontSize: 14 }} />}
+              onClick={() => void openCreatePrModal()}
               style={{
                 background: bluePrimary,
                 borderColor: bluePrimary,
@@ -280,6 +326,43 @@ export default function PullRequestsPage() {
             </Button>
           </div>
         </div>
+
+        <Modal
+          title={t('app.pullRequests.newPullRequest')}
+          open={createPrOpen}
+          onCancel={() => { setCreatePrOpen(false); createPrForm.resetFields(); }}
+          onOk={handleCreatePr}
+          okText={t('app.pullRequests.newPullRequest')}
+          confirmLoading={creatingPr}
+          okButtonProps={{ style: { background: bluePrimary } }}
+        >
+          <Form form={createPrForm} layout="vertical">
+            <Form.Item
+              name="title"
+              label={t('app.pullRequests.prTitle')}
+              rules={[{ required: true, message: t('app.pullRequests.prTitleRequired') }]}
+            >
+              <Input placeholder={t('app.pullRequests.prTitlePlaceholder')} />
+            </Form.Item>
+            <Form.Item
+              name="source_branch"
+              label={t('app.pullRequests.sourceBranch')}
+              rules={[{ required: true }]}
+            >
+              <Select options={branchOptions.map((b) => ({ label: b, value: b }))} />
+            </Form.Item>
+            <Form.Item
+              name="target_branch"
+              label={t('app.pullRequests.targetBranch')}
+              rules={[{ required: true }]}
+            >
+              <Select options={branchOptions.map((b) => ({ label: b, value: b }))} />
+            </Form.Item>
+            <Form.Item name="description" label={t('app.pullRequests.prDescription')}>
+              <Input.TextArea rows={3} />
+            </Form.Item>
+          </Form>
+        </Modal>
 
         {error && (
           <div style={{ padding: '12px 24px', color: '#f85149', fontSize: 13, borderBottom: `1px solid ${borderColor}` }}>

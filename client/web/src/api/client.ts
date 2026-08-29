@@ -50,9 +50,13 @@ async function refreshAccessToken(): Promise<string | null> {
 
 async function execute<T>(path: string, options: RequestInit, token: string | null): Promise<T> {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
+
+  // FormData 由浏览器自动设置 multipart boundary, 不能手动指定 Content-Type
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;

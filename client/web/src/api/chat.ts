@@ -37,6 +37,13 @@ export interface RealtimeRoom {
   created_at: string | null;
 }
 
+export interface ChatAttachment {
+  name: string;
+  size: number;
+  content_type: string;
+  url: string;
+}
+
 export const chatApi = {
   getRoomMessages: (roomId: string, params?: { limit?: number; before?: string }) => {
     const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
@@ -51,4 +58,13 @@ export const chatApi = {
 
   getRepositoryRoom: (repoId: string) =>
     apiRequest<RealtimeRoom>(`/api/v1/repositories/${repoId}/room`),
+
+  uploadAttachment: (roomId: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return apiRequest<ChatAttachment>(`/api/v1/rooms/${roomId}/attachments`, {
+      method: 'POST',
+      body: form,
+    });
+  },
 };

@@ -160,10 +160,10 @@ export default function LandingPage() {
             <button className="l-btn-hero-secondary" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>{t('landing.hero.learnMore')}</button>
           </div>
           <div className="l-hero-stats">
-            <div className="l-hero-stat"><div className="num">{platformStats ? formatCount(platformStats.repository_count) : '24'}</div><div className="label">{t('landing.hero.stats.repositories')}</div></div>
-            <div className="l-hero-stat"><div className="num">{platformStats ? formatCount(platformStats.commit_count) : '1.8K'}</div><div className="label">{t('landing.hero.stats.commits')}</div></div>
-            <div className="l-hero-stat"><div className="num">{platformStats ? formatCount(platformStats.user_count) : '8'}</div><div className="label">{t('landing.hero.stats.teamMembers')}</div></div>
-            <div className="l-hero-stat"><div className="num">{platformStats ? formatUptime(platformStats.uptime_seconds) : '99.9%'}</div><div className="label">{t('landing.hero.stats.uptime')}</div></div>
+            <div className="l-hero-stat"><div className="num">{platformStats ? formatCount(platformStats.repository_count) : '--'}</div><div className="label">{t('landing.hero.stats.repositories')}</div></div>
+            <div className="l-hero-stat"><div className="num">{platformStats ? formatCount(platformStats.commit_count) : '--'}</div><div className="label">{t('landing.hero.stats.commits')}</div></div>
+            <div className="l-hero-stat"><div className="num">{platformStats ? formatCount(platformStats.user_count) : '--'}</div><div className="label">{t('landing.hero.stats.teamMembers')}</div></div>
+            <div className="l-hero-stat"><div className="num">{platformStats ? formatUptime(platformStats.uptime_seconds) : '--'}</div><div className="label">{t('landing.hero.stats.uptime')}</div></div>
           </div>
         </div>
       </section>

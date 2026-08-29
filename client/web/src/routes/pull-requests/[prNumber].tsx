@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Layout, Button, Input, Spin, Dropdown, Avatar, App as AntApp, Alert } from 'antd';
+import { Layout, Button, Input, Spin, Dropdown, Avatar, App as AntApp, Alert, Space } from 'antd';
 import type { ReactElement } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeftOutlined, PullRequestOutlined, MergeOutlined, CloseCircleOutlined, SendOutlined, DownOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PullRequestOutlined, MergeOutlined, CloseCircleOutlined, SendOutlined, DownOutlined, TagOutlined, CheckOutlined, StopOutlined, MessageOutlined, EditOutlined } from '@ant-design/icons';
 import { useRepositoriesStore } from '../../stores/repositories';
 import { usePullRequestsStore } from '../../stores/pullRequests';
+import { pullRequestsApi } from '../../api/pullRequests';
 
 const { Content } = Layout;
 
@@ -68,6 +69,8 @@ export default function PullRequestDetailPage() {
     fetchPullRequest,
     fetchComments,
     createComment,
+    createReview,
+    updatePullRequest,
     closePullRequest,
     mergePullRequest,
   } = usePullRequestsStore();
@@ -76,6 +79,12 @@ export default function PullRequestDetailPage() {
   const [body, setBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [acting, setActing] = useState(false);
+  const [allLabels, setAllLabels] = useState<{ id: string; name: string; color: string }[]>([]);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewing, setReviewing] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [descDraft, setDescDraft] = useState('');
 
   useEffect(() => {
     if (!currentRepo && owner && repo) {
@@ -87,6 +96,7 @@ export default function PullRequestDetailPage() {
     if (currentRepo) {
       fetchPullRequest(currentRepo.id, num);
       fetchComments(currentRepo.id, num);
+      pullRequestsApi.getLabels(currentRepo.id).then((labels) => setAllLabels(labels)).catch(() => {});
     }
   }, [currentRepo, num, fetchPullRequest, fetchComments]);
 
@@ -139,6 +149,63 @@ export default function PullRequestDetailPage() {
     { key: 'rebase', label: t('app.pullRequests.detail.mergeRebase') },
   ];
 
+  const currentLabelIds = new Set((currentPR?.labels || []).map((l) => l.id));
+
+  const handleToggleLabel = async (labelId: string) => {
+    if (!currentRepo || !currentPR) return;
+    try {
+      if (currentLabelIds.has(labelId)) {
+        await pullRequestsApi.removeLabel(currentRepo.id, num, labelId);
+      } else {
+        await pullRequestsApi.addLabel(currentRepo.id, num, labelId);
+      }
+      await fetchPullRequest(currentRepo.id, num);
+    } catch (e) {
+      message.error((e as Error).message || 'Failed to update label');
+    }
+  };
+
+  const labelItems = allLabels
+    .filter((l) => !currentLabelIds.has(l.id))
+    .map((l) => ({ key: l.id, label: l.name }));
+
+  const handleSubmitReview = async (status: 'approved' | 'changes_requested' | 'commented') => {
+    if (!currentRepo || !currentPR) return;
+    setReviewing(true);
+    try {
+      await createReview(currentRepo.id, num, { status, comment: reviewComment });
+      setReviewComment('');
+      message.success(t('app.pullRequests.detail.reviewSubmitted', { defaultValue: '审查已提交' }));
+      fetchPullRequest(currentRepo.id, num);
+    } catch (e) {
+      message.error((e as Error).message || 'Failed to submit review');
+    } finally {
+      setReviewing(false);
+    }
+  };
+
+  const startEditing = () => {
+    setTitleDraft(currentPR?.title || '');
+    setDescDraft(currentPR?.description || '');
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    if (!currentRepo || !currentPR) return;
+    try {
+      await updatePullRequest(currentRepo.id, num, { title: titleDraft, description: descDraft });
+      setEditing(false);
+    } catch (e) {
+      message.error((e as Error).message || 'Failed to update PR');
+    }
+  };
+
+  const reviewItems = [
+    { key: 'approved', icon: <CheckOutlined />, label: t('app.pullRequests.detail.reviewApprove', { defaultValue: '通过 (Approve)' }) },
+    { key: 'changes_requested', icon: <StopOutlined />, label: t('app.pullRequests.detail.reviewRequestChanges', { defaultValue: '请求修改 (Request changes)' }) },
+    { key: 'commented', icon: <MessageOutlined />, label: t('app.pullRequests.detail.reviewComment', { defaultValue: '评论 (Comment)' }) },
+  ];
+
   return (
     <Layout style={{ height: '100%', background: 'transparent' }}>
       <Content style={{ overflow: 'auto', padding: '24px 32px' }}>
@@ -157,7 +224,27 @@ export default function PullRequestDetailPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: textPrimary, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <span style={{ color: textTertiary, fontWeight: 500 }}>#{currentPR.pr_number}</span>
-                      {currentPR.title}
+                      {editing ? (
+                        <Input
+                          value={titleDraft}
+                          onChange={(e) => setTitleDraft(e.target.value)}
+                          onPressEnter={saveEdit}
+                          style={{ maxWidth: 400 }}
+                          size="small"
+                        />
+                      ) : (
+                        currentPR.title
+                      )}
+                      {currentPR.status === 'open' && (
+                        editing ? (
+                          <Space size={4}>
+                            <Button size="small" type="primary" onClick={saveEdit}>{t('app.pullRequests.detail.save', { defaultValue: '保存' })}</Button>
+                            <Button size="small" onClick={() => setEditing(false)}>{t('app.pullRequests.detail.cancel', { defaultValue: '取消' })}</Button>
+                          </Space>
+                        ) : (
+                          <Button size="small" type="text" icon={<EditOutlined />} onClick={startEditing} style={{ color: textSecondary }} />
+                        )
+                      )}
                     </h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, color: textSecondary, fontSize: 13, flexWrap: 'wrap' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, border: `1px solid ${statusCfg.text}66`, borderRadius: 14, padding: '2px 12px', color: statusCfg.text, fontWeight: 600, fontSize: 12 }}>
@@ -193,19 +280,41 @@ export default function PullRequestDetailPage() {
                 </div>
               </div>
               <div style={{ padding: '20px' }}>
-                {currentPR.description ? (
+                {editing ? (
+                  <Input.TextArea
+                    value={descDraft}
+                    onChange={(e) => setDescDraft(e.target.value)}
+                    rows={4}
+                    style={{ fontSize: 14 }}
+                    placeholder={t('app.pullRequests.detail.descPlaceholder', { defaultValue: '描述变更内容…' })}
+                  />
+                ) : currentPR.description ? (
                   <div style={{ fontSize: 14, lineHeight: 1.7, color: textPrimary, whiteSpace: 'pre-wrap' }}>{currentPR.description}</div>
                 ) : (
                   <div style={{ color: textTertiary, fontStyle: 'italic' }}>{t('app.pullRequests.detail.noDescription')}</div>
                 )}
               </div>
-              {(currentPR.labels || []).length > 0 && (
-                <div style={{ padding: '12px 20px', background: bgTertiary, borderTop: `1px solid ${borderColor}`, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: textSecondary }}>
-                  {(currentPR.labels as { id: string; name: string; color: string }[]).map((l) => (
-                    <span key={l.id} style={{ fontSize: 10, fontWeight: 600, borderRadius: 12, background: `${l.color}22`, color: l.color, border: 'none', padding: '2px 8px' }}>{l.name}</span>
-                  ))}
-                </div>
-              )}
+              <div style={{ padding: '12px 20px', background: bgTertiary, borderTop: `1px solid ${borderColor}`, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: textSecondary }}>
+                <TagOutlined style={{ fontSize: 13 }} />
+                {(currentPR.labels || []).length === 0 && (
+                  <span style={{ color: textTertiary }}>{t('app.pullRequests.detail.noLabels', { defaultValue: '暂无标签' })}</span>
+                )}
+                {(currentPR.labels || []).map((l) => (
+                  <span key={l.id} style={{ fontSize: 10, fontWeight: 600, borderRadius: 12, background: `${l.color}22`, color: l.color, border: 'none', padding: '2px 8px' }}>{l.name}</span>
+                ))}
+                {currentPR.status === 'open' && (
+                  <Dropdown
+                    menu={{
+                      items: labelItems.length ? labelItems : [{ key: '__empty', label: t('app.pullRequests.detail.noLabelsAvailable', { defaultValue: '暂无可用标签' }), disabled: true }],
+                      onClick: ({ key }) => { if (key !== '__empty') handleToggleLabel(key); },
+                    }}
+                  >
+                    <Button size="small" type="text" icon={<TagOutlined />} style={{ color: blueLight, fontSize: 12 }}>
+                      {t('app.pullRequests.detail.manageLabels', { defaultValue: '标签' })}
+                    </Button>
+                  </Dropdown>
+                )}
+              </div>
             </div>
 
             {/* Comments */}
@@ -224,6 +333,29 @@ export default function PullRequestDetailPage() {
                 <div style={{ padding: '12px 16px', fontSize: 14, color: textPrimary, whiteSpace: 'pre-wrap' }}>{c.content}</div>
               </div>
             ))}
+
+            {/* Review submit */}
+            {currentPR.status === 'open' && (
+              <div style={{ border: `1px solid ${borderColor}`, borderRadius: 10, overflow: 'hidden', background: bgSecondary, marginBottom: 12 }}>
+                <div style={{ padding: '10px 16px', background: bgTertiary, borderBottom: `1px solid ${borderColor}`, fontSize: 13, color: textSecondary }}>
+                  {t('app.pullRequests.detail.leaveReview', { defaultValue: '提交代码审查' })}
+                </div>
+                <div style={{ padding: 16 }}>
+                  <Input.TextArea rows={2} value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} placeholder={t('app.pullRequests.detail.reviewCommentPlaceholder', { defaultValue: '审查意见（可选）…' })} />
+                  <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                    <Dropdown
+                      menu={{ items: reviewItems, onClick: ({ key }) => handleSubmitReview(key as 'approved' | 'changes_requested' | 'commented') }}
+                    >
+                      <Button type="primary" loading={reviewing} icon={<CheckOutlined />}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          {t('app.pullRequests.detail.submitReview', { defaultValue: '提交审查' })} <DownOutlined style={{ fontSize: 10 }} />
+                        </span>
+                      </Button>
+                    </Dropdown>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Comment input */}
             {currentPR.status === 'open' ? (

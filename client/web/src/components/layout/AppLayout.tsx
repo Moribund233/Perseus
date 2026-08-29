@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Input, Button, Avatar, Dropdown, Space, Tooltip, Popover, Empty } from 'antd';
+import { Layout, Input, Button, Avatar, Dropdown, Space, Tooltip, Popover, Empty, Modal, Form, Switch, message as antdMessage } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   DashboardOutlined,
@@ -18,6 +18,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/auth';
 import { useNotificationsStore } from '../../stores/notifications';
+import { repositoriesApi, type Repository } from '../../api/repositories';
 import type { Notification } from '../../api/notifications';
 
 const { Header, Sider, Content } = Layout;
@@ -84,8 +85,59 @@ export default function AppLayout() {
     }
   };
 
-  const handleNotificationClick = (n: Notification) => {
-    if (!n.is_read) void markAsRead(n.id);
+  const handleNotificationClick = async (n: Notification) => {
+    setNotifOpen(false);
+    if (!n.is_read) {
+      try {
+        await markAsRead(n.id);
+      } catch {
+        // 标记已读失败不阻塞跳转
+      }
+    }
+    let repoPath: string | null = null;
+    if (n.repository_id) {
+      try {
+        const repo = await repositoriesApi.get(n.repository_id);
+        repoPath = repo.path;
+      } catch {
+        // 忽略解析失败, 仅打开通知面板所在的页面
+      }
+    }
+    const type = (n.target_type || '').toLowerCase();
+    if (!repoPath) return;
+    if (type.includes('pr') || type.includes('pull')) {
+      navigate(`/repositories/${repoPath}/pulls`);
+    } else if (type.includes('issue')) {
+      navigate(`/repositories/${repoPath}/issues`);
+    } else {
+      navigate(`/repositories/${repoPath}`);
+    }
+  };
+
+  // 顶栏 New 按钮：新建仓库
+  const [createRepoOpen, setCreateRepoOpen] = useState(false);
+  const [creatingRepo, setCreatingRepo] = useState(false);
+  const [repoForm] = Form.useForm();
+
+  const handleCreateRepo = async () => {
+    try {
+      const values = await repoForm.validateFields();
+      setCreatingRepo(true);
+      const repo: Repository = await repositoriesApi.create({
+        name: (values.name as string).trim(),
+        description: (values.description as string | undefined)?.trim() || undefined,
+        is_public: values.isPublic ?? true,
+      });
+      antdMessage.success(t('app.topBar.repoCreated', { name: repo.name }));
+      setCreateRepoOpen(false);
+      repoForm.resetFields();
+      navigate(`/repositories/${repo.path}`);
+    } catch (err) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return; // 表单校验错误
+      antdMessage.error((err as Error).message || t('app.topBar.repoCreateFailed'));
+    } finally {
+      setCreatingRepo(false);
+    }
   };
 
   const handleMarkAllRead = async () => {
@@ -96,16 +148,16 @@ export default function AppLayout() {
   const navItems: NavItemDef[] = [
     { key: 'dashboard', path: '/dashboard', icon: <DashboardOutlined />, label: t('app.nav.dashboard') },
     { key: 'repositories', path: '/repositories', icon: <CodeOutlined />, label: t('app.nav.repositories') },
-    { key: 'pulls', path: '/pulls', icon: <PullRequestOutlined />, label: t('app.nav.pullRequests'), badge: 5 },
+    { key: 'pulls', path: '/pulls', icon: <PullRequestOutlined />, label: t('app.nav.pullRequests') },
     { key: 'editor', path: '/editor', icon: <EditOutlined />, label: t('app.nav.codeEditor') },
-    { key: 'chat', path: '/chat', icon: <MessageOutlined />, label: t('app.nav.teamChat'), badge: 3 },
+    { key: 'chat', path: '/chat', icon: <MessageOutlined />, label: t('app.nav.teamChat') },
   ];
 
   const activeKey = navItems.find((item) => location.pathname.startsWith(item.path))?.key || 'dashboard';
   const activeLabel = navItems.find((item) => item.key === activeKey)?.label || t('app.nav.dashboard');
 
   const userMenu: MenuProps['items'] = [
-    { key: 'profile', label: t('app.userMenu.profile') },
+    { key: 'profile', label: t('app.userMenu.profile'), onClick: () => navigate('/settings') },
     { key: 'settings', label: t('app.userMenu.settings'), onClick: () => navigate('/settings') },
     { type: 'divider' },
     { key: 'logout', label: t('app.userMenu.signOut'), onClick: () => { logout(); navigate('/'); } },
@@ -556,6 +608,7 @@ export default function AppLayout() {
             <Button
               type="primary"
               icon={<PlusOutlined style={{ fontSize: 14 }} />}
+              onClick={() => setCreateRepoOpen(true)}
               style={{
                 background: bluePrimary,
                 borderColor: bluePrimary,
@@ -578,6 +631,35 @@ export default function AppLayout() {
         <Content style={{ padding: 0, overflow: 'hidden' }}>
           <Outlet />
         </Content>
+
+        <Modal
+          title={t('app.topBar.newRepoTitle')}
+          open={createRepoOpen}
+          onCancel={() => { setCreateRepoOpen(false); repoForm.resetFields(); }}
+          onOk={handleCreateRepo}
+          okText={t('app.topBar.repoCreate')}
+          confirmLoading={creatingRepo}
+          okButtonProps={{ style: { background: bluePrimary } }}
+        >
+          <Form form={repoForm} layout="vertical">
+            <Form.Item
+              name="name"
+              label={t('app.topBar.repoName')}
+              rules={[
+                { required: true, message: t('app.topBar.repoNameRequired') },
+                { pattern: /^[A-Za-z0-9._-]+$/, message: t('app.topBar.repoNamePattern') },
+              ]}
+            >
+              <Input placeholder="my-project" />
+            </Form.Item>
+            <Form.Item name="description" label={t('app.topBar.repoDescription')}>
+              <Input.TextArea rows={2} placeholder={t('app.topBar.repoDescriptionPlaceholder')} />
+            </Form.Item>
+            <Form.Item name="isPublic" label={t('app.topBar.repoVisibility')} initialValue={true} valuePropName="checked">
+              <Switch checkedChildren="Public" unCheckedChildren="Private" />
+            </Form.Item>
+          </Form>
+        </Modal>
       </Layout>
     </Layout>
   );

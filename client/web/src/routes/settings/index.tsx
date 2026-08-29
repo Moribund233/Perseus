@@ -1,18 +1,22 @@
-import { useState, useEffect, type ReactNode } from 'react';
-import { Layout, Card, Form, Input, Button, Switch, Select, Avatar, Divider, Radio, message } from 'antd';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { Layout, Card, Form, Input, Button, Switch, Select, Avatar, Divider, message } from 'antd';
 import {
   UserOutlined,
   LockOutlined,
   GlobalOutlined,
-  BgColorsOutlined,
   BellOutlined,
   SafetyOutlined,
   MailOutlined,
   CheckOutlined,
+  EyeOutlined,
+  MessageOutlined,
+  PullRequestOutlined,
+  TagOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/auth';
 import { settingsApi } from '../../api/settings';
+import { notificationsApi, type NotificationPreference } from '../../api/notifications';
 import SettingsSkeleton from '../../components/skeleton/SettingsSkeleton';
 
 const { Sider, Content } = Layout;
@@ -54,13 +58,23 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
+  const [preferences, setPreferences] = useState<NotificationPreference | null>(null);
+  const [prefSaving, setPrefSaving] = useState(false);
   const [form] = Form.useForm();
   const { user } = useAuthStore();
   const { t, i18n } = useTranslation();
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
+  // 真实加载：通知偏好来自 API（骨架屏等真实请求完成）
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(timer);
+    let cancelled = false;
+    notificationsApi.getPreferences()
+      .then((prefs) => { if (!cancelled) setPreferences(prefs); })
+      .catch(() => { if (!cancelled) setPreferences(null); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -68,14 +82,7 @@ export default function SettingsPage() {
       username: user?.username || '',
       name: user?.full_name || '',
       email: user?.email || '',
-      bio: '',
-      company: '',
-      location: '',
-      website: '',
       language: i18n.language || 'en',
-      theme: 'dark',
-      emailNotifications: true,
-      pushNotifications: false,
     });
   }, [user, i18n.language, form]);
 
@@ -83,7 +90,7 @@ export default function SettingsPage() {
     if (!user) return;
     try {
       setSaving(true);
-      const values = form.getFieldsValue(['name', 'bio', 'company', 'location', 'website']);
+      const values = form.getFieldsValue(['name']);
       await settingsApi.updateProfile(user.id, {
         full_name: values.name,
       });
@@ -92,6 +99,22 @@ export default function SettingsPage() {
       message.error(t('app.settings.saveError'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAvatarSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploadingAvatar(true);
+    try {
+      const updated = await settingsApi.uploadAvatar(file);
+      setAvatarUrl(settingsApi.getAvatarUrl(updated.id));
+      message.success(t('app.settings.avatarUpdated'));
+    } catch (err) {
+      message.error((err as Error).message || t('app.settings.saveError'));
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
@@ -122,10 +145,22 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSaveNotifications = () => {
-    const values = form.getFieldsValue(['emailNotifications', 'pushNotifications']);
-    console.log('Notification preferences:', values);
-    message.success(t('app.settings.saveSuccess'));
+  const handleSaveNotifications = async () => {
+    if (!preferences) return;
+    setPrefSaving(true);
+    try {
+      const updated = await notificationsApi.updatePreferences(preferences);
+      setPreferences(updated);
+      message.success(t('app.settings.saveSuccess'));
+    } catch {
+      message.error(t('app.settings.saveError'));
+    } finally {
+      setPrefSaving(false);
+    }
+  };
+
+  const updatePref = (key: keyof NotificationPreference, value: boolean) => {
+    setPreferences((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
   if (loading) return <SettingsSkeleton />;
@@ -133,7 +168,7 @@ export default function SettingsPage() {
   const menuItems: MenuItem[] = [
     { key: 'profile', icon: <UserOutlined style={{ fontSize: 14 }} />, label: t('app.settings.profile') },
     { key: 'account', icon: <SafetyOutlined style={{ fontSize: 14 }} />, label: t('app.settings.account') },
-    { key: 'appearance', icon: <BgColorsOutlined style={{ fontSize: 14 }} />, label: t('app.settings.appearance') },
+    { key: 'appearance', icon: <GlobalOutlined style={{ fontSize: 14 }} />, label: t('app.settings.appearance') },
     { key: 'notifications', icon: <BellOutlined style={{ fontSize: 14 }} />, label: t('app.settings.notifications') },
   ];
 
@@ -206,19 +241,29 @@ export default function SettingsPage() {
               />
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={handleAvatarSelected}
+                />
                 <Avatar
                   size={80}
+                  src={avatarUrl ?? (user?.avatar_url ? settingsApi.getAvatarUrl(user.id) : undefined)}
                   style={{
                     background: 'linear-gradient(135deg, #1f6feb, #bc8cff)',
                     fontSize: 28,
                     fontWeight: 700,
                   }}
                 >
-                  {user?.full_name?.slice(0, 2).toUpperCase() || user?.username?.slice(0, 2).toUpperCase() || 'ZL'}
+                  {user?.full_name?.slice(0, 2).toUpperCase() || user?.username?.slice(0, 2).toUpperCase() || ''}
                 </Avatar>
                 <div>
                   <Button
                     type="primary"
+                    loading={uploadingAvatar}
+                    onClick={() => avatarInputRef.current?.click()}
                     style={{
                       background: bluePrimary,
                       borderColor: bluePrimary,
@@ -230,27 +275,11 @@ export default function SettingsPage() {
                   >
                     {t('app.settings.changeAvatar')}
                   </Button>
-                  <p style={{ fontSize: 12, color: textTertiary, margin: 0 }}>JPG, GIF or PNG. Max size 2MB.</p>
+                  <p style={{ fontSize: 12, color: textTertiary, margin: 0 }}>JPG, GIF, PNG or WebP. Max 5MB.</p>
                 </div>
               </div>
 
               <Form.Item name="name" label={<FormFieldLabel label={t('app.settings.name')} />}>
-                <Input style={{ background: bgTertiary, borderColor: borderColor, color: textPrimary }} />
-              </Form.Item>
-              <Form.Item name="bio" label={<FormFieldLabel label={t('app.settings.bio')} />}>
-                <Input.TextArea
-                  rows={3}
-                  placeholder={t('app.settings.bioPlaceholder')}
-                  style={{ background: bgTertiary, borderColor: borderColor, color: textPrimary, resize: 'none' }}
-                />
-              </Form.Item>
-              <Form.Item name="company" label={<FormFieldLabel label={t('app.settings.company')} />}>
-                <Input style={{ background: bgTertiary, borderColor: borderColor, color: textPrimary }} />
-              </Form.Item>
-              <Form.Item name="location" label={<FormFieldLabel label={t('app.settings.location')} />}>
-                <Input style={{ background: bgTertiary, borderColor: borderColor, color: textPrimary }} />
-              </Form.Item>
-              <Form.Item name="website" label={<FormFieldLabel label={t('app.settings.website')} />}>
                 <Input style={{ background: bgTertiary, borderColor: borderColor, color: textPrimary }} />
               </Form.Item>
 
@@ -264,7 +293,10 @@ export default function SettingsPage() {
                 >
                   {t('app.settings.saveChanges')}
                 </Button>
-                <Button style={{ background: bgTertiary, borderColor: borderColor, color: textSecondary, borderRadius: 8, fontSize: 13, height: 34 }}>
+                <Button
+                  onClick={() => form.setFieldsValue({ name: user?.full_name || '' })}
+                  style={{ background: bgTertiary, borderColor: borderColor, color: textSecondary, borderRadius: 8, fontSize: 13, height: 34 }}
+                >
                   {t('app.settings.cancel')}
                 </Button>
               </div>
@@ -327,7 +359,10 @@ export default function SettingsPage() {
                 >
                   {t('app.settings.saveChanges')}
                 </Button>
-                <Button style={{ background: bgTertiary, borderColor: borderColor, color: textSecondary, borderRadius: 8, fontSize: 13, height: 34 }}>
+                <Button
+                  onClick={() => form.setFieldsValue({ username: user?.username || '', email: user?.email || '', currentPassword: '', newPassword: '', confirmNewPassword: '' })}
+                  style={{ background: bgTertiary, borderColor: borderColor, color: textSecondary, borderRadius: 8, fontSize: 13, height: 34 }}
+                >
                   {t('app.settings.cancel')}
                 </Button>
               </div>
@@ -344,41 +379,6 @@ export default function SettingsPage() {
                 description={t('app.settings.appearanceSettingsDesc')}
               />
 
-              <Form.Item label={<FormFieldLabel label={t('app.settings.theme')} />}>
-                <Radio.Group defaultValue="dark" buttonStyle="solid">
-                  <Radio.Button
-                    value="dark"
-                    style={{
-                      background: bgTertiary,
-                      borderColor: borderColor,
-                      color: textPrimary,
-                    }}
-                  >
-                    {t('app.settings.dark')}
-                  </Radio.Button>
-                  <Radio.Button
-                    value="light"
-                    style={{
-                      background: bgTertiary,
-                      borderColor: borderColor,
-                      color: textPrimary,
-                    }}
-                  >
-                    {t('app.settings.light')}
-                  </Radio.Button>
-                  <Radio.Button
-                    value="system"
-                    style={{
-                      background: bgTertiary,
-                      borderColor: borderColor,
-                      color: textPrimary,
-                    }}
-                  >
-                    {t('app.settings.system')}
-                  </Radio.Button>
-                </Radio.Group>
-              </Form.Item>
-
               <Form.Item name="language" label={<FormFieldLabel label={t('app.settings.language')} />}>
                 <Select
                   onChange={(val) => i18n.changeLanguage(val)}
@@ -389,16 +389,6 @@ export default function SettingsPage() {
                   style={{ width: 200 }}
                 />
               </Form.Item>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-start', gap: 12, marginTop: 8 }}>
-                <Button
-                  type="primary"
-                  icon={<CheckOutlined style={{ fontSize: 14 }} />}
-                  style={{ background: bluePrimary, borderColor: bluePrimary, borderRadius: 8, fontSize: 13, height: 34 }}
-                >
-                  {t('app.settings.saveChanges')}
-                </Button>
-              </div>
             </Card>
           )}
 
@@ -412,55 +402,77 @@ export default function SettingsPage() {
                 description={t('app.settings.notificationsSettingsDesc')}
               />
 
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '14px 0',
-                  borderBottom: `1px solid ${borderColor}`,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <MailOutlined style={{ fontSize: 18, color: blueLight }} />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: textPrimary }}>{t('app.settings.emailNotifications')}</div>
-                    <div style={{ fontSize: 12, color: textTertiary }}>{t('app.settings.emailNotificationsDesc')}</div>
-                  </div>
+              {preferences ? (
+                <>
+                  {([
+                    {
+                      key: 'email_on_mention' as const,
+                      icon: <MailOutlined style={{ fontSize: 18, color: blueLight }} />,
+                      label: t('app.settings.emailOnMention'),
+                      desc: t('app.settings.emailOnMentionDesc'),
+                      border: true,
+                    },
+                    {
+                      key: 'email_on_pr_review' as const,
+                      icon: <PullRequestOutlined style={{ fontSize: 18, color: blueLight }} />,
+                      label: t('app.settings.emailOnPrReview'),
+                      desc: t('app.settings.emailOnPrReviewDesc'),
+                      border: true,
+                    },
+                    {
+                      key: 'in_app_on_mention' as const,
+                      icon: <EyeOutlined style={{ fontSize: 18, color: blueLight }} />,
+                      label: t('app.settings.inAppOnMention'),
+                      desc: t('app.settings.inAppOnMentionDesc'),
+                      border: true,
+                    },
+                    {
+                      key: 'in_app_on_issue_comment' as const,
+                      icon: <MessageOutlined style={{ fontSize: 18, color: blueLight }} />,
+                      label: t('app.settings.inAppOnIssueComment'),
+                      desc: t('app.settings.inAppOnIssueCommentDesc'),
+                      border: false,
+                    },
+                  ]).map((row) => (
+                    <div
+                      key={row.key}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '14px 0',
+                        borderBottom: row.border ? `1px solid ${borderColor}` : 'none',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        {row.icon}
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: textPrimary }}>{row.label}</div>
+                          <div style={{ fontSize: 12, color: textTertiary }}>{row.desc}</div>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={preferences[row.key]}
+                        checkedChildren={<CheckOutlined style={{ fontSize: 10 }} />}
+                        onChange={(checked) => updatePref(row.key, checked)}
+                        style={preferences[row.key] ? { background: green } : undefined}
+                      />
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 0', color: textTertiary, fontSize: 13 }}>
+                  <TagOutlined style={{ color: textTertiary }} />
+                  {t('app.settings.preferencesUnavailable')}
                 </div>
-                <Form.Item name="emailNotifications" valuePropName="checked" noStyle>
-                  <Switch
-                    checkedChildren={<CheckOutlined style={{ fontSize: 10 }} />}
-                    style={{ background: green }}
-                  />
-                </Form.Item>
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '14px 0',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <GlobalOutlined style={{ fontSize: 18, color: blueLight }} />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: textPrimary }}>{t('app.settings.pushNotifications')}</div>
-                    <div style={{ fontSize: 12, color: textTertiary }}>{t('app.settings.pushNotificationsDesc')}</div>
-                  </div>
-                </div>
-                <Form.Item name="pushNotifications" valuePropName="checked" noStyle>
-                  <Switch checkedChildren={<CheckOutlined style={{ fontSize: 10 }} />} />
-                </Form.Item>
-              </div>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-start', gap: 12, marginTop: 16 }}>
                 <Button
                   type="primary"
                   icon={<CheckOutlined style={{ fontSize: 14 }} />}
-                  loading={saving}
+                  loading={prefSaving}
+                  disabled={!preferences}
                   onClick={handleSaveNotifications}
                   style={{ background: bluePrimary, borderColor: bluePrimary, borderRadius: 8, fontSize: 13, height: 34 }}
                 >

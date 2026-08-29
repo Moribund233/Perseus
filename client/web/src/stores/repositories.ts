@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { repositoriesApi, type Repository, type RepoFile, type RepoBlob, type RepoBranch, type RepoCommit, type RepoMember, type PaginationResponse } from '../api/repositories';
+import { repositoriesApi, type Repository, type RepoFile, type RepoBlob, type RepoBranch, type RepoCommit, type RepoMember, type PaginationResponse, type FileCommitResponse } from '../api/repositories';
 
 interface RepositoriesState {
   repositories: Repository[];
@@ -25,6 +25,8 @@ interface RepositoriesState {
   unarchiveRepository: (repoId: string) => Promise<void>;
   fetchTree: (repoId: string, ref?: string, path?: string) => Promise<void>;
   fetchBlob: (repoId: string, path: string, ref?: string) => Promise<void>;
+  commitFileContent: (repoId: string, path: string, content: string, message?: string, branch?: string) => Promise<FileCommitResponse>;
+  deleteFileContent: (repoId: string, path: string, branch?: string) => Promise<FileCommitResponse>;
   fetchReadme: (repoId: string, ref?: string) => Promise<void>;
   fetchBranches: (repoId: string) => Promise<void>;
   fetchCommits: (repoId: string, params?: { page?: number; per_page?: number; branch?: string }) => Promise<void>;
@@ -163,6 +165,12 @@ export const useRepositoriesStore = create<RepositoriesState>((set, get) => ({
       set({ error: (e as Error).message });
     }
   },
+
+  commitFileContent: async (repoId, path, content, message, branch) =>
+    repositoriesApi.commitFile(repoId, path, { content, message, branch }),
+
+  deleteFileContent: async (repoId, path, branch) =>
+    repositoriesApi.deleteFile(repoId, path, branch),
 
   fetchReadme: async (repoId, ref) => {
     try {

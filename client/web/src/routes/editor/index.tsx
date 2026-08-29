@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Layout, Avatar } from 'antd';
+import { Layout, Avatar, Button, Input, Modal, Tooltip, message as antdMessage } from 'antd';
 import {
   FolderOutlined,
   FileOutlined,
@@ -8,6 +8,10 @@ import {
   MessageOutlined,
   TeamOutlined,
   BranchesOutlined,
+  SaveOutlined,
+  EyeOutlined,
+  EditOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import { EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, rectangularSelection, crosshairCursor, highlightActiveLine } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
@@ -26,6 +30,7 @@ import { markdown } from '@codemirror/lang-markdown';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import EditorSkeleton from '../../components/skeleton/EditorSkeleton';
+import Markdown from '../../components/Markdown';
 import { useRepositoriesStore } from '../../stores/repositories';
 import type { RepoFile, RepoMember } from '../../api/repositories';
 
@@ -44,6 +49,7 @@ const bgPrimary = '#0d1117';
 const bgSecondary = '#161b22';
 const bgTertiary = '#1c2128';
 const green = '#3fb950';
+const yellow = '#d29922';
 
 interface TreeNode {
   title: string;
@@ -159,7 +165,7 @@ function findFileByKey(nodes: TreeNode[], key: string): TreeNode | null {
 
 const sampleCode = `// Select a file from the explorer to view repository contents.`;
 
-const basicSetup = () => [
+const basicSetup = (onSave: () => void) => [
   lineNumbers(),
   highlightActiveLineGutter(),
   highlightSpecialChars(),
@@ -181,13 +187,9 @@ const basicSetup = () => [
     ...searchKeymap,
     ...lintKeymap,
     indentWithTab,
+    // Ctrl/Cmd+S 提交保存, 阻止浏览器默认行为
+    { key: 'Mod-s', preventDefault: true, run: () => { onSave(); return true; } },
   ]),
-];
-
-const discussions = [
-  { id: 1, author: 'Li Wei', line: 'Line 11', code: 'handleMessage(msg)', text: 'Should we add error handling for malformed JSON messages? The current parse will throw.', replies: 2, time: '10m ago', icon: '💬' },
-  { id: 2, author: 'Chen Mei', line: 'Line 15', code: 'startHeartbeat()', text: 'Should we make the heartbeat interval configurable instead of hardcoded?', replies: 1, time: '25m ago', icon: '💬' },
-  { id: 3, author: 'Wang Jun', line: 'Line 34', code: 'getRetryDelay()', text: 'Fixed the jitter calculation — changed Math.random() to use crypto.getRandomValues per review feedback.', replies: 0, time: '1h ago', icon: '✅', resolved: true },
 ];
 
 function FileIcon({ type, fileType }: { type: 'folder' | 'file'; fileType?: string }) {
@@ -215,15 +217,18 @@ function TreeNodeView({
   depth,
   selectedKey,
   onSelect,
+  onDelete,
 }: {
   node: TreeNode;
   depth: number;
   selectedKey: string;
   onSelect: (key: string) => void;
+  onDelete?: (node: TreeNode) => void;
 }) {
   const isSelected = selectedKey === node.key;
   const hasChildren = node.children && node.children.length > 0;
   const [expanded, setExpanded] = useState(hasChildren);
+  const { t } = useTranslation();
 
   return (
     <div>
@@ -232,6 +237,7 @@ function TreeNodeView({
           onSelect(node.key);
           if (hasChildren) setExpanded(!expanded);
         }}
+        className="cm-file-tree-row"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -243,6 +249,7 @@ function TreeNodeView({
           background: isSelected ? activeBg : 'transparent',
           transition: 'all 0.15s',
           fontFamily: "'JetBrains Mono', monospace",
+          position: 'relative',
         }}
         onMouseEnter={(e) => {
           if (!isSelected) {
@@ -262,11 +269,39 @@ function TreeNodeView({
         ))}
         <FileIcon type={node.type} fileType={node.fileType} />
         <span>{node.title}</span>
+        {onDelete && node.type === 'file' && (
+          <Tooltip title={t('app.codeEditor.deleteFile', { defaultValue: '删除文件' })}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(node);
+              }}
+              className="cm-tree-delete-btn"
+              style={{
+                marginLeft: 'auto',
+                background: 'none',
+                border: 'none',
+                color: textTertiary,
+                cursor: 'pointer',
+                padding: '0 2px',
+                fontSize: 13,
+                display: 'flex',
+                alignItems: 'center',
+                opacity: 0,
+                transition: 'opacity 0.15s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#f85149'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = textTertiary; }}
+            >
+              <DeleteOutlined />
+            </button>
+          </Tooltip>
+        )}
       </div>
       {expanded && hasChildren && (
         <div>
           {node.children!.map((child) => (
-            <TreeNodeView key={child.key} node={child} depth={depth + 1} selectedKey={selectedKey} onSelect={onSelect} />
+            <TreeNodeView key={child.key} node={child} depth={depth + 1} selectedKey={selectedKey} onSelect={onSelect} onDelete={onDelete} />
           ))}
         </div>
       )}
@@ -282,9 +317,26 @@ export default function EditorPage() {
   const [panelTab, setPanelTab] = useState('discussions');
   const [selectedTreeKey, setSelectedTreeKey] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [commitMessage, setCommitMessage] = useState('');
+  // 预览绑定到具体文件: 切换文件自动退出预览, 无需 effect 复位
+  const [previewTab, setPreviewTab] = useState<string | null>(null);
+  const [previewContent, setPreviewContent] = useState('');
+  const previewMode = previewTab != null && previewTab === activeTab;
+  const [newFileModalOpen, setNewFileModalOpen] = useState(false);
+  const [newFileName, setNewFileName] = useState('');
+  const [newFileCreating, setNewFileCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<TreeNode | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [cursor, setCursor] = useState({ line: 1, col: 1 });
   const { t } = useTranslation();
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  // 保存基线用 ref 承载, 避免闭包过期导致 dirty 判断失准
+  const savedContentRef = useRef<string>('');
+  const handleSaveRef = useRef<() => void>(() => {});
 
   const {
     currentRepo,
@@ -295,6 +347,8 @@ export default function EditorPage() {
     fetchTree,
     fetchBlob,
     fetchMembers,
+    commitFileContent,
+    deleteFileContent,
     clearCurrent,
   } = useRepositoriesStore();
 
@@ -380,6 +434,94 @@ export default function EditorPage() {
     });
   }, [activeTab, currentRepo?.id, fetchBlob]);
 
+  // 保存: 将编辑器当前内容提交到默认分支
+  const performSave = useCallback(async (message?: string) => {
+    const repoId = currentRepo?.id;
+    const path = activeTab;
+    if (!repoId || !path || saving) return;
+    const content = viewRef.current?.state.doc.toString() ?? currentBlob?.content ?? '';
+    if (content === savedContentRef.current) {
+      setIsDirty(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      const result = await commitFileContent(
+        repoId,
+        path,
+        content,
+        message || `Update ${path}`,
+        currentRepo?.default_branch,
+      );
+      savedContentRef.current = content;
+      setIsDirty(false);
+      antdMessage.success(t('app.codeEditor.saved', { defaultValue: `已提交 ${result.commit_id.slice(0, 7)}` }));
+      // 后台刷新提交历史等派生数据
+      fetchTree(repoId, currentRepo?.default_branch).catch(() => {});
+    } catch (e) {
+      antdMessage.error((e as Error).message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  }, [currentRepo, activeTab, currentBlob, saving, commitFileContent, fetchTree, t]);
+
+  useEffect(() => {
+    handleSaveRef.current = () => {
+      if (isDirty && !saving) setSaveModalOpen(true);
+    };
+  }, [isDirty, saving, commitMessage]);
+
+  // 新建文件: 以空内容提交到默认分支, 随后刷新文件树并打开
+  const handleCreateFile = useCallback(async () => {
+    const repoId = currentRepo?.id;
+    const name = newFileName.trim().replace(/^\/+|\/+$/g, '');
+    if (!repoId || !name || newFileCreating) return;
+    if (name.split('/').some((seg) => seg === '..' || seg === '.')) {
+      antdMessage.error('Invalid file name');
+      return;
+    }
+    setNewFileCreating(true);
+    try {
+      await commitFileContent(repoId, name, '', `Create ${name}`, currentRepo?.default_branch);
+      await fetchTree(repoId, currentRepo?.default_branch);
+      setOpenTabs((prev) => (prev.includes(name) ? prev : [...prev, name]));
+      setActiveTab(name);
+      setSelectedTreeKey(name);
+      savedContentRef.current = '';
+      setIsDirty(false);
+      setNewFileModalOpen(false);
+      setNewFileName('');
+      antdMessage.success(t('app.codeEditor.fileCreated', { defaultValue: `已创建 ${name}` }));
+    } catch (e) {
+      antdMessage.error((e as Error).message || 'Create file failed');
+    } finally {
+      setNewFileCreating(false);
+    }
+  }, [currentRepo, newFileName, newFileCreating, commitFileContent, fetchTree, t]);
+
+  // 删除文件
+  const handleDeleteFile = useCallback(async () => {
+    const repoId = currentRepo?.id;
+    if (!repoId || !deleteTarget || deleting) return;
+    setDeleting(true);
+    try {
+      await deleteFileContent(repoId, deleteTarget.key, currentRepo?.default_branch);
+      const delKey = deleteTarget.key;
+      await fetchTree(repoId, currentRepo?.default_branch);
+      setDeleteTarget(null);
+      if (activeTab === delKey) {
+        setActiveTab(null);
+        setSelectedTreeKey('');
+        setOpenTabs((prev) => prev.filter((k) => k !== delKey));
+      }
+      antdMessage.success(t('app.codeEditor.fileDeleted', { defaultValue: `已删除 ${delKey}` }));
+    } catch (e) {
+      antdMessage.error((e as Error).message || 'Delete failed');
+    } finally {
+      setDeleting(false);
+    }
+  }, [currentRepo, deleteTarget, deleting, deleteFileContent, fetchTree, activeTab, t]);
+
   // Initialize / update CodeMirror editor
   useEffect(() => {
     if (loading || !editorRef.current) return;
@@ -388,8 +530,24 @@ export default function EditorPage() {
       viewRef.current = null;
     }
     const content = currentBlob?.content ?? sampleCode;
+    savedContentRef.current = content === sampleCode ? '\u0000-sample' : content;
+    setIsDirty(false);
     const lang = activeTab ? getLanguageExtension(activeTab) : undefined;
-    const extensions = [basicSetup(), oneDark, EditorView.theme({ '&': { height: '100%' }, '.cm-scroller': { overflow: 'auto' } })];
+    const extensions = [
+      basicSetup(() => handleSaveRef.current()),
+      oneDark,
+      EditorView.theme({ '&': { height: '100%' }, '.cm-scroller': { overflow: 'auto' } }),
+      EditorView.updateListener.of((update) => {
+        if (update.docChanged) {
+          setIsDirty(update.state.doc.toString() !== savedContentRef.current);
+        }
+        if (update.selectionSet || update.docChanged) {
+          const head = update.state.selection.main.head;
+          const line = update.state.doc.lineAt(head);
+          setCursor({ line: line.number, col: head - line.from + 1 });
+        }
+      }),
+    ];
     if (lang) extensions.push(lang);
 
     const state = EditorState.create({
@@ -445,6 +603,11 @@ export default function EditorPage() {
 
   return (
     <Layout style={{ height: '100%', background: 'transparent' }}>
+      <style>{`
+        .cm-file-tree-row:hover .cm-tree-delete-btn {
+          opacity: 1 !important;
+        }
+      `}</style>
       {/* Left Sidebar */}
       <Sider
         width={260}
@@ -476,22 +639,25 @@ export default function EditorPage() {
           >
             Explorer — {currentRepo?.name || `${owner}/${repo}`}
           </span>
-          <button
-            style={{
-              background: 'none',
-              border: 'none',
-              color: textTertiary,
-              cursor: 'pointer',
-              padding: 2,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = textPrimary; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = textTertiary; }}
-          >
-            <PlusOutlined style={{ fontSize: 14 }} />
-          </button>
+          <Tooltip title={t('app.codeEditor.newFile', { defaultValue: '新建文件' })}>
+            <button
+              style={{
+                background: 'none',
+                border: 'none',
+                color: textTertiary,
+                cursor: 'pointer',
+                padding: 2,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = textPrimary; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = textTertiary; }}
+              onClick={() => setNewFileModalOpen(true)}
+            >
+              <PlusOutlined style={{ fontSize: 14 }} />
+            </button>
+          </Tooltip>
         </div>
         <div style={{ flex: 1, overflow: 'auto', padding: '4px 0' }}>
           {fileTree.map((node) => (
@@ -501,6 +667,7 @@ export default function EditorPage() {
               depth={0}
               selectedKey={selectedTreeKey}
               onSelect={handleSelectFile}
+              onDelete={setDeleteTarget}
             />
           ))}
         </div>
@@ -568,6 +735,25 @@ export default function EditorPage() {
               </div>
             );
           })}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', padding: '0 8px', gap: 6, flexShrink: 0 }}>
+            {isDirty && (
+              <span
+                title={t('app.codeEditor.unsaved', { defaultValue: '有未保存的更改' })}
+                style={{ width: 8, height: 8, borderRadius: '50%', background: yellow, flexShrink: 0 }}
+              />
+            )}
+            <Button
+              size="small"
+              type={isDirty ? 'primary' : 'default'}
+              icon={<SaveOutlined style={{ fontSize: 12 }} />}
+              loading={saving}
+              disabled={!isDirty || saving}
+              onClick={() => setSaveModalOpen(true)}
+              style={{ fontSize: 12 }}
+            >
+              {t('app.codeEditor.commit', { defaultValue: 'Commit' })}
+            </Button>
+          </div>
         </div>
 
         {/* Breadcrumb */}
@@ -592,6 +778,32 @@ export default function EditorPage() {
               <span style={idx === breadcrumb.length - 1 ? { color: textPrimary } : { cursor: 'pointer' }}>{part}</span>
             </span>
           ))}
+          {activeNode?.fileType === 'md' && (
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+              <Button
+                size="small"
+                type={previewMode ? 'text' : 'primary'}
+                icon={<EditOutlined style={{ fontSize: 11 }} />}
+                onClick={() => setPreviewTab(null)}
+                style={{ fontSize: 11, height: 22, padding: '0 8px' }}
+              >
+                {t('app.codeEditor.edit', { defaultValue: 'Edit' })}
+              </Button>
+              <Button
+                size="small"
+                type={previewMode ? 'primary' : 'text'}
+                icon={<EyeOutlined style={{ fontSize: 11 }} />}
+                onClick={() => {
+                  // 事件上下文中读取编辑器内容, 预览期间编辑器隐藏, 内容不会变化
+                  setPreviewContent(viewRef.current?.state.doc.toString() ?? currentBlob?.content ?? '');
+                  setPreviewTab(activeTab);
+                }}
+                style={{ fontSize: 11, height: 22, padding: '0 8px' }}
+              >
+                {t('app.codeEditor.preview', { defaultValue: 'Preview' })}
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Collab Bar */}
@@ -654,7 +866,13 @@ export default function EditorPage() {
 
         {/* Code Editor */}
         <Content style={{ display: 'flex', overflow: 'hidden', background: bgPrimary, flex: 1 }}>
-          <div ref={editorRef} style={{ flex: 1, overflow: 'auto' }} />
+          {previewMode && activeNode?.fileType === 'md' && (
+            <div style={{ flex: 1, overflow: 'auto', padding: '16px 24px' }}>
+              <Markdown>{previewContent || (currentBlob?.content ?? '')}</Markdown>
+            </div>
+          )}
+          {/* 预览时仅隐藏编辑器, 保持 CodeMirror DOM 挂载以免丢失文档状态 */}
+          <div ref={editorRef} style={{ flex: 1, overflow: 'auto', display: previewMode ? 'none' : undefined }} />
         </Content>
 
         {/* Collab Panel */}
@@ -670,7 +888,7 @@ export default function EditorPage() {
         >
           <div style={{ display: 'flex', background: bgSecondary, borderBottom: `1px solid ${borderColor}`, padding: '0 8px', flexShrink: 0 }}>
             {[
-              { key: 'discussions', icon: <MessageOutlined style={{ fontSize: 12 }} />, label: t('app.codeEditor.discussions'), count: discussions.length },
+              { key: 'discussions', icon: <MessageOutlined style={{ fontSize: 12 }} />, label: t('app.codeEditor.discussions'), count: 0 },
               { key: 'editors', icon: <TeamOutlined style={{ fontSize: 12 }} />, label: t('app.codeEditor.activity'), count: editors.length },
             ].map((tab) => (
               <div
@@ -709,45 +927,13 @@ export default function EditorPage() {
             ))}
           </div>
           <div style={{ flex: 1, overflow: 'auto', padding: '6px 0' }}>
-            {panelTab === 'discussions' &&
-              discussions.map((d) => (
-                <div
-                  key={d.id}
-                  style={{
-                    display: 'flex',
-                    gap: 10,
-                    padding: '8px 16px',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s',
-                    borderLeft: '3px solid transparent',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = hoverBg;
-                    e.currentTarget.style.borderLeftColor = bluePrimary;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.borderLeftColor = 'transparent';
-                  }}
-                >
-                  <span style={{ flexShrink: 0, fontSize: 13, marginTop: 1 }}>{d.icon}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: textPrimary }}>{d.author}</div>
-                    <div style={{ fontSize: 11, color: blueLight, fontFamily: "'JetBrains Mono', monospace", marginTop: 1 }}>
-                      {d.line} — <span style={{ color: textTertiary }}>{d.code}</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 2 }}>
-                      {d.text}
-                    </div>
-                    <div style={{ fontSize: 11, color: textTertiary, display: 'flex', gap: 8, marginTop: 3 }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                        <MessageOutlined style={{ fontSize: 10 }} /> {d.resolved ? 'Resolved' : `${d.replies} replies`}
-                      </span>
-                      <span>{d.time}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            {panelTab === 'discussions' && (
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: textTertiary, fontSize: 12, gap: 6 }}>
+                <MessageOutlined style={{ fontSize: 22, opacity: 0.5 }} />
+                <span>{t('app.codeEditor.noDiscussions', { defaultValue: '暂无代码讨论' })}</span>
+                <span style={{ fontSize: 11 }}>{t('app.codeEditor.noDiscussionsHint', { defaultValue: '行内评论能力将在后续版本提供' })}</span>
+              </div>
+            )}
             {panelTab === 'editors' && (
               <div style={{ padding: '6px 0' }}>
                 {editors.map((ed) => (
@@ -808,13 +994,81 @@ export default function EditorPage() {
             {t('app.codeEditor.online')}
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 16 }}>
-            <span>Ln 24, Col 38</span>
+            <span>{t('app.codeEditor.lnCol', { defaultValue: `Ln ${cursor.line}, Col ${cursor.col}` })}</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><TeamOutlined style={{ fontSize: 12 }} /> {members.length || 1} online</span>
+            {isDirty && <span style={{ color: '#e3b341' }}>{t('app.codeEditor.unsavedShort', { defaultValue: '● 未保存' })}</span>}
             <span>{activeNode?.fileType ? activeNode.fileType.toUpperCase() : 'Text'}</span>
             <span>UTF-8</span>
           </div>
         </div>
       </Layout>
+
+      {/* 提交保存弹窗 */}
+      <Modal
+        title={t('app.codeEditor.commitTitle', { defaultValue: `提交更改 — ${activeTab || ''}` })}
+        open={saveModalOpen}
+        onCancel={() => setSaveModalOpen(false)}
+        onOk={() => {
+          performSave(commitMessage.trim() || undefined).then(() => {
+            setSaveModalOpen(false);
+            setCommitMessage('');
+          });
+        }}
+        okText={t('app.codeEditor.commitOk', { defaultValue: `提交到 ${currentRepo?.default_branch || 'main'}` })}
+        confirmLoading={saving}
+        okButtonProps={{ style: { background: bluePrimary } }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <span style={{ color: textSecondary, fontSize: 13 }}>
+            {t('app.codeEditor.commitHint', { defaultValue: '更改将作为一次 Git 提交推送到默认分支' })}
+          </span>
+          <Input
+            value={commitMessage}
+            onChange={(e) => setCommitMessage(e.target.value)}
+            placeholder={`Update ${activeTab || 'file'}`}
+            onPressEnter={() => {
+              performSave(commitMessage.trim() || undefined).then(() => {
+                setSaveModalOpen(false);
+                setCommitMessage('');
+              });
+            }}
+          />
+        </div>
+      </Modal>
+
+      {/* 删除文件弹窗 */}
+      <Modal
+        title={t('app.codeEditor.deleteFileTitle', { defaultValue: '删除文件' })}
+        open={!!deleteTarget}
+        onCancel={() => setDeleteTarget(null)}
+        onOk={handleDeleteFile}
+        okText={t('app.codeEditor.delete', { defaultValue: '删除' })}
+        okButtonProps={{ danger: true, style: { background: '#f85149', borderColor: '#f85149' } }}
+        confirmLoading={deleting}
+      >
+        <div style={{ color: textSecondary, fontSize: 13 }}>
+          {deleteTarget && t('app.codeEditor.deleteFileConfirm', { defaultValue: `确定要删除 ${deleteTarget.key} 吗？此操作将创建一次删除该文件的 Git 提交。` })}
+        </div>
+      </Modal>
+
+      {/* 新建文件弹窗 */}
+      <Modal
+        title={t('app.codeEditor.newFileTitle', { defaultValue: '新建文件' })}
+        open={newFileModalOpen}
+        onCancel={() => { setNewFileModalOpen(false); setNewFileName(''); }}
+        onOk={handleCreateFile}
+        okText={t('app.codeEditor.create', { defaultValue: '创建' })}
+        confirmLoading={newFileCreating}
+        okButtonProps={{ style: { background: bluePrimary } }}
+      >
+        <Input
+          autoFocus
+          value={newFileName}
+          onChange={(e) => setNewFileName(e.target.value)}
+          placeholder={t('app.codeEditor.newFilePlaceholder', { defaultValue: '例如 src/utils/helpers.ts 或 README.md' })}
+          onPressEnter={handleCreateFile}
+        />
+      </Modal>
     </Layout>
   );
 }

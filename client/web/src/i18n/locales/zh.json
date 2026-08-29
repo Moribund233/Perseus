@@ -84,7 +84,17 @@
     },
     "topBar": {
       "searchPlaceholder": "搜索...",
-      "new": "新建"
+      "new": "新建",
+      "repoCreated": "仓库 {{name}} 创建成功",
+      "repoCreateFailed": "创建仓库失败",
+      "newRepoTitle": "新建仓库",
+      "repoCreate": "创建",
+      "repoName": "仓库名称",
+      "repoNameRequired": "请输入仓库名称",
+      "repoNamePattern": "仅支持字母、数字、点、下划线和连字符",
+      "repoDescription": "描述（可选）",
+      "repoDescriptionPlaceholder": "这个项目是做什么的？",
+      "repoVisibility": "可见性"
     },
     "notifications": {
       "title": "通知",
@@ -142,18 +152,13 @@
       "stats": {
         "repositories": "仓库",
         "openPRs": "待处理 PR",
-        "teamMembers": "团队成员",
-        "commits": "提交",
-        "repositoriesChange": "本周新增 3 个",
-        "openPRsChange": "5 个待审查",
-        "teamMembersChange": "新增 2 人",
-        "commitsChange": "本周 142 次提交"
+        "openIssues": "未处理 Issue"
       },
       "recentActivity": "最近动态",
       "viewAll": "查看全部",
       "yourRepositories": "你的仓库",
       "contributionActivity": "贡献活动",
-      "contributionsCount": "过去 30 天共 {{count}} 次贡献",
+      "contributionsCount": "{{count}} 次贡献（近 30 天）",
       "activity": {
         "mergedPR": "合并了 PR <strong>#{{id}}</strong> 到 <strong>{{repo}}</strong>",
         "pushedCommits": "推送了 {{count}} 次提交到 <strong>{{branch}}</strong>",
@@ -161,7 +166,21 @@
         "reviewedPR": "审查了 PR <strong>#{{id}}</strong> 在 <strong>{{repo}}</strong>",
         "createdIssue": "创建了 issue <strong>#{{id}}</strong> — \"{{title}}\"",
         "commentedOnIssue": "评论了 issue <strong>#{{id}}</strong> 在 <strong>{{repo}}</strong>"
-      }
+      },
+      "activityText": {
+        "pull_request_opened": "创建了 PR：{{details}}",
+        "pull_request_closed": "关闭了 PR：{{details}}",
+        "pull_request_merged": "合并了 PR：{{details}}",
+        "issue_opened": "创建了 Issue：{{details}}",
+        "issue_closed": "关闭了 Issue：{{details}}",
+        "fallback": "{{action}} 了 {{entityType}}"
+      },
+      "emptyActivity": "暂无动态，创建 Issue 或 PR 后这里会展示动态",
+      "noContributions": "暂无贡献数据",
+      "timeJustNow": "刚刚",
+      "timeMinutesAgo": "{{count}} 分钟前",
+      "timeHoursAgo": "{{count}} 小时前",
+      "timeDaysAgo": "{{count}} 天前"
     },
     "issues": {
       "title": "Issues",
@@ -238,15 +257,41 @@
         "commentPlaceholder": "发表评论",
         "submitComment": "评论",
         "commentFailed": "评论发送失败",
-        "threadClosed": "该 Pull Request 已关闭，评论已锁定。"
-      }
+        "threadClosed": "该 Pull Request 已关闭，评论已锁定。",
+        "save": "保存",
+        "cancel": "取消",
+        "descPlaceholder": "描述变更内容…",
+        "noLabels": "暂无标签",
+        "manageLabels": "标签",
+        "noLabelsAvailable": "暂无可用标签",
+        "leaveReview": "提交代码审查",
+        "reviewCommentPlaceholder": "审查意见（可选）…",
+        "reviewApprove": "通过 (Approve)",
+        "reviewRequestChanges": "请求修改 (Request changes)",
+        "reviewComment": "评论 (Comment)",
+        "submitReview": "提交审查",
+        "reviewSubmitted": "审查已提交"
+      },
+      "created": "Pull Request 创建成功",
+      "createFailed": "创建 Pull Request 失败",
+      "prTitle": "标题",
+      "prTitleRequired": "请输入标题",
+      "prTitlePlaceholder": "例如：支持 WebSocket 断线重连",
+      "sourceBranch": "源分支",
+      "targetBranch": "目标分支",
+      "prDescription": "描述（可选）"
     },
     "codeEditor": {
       "title": "代码编辑器",
       "online": "在线",
       "offline": "离线",
       "discussions": "讨论",
-      "activity": "动态"
+      "activity": "动态",
+      "deleteFile": "删除文件",
+      "deleteFileTitle": "删除文件",
+      "delete": "删除",
+      "deleteFileConfirm": "确定要删除 {{file}} 吗？此操作将创建一次删除该文件的 Git 提交。",
+      "fileDeleted": "已删除 {{file}}"
     },
     "teamChat": {
       "title": "团队聊天",
@@ -256,7 +301,8 @@
       "placeholder": "给 #{{channel}} 发送消息...",
       "today": "今天",
       "noChannels": "暂无可用频道，创建仓库后即可开始聊天",
-      "disconnected": "实时连接已断开，暂时无法发送消息"
+      "disconnected": "实时连接已断开，暂时无法发送消息",
+      "deleteMessage": "删除消息"
     },
     "settings": {
       "title": "设置",
@@ -272,11 +318,6 @@
       "publicProfile": "公开资料",
       "publicProfileDesc": "这些信息将公开显示在你的个人资料页。",
       "name": "姓名",
-      "bio": "简介",
-      "bioPlaceholder": "简单介绍一下你自己。",
-      "company": "公司",
-      "location": "位置",
-      "website": "网站",
       "accountSettings": "账号设置",
       "accountSettingsDesc": "更新用户名并管理密码。",
       "currentPassword": "当前密码",
@@ -285,17 +326,19 @@
       "changePassword": "修改密码",
       "appearanceSettings": "外观设置",
       "appearanceSettingsDesc": "自定义 Perseus 的显示方式。",
-      "theme": "主题",
-      "dark": "深色",
-      "light": "浅色",
-      "system": "跟随系统",
       "language": "语言",
       "notificationsSettings": "通知",
       "notificationsSettingsDesc": "选择你希望接收通知的方式。",
-      "emailNotifications": "邮件通知",
-      "pushNotifications": "推送通知",
-      "emailNotificationsDesc": "接收关于 PR、Issue 和提及的更新。",
-      "pushNotificationsDesc": "接收实时事件的浏览器通知。"
+      "avatarUpdated": "头像已更新",
+      "preferencesUnavailable": "通知偏好暂不可用",
+      "emailOnMention": "邮件通知 — 被提及",
+      "emailOnMentionDesc": "有人 @ 提及你时发送邮件",
+      "emailOnPrReview": "邮件通知 — PR 审查",
+      "emailOnPrReviewDesc": "你的 PR 收到审查时发送邮件",
+      "inAppOnMention": "站内通知 — 被提及",
+      "inAppOnMentionDesc": "有人 @ 提及你时站内提醒",
+      "inAppOnIssueComment": "站内通知 — Issue 评论",
+      "inAppOnIssueCommentDesc": "你参与的 Issue 有新评论时提醒"
     }
   },
   "auth": {

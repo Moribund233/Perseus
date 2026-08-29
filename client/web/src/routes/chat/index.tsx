@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Layout, Input, Button, Avatar, Tooltip } from 'antd';
+import { Layout, Input, Button, Avatar, Tooltip, Popover, message as antdMessage } from 'antd';
 import {
   NumberOutlined,
   LockOutlined,
@@ -13,9 +13,11 @@ import {
   SearchOutlined,
   EyeOutlined,
   MoreOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import ChatSkeleton from '../../components/skeleton/ChatSkeleton';
+import Markdown from '../../components/Markdown';
 import { useRepositoriesStore } from '../../stores/repositories';
 import { useAuthStore } from '../../stores/auth';
 import { chatApi, type ChatMessage, type RoomMember, type RealtimeRoom } from '../../api/chat';
@@ -39,6 +41,13 @@ const yellow = '#d29922';
 
 const avatarColors = ['#1f6feb', '#3fb950', '#58a6ff', '#bc8cff', '#d29922', '#f85149', '#f0883e', '#7956d9'];
 
+const emojiPalette = [
+  '😀', '😂', '🤣', '😊', '😍', '🤔', '😎', '🥳',
+  '😢', '😡', '👍', '👎', '👏', '🙌', '🤝', '💪',
+  '🔥', '⭐', '🎉', '🚀', '✅', '❌', '⚠️', '💡',
+  '🐛', '📌', '👀', '❤️', '🙏', '😅', '🫡', '🤖',
+];
+
 interface Channel {
   id: string;
   name: string;
@@ -56,6 +65,7 @@ interface DM {
 
 interface Message {
   id: string;
+  senderId: string;
   author: string;
   initials: string;
   color: string;
@@ -102,6 +112,7 @@ function mapChatMessage(msg: ChatMessage): Message {
   const initials = getInitials(author);
   return {
     id: msg.id,
+    senderId: msg.sender_id,
     author,
     initials,
     color: getAvatarColor(initials),
@@ -138,10 +149,14 @@ export default function ChatPage() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [wsStatus, setWsStatus] = useState<ChatSocketStatus>('disconnected');
   const [channelsLoaded, setChannelsLoaded] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const { t } = useTranslation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeRoomIdRef = useRef<string | null>(null);
   const joinedRoomIdRef = useRef<string | null>(null);
+  const textAreaRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { user } = useAuthStore();
   const { repositories, fetchRepositoriesByUser } = useRepositoriesStore();
@@ -184,7 +199,8 @@ export default function ChatPage() {
     if (user?.id) {
       fetchRepositoriesByUser(user.id).finally(() => setChannelsLoaded(true));
     } else {
-      setChannelsLoaded(true);
+      // 微任务延迟, 避免在 effect 同步体中触发级联渲染
+      Promise.resolve().then(() => setChannelsLoaded(true));
     }
   }, [user?.id, fetchRepositoriesByUser]);
 
@@ -279,10 +295,87 @@ export default function ChatPage() {
     setSendError(null);
   }, [input, room, wsStatus]);
 
+  const handleDeleteMessage = useCallback(async (msg: Message) => {
+    if (!room) return;
+    if (msg.senderId && user && msg.senderId !== user.id) return;
+    try {
+      await chatApi.deleteMessage(room.id, msg.id);
+      setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+    } catch (e) {
+      antdMessage.error((e as Error).message || 'Failed to delete message');
+    }
+  }, [room, user]);
+
   const handleInputChange = (value: string) => {
     setInput(value);
     if (sendError) setSendError(null);
   };
+
+  const getTextAreaEl = (): HTMLTextAreaElement | null =>
+    textAreaRef.current?.querySelector('textarea') ?? null;
+
+  const insertAtCursor = useCallback((text: string, wrap?: string) => {
+    const el = getTextAreaEl();
+    const start = el?.selectionStart ?? input.length;
+    const end = el?.selectionEnd ?? input.length;
+    const selected = input.slice(start, end);
+    const inserted = wrap != null
+      ? `${wrap}${selected || text}${wrap}`
+      : text;
+    const next = input.slice(0, start) + inserted + input.slice(end);
+    setInput(next);
+    // 焦点与光标复位到插入内容之后
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const caret = start + inserted.length - (wrap != null && !selected ? wrap.length : 0);
+      el.setSelectionRange(caret, caret);
+    });
+  }, [input]);
+
+  const insertLink = useCallback(() => {
+    const el = getTextAreaEl();
+    const start = el?.selectionStart ?? input.length;
+    const end = el?.selectionEnd ?? input.length;
+    const selected = input.slice(start, end);
+    // 选中内容形似 URL 时作为链接地址, 否则作为链接文本
+    const isUrl = /^https?:\/\//.test(selected);
+    const inserted = isUrl
+      ? `[文本](${selected})`
+      : `[${selected || '文本'}](https://)`;
+    const next = input.slice(0, start) + inserted + input.slice(end);
+    setInput(next);
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const caret = isUrl
+        ? start + inserted.length
+        : start + inserted.length - 'https://)'.length - (selected ? 0 : 1);
+      el.setSelectionRange(caret, caret);
+    });
+  }, [input]);
+
+  const handleFileSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !room) return;
+    if (wsStatus !== 'connected') {
+      antdMessage.warning(t('app.teamChat.disconnected'));
+      return;
+    }
+    setUploading(true);
+    try {
+      const att = await chatApi.uploadAttachment(room.id, file);
+      const content = att.content_type.startsWith('image/')
+        ? `![${att.name}](${att.url})`
+        : `[${att.name}](${att.url})`;
+      chatSocket.sendChatMessage(room.id, content);
+    } catch (err) {
+      antdMessage.error((err as Error).message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  }, [room, wsStatus, t]);
 
   const activeChannelName = useMemo(() =>
     channels.find((c) => c.id === activeChannel)?.name || room?.name || '—',
@@ -318,6 +411,11 @@ export default function ChatPage() {
 
   return (
     <Layout style={{ height: '100%', background: 'transparent' }}>
+      <style>{`
+        .chat-msg:hover .chat-delete-btn {
+          opacity: 1 !important;
+        }
+      `}</style>
       {/* Left Channels */}
       <Sider
         width={240}
@@ -565,6 +663,30 @@ export default function ChatPage() {
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: textPrimary }}>{msg.author}</span>
                   <span style={{ fontSize: 11, color: textTertiary }}>{msg.time}</span>
+                  {user && msg.senderId === user.id && (
+                    <Tooltip title={t('app.teamChat.deleteMessage', { defaultValue: '删除' })}>
+                      <button
+                        onClick={() => handleDeleteMessage(msg)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: textTertiary,
+                          cursor: 'pointer',
+                          padding: 0,
+                          fontSize: 12,
+                          lineHeight: 1,
+                          marginLeft: 'auto',
+                          opacity: 0,
+                          transition: 'opacity 0.15s',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = '#f85149'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = textTertiary; }}
+                        className="chat-delete-btn"
+                      >
+                        <DeleteOutlined style={{ fontSize: 12 }} />
+                      </button>
+                    </Tooltip>
+                  )}
                 </div>
                 <div
                   style={{
@@ -573,13 +695,9 @@ export default function ChatPage() {
                     color: textSecondary,
                     wordWrap: 'break-word',
                   }}
-                  dangerouslySetInnerHTML={{
-                    __html: msg.text.replace(
-                      /<code>(.*?)<\/code>/g,
-                      '<code style="background:#1c2128;padding:1px 5px;border-radius:3px;font-family:\'JetBrains Mono\',monospace;font-size:12px;color:#58a6ff;">$1</code>'
-                    ),
-                  }}
-                />
+                >
+                  <Markdown>{msg.text}</Markdown>
+                </div>
                 {msg.reactions && (
                   <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
                     {msg.reactions.map((r, idx) => (
@@ -620,25 +738,27 @@ export default function ChatPage() {
               overflow: 'hidden',
             }}
           >
-            <Input.TextArea
-              value={input}
-              onChange={(e) => handleInputChange(e.target.value)}
-              onPressEnter={(e) => {
-                if (!e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder={t('app.teamChat.placeholder', { channel: activeChannelName })}
-              autoSize={{ minRows: 1, maxRows: 4 }}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: textPrimary,
-                resize: 'none',
-                padding: '12px 14px',
-              }}
-            />
+            <div ref={textAreaRef}>
+              <Input.TextArea
+                value={input}
+                onChange={(e) => handleInputChange(e.target.value)}
+                onPressEnter={(e) => {
+                  if (!e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder={t('app.teamChat.placeholder', { channel: activeChannelName })}
+                autoSize={{ minRows: 1, maxRows: 4 }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: textPrimary,
+                  resize: 'none',
+                  padding: '12px 14px',
+                }}
+              />
+            </div>
             <div
               style={{
                 display: 'flex',
@@ -648,12 +768,64 @@ export default function ChatPage() {
                 borderTop: `1px solid #30363d`,
               }}
             >
-              <Button type="text" icon={<PaperClipOutlined style={{ fontSize: 14, color: textTertiary }} />} size="small" />
-              <Button type="text" icon={<SmileOutlined style={{ fontSize: 14, color: textTertiary }} />} size="small" />
-              <Button type="text" icon={<BoldOutlined style={{ fontSize: 14, color: textTertiary }} />} size="small" />
-              <Button type="text" icon={<ItalicOutlined style={{ fontSize: 14, color: textTertiary }} />} size="small" />
-              <Button type="text" icon={<CodeOutlined style={{ fontSize: 14, color: textTertiary }} />} size="small" />
-              <Button type="text" icon={<LinkOutlined style={{ fontSize: 14, color: textTertiary }} />} size="small" />
+              <input
+                ref={fileInputRef}
+                type="file"
+                style={{ display: 'none' }}
+                onChange={handleFileSelected}
+              />
+              <Tooltip title={t('app.teamChat.attach', { defaultValue: '上传附件' })}>
+                <Button
+                  type="text"
+                  icon={<PaperClipOutlined style={{ fontSize: 14, color: uploading ? bluePrimary : textTertiary }} />}
+                  size="small"
+                  loading={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                />
+              </Tooltip>
+              <Popover
+                trigger="click"
+                open={emojiOpen}
+                onOpenChange={setEmojiOpen}
+                styles={{ root: { background: bgSecondary, border: `1px solid ${borderColor}` } }}
+                content={
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 2, width: 264 }}>
+                    {emojiPalette.map((emoji) => (
+                      <button
+                        key={emoji}
+                        onClick={() => { insertAtCursor(emoji); setEmojiOpen(false); }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          fontSize: 18,
+                          cursor: 'pointer',
+                          padding: 4,
+                          borderRadius: 6,
+                          lineHeight: 1,
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                }
+              >
+                <Button type="text" icon={<SmileOutlined style={{ fontSize: 14, color: textTertiary }} />} size="small" />
+              </Popover>
+              <Tooltip title="**粗体**">
+                <Button type="text" size="small" onClick={() => insertAtCursor('粗体', '**')} icon={<BoldOutlined style={{ fontSize: 14, color: textTertiary }} />} />
+              </Tooltip>
+              <Tooltip title="*斜体*">
+                <Button type="text" size="small" onClick={() => insertAtCursor('斜体', '*')} icon={<ItalicOutlined style={{ fontSize: 14, color: textTertiary }} />} />
+              </Tooltip>
+              <Tooltip title="`行内代码`">
+                <Button type="text" size="small" onClick={() => insertAtCursor('code', '`')} icon={<CodeOutlined style={{ fontSize: 14, color: textTertiary }} />} />
+              </Tooltip>
+              <Tooltip title="[文本](url)">
+                <Button type="text" size="small" onClick={insertLink} icon={<LinkOutlined style={{ fontSize: 14, color: textTertiary }} />} />
+              </Tooltip>
               <Tooltip title={wsStatus !== 'connected' ? t('app.teamChat.disconnected') : 'Enter'}>
                 <Button
                   type="primary"

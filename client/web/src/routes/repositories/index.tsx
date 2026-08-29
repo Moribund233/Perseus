@@ -20,7 +20,10 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useSpring, animated } from '@react-spring/web';
 import RepositoriesSkeleton from '../../components/skeleton/RepositoriesSkeleton';
+import Markdown from '../../components/Markdown';
 import { useRepositoriesStore } from '../../stores/repositories';
+import { useIssuesStore } from '../../stores/issues';
+import { usePullRequestsStore } from '../../stores/pullRequests';
 import { useAuthStore } from '../../stores/auth';
 import { repositoriesApi } from '../../api/repositories';
 import type { RepoFile, RepoBlob } from '../../api/repositories';
@@ -278,7 +281,6 @@ export default function RepositoriesPage() {
     repositories,
     currentRepo,
     files: storeFiles,
-    branches,
     commits,
     readme,
     isLoading,
@@ -304,6 +306,8 @@ export default function RepositoriesPage() {
   const [isStarred, setIsStarred] = useState(false);
   const [repoFilter, setRepoFilter] = useState<'mine' | 'all'>('mine');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const { issues, fetchIssues } = useIssuesStore();
+  const { pullRequests, fetchPullRequests } = usePullRequestsStore();
 
   useEffect(() => {
     if (repo && owner) {
@@ -353,11 +357,13 @@ export default function RepositoriesPage() {
       fetchReadme(currentRepo.id, ref);
       fetchBranches(currentRepo.id);
       fetchCommits(currentRepo.id, { branch: ref });
+      fetchIssues(currentRepo.id, 'open');
+      fetchPullRequests(currentRepo.id);
       repositoriesApi.getStarStatus(currentRepo.id).then((res) => {
         setIsStarred(res.starred);
       }).catch(() => {});
     }
-  }, [currentRepo, fetchTree, fetchReadme, fetchBranches, fetchCommits]);
+  }, [currentRepo, fetchTree, fetchReadme, fetchBranches, fetchCommits, fetchIssues, fetchPullRequests]);
 
   const repoTree = useMemo(() => buildTree(storeFiles), [storeFiles]);
 
@@ -612,8 +618,8 @@ export default function RepositoriesPage() {
 
   const tabItems: TabsProps['items'] = [
     { key: 'code', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><FileTextOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.code')}</span> },
-    { key: 'pullRequests', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={() => navigate(`/repositories/${owner}/${repo}/pulls`)}><PullRequestOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.pullRequests')}<span className="tab-count">{branches.length}</span></span> },
-    { key: 'issues', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={() => navigate(`/repositories/${owner}/${repo}/issues`)}><ExclamationCircleOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.issues')}<span className="tab-count">{commits.length}</span></span> },
+    { key: 'pullRequests', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={() => navigate(`/repositories/${owner}/${repo}/pulls`)}><PullRequestOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.pullRequests')}<span className="tab-count">{pullRequests.length}</span></span> },
+    { key: 'issues', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={() => navigate(`/repositories/${owner}/${repo}/issues`)}><ExclamationCircleOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.issues')}<span className="tab-count">{issues.length}</span></span> },
     { key: 'actions', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><PlayCircleOutlined style={{ fontSize: 14 }} />Actions</span> },
     { key: 'settings', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><SettingOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.settings')}</span> },
   ];
@@ -961,10 +967,10 @@ export default function RepositoriesPage() {
               README.md
             </div>
             <div
-              className="readme-body"
-              dangerouslySetInnerHTML={{ __html: readme }}
               style={{ padding: 20, fontSize: 14, lineHeight: 1.7, color: textSecondary }}
-            />
+            >
+              <Markdown>{readme}</Markdown>
+            </div>
           </div>
         )}
       </div>

@@ -25,6 +25,8 @@ export interface DashboardData {
   recent_activities: Record<string, unknown>[];
   recent_prs: Record<string, unknown>[];
   recent_issues: Record<string, unknown>[];
+  /** 最近 30 天按日活动聚合, key 为 "YYYY-MM-DD" */
+  contributions_by_day: Record<string, number>;
 }
 
 export interface SSHKey {

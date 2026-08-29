@@ -105,6 +105,12 @@ export interface CodeSearchResponse {
   truncated: boolean;
 }
 
+export interface FileCommitResponse {
+  commit_id: string;
+  branch: string;
+  path: string;
+}
+
 export const repositoriesApi = {
   list: (params?: { page?: number; per_page?: number }) => {
     const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
@@ -166,6 +172,23 @@ export const repositoriesApi = {
   getBlob: (repoId: string, path: string, ref?: string) => {
     const qs = `?path=${encodeURIComponent(path)}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}`;
     return apiRequest<RepoBlob>(`/api/v1/repositories/${repoId}/blob${qs}`);
+  },
+
+  commitFile: (repoId: string, path: string, data: { content: string; message?: string; branch?: string }) => {
+    // 保留路径分隔符, 仅对各段做 URI 编码 (后端 {file_path:path} 路由)
+    const encoded = path.split('/').map(encodeURIComponent).join('/');
+    return apiRequest<FileCommitResponse>(`/api/v1/repositories/${repoId}/contents/${encoded}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteFile: (repoId: string, path: string, branch?: string) => {
+    const encoded = path.split('/').map(encodeURIComponent).join('/');
+    const qs = branch ? `?branch=${encodeURIComponent(branch)}` : '';
+    return apiRequest<FileCommitResponse>(`/api/v1/repositories/${repoId}/contents/${encoded}${qs}`, {
+      method: 'DELETE',
+    });
   },
 
   getReadme: (repoId: string, ref?: string) => {
