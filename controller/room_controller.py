@@ -8,6 +8,7 @@ from models.repository import Repository
 from api.dependencies import get_current_user, get_current_admin_user
 from services.realtime.room_service import RoomService
 from services.repository_service import get_repository_by_id
+from core.exception import ValidationException
 import uuid
 
 
@@ -22,7 +23,17 @@ async def get_repository_room(
 ):
     room = await RoomService.get_repository_room(db, repo_id)
     if not room:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
+        # Fork/历史数据等路径不会创建房间, 按需补建保证仓库始终有频道
+        repo = await get_repository_by_id(repo_id, db)
+        if not repo:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+        try:
+            room = await RoomService.create_room(db, repo_id, repo["name"], current_user.id)
+        except ValidationException:
+            # 并发请求已创建
+            room = await RoomService.get_repository_room(db, repo_id)
+            if not room:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
     return {
         "id": room.id,
         "repository_id": room.repository_id,

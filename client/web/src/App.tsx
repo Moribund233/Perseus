@@ -61,7 +61,7 @@ function AppRoutes() {
           path="/"
           element={
             <PublicRoute>
-              <PageTransition><LandingPage /></PageTransition>
+              <PageTransition fill={false}><LandingPage /></PageTransition>
             </PublicRoute>
           }
         />

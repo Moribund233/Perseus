@@ -751,7 +751,7 @@ export default function RepositoriesPage() {
             ))
           ) : (
             <div style={{ padding: 16, color: textTertiary, fontSize: 13, textAlign: 'center' }}>
-              {t('app.repositories.noFiles')}
+              {t('app.repositories.empty.noFiles')}
             </div>
           )}
         </div>
@@ -823,7 +823,7 @@ export default function RepositoriesPage() {
                   {latestCommit.message}
                 </>
               ) : (
-                t('app.repositories.noCommits')
+                t('app.repositories.empty.noCommits')
               )}
             </span>
             <span style={{ color: textTertiary, fontSize: 12, whiteSpace: 'nowrap' }}>
@@ -879,7 +879,7 @@ export default function RepositoriesPage() {
           ))}
           {displayFiles.length === 0 && (
             <div style={{ padding: 16, color: textTertiary, fontSize: 13, textAlign: 'center' }}>
-              {t('app.repositories.noFiles')}
+              {t('app.repositories.empty.noFiles')}
             </div>
           )}
         </div>
