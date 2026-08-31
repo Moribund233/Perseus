@@ -44,7 +44,46 @@ export interface ChangePasswordRequest {
 
 export interface OAuthAccount {
   provider: string;
-  provider_user_id: string;
+  provider_username: string;
+  created_at: string;
+}
+
+export interface PaginationResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
+interface MyUserRef {
+  id: string;
+  username: string;
+  full_name: string | null;
+}
+
+export interface MyPullRequest {
+  id: string;
+  pr_number: number;
+  title: string;
+  status: string;
+  is_draft: boolean;
+  repository_id: string;
+  author: MyUserRef;
+  created_at: string;
+}
+
+export interface MyIssue {
+  id: string;
+  issue_number: number;
+  title: string;
+  status: string;
+  priority: string;
+  repository_id: string;
+  author: MyUserRef;
+  assignee: MyUserRef | null;
   created_at: string;
 }
 
@@ -61,11 +100,15 @@ export const settingsApi = {
   getDashboard: () =>
     apiRequest<DashboardData>('/api/v1/users/me/dashboard'),
 
-  getUserPullRequests: () =>
-    apiRequest<Record<string, unknown>[]>('/api/v1/users/me/pull-requests'),
+  getUserPullRequests: (params?: { status?: string; page?: number; limit?: number }) => {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    return apiRequest<PaginationResponse<MyPullRequest>>(`/api/v1/users/me/pull-requests${qs}`);
+  },
 
-  getUserIssues: () =>
-    apiRequest<Record<string, unknown>[]>('/api/v1/users/me/issues'),
+  getUserIssues: (params?: { status?: string; page?: number; limit?: number }) => {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    return apiRequest<PaginationResponse<MyIssue>>(`/api/v1/users/me/issues${qs}`);
+  },
 
   changePassword: (data: ChangePasswordRequest) =>
     apiRequest<void>('/api/v1/users/me/password', {

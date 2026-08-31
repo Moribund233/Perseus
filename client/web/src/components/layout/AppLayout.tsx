@@ -9,7 +9,6 @@ import {
   EditOutlined,
   MessageOutlined,
   SettingOutlined,
-  SearchOutlined,
   BellOutlined,
   PlusOutlined,
   UserOutlined,
@@ -20,6 +19,7 @@ import { useAuthStore } from '../../stores/auth';
 import { useNotificationsStore } from '../../stores/notifications';
 import { repositoriesApi, type Repository } from '../../api/repositories';
 import type { Notification } from '../../api/notifications';
+import GlobalSearch from './GlobalSearch';
 
 const { Header, Sider, Content } = Layout;
 
@@ -422,30 +422,7 @@ export default function AppLayout() {
           </div>
 
           {/* Search */}
-          <div style={{ flex: 1, maxWidth: 480, position: 'relative' }}>
-            <SearchOutlined
-              style={{
-                position: 'absolute',
-                left: 10,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: '#6e7681',
-                fontSize: 16,
-                zIndex: 1,
-              }}
-            />
-            <Input
-              placeholder={t('app.topBar.searchPlaceholder')}
-              style={{
-                width: '100%',
-                backgroundColor: '#0d1117',
-                borderColor: '#30363d',
-                color: textPrimary,
-                paddingLeft: 34,
-                fontSize: 13,
-              }}
-            />
-          </div>
+          <GlobalSearch />
 
           {/* Actions */}
           <Space size={8} style={{ marginLeft: 'auto' }}>

@@ -13,6 +13,8 @@
 >   PR 详情标签管理（拉取/添加/移除）、PR 编辑（标题/描述）、PR Review 提交（Approve/Request changes/Comment）
 > - 2026-08-29 批次 B（仓库能力页）：Releases tab（列表/创建/编辑/删除/草稿）、Actions tab 接 Builds（列表/状态筛选/日志）、
 >   仓库 Settings tab（描述/可见性/默认分支 + 协作者管理 + Webhooks CRUD/测试/投递记录）
+> - 2026-08-31 批次 C（用户中心）：Settings「安全」tab（SSH Keys 增删 + OAuth 账号解绑）、
+>   Dashboard「我的 PR / Issues」跨仓库聚合、顶栏全局搜索（防抖下拉 + /search 结果页 + Editor 行号跳转）
 
 ---
 
@@ -46,15 +48,15 @@
 - **后端**: `build_controller.py` 已实现 list/get/create/getLogs；PR 合并后自动创建 Build（F-046）
 - **前端**: 仓库页 Actions tab（`components/repo/BuildsTab.tsx`）：构建列表 + 状态筛选 + 日志查看
 
-### 2.4 用户中心类 API — P1
+### 2.4 用户中心类 API — ✅ 已完成（批次 C）
 
-`api/settings.ts` 中已封装但 UI 无入口：
+`api/settings.ts` 中的封装全部接入 UI：
 
-| 方法 | 后端 | 建议 |
+| 方法 | 后端 | 落地 |
 |---|---|---|
-| `listSSHKeys / addSSHKey / deleteSSHKey` | `key_controller.py` | Settings 新增 SSH Keys tab（表单 + 列表 + 删除） |
-| `listOAuthAccounts / unlinkOAuth` | `oauth_controller.py` | Settings 新增 OAuth 账号管理卡片 |
-| `getUserPullRequests / getUserIssues` | `user_controller.py /me/*` | Dashboard 或用户页聚合展示 |
+| `listSSHKeys / addSSHKey / deleteSSHKey` | `key_controller.py` | Settings「安全」tab（`components/settings/SecuritySettings.tsx`）：添加表单 + 列表（fingerprint）+ 删除（确认弹窗） |
+| `listOAuthAccounts / unlinkOAuth` | `oauth_controller.py` | 同上「安全」tab 内 OAuth 账号卡片：列表 + 解除绑定 |
+| `getUserPullRequests / getUserIssues` | `user_controller.py /me/*` | Dashboard「我的 PR / Issues」卡片（`components/dashboard/MyWork.tsx`）：跨仓库聚合 + PR/Issues 切换 + 点击跳转详情 |
 
 ---
 
@@ -64,7 +66,7 @@
 
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
-| 全局搜索框 | 无 value/onChange/onPressEnter | 后端 `search_controller.py` 已有仓库内与跨仓库搜索；需补全局搜索聚合端点 + 结果下拉页 | P2 |
+| 全局搜索框 | ✅ 已接线：受控输入 + 350ms 防抖 → 下拉结果（按仓库分组、可点击进 Editor 对应文件/行）+ Enter 进入 `/search` 结果页 | 复用了后端跨仓库代码搜索 `/api/v1/search/code`（已存在聚合端点） | P2 |
 | 通知点击跳转 | ✅ 已按 `target_type` 映射路由（PR→pulls / Issue→issues / 其余→仓库），解析 repository_id→path | — | P1 |
 | 侧边栏未读徽标 | 已移除假数字（本批） | 若要恢复，需后端提供未读聚合端点 | P3 |
 
@@ -134,7 +136,7 @@
 |---|---|---|
 | **批次 A（接线冲刺）** ✅ | 通知点击跳转、消息删除、文件删除、PR 标签 UI、PR 编辑、PR review 提交 — **已完成** | — |
 | **批次 B（仓库能力页）** ✅ | Releases tab（2.1）+ Actions/Builds tab（2.3）+ 仓库 Settings tab（含 Webhooks 2.2、协作者、默认分支）— **已完成** | — |
-| **批次 C（用户中心）** | SSH Keys、OAuth 账号管理、`/me/*` 聚合展示（2.4）；全局搜索（3.1） | 前端 2~3 天（搜索含少量后端） |
+| **批次 C（用户中心）** ✅ | SSH Keys、OAuth 账号管理、`/me/*` 聚合展示（2.4）；全局搜索（3.1）— **已完成** | — |
 | **批次 D（实时增强）** | Editor 在线状态（3.4）、聊天 presence/未读数（3.3）—— 共用 presence 基础设施，需后端 WS 扩展 | 前后端 4~6 天 |
 | **批次 E（体验完善）** | 消息 reactions、DM 私聊、文件树 last-commit 聚合、行内评论、亮色主题 | 按需评估，均涉及新后端能力 |
 

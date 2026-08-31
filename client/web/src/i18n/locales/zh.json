@@ -94,7 +94,11 @@
       "repoNamePattern": "仅支持字母、数字、点、下划线和连字符",
       "repoDescription": "描述（可选）",
       "repoDescriptionPlaceholder": "这个项目是做什么的？",
-      "repoVisibility": "可见性"
+      "repoVisibility": "可见性",
+      "searching": "搜索中...",
+      "searchFailed": "搜索失败，请重试",
+      "searchNoResults": "未找到与 '{{query}}' 相关的结果",
+      "searchViewAll": "查看全部结果"
     },
     "notifications": {
       "title": "通知",
@@ -278,7 +282,12 @@
       "timeJustNow": "刚刚",
       "timeMinutesAgo": "{{count}} 分钟前",
       "timeHoursAgo": "{{count}} 小时前",
-      "timeDaysAgo": "{{count}} 天前"
+      "timeDaysAgo": "{{count}} 天前",
+      "myPullRequests": "我的 Pull Requests",
+      "myIssues": "我的 Issues",
+      "issues": "Issues",
+      "loading": "加载中...",
+      "myWorkEmpty": "暂无相关内容"
     },
     "issues": {
       "title": "Issues",
@@ -436,7 +445,38 @@
       "inAppOnMention": "站内通知 — 被提及",
       "inAppOnMentionDesc": "有人 @ 提及你时站内提醒",
       "inAppOnIssueComment": "站内通知 — Issue 评论",
-      "inAppOnIssueCommentDesc": "你参与的 Issue 有新评论时提醒"
+      "inAppOnIssueCommentDesc": "你参与的 Issue 有新评论时提醒",
+      "security": "安全",
+      "securityDesc": "管理 SSH 密钥与第三方账号关联。",
+      "sshKeys": "SSH Keys",
+      "sshKeysDesc": "SSH 公钥允许你通过 SSH 进行 Git 认证。",
+      "sshKeyName": "名称",
+      "sshPublicKey": "SSH 公钥",
+      "addKey": "添加密钥",
+      "keyAdded": "SSH 密钥已添加",
+      "keyAddFailed": "添加 SSH 密钥失败",
+      "keyDeleteConfirm": "确定删除该 SSH 密钥吗？",
+      "keyDeleted": "SSH 密钥已删除",
+      "keyDeleteFailed": "删除 SSH 密钥失败",
+      "noKeys": "暂无 SSH 密钥",
+      "keyAddedAt": "添加于 {{time}}",
+      "oauthAccounts": "已关联的 OAuth 账号",
+      "oauthAccountsDesc": "你的账号可以通过第三方登录关联。",
+      "oauthUnlink": "解除绑定",
+      "oauthUnlinkConfirm": "确定解除绑定 {{provider}} 账号吗？",
+      "oauthUnlinked": "解绑成功",
+      "oauthUnlinkFailed": "解除绑定失败",
+      "noOauthAccounts": "尚未关联任何 OAuth 账号"
+    },
+    "search": {
+      "placeholder": "搜索全部仓库代码",
+      "button": "搜索",
+      "resultsFor": "关于 {{query}} 的结果",
+      "resultCount": "共 {{count}} 个匹配",
+      "failed": "搜索失败，请重试",
+      "noResults": "未找到与 {{query}} 相关的结果",
+      "matches": "个匹配",
+      "initialHint": "输入关键词搜索全部仓库的代码"
     }
   },
   "auth": {
@@ -484,6 +524,8 @@
   "common": {
     "language": "语言",
     "english": "English",
-    "chinese": "中文"
+    "chinese": "中文",
+    "confirm": "确定",
+    "cancel": "取消"
   }
 }

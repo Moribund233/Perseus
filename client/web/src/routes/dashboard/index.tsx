@@ -12,6 +12,7 @@ import { useAuthStore } from '../../stores/auth';
 import { useRepositoriesStore } from '../../stores/repositories';
 import { settingsApi, type DashboardData } from '../../api/settings';
 import DashboardSkeleton from '../../components/skeleton/DashboardSkeleton';
+import MyWorkCard from '../../components/dashboard/MyWork';
 
 interface Repo {
   id: string;
@@ -205,6 +206,16 @@ export default function DashboardPage() {
     [repositories]
   );
 
+  const { repoIdToPath, repoIdToName } = useMemo(() => {
+    const repoIdToPath = new Map<string, string>();
+    const repoIdToName = new Map<string, string>();
+    (repositories ?? []).forEach((repo) => {
+      repoIdToPath.set(repo.id, repo.path);
+      repoIdToName.set(repo.id, repo.name);
+    });
+    return { repoIdToPath, repoIdToName };
+  }, [repositories]);
+
   const contributions = useMemo(() => {
     const byDay = (dashboardData?.contributions_by_day ?? {}) as Record<string, number>;
     return Object.values(byDay).reduce((sum, n) => sum + n, 0);
@@ -257,11 +268,11 @@ export default function DashboardPage() {
 
       <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
         <Row gutter={[16, 16]} style={{ height: '100%' }}>
-          <Col span={16} style={{ height: '100%' }}>
+          <Col span={16} style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 16, overflow: 'hidden' }}>
             <Card
               title={<span style={{ fontSize: 14, fontWeight: 600, color: '#e6edf3' }}>{t('app.dashboard.recentActivity')}</span>}
               styles={{ body: { padding: '0 20px 20px', flex: 1, overflowY: 'auto' } }}
-              style={{ border: '1px solid #21262d', background: '#161b22', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+              style={{ border: '1px solid #21262d', background: '#161b22', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}
             >
               {activities.length === 0 ? (
                 <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', color: '#6e7681', fontSize: 13 }}>
@@ -286,6 +297,7 @@ export default function DashboardPage() {
                 />
               )}
             </Card>
+            <MyWorkCard repoPaths={repoIdToPath} repoNames={repoIdToName} />
           </Col>
           <Col span={8} style={{ height: '100%' }}>
             <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>

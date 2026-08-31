@@ -16,6 +16,7 @@ import PullRequestDetailPage from './routes/pull-requests/[prNumber]';
 import EditorPage from './routes/editor';
 import ChatPage from './routes/chat';
 import SettingsPage from './routes/settings';
+import GlobalSearchPage from './routes/search';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -85,6 +86,7 @@ function AppRoutes() {
         <Route path="/editor/:owner/:repo" element={<PageTransition><EditorPage /></PageTransition>} />
         <Route path="/chat" element={<PageTransition><ChatPage /></PageTransition>} />
         <Route path="/settings" element={<PageTransition><SettingsPage /></PageTransition>} />
+        <Route path="/search" element={<PageTransition><GlobalSearchPage /></PageTransition>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

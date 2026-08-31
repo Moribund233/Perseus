@@ -337,6 +337,8 @@ export default function EditorPage() {
   // 保存基线用 ref 承载, 避免闭包过期导致 dirty 判断失准
   const savedContentRef = useRef<string>('');
   const handleSaveRef = useRef<() => void>(() => {});
+  // 全局搜索结果跳转携带 ?line= 时, 编辑器就绪后滚动到该行
+  const pendingLineRef = useRef<number | null>(null);
 
   const {
     currentRepo,
@@ -378,8 +380,13 @@ export default function EditorPage() {
         if (cancelled) return;
         const tree = useRepositoriesStore.getState().files;
         const built = buildTree(tree);
+        const loc = new URLSearchParams(window.location.search);
+        const requestedFile = loc.get('file');
+        const lineParam = loc.get('line');
+        pendingLineRef.current = lineParam && Number(lineParam) > 0 ? Number(lineParam) : null;
+        const requestedNode = requestedFile ? findFileByKey(built, requestedFile) : undefined;
         const readme = findFileByKey(built, 'README.md') || findFileByKey(built, 'readme.md');
-        const defaultFile = readme || findFirstFile(built);
+        const defaultFile = requestedNode || readme || findFirstFile(built);
         if (defaultFile) {
           setActiveTab(defaultFile.key);
           setSelectedTreeKey(defaultFile.key);
@@ -555,6 +562,15 @@ export default function EditorPage() {
       extensions,
     });
     viewRef.current = new EditorView({ state, parent: editorRef.current });
+    const pendingLine = pendingLineRef.current;
+    if (pendingLine && pendingLine > 0) {
+      pendingLineRef.current = null;
+      const view = viewRef.current;
+      const docLine = view?.state.doc.line(Math.min(pendingLine, view.state.doc.lines));
+      if (docLine) {
+        view.dispatch({ selection: { anchor: docLine.from }, scrollIntoView: true });
+      }
+    }
     return () => {
       viewRef.current?.destroy();
       viewRef.current = null;

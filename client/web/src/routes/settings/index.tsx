@@ -12,12 +12,14 @@ import {
   MessageOutlined,
   PullRequestOutlined,
   TagOutlined,
+  KeyOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/auth';
 import { settingsApi } from '../../api/settings';
 import { notificationsApi, type NotificationPreference } from '../../api/notifications';
 import SettingsSkeleton from '../../components/skeleton/SettingsSkeleton';
+import SecuritySettings from '../../components/settings/SecuritySettings';
 
 const { Sider, Content } = Layout;
 
@@ -33,7 +35,7 @@ const bgSecondary = '#161b22';
 const bgTertiary = '#1c2128';
 const green = '#3fb950';
 
-type SettingsTab = 'profile' | 'account' | 'appearance' | 'notifications';
+type SettingsTab = 'profile' | 'account' | 'appearance' | 'notifications' | 'security';
 
 interface MenuItem {
   key: SettingsTab;
@@ -170,6 +172,7 @@ export default function SettingsPage() {
     { key: 'account', icon: <SafetyOutlined style={{ fontSize: 14 }} />, label: t('app.settings.account') },
     { key: 'appearance', icon: <GlobalOutlined style={{ fontSize: 14 }} />, label: t('app.settings.appearance') },
     { key: 'notifications', icon: <BellOutlined style={{ fontSize: 14 }} />, label: t('app.settings.notifications') },
+    { key: 'security', icon: <KeyOutlined style={{ fontSize: 14 }} />, label: t('app.settings.security') },
   ];
 
   return (
@@ -480,6 +483,10 @@ export default function SettingsPage() {
                 </Button>
               </div>
             </Card>
+          )}
+
+          {activeTab === 'security' && (
+            <SecuritySettings />
           )}
         </Form>
       </Content>
