@@ -3,11 +3,29 @@ import type { ChatMessage } from './chat';
 
 export type ChatSocketStatus = 'connecting' | 'connected' | 'disconnected';
 
+export interface PresenceUser {
+  user_id: string;
+  username: string;
+}
+
+export interface TypingEvent {
+  room_id: string;
+  user_id: string;
+  username: string;
+  is_typing: boolean;
+}
+
 interface ChatSocketHandlers {
   onChatMessage?: (msg: ChatMessage) => void;
   onAck?: (msg: ChatMessage) => void;
   onStatusChange?: (status: ChatSocketStatus) => void;
   onError?: (error: string, originalType?: string) => void;
+  onPresence?: (roomId: string, users: PresenceUser[]) => void;
+  onPresenceJoin?: (roomId: string, user: PresenceUser) => void;
+  onPresenceLeave?: (roomId: string, user: PresenceUser) => void;
+  onTyping?: (evt: TypingEvent) => void;
+  onReaction?: (msg: ChatMessage) => void;
+  onReactionAck?: (msg: ChatMessage) => void;
 }
 
 function resolveWsUrl(): string {
@@ -73,8 +91,16 @@ class ChatSocketClient {
     this.send({ type: 'chat_message', room_id: roomId, content, reply_to: replyTo });
   }
 
+  sendReaction(roomId: string, messageId: string, emoji: string, add: boolean) {
+    this.send({ type: 'chat_reaction', room_id: roomId, message_id: messageId, emoji, add });
+  }
+
   sendTyping(roomId: string, isTyping: boolean) {
     this.send({ type: 'chat_typing', room_id: roomId, is_typing: isTyping });
+  }
+
+  requestPresenceList(roomId: string) {
+    this.send({ type: 'presence_list', room_id: roomId });
   }
 
   private send(payload: Record<string, unknown>) {
@@ -108,6 +134,33 @@ class ChatSocketClient {
           break;
         case 'chat_message':
           this.handlers.onChatMessage?.(data.message as ChatMessage);
+          break;
+        case 'chat_reaction_ack':
+          this.handlers.onReactionAck?.(data.message as ChatMessage);
+          break;
+        case 'chat_reaction':
+          this.handlers.onReaction?.(data.message as ChatMessage);
+          break;
+        case 'presence_list':
+          this.handlers.onPresence?.(data.room_id as string, (data.users ?? []) as PresenceUser[]);
+          break;
+        case 'presence_join': {
+          const user = { user_id: data.user_id, username: data.username } as PresenceUser;
+          this.handlers.onPresenceJoin?.(data.room_id as string, user);
+          break;
+        }
+        case 'presence_leave': {
+          const user = { user_id: data.user_id, username: data.username } as PresenceUser;
+          this.handlers.onPresenceLeave?.(data.room_id as string, user);
+          break;
+        }
+        case 'chat_typing':
+          this.handlers.onTyping?.({
+            room_id: data.room_id,
+            user_id: data.user_id,
+            username: data.username,
+            is_typing: data.is_typing,
+          } as TypingEvent);
           break;
         case 'error':
           this.handlers.onError?.(data.error as string, data.original_type as string | undefined);

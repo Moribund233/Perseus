@@ -80,6 +80,7 @@ interface Member {
   status: 'online' | 'away' | 'offline';
   initials: string;
   color: string;
+  user_id: string;
 }
 
 function getInitials(name: string): string {
@@ -118,6 +119,7 @@ function mapChatMessage(msg: ChatMessage): Message {
     color: getAvatarColor(initials),
     time: formatMessageTime(msg.created_at),
     text: msg.content,
+    reactions: msg.reactions,
   };
 }
 
@@ -151,6 +153,8 @@ export default function ChatPage() {
   const [channelsLoaded, setChannelsLoaded] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
+  const [unreadByRepo, setUnreadByRepo] = useState<Record<string, number>>({});
   const { t } = useTranslation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeRoomIdRef = useRef<string | null>(null);
@@ -166,12 +170,28 @@ export default function ChatPage() {
       id: r.id,
       name: r.name,
       type: r.is_public ? 'public' : 'private',
-      unread: 0,
+      unread: unreadByRepo[r.id] ?? 0,
     })),
-    [repositories]
+    [repositories, unreadByRepo]
   );
 
+  const refreshUnread = useCallback(async () => {
+    try {
+      const list = await chatApi.getUnreadCounts();
+      const map: Record<string, number> = {};
+      for (const r of list) map[r.repository_id] = r.unread_count;
+      setUnreadByRepo(map);
+    } catch {
+      // 未读刷新失败不影响主流程
+    }
+  }, []);
+
   // WebSocket: 连接、房间订阅与实时消息接收
+  const applyReaction = useCallback((updated: ChatMessage) => {
+    // 无论消息是否在当前频道, 都尝试定位更新 (ack 与广播最终一致)
+    setMessages((prev) => prev.map((m) => m.id === updated.id ? mapChatMessage(updated) : m));
+  }, []);
+
   useEffect(() => {
     chatSocket.setHandlers({
       onStatusChange: setWsStatus,
@@ -184,15 +204,49 @@ export default function ChatPage() {
       onChatMessage: (msg) => {
         if (msg.room_id === activeRoomIdRef.current) {
           setMessages((prev) => [...prev, mapChatMessage(msg)]);
+          // 正在观看的频道收到新消息立即保持已读水位
+          chatApi.markRead(msg.room_id).catch(() => {});
+        } else {
+          refreshUnread();
         }
+      },
+      onReactionAck: (msg) => {
+        if (msg.room_id === activeRoomIdRef.current) applyReaction(msg);
+      },
+      onReaction: (msg) => {
+        if (msg.room_id === activeRoomIdRef.current) applyReaction(msg);
+      },
+      onPresence: (roomId, users) => {
+        if (roomId === activeRoomIdRef.current) {
+          setOnlineUserIds(new Set(users.map((u) => u.user_id)));
+        }
+      },
+      onPresenceJoin: (roomId, user) => {
+        if (roomId !== activeRoomIdRef.current) return;
+        setOnlineUserIds((prev) => {
+          if (prev.has(user.user_id)) return prev;
+          const next = new Set(prev);
+          next.add(user.user_id);
+          return next;
+        });
+      },
+      onPresenceLeave: (roomId, user) => {
+        if (roomId !== activeRoomIdRef.current) return;
+        setOnlineUserIds((prev) => {
+          if (!prev.has(user.user_id)) return prev;
+          const next = new Set(prev);
+          next.delete(user.user_id);
+          return next;
+        });
       },
       onError: (err, originalType) => {
         if (originalType === 'chat_message') setSendError(err);
       },
     });
     chatSocket.start();
+    Promise.resolve().then(() => refreshUnread());
     return () => chatSocket.stop();
-  }, []);
+  }, [refreshUnread, applyReaction]);
 
   // Fetch user repositories on mount
   useEffect(() => {
@@ -223,6 +277,12 @@ export default function ChatPage() {
         joinedRoomIdRef.current = roomData.id;
       }
 
+      // 进入频道: 拉取在线成员并标记已读
+      setOnlineUserIds(new Set());
+      chatSocket.requestPresenceList(roomData.id);
+      setUnreadByRepo((prev) => ({ ...prev, [repoId]: 0 }));
+      chatApi.markRead(roomData.id).catch(() => {});
+
       const [messagesRes, membersRes] = await Promise.all([
         chatApi.getRoomMessages(roomData.id, { limit: 50 }),
         chatApi.getRoomMembers(roomData.id),
@@ -236,9 +296,10 @@ export default function ChatPage() {
         const name = m.username || m.user_id;
         const initials = getInitials(name);
         return {
+          user_id: m.user_id,
           name,
           role: m.role === 'admin' ? 'Admin' : 'Member',
-          status: 'online',
+          status: 'offline',
           initials,
           color: getAvatarColor(initials),
         };
@@ -250,7 +311,7 @@ export default function ChatPage() {
         return {
           id: m.user_id,
           name,
-          status: 'online',
+          status: 'offline',
           initials,
           color: getAvatarColor(initials),
         };
@@ -305,6 +366,24 @@ export default function ChatPage() {
       antdMessage.error((e as Error).message || 'Failed to delete message');
     }
   }, [room, user]);
+
+  const handleReaction = useCallback(async (msg: Message, emoji: string) => {
+    if (!room) return;
+    if (wsStatus !== 'connected') return;
+    const existing = msg.reactions?.find((r) => r.emoji === emoji);
+    const adding = !existing?.active;
+    chatSocket.sendReaction(room.id, msg.id, emoji, adding);
+  }, [room, wsStatus]);
+
+  const handleReactionPicker = useCallback(async (msg: Message, emoji: string) => {
+    if (!room) return;
+    try {
+      const updated = await chatApi.addReaction(room.id, msg.id, emoji);
+      applyReaction(updated);
+    } catch (e) {
+      antdMessage.error((e as Error).message || 'Failed to add reaction');
+    }
+  }, [room, applyReaction]);
 
   const handleInputChange = (value: string) => {
     setInput(value);
@@ -406,8 +485,8 @@ export default function ChatPage() {
     );
   }
 
-  const onlineMembers = members.filter((m) => m.status !== 'offline');
-  const offlineMembers = members.filter((m) => m.status === 'offline');
+  const onlineMembers = members.filter((m) => onlineUserIds.has(m.user_id));
+  const offlineMembers = members.filter((m) => !onlineUserIds.has(m.user_id));
 
   return (
     <Layout style={{ height: '100%', background: 'transparent' }}>
@@ -541,7 +620,7 @@ export default function ChatPage() {
                     width: 8,
                     height: 8,
                     borderRadius: '50%',
-                    background: statusColor(dm.status),
+                    background: statusColor(onlineUserIds.has(dm.id) ? 'online' : 'offline'),
                     border: `2px solid ${bgSecondary}`,
                   }}
                 />
@@ -698,11 +777,11 @@ export default function ChatPage() {
                 >
                   <Markdown>{msg.text}</Markdown>
                 </div>
-                {msg.reactions && (
-                  <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                    {msg.reactions.map((r, idx) => (
+                <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                    {msg.reactions && msg.reactions.map((r, idx) => (
                       <span
                         key={idx}
+                        onClick={() => handleReaction(msg, r.emoji)}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -718,9 +797,49 @@ export default function ChatPage() {
                         {r.emoji} <span style={{ fontSize: 11, color: textSecondary }}>{r.count}</span>
                       </span>
                     ))}
+                    <Popover
+                      trigger="click"
+                      styles={{ root: { background: bgSecondary, border: `1px solid ${borderColor}` } }}
+                      content={
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 2, width: 264 }}>
+                          {emojiPalette.map((emoji) => (
+                            <button
+                              key={emoji}
+                              onClick={() => { handleReactionPicker(msg, emoji); }}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                fontSize: 16,
+                                cursor: 'pointer',
+                                padding: 4,
+                                borderRadius: 6,
+                                lineHeight: 1,
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      }
+                    >
+                      <button
+                        style={{
+                          background: 'transparent',
+                          border: `1px dashed #30363d`,
+                          borderRadius: 12,
+                          color: textTertiary,
+                          fontSize: 12,
+                          padding: '0 8px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        +
+                      </button>
+                    </Popover>
                   </div>
-                )}
-              </div>
+                </div>
             </div>
           ))}
           <div ref={messagesEndRef} />
@@ -891,7 +1010,7 @@ export default function ChatPage() {
                     width: 8,
                     height: 8,
                     borderRadius: '50%',
-                    background: statusColor(m.status),
+                    background: statusColor(onlineUserIds.has(m.user_id) ? 'online' : 'offline'),
                     border: `2px solid ${bgSecondary}`,
                   }}
                 />
@@ -917,7 +1036,7 @@ export default function ChatPage() {
               gap: 6,
             }}
           >
-            <StatusDot status="offline" size={8} /> Offline — {offlineMembers.length}
+            <StatusDot status="offline" size={8} /> {t('app.teamChat.offlineMembers')} — {offlineMembers.length}
           </div>
           {offlineMembers.map((m) => (
             <div
@@ -944,7 +1063,7 @@ export default function ChatPage() {
                     width: 8,
                     height: 8,
                     borderRadius: '50%',
-                    background: statusColor(m.status),
+                    background: statusColor(onlineUserIds.has(m.user_id) ? 'online' : 'offline'),
                     border: `2px solid ${bgSecondary}`,
                   }}
                 />

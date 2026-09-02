@@ -104,10 +104,46 @@ def _get_tree(repo: pygit2.Repository, commit: pygit2.Commit, path: str = "") ->
         raise PathNotFoundException(detail=f"Path not found: {path}")
 
 
+def _get_file_last_commit(repo: pygit2.Repository, commit: pygit2.Commit, path: str) -> Dict[str, Any] | None:
+    """
+    获取某文件的最近提交信息（非空仓库）
+
+    仅对文件（blob）有意义；目录返回 None。
+    通过 `simplify_first_parent()` 过滤走树历史，只考虑修改过该路径的提交，
+    按时间排序取最新的一个，避免遍历整条历史。
+
+    Args:
+        repo: 仓库对象
+        commit: 起始提交对象（HEAD）
+        path: 文件路径
+
+    Returns:
+        dict: {"hash", "message", "author", "date"} 或 None（无可定位提交）
+    """
+    try:
+        entry = commit.tree[path]
+        if entry.type != pygit2.GIT_OBJECT_BLOB:
+            return None
+    except KeyError:
+        return None
+
+    walker = repo.walk(commit.id, pygit2.GIT_SORT_TIME)
+    walker.simplify_first_parent()
+    for c in walker:
+        return {
+            "hash": str(c.id),
+            "message": c.message,
+            "author": c.author.name,
+            "date": datetime.fromtimestamp(c.author.time).isoformat(),
+        }
+    return None
+
+
 async def get_tree_entries(
     repo_path: str,
     ref: str = "HEAD",
-    path: str = ""
+    path: str = "",
+    last_commit: bool = False
 ) -> Dict[str, Any]:
     """
     获取文件树条目
@@ -116,6 +152,7 @@ async def get_tree_entries(
         repo_path: 仓库物理路径
         ref: 分支名或提交SHA，默认 HEAD
         path: 子目录路径，默认根目录
+        last_commit: 是否附带每个文件最近提交信息（仅对文件），默认 False
 
     Returns:
         dict: 包含路径列表和条目列表的字典
@@ -162,6 +199,10 @@ async def get_tree_entries(
         if entry.type == pygit2.GIT_OBJECT_BLOB:
             blob = repo[entry.id]
             entry_data["size"] = blob.size
+            if last_commit:
+                entry_data["last_commit"] = _get_file_last_commit(
+                    repo, commit, f"{path}/{entry.name}" if path else entry.name
+                )
 
         entries.append(entry_data)
 

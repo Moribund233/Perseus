@@ -38,6 +38,7 @@ def register_all_handlers():
         "room_leave": room.handle_room_leave,
         "chat_message": chat.handle_chat_message,
         "chat_typing": chat.handle_chat_typing,
+        "chat_reaction": chat.handle_chat_reaction,
         "presence_list": room.handle_presence_list,
     }
     

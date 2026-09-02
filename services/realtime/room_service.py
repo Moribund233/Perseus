@@ -40,6 +40,7 @@ class RoomService:
             user_id=created_by_user_id,
             role="admin",
             joined_at=datetime.now(timezone.utc),
+            last_read_at=datetime.now(timezone.utc),
         )
         db.add(member)
         await db.commit()
@@ -92,6 +93,7 @@ class RoomService:
             user_id=user_id,
             role="member",
             joined_at=datetime.now(timezone.utc),
+            last_read_at=datetime.now(timezone.utc),
         )
         db.add(member)
         await db.commit()

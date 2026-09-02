@@ -380,6 +380,19 @@ pytest -v -m e2e
 - **Sprint 3（2-3 周）**：F-204 + F-205，补齐实时协作高级能力
 - **Sprint 4（持续）**：F-048~050 + F-051~057，国际化与生产准备
 
+### 7.4 批次 D 增量（2026-08-31 实时增强）
+
+配合前端 pres̲ence/未读接线新增的 REST 端点：
+
+| 端点 | 说明 |
+|------|------|
+| `GET /api/v1/rooms/unread` | 当前用户所在全部房间的未读数（含 0）；未读 = 非本人、非删除消息且 `created_at > last_read_at` |
+| `POST /api/v1/rooms/{room_id}/read` | 将房间标记已读（更新 `RoomMember.last_read_at` 水位） |
+
+- `ChatService.get_unread_counts` / `mark_read`；`RoomService` 建房/加入时初始化 `last_read_at`（新成员历史不计未读）
+- 修复：`send_message` 显式写入微秒级 `created_at`，规避 SQLite `CURRENT_TIMESTAMP` 秒级存储与水位比较不一致
+- 在线状态沿用既有 WS presence（`presence_list`/`join`/`leave`），前端 chat/editor 页已接线
+
 ---
 
 ## 附录：现有测试基础

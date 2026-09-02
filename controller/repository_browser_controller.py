@@ -64,6 +64,7 @@ async def get_repository_tree(
     repo_id: uuid.UUID,
     ref: str = Query("HEAD", description="分支名或提交SHA"),
     path: str = Query("", description="子目录路径"),
+    last_commit: bool = Query(False, description="是否附带每个文件最近提交信息"),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
@@ -73,6 +74,7 @@ async def get_repository_tree(
         repo_id: 仓库ID
         ref: 分支名或提交SHA，默认 HEAD
         path: 子目录路径，默认根目录
+        last_commit: 是否附带每个文件最近提交信息
         db: 数据库会话
 
     Returns:
@@ -82,7 +84,7 @@ async def get_repository_tree(
         HTTPException: 仓库或路径不存在
     """
     repo_path = await _get_repo_path(repo_id, db)
-    return await get_tree_entries(repo_path, ref=ref, path=path)
+    return await get_tree_entries(repo_path, ref=ref, path=path, last_commit=last_commit)
 
 
 @router.get("/{repo_id}/blob")

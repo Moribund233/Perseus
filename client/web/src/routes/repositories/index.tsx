@@ -887,8 +887,27 @@ export default function RepositoriesPage() {
                 {file.type === 'directory' ? <FolderOutlined /> : <FileOutlined />}
               </span>
               <span style={{ flex: 1, color: textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</span>
-              <span style={{ flex: 2, color: textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>-</span>
-              <span style={{ color: textTertiary, fontSize: 12, width: 100, textAlign: 'right', whiteSpace: 'nowrap' }}></span>
+              <span style={{ flex: 2, color: textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {file.type === 'file' && file.last_commit ? (
+                  <>
+                    <strong style={{ color: textPrimary, marginRight: 4 }}>{file.last_commit.author}</strong>
+                    {file.last_commit.message}
+                  </>
+                ) : '-'}
+              </span>
+              <span style={{ color: textTertiary, fontSize: 12, width: 100, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                {file.type === 'file' && file.last_commit ? (() => {
+                  const d = new Date(file.last_commit.date);
+                  if (Number.isNaN(d.getTime())) return '';
+                  const diff = Date.now() - d.getTime();
+                  if (diff < 60_000) return t('app.repositories.fileList.timeUnits.justNow');
+                  if (diff < 3_600_000) return t('app.repositories.fileList.timeUnits.minutesAgo', { n: Math.floor(diff / 60_000) });
+                  if (diff < 86_400_000) return t('app.repositories.fileList.timeUnits.hoursAgo', { n: Math.floor(diff / 3_600_000) });
+                  if (diff < 7 * 86_400_000) return t('app.repositories.fileList.timeUnits.daysAgo', { n: Math.floor(diff / 86_400_000) });
+                  if (diff < 30 * 86_400_000) return t('app.repositories.fileList.timeUnits.monthsAgo', { n: Math.floor(diff / (30 * 86_400_000)) });
+                  return t('app.repositories.fileList.timeUnits.yearsAgo', { n: Math.floor(diff / (365 * 86_400_000)) });
+                })() : ''}
+              </span>
             </div>
           ))}
           {displayFiles.length === 0 && (

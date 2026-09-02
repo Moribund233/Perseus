@@ -32,7 +32,9 @@ import { useParams } from 'react-router-dom';
 import EditorSkeleton from '../../components/skeleton/EditorSkeleton';
 import Markdown from '../../components/Markdown';
 import { useRepositoriesStore } from '../../stores/repositories';
-import type { RepoFile, RepoMember } from '../../api/repositories';
+import { chatApi } from '../../api/chat';
+import { chatSocket, type PresenceUser } from '../../api/chatSocket';
+import type { RepoFile } from '../../api/repositories';
 
 const { Sider, Content } = Layout;
 
@@ -331,6 +333,7 @@ export default function EditorPage() {
   const [deleteTarget, setDeleteTarget] = useState<TreeNode | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [cursor, setCursor] = useState({ line: 1, col: 1 });
+  const [onlinePresence, setOnlinePresence] = useState<PresenceUser[]>([]);
   const { t } = useTranslation();
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -344,7 +347,6 @@ export default function EditorPage() {
     currentRepo,
     files,
     currentBlob,
-    members,
     fetchRepositoryByPath,
     fetchTree,
     fetchBlob,
@@ -406,6 +408,44 @@ export default function EditorPage() {
       clearCurrent();
     };
   }, [owner, repo, fetchRepositoryByPath, fetchTree, fetchBlob, fetchMembers, clearCurrent]);
+
+  // 实时在线协作者: 订阅仓库房间 presence
+  useEffect(() => {
+    const repoId = currentRepo?.id;
+    if (!repoId) return;
+
+    const joinedRoomRef = { current: '' };
+    chatSocket.setHandlers({
+      onPresence: (roomId, users) => {
+        if (roomId === joinedRoomRef.current) setOnlinePresence(users);
+      },
+      onPresenceJoin: (roomId, user) => {
+        if (roomId !== joinedRoomRef.current) return;
+        setOnlinePresence((prev) =>
+          prev.some((u) => u.user_id === user.user_id) ? prev : [...prev, user]
+        );
+      },
+      onPresenceLeave: (roomId, user) => {
+        if (roomId !== joinedRoomRef.current) return;
+        setOnlinePresence((prev) => prev.filter((u) => u.user_id !== user.user_id));
+      },
+    });
+    chatSocket.start();
+
+    chatApi.getRepositoryRoom(repoId)
+      .then((roomData) => {
+        joinedRoomRef.current = roomData.id;
+        chatSocket.joinRoom(roomData.id);
+        chatSocket.requestPresenceList(roomData.id);
+      })
+      .catch(() => {});
+
+    return () => {
+      if (joinedRoomRef.current) chatSocket.leaveRoom(joinedRoomRef.current);
+      chatSocket.setHandlers({});
+      chatSocket.stop();
+    };
+  }, [currentRepo?.id]);
 
   const handleSelectFile = useCallback(async (key: string) => {
     setSelectedTreeKey(key);
@@ -578,21 +618,21 @@ export default function EditorPage() {
   }, [loading, activeTab, currentBlob]);
 
   const collaborators = useMemo(() => {
-    return (members as RepoMember[]).map((m) => {
-      const name = m.user?.username || m.user_id;
+    return (onlinePresence as PresenceUser[]).map((u) => {
+      const name = u.username || u.user_id;
       const initials = getInitials(name);
       return {
         initials,
         color: getAvatarColor(initials),
         border: getAvatarColor(initials),
-        title: `${name} — ${m.role}`,
+        title: name,
       };
     });
-  }, [members]);
+  }, [onlinePresence]);
 
   const editors = useMemo(() => {
-    return (members as RepoMember[]).map((m) => {
-      const name = m.user?.username || m.user_id;
+    return (onlinePresence as PresenceUser[]).map((u) => {
+      const name = u.username || u.user_id;
       const initials = getInitials(name);
       return {
         initials,
@@ -602,7 +642,7 @@ export default function EditorPage() {
         status: 'viewing' as const,
       };
     });
-  }, [members, activeTab]);
+  }, [onlinePresence, activeTab]);
 
   if (loading) return <EditorSkeleton />;
 
@@ -841,8 +881,8 @@ export default function EditorPage() {
                 width: 7,
                 height: 7,
                 borderRadius: '50%',
-                background: green,
-                boxShadow: `0 0 6px ${green}`,
+                background: onlinePresence.length > 0 ? green : '#6e7681',
+                boxShadow: onlinePresence.length > 0 ? `0 0 6px ${green}` : 'none',
               }}
             />
             {t('app.codeEditor.online')}
@@ -876,7 +916,7 @@ export default function EditorPage() {
           </div>
           <div style={{ color: textTertiary, marginLeft: 'auto', fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
             <TeamOutlined style={{ fontSize: 14 }} />
-            <strong style={{ color: textSecondary }}>{Math.max(1, members.length)}</strong> editors viewing this file
+            <strong style={{ color: textSecondary }}>{onlinePresence.length}</strong> {t('app.codeEditor.editorsOnline')}
           </div>
         </div>
 
@@ -1006,12 +1046,12 @@ export default function EditorPage() {
             {currentRepo?.default_branch || 'main'}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: green, display: 'inline-block', marginRight: 2 }} />
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: onlinePresence.length > 0 ? green : '#6e7681', display: 'inline-block', marginRight: 2 }} />
             {t('app.codeEditor.online')}
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 16 }}>
             <span>{t('app.codeEditor.lnCol', { defaultValue: `Ln ${cursor.line}, Col ${cursor.col}` })}</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><TeamOutlined style={{ fontSize: 12 }} /> {members.length || 1} online</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><TeamOutlined style={{ fontSize: 12 }} /> {onlinePresence.length} online</span>
             {isDirty && <span style={{ color: '#e3b341' }}>{t('app.codeEditor.unsavedShort', { defaultValue: '● 未保存' })}</span>}
             <span>{activeNode?.fileType ? activeNode.fileType.toUpperCase() : 'Text'}</span>
             <span>UTF-8</span>

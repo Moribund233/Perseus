@@ -10,6 +10,7 @@ export interface ChatMessage {
   reply_to: string | null;
   edited_at: string | null;
   created_at: string | null;
+  reactions?: { emoji: string; count: number; active: boolean }[];
 }
 
 export interface RoomMember {
@@ -44,6 +45,13 @@ export interface ChatAttachment {
   url: string;
 }
 
+export interface RoomUnread {
+  room_id: string;
+  repository_id: string;
+  room_name: string;
+  unread_count: number;
+}
+
 export const chatApi = {
   getRoomMessages: (roomId: string, params?: { limit?: number; before?: string }) => {
     const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
@@ -56,8 +64,26 @@ export const chatApi = {
   deleteMessage: (roomId: string, msgId: string) =>
     apiRequest<void>(`/api/v1/rooms/${roomId}/messages/${msgId}`, { method: 'DELETE' }),
 
+  addReaction: (roomId: string, msgId: string, emoji: string) =>
+    apiRequest<ChatMessage>(`/api/v1/rooms/${roomId}/messages/${msgId}/reactions`, {
+      method: 'POST',
+      body: JSON.stringify({ emoji }),
+    }),
+
+  removeReaction: (roomId: string, msgId: string, emoji: string) =>
+    apiRequest<ChatMessage>(`/api/v1/rooms/${roomId}/messages/${msgId}/reactions`, {
+      method: 'DELETE',
+      body: JSON.stringify({ emoji }),
+    }),
+
   getRepositoryRoom: (repoId: string) =>
     apiRequest<RealtimeRoom>(`/api/v1/repositories/${repoId}/room`),
+
+  getUnreadCounts: () =>
+    apiRequest<RoomUnread[]>('/api/v1/rooms/unread'),
+
+  markRead: (roomId: string) =>
+    apiRequest<{ success: boolean }>(`/api/v1/rooms/${roomId}/read`, { method: 'POST' }),
 
   uploadAttachment: (roomId: string, file: File) => {
     const form = new FormData();

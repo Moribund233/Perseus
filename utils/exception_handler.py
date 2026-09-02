@@ -1,12 +1,16 @@
 """
 异常处理工具
 
-提供统一的异常处理机制，用于捕获和处理应用中的各种异常
+提供统一的异常处理机制，用于捕获和处理应用中的各种异常。
+当异常携带 ``error_code`` 时，根据 `Accept-Language` 请求头自动返回
+对应语言的本地化错误消息；无 `Accept-Language` 或无 `error_code` 时
+沿用原 `detail`，完全向后兼容。
 """
 import traceback
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from core.exception import BaseException
+from core.i18n import normalize_locale, get_error_message
 from utils.logging import get_named_logger
 
 # 创建异常日志记录器
@@ -46,28 +50,36 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     捕获并处理应用中所有未被捕获的异常。
 
     自定义异常（继承自 BaseException）已在其 __init__ 中设置了正确的
-    status_code，因此无需按子类分别映射状态码。
+    status_code，因此无需按子类分别映射状态码。当异常携带 `error_code`
+    时，根据 `Accept-Language` 请求头自动翻译 `detail`。
     """
     is_debug = _is_debug_mode()
 
-    # 记录异常
     _log_exception(exc, is_debug)
 
-    # 如果是自定义异常，直接使用异常中设定的 HTTP 状态码返回
+    # --- BaseException 及子类 ---
     if isinstance(exc, BaseException):
+        # 根据 Accept-Language 翻译 detail
+        detail = exc.detail
+        if getattr(exc, "error_code", None):
+            accept_language = request.headers.get("accept-language")
+            locale = normalize_locale(accept_language)
+            translated = get_error_message(exc.error_code, locale, default=detail)
+            detail = translated or detail
+
         return JSONResponse(
             status_code=exc.status_code,
             content={
-                "detail": exc.detail,
+                "detail": detail,
                 "error": {
                     "code": exc.status_code,
-                    "message": exc.detail,
-                    "type": exc.__class__.__name__ if is_debug else "Error"
-                }
-            }
+                    "message": detail,
+                    "type": exc.__class__.__name__ if is_debug else "Error",
+                },
+            },
         )
 
-    # 处理其他类型的异常
+    # --- 其他未处理异常 ---
     if is_debug:
         error_msg = str(exc) if str(exc) else "Internal Server Error"
         error_type = exc.__class__.__name__
@@ -82,9 +94,9 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
             "error": {
                 "code": 500,
                 "message": error_msg if is_debug else "Internal Server Error",
-                "type": error_type if is_debug else "InternalServerError"
-            }
-        }
+                "type": error_type if is_debug else "InternalServerError",
+            },
+        },
     )
 
 

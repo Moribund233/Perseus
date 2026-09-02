@@ -75,3 +75,21 @@ class TestChatHandlers:
         await handle_chat_typing(conn, {"type": "chat_typing", "room_id": 1, "is_typing": True})
         call_args = _sent_payload(mock_ws)
         assert call_args["type"] == "error"
+
+    @pytest.mark.asyncio
+    async def test_handle_chat_reaction_requires_auth(self):
+        from api.websocket.handlers.chat import handle_chat_reaction
+        manager = ConnectionManager()
+        conn, mock_ws = await _register_connection(manager)
+        await handle_chat_reaction(conn, {"type": "chat_reaction", "room_id": 1, "message_id": 1, "emoji": "👍", "add": True})
+        call_args = _sent_payload(mock_ws)
+        assert call_args["type"] == "error"
+
+    @pytest.mark.asyncio
+    async def test_handle_chat_reaction_missing_fields(self):
+        from api.websocket.handlers.chat import handle_chat_reaction
+        manager = ConnectionManager()
+        conn, mock_ws = await _register_connection(manager, user_id=uuid.uuid4())
+        await handle_chat_reaction(conn, {"type": "chat_reaction", "room_id": 1})
+        call_args = _sent_payload(mock_ws)
+        assert call_args["type"] == "error"

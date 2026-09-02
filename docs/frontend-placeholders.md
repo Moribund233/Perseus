@@ -15,6 +15,8 @@
 >   仓库 Settings tab（描述/可见性/默认分支 + 协作者管理 + Webhooks CRUD/测试/投递记录）
 > - 2026-08-31 批次 C（用户中心）：Settings「安全」tab（SSH Keys 增删 + OAuth 账号解绑）、
 >   Dashboard「我的 PR / Issues」跨仓库聚合、顶栏全局搜索（防抖下拉 + /search 结果页 + Editor 行号跳转）
+> - 2026-08-31 批次 D（实时增强）：聊天/Editor 在线状态接 WS presence（list/join/leave）、
+>   聊天频道未读数徽标（后端 `GET /rooms/unread` + `POST /rooms/{id}/read`，RoomMember.last_read_at 水位）
 
 ---
 
@@ -86,8 +88,8 @@
 | 顶栏 Eye/Search/More 三按钮 | 无 onClick | 无对应后端能力；Search 可接消息搜索（需后端消息检索端点） | P3 |
 | 消息删除 | ✅ 已加本人 hover 删除按钮 + 确认，调用 `chatApi.deleteMessage` | — | P1 |
 | DM 私聊列表 | 成员伪装成 DM，点击无效 | 后端无私聊模型（仅 repo room），需私信会话设计 | P3 |
-| 成员在线状态 | 硬编码 `online` | 后端 ConnectionManager 有连接状态，需 presence 广播/查询端点 | P3 |
-| 频道未读数 | 硬编码 0 | 需未读计数（按房间记录 last_read 水位） | P3 |
+| 成员在线状态 | ✅ 已接 WS presence：进入房间 `presence_list` + join/leave 实时增删（批次 D） | — | P1 |
+| 频道未读数 | ✅ 已接后端 `GET /rooms/unread`（按 repository_id 映射频道）+ 进频道 `POST /rooms/{id}/read`（批次 D） | — | P1 |
 | 表情回应 reactions | UI 死代码（渲染逻辑存在，数据恒空） | 后端消息 reactions 存储 + WS 广播 | P3 |
 | 消息按日期分组 | 所有消息归入 "Today" | 纯前端按 created_at 分组渲染 | P2 |
 | 侧边栏搜索框 | 无 value/onChange | 同顶栏搜索，依赖消息检索 | P3 |
@@ -97,8 +99,8 @@
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
 | Discussions 面板 | 空状态占位（mock 已移除） | 行内评论需后端锚定文件+行号存储，可复用 PR 评论模型扩展 | P3 |
-| 协作者 "viewing" 状态 | 硬编码 | 需 presence/编辑会话广播（WS 已有基础设施） | P3 |
-| "Online" 绿点 | 硬编码 | 接 WS 连接状态即可（`chatSocket` 已有状态机可参考） | P2 |
+| 协作者 "viewing" 状态 | ✅ 已接 WS presence：在线协作者列表即 Editors tab 内容（批次 D） | — | P3 |
+| "Online" 绿点 | ✅ 已接房间 presence（在线人数 > 0 亮绿）（批次 D） | — | P2 |
 | 面包屑点击 | cursor:pointer 无跳转 | 点击目录段切回该目录/根文件树，纯前端 | P2 |
 | 文件删除入口 | ✅ 已加文件树 hover 删除按钮 + 确认弹窗，调用 `deleteFileContent`，删除后刷新树并关闭对应标签 | — | P1 |
 | 文件重命名/移动 | 无 | 后端需 move 端点（或 copy+delete 组合提交） | P3 |
@@ -137,7 +139,7 @@
 | **批次 A（接线冲刺）** ✅ | 通知点击跳转、消息删除、文件删除、PR 标签 UI、PR 编辑、PR review 提交 — **已完成** | — |
 | **批次 B（仓库能力页）** ✅ | Releases tab（2.1）+ Actions/Builds tab（2.3）+ 仓库 Settings tab（含 Webhooks 2.2、协作者、默认分支）— **已完成** | — |
 | **批次 C（用户中心）** ✅ | SSH Keys、OAuth 账号管理、`/me/*` 聚合展示（2.4）；全局搜索（3.1）— **已完成** | — |
-| **批次 D（实时增强）** | Editor 在线状态（3.4）、聊天 presence/未读数（3.3）—— 共用 presence 基础设施，需后端 WS 扩展 | 前后端 4~6 天 |
+| **批次 D（实时增强）** ✅ | Editor 在线状态（3.4）、聊天 presence/未读数（3.3）— **已完成**（presence 复用原 WS 基础设施，未读数新增 REST 端点） | — |
 | **批次 E（体验完善）** | 消息 reactions、DM 私聊、文件树 last-commit 聚合、行内评论、亮色主题 | 按需评估，均涉及新后端能力 |
 
 ---

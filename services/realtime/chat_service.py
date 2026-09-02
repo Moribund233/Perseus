@@ -1,8 +1,8 @@
 import uuid
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.orm import selectinload
 
 from models.chat_message import ChatMessage
@@ -24,9 +24,9 @@ class ChatService:
         )
         room = result.scalar_one_or_none()
         if not room:
-            raise NotFoundException("房间不存在")
+            raise NotFoundException("房间不存在", error_code="room_not_found")
         if not room.is_active:
-            raise ValidationException("房间已关闭")
+            raise ValidationException("房间已关闭", error_code="room_closed")
         return room
 
     @staticmethod
@@ -38,7 +38,7 @@ class ChatService:
             )
         )
         if not result.scalar_one_or_none():
-            raise ValidationException("你不是该房间的成员")
+            raise ValidationException("你不是该房间的成员", error_code="room_not_member")
 
     @staticmethod
     async def _ensure_membership(db: AsyncSession, room_id: uuid.UUID, user_id: uuid.UUID) -> None:
@@ -67,7 +67,7 @@ class ChatService:
         )
         repo = repo_result.scalar_one_or_none()
         if repo is None:
-            raise NotFoundException("房间不存在")
+            raise NotFoundException("房间不存在", error_code="room_not_found")
 
         has_access = repo.is_public or repo.owner_id == user_id
         if not has_access:
@@ -80,7 +80,7 @@ class ChatService:
             )
             has_access = member_result.scalar_one_or_none() is not None
         if not has_access:
-            raise ValidationException("你不是该房间的成员")
+            raise ValidationException("你不是该房间的成员", error_code="room_not_member")
 
         db.add(RoomMember(
             room_id=room_id,
@@ -100,7 +100,7 @@ class ChatService:
         reply_to: Optional[uuid.UUID] = None
     ) -> Dict[str, Any]:
         if not content or not content.strip():
-            raise ValidationException("消息内容不能为空")
+            raise ValidationException("消息内容不能为空", error_code="message_content_required")
         content = content.strip()[:MAX_CONTENT_LENGTH]
 
         await ChatService._get_room_or_raise(db, room_id)
@@ -112,15 +112,79 @@ class ChatService:
             content=content,
             message_type=message_type,
             reply_to_id=reply_to,
+            created_at=datetime.now(timezone.utc),
         )
         db.add(msg)
         await db.commit()
         await db.refresh(msg)
 
-        return await ChatService._format_message(db, msg)
+        return await ChatService._format_message(db, msg, sender_id)
 
     @staticmethod
-    async def _format_message(db: AsyncSession, msg: ChatMessage) -> Dict[str, Any]:
+    async def get_unread_counts(db: AsyncSession, user_id: uuid.UUID) -> List[Dict[str, Any]]:
+        """
+        返回用户所在所有房间的未读计数列表.
+
+        未读 = 房间内 created_at > 本人 last_read_at 且非本人发送、非已删除的消息数.
+        新成员 (last_read_at 为空) 视为已读, 历史消息不计入未读.
+        """
+        member_result = await db.execute(
+            select(RealtimeRoom)
+            .join(RoomMember, RoomMember.room_id == RealtimeRoom.id)
+            .filter(
+                RoomMember.user_id == user_id,
+                RealtimeRoom.is_active.is_(True),
+            )
+        )
+        rooms = member_result.scalars().all()
+
+        unread_query = (
+            select(
+                ChatMessage.room_id.label("room_id"),
+                func.count(ChatMessage.id).label("unread_count"),
+            )
+            .join(RoomMember, RoomMember.room_id == ChatMessage.room_id)
+            .filter(
+                RoomMember.user_id == user_id,
+                ChatMessage.sender_id != user_id,
+                ChatMessage.message_type != "system",
+                RoomMember.last_read_at.isnot(None),
+                ChatMessage.created_at > RoomMember.last_read_at,
+            )
+            .group_by(ChatMessage.room_id)
+        )
+        unread_result = await db.execute(unread_query)
+        unread_map = {str(row.room_id): row.unread_count for row in unread_result.all()}
+
+        return [
+            {
+                "room_id": room.id,
+                "repository_id": room.repository_id,
+                "room_name": room.name,
+                "unread_count": unread_map.get(str(room.id), 0),
+            }
+            for room in rooms
+        ]
+
+    @staticmethod
+    async def mark_read(db: AsyncSession, room_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+        """将某房间在本人视角标记为已读 (水位 = 当前时间)."""
+        await ChatService._ensure_membership(db, room_id, user_id)
+        result = await db.execute(
+            select(RoomMember).filter(
+                RoomMember.room_id == room_id,
+                RoomMember.user_id == user_id
+            )
+        )
+        member = result.scalar_one_or_none()
+        if member is None:
+            raise NotFoundException("你不是该房间的成员", error_code="message_room_membership")
+        member.last_read_at = datetime.now(timezone.utc)
+        await db.commit()
+        return True
+
+    @staticmethod
+    async def _format_message(db: AsyncSession, msg: ChatMessage, current_user: Optional[uuid.UUID] = None) -> Dict[str, Any]:
         result = await db.execute(
             select(User).filter(User.id == msg.sender_id)
         )
@@ -135,7 +199,96 @@ class ChatService:
             "reply_to": msg.reply_to_id,
             "edited_at": msg.edited_at.isoformat() if msg.edited_at else None,
             "created_at": msg.created_at.isoformat() if msg.created_at else None,
+            "reactions": ChatService._format_reactions(msg, current_user),
         }
+
+    @staticmethod
+    def _reaction_map(msg: ChatMessage) -> Dict[str, list]:
+        meta = msg.metadata_ or {}
+        reactions = meta.get("reactions")
+        if not isinstance(reactions, dict):
+            return {}
+        return reactions
+
+    @staticmethod
+    def _format_reactions(msg: ChatMessage, current_user: Optional[uuid.UUID] = None) -> List[Dict[str, Any]]:
+        """将 metadata_.reactions 原始映射整理为前端渲染结构."""
+        reactions = ChatService._reaction_map(msg)
+        return [
+            {
+                "emoji": emoji,
+                "count": len(user_ids),
+                "active": current_user is not None and str(current_user) in {str(u) for u in user_ids},
+            }
+            for emoji, user_ids in reactions.items()
+            if user_ids
+        ]
+
+    @staticmethod
+    async def add_reaction(
+        db: AsyncSession,
+        message_id: uuid.UUID,
+        user_id: uuid.UUID,
+        emoji: str
+    ) -> Dict[str, Any]:
+        emoji = (emoji or "").strip()
+        if not emoji or len(emoji) > 8:
+            raise ValidationException("表情不合法", error_code="invalid_emoji")
+
+        result = await db.execute(
+            select(ChatMessage).filter(ChatMessage.id == message_id)
+        )
+        msg = result.scalar_one_or_none()
+        if not msg:
+            raise NotFoundException("消息不存在", error_code="message_not_found")
+
+        meta = dict(msg.metadata_ or {})
+        reactions = meta.get("reactions")
+        if not isinstance(reactions, dict):
+            reactions = {}
+        user_ids = reactions.setdefault(emoji, [])
+        current = str(user_id)
+        if current in {str(u) for u in user_ids}:
+            raise ValidationException("你已回应过该表情", error_code="reaction_duplicate")
+        user_ids.append(current)
+        meta["reactions"] = reactions
+        msg.metadata_ = meta
+        await db.commit()
+        await db.refresh(msg)
+        return await ChatService._format_message(db, msg, user_id)
+
+    @staticmethod
+    async def remove_reaction(
+        db: AsyncSession,
+        message_id: uuid.UUID,
+        user_id: uuid.UUID,
+        emoji: str
+    ) -> Dict[str, Any]:
+        result = await db.execute(
+            select(ChatMessage).filter(ChatMessage.id == message_id)
+        )
+        msg = result.scalar_one_or_none()
+        if not msg:
+            raise NotFoundException("消息不存在", error_code="message_not_found")
+
+        meta = dict(msg.metadata_ or {})
+        reactions = meta.get("reactions")
+        if not isinstance(reactions, dict):
+            return await ChatService._format_message(db, msg, user_id)
+
+        user_ids = reactions.get(emoji, [])
+        current = str(user_id)
+        if current not in {str(u) for u in user_ids}:
+            return await ChatService._format_message(db, msg, user_id)
+
+        reactions[emoji] = [u for u in user_ids if str(u) != current]
+        if not reactions[emoji]:
+            del reactions[emoji]
+        meta["reactions"] = reactions
+        msg.metadata_ = meta
+        await db.commit()
+        await db.refresh(msg)
+        return await ChatService._format_message(db, msg, user_id)
 
     @staticmethod
     async def get_messages(
@@ -189,6 +342,7 @@ class ChatService:
                 "reply_to": msg.reply_to_id,
                 "edited_at": msg.edited_at.isoformat() if msg.edited_at else None,
                 "created_at": msg.created_at.isoformat() if msg.created_at else None,
+                "reactions": ChatService._format_reactions(msg, user_id),
             })
 
         next_before = rows[-1].id if rows else None
@@ -210,17 +364,17 @@ class ChatService:
         )
         msg = result.scalar_one_or_none()
         if not msg:
-            raise NotFoundException("消息不存在")
+            raise NotFoundException("消息不存在", error_code="message_not_found")
         if msg.sender_id != user_id:
-            raise ValidationException("只能编辑自己的消息")
+            raise ValidationException("只能编辑自己的消息", error_code="message_edit_own_only")
         if not new_content or not new_content.strip():
-            raise ValidationException("消息内容不能为空")
+            raise ValidationException("消息内容不能为空", error_code="message_content_required")
 
         msg.content = new_content.strip()[:MAX_CONTENT_LENGTH]
         msg.edited_at = datetime.now(timezone.utc)
         await db.commit()
         await db.refresh(msg)
-        return await ChatService._format_message(db, msg)
+        return await ChatService._format_message(db, msg, user_id)
 
     @staticmethod
     async def delete_message(
@@ -246,7 +400,7 @@ class ChatService:
             )
             is_admin = member_result.scalar_one_or_none() is not None
             if not is_admin:
-                raise ValidationException("没有权限删除此消息")
+                raise ValidationException("没有权限删除此消息", error_code="message_delete_forbidden")
 
         msg.content = "[deleted]"
         msg.message_type = "system"

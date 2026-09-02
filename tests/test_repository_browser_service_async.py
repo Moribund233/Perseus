@@ -310,6 +310,36 @@ async def test_get_tree_entries_sorting():
             assert max(tree_indices) < min(blob_indices)
 
 
+@pytest.mark.asyncio
+async def test_get_tree_entries_last_commit():
+    """测试 last_commit=True 时给文件附带最近提交信息"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_path = create_test_repository(tmpdir)
+        result = await get_tree_entries(repo_path, ref="HEAD", path="", last_commit=True)
+
+        # 根目录文件应带 last_commit
+        readme_entry = next((e for e in result["entries"] if e["name"] == "README.md"), None)
+        assert readme_entry is not None
+        assert "last_commit" in readme_entry
+        assert readme_entry["last_commit"] is not None
+        assert "author" in readme_entry["last_commit"]
+        assert "message" in readme_entry["last_commit"]
+        # 目录不应带 last_commit
+        src_entry = next((e for e in result["entries"] if e["name"] == "src"), None)
+        assert src_entry is not None
+        assert "last_commit" not in src_entry
+
+
+@pytest.mark.asyncio
+async def test_get_tree_entries_last_commit_default_off():
+    """测试默认 last_commit=False 时不附带最近提交信息"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_path = create_test_repository(tmpdir)
+        result = await get_tree_entries(repo_path, ref="HEAD", path="")
+        for e in result["entries"]:
+            assert "last_commit" not in e
+
+
 # ============ get_blob_content 测试 ============
 
 @pytest.mark.asyncio

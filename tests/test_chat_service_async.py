@@ -169,3 +169,59 @@ async def test_delete_others_message_not_admin(async_db: AsyncSession, async_tes
     msg = await ChatService.send_message(async_db, room.id, async_test_user.id, "owner msg")
     with pytest.raises(ValidationException):
         await ChatService.delete_message(async_db, msg["id"], async_test_user2.id)
+
+
+@pytest.mark.asyncio
+async def test_add_reaction_success(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
+    room = await RoomService.create_room(async_db, async_test_repo.id, "general", async_test_user.id)
+    msg = await ChatService.send_message(async_db, room.id, async_test_user.id, "reaction target")
+    updated = await ChatService.add_reaction(async_db, msg["id"], async_test_user.id, "👍")
+    reactions = updated["reactions"]
+    assert len(reactions) == 1
+    assert reactions[0]["emoji"] == "👍"
+    assert reactions[0]["count"] == 1
+    assert reactions[0]["active"] is True
+
+
+@pytest.mark.asyncio
+async def test_add_reaction_duplicate_forbidden(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
+    room = await RoomService.create_room(async_db, async_test_repo.id, "general", async_test_user.id)
+    msg = await ChatService.send_message(async_db, room.id, async_test_user.id, "dup")
+    await ChatService.add_reaction(async_db, msg["id"], async_test_user.id, "👍")
+    with pytest.raises(ValidationException):
+        await ChatService.add_reaction(async_db, msg["id"], async_test_user.id, "👍")
+
+
+@pytest.mark.asyncio
+async def test_remove_reaction(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
+    room = await RoomService.create_room(async_db, async_test_repo.id, "general", async_test_user.id)
+    msg = await ChatService.send_message(async_db, room.id, async_test_user.id, "remove target")
+    updated = await ChatService.remove_reaction(async_db, msg["id"], async_test_user.id, "👍")
+    assert updated["reactions"] == []
+
+
+@pytest.mark.asyncio
+async def test_remove_reaction_noop_when_absent(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User):
+    room = await RoomService.create_room(async_db, async_test_repo.id, "general", async_test_user.id)
+    msg = await ChatService.send_message(async_db, room.id, async_test_user.id, "noop")
+    updated = await ChatService.remove_reaction(async_db, msg["id"], async_test_user.id, "👍")
+    assert updated["reactions"] == []
+
+
+@pytest.mark.asyncio
+async def test_add_reaction_not_found(async_db: AsyncSession, async_test_user: User):
+    with pytest.raises(NotFoundException):
+        await ChatService.add_reaction(async_db, 9999, async_test_user.id, "👍")
+
+
+@pytest.mark.asyncio
+async def test_get_messages_includes_reactions(async_db: AsyncSession, async_test_repo: Repository, async_test_user: User, async_test_user2: User):
+    room = await RoomService.create_room(async_db, async_test_repo.id, "general", async_test_user.id)
+    await RoomService.join_room(async_db, room.id, async_test_user2.id)
+    msg = await ChatService.send_message(async_db, room.id, async_test_user.id, "with reaction")
+    await ChatService.add_reaction(async_db, msg["id"], async_test_user2.id, "🎉")
+    result = await ChatService.get_messages(async_db, room.id, async_test_user.id)
+    target = next(m for m in result["messages"] if m["id"] == msg["id"])
+    assert target["reactions"][0]["emoji"] == "🎉"
+    assert target["reactions"][0]["count"] == 1
+    assert target["reactions"][0]["active"] is False

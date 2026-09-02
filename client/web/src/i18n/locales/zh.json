@@ -238,7 +238,15 @@
         "lastCommit": "最新提交",
         "name": "名称",
         "message": "提交信息",
-        "time": "时间"
+        "time": "时间",
+        "timeUnits": {
+          "justNow": "刚刚",
+          "minutesAgo": "{{n}} 分钟前",
+          "hoursAgo": "{{n}} 小时前",
+          "daysAgo": "{{n}} 天前",
+          "monthsAgo": "{{n}} 个月前",
+          "yearsAgo": "{{n}} 年前"
+        }
       },
       "readme": "README",
       "empty": {
@@ -398,7 +406,8 @@
       "deleteFileTitle": "删除文件",
       "delete": "删除",
       "deleteFileConfirm": "确定要删除 {{file}} 吗？此操作将创建一次删除该文件的 Git 提交。",
-      "fileDeleted": "已删除 {{file}}"
+      "fileDeleted": "已删除 {{file}}",
+      "editorsOnline": "位协作者在线"
     },
     "teamChat": {
       "title": "团队聊天",
@@ -409,7 +418,8 @@
       "today": "今天",
       "noChannels": "暂无可用频道，创建仓库后即可开始聊天",
       "disconnected": "实时连接已断开，暂时无法发送消息",
-      "deleteMessage": "删除消息"
+      "deleteMessage": "删除消息",
+      "offlineMembers": "离线"
     },
     "settings": {
       "title": "设置",

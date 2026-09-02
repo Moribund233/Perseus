@@ -37,6 +37,12 @@ export interface RepoFile {
   type: 'file' | 'directory' | 'symlink';
   size?: number;
   sha?: string;
+  last_commit?: {
+    hash: string;
+    message: string;
+    author: string;
+    date: string;
+  } | null;
 }
 
 export interface RepoBlob {
@@ -159,8 +165,10 @@ export const repositoriesApi = {
     const params = new URLSearchParams();
     if (ref) params.set('ref', ref);
     if (path) params.set('path', path);
+    // 仅根目录附加 last_commit，避免每次展开子目录都遍历提交历史
+    if (!path) params.set('last_commit', 'true');
     const qs = params.toString() ? `?${params.toString()}` : '';
-    const data = await apiRequest<{ entries: Array<{ name: string; path: string; type: 'tree' | 'blob' | 'symlink'; size?: number; sha?: string }> }>(
+    const data = await apiRequest<{ entries: Array<{ name: string; path: string; type: 'tree' | 'blob' | 'symlink'; size?: number; sha?: string; last_commit?: RepoFile['last_commit'] }> }>(
       `/api/v1/repositories/${repoId}/tree${qs}`
     );
     return data.entries.map((e) => ({

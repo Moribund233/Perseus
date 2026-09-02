@@ -10,120 +10,65 @@ class BaseException(HTTPException):
     """
     基础异常类
     
-    所有自定义异常的基类，继承自FastAPI的HTTPException
+    所有自定义异常的基类，继承自FastAPI的HTTPException。
+
+    `error_code` 是供国际化使用的稳定错误码（如 ``"room_not_found"``），
+    与 `detail` 分离，允许异常处理器根据 `Accept-Language` 自动返回
+    对应语言的错误消息。未传 `error_code` 时沿用原 `detail`，完全向后兼容。
     """
     def __init__(self,
                  status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
                  detail: str = "Internal Server Error",
-                 headers: dict = None):
-        """
-        初始化基础异常
-        
-        Args:
-            status_code: HTTP状态码
-            detail: 错误详情
-            headers: 响应头
-        """
+                 headers: dict = None,
+                 error_code: str | None = None):
         super().__init__(
             status_code=status_code,
             detail=detail,
-            headers=headers
+            headers=headers,
         )
+        self.error_code = error_code
 
 
 class ValidationException(BaseException):
-    """
-    验证异常
-    
-    用于处理请求参数验证失败的情况
-    """
-    def __init__(self, detail: str = "Validation Error"):
-        """
-        初始化验证异常
-        
-        Args:
-            detail: 错误详情
-        """
+    def __init__(self, detail: str = "Validation Error", error_code: str | None = None):
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=detail
+            detail=detail,
+            error_code=error_code,
         )
 
 
 class AuthenticationException(BaseException):
-    """
-    认证异常
-    
-    用于处理用户认证失败的情况
-    """
     def __init__(self, detail: str = "Authentication Failed"):
-        """
-        初始化认证异常
-        
-        Args:
-            detail: 错误详情
-        """
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=detail,
-            headers={"WWW-Authenticate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
 
 class AuthorizationException(BaseException):
-    """
-    授权异常
-    
-    用于处理用户权限不足的情况
-    """
     def __init__(self, detail: str = "Permission Denied"):
-        """
-        初始化授权异常
-        
-        Args:
-            detail: 错误详情
-        """
         super().__init__(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=detail
+            detail=detail,
         )
 
 
 class NotFoundException(BaseException):
-    """
-    资源不存在异常
-    
-    用于处理请求的资源不存在的情况
-    """
-    def __init__(self, detail: str = "Resource Not Found"):
-        """
-        初始化资源不存在异常
-        
-        Args:
-            detail: 错误详情
-        """
+    def __init__(self, detail: str = "Resource Not Found", error_code: str | None = None):
         super().__init__(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=detail
+            detail=detail,
+            error_code=error_code,
         )
 
 
 class ConflictException(BaseException):
-    """
-    资源冲突异常
-    
-    用于处理资源冲突的情况，如重复创建
-    """
     def __init__(self, detail: str = "Resource Conflict"):
-        """
-        初始化资源冲突异常
-        
-        Args:
-            detail: 错误详情
-        """
         super().__init__(
             status_code=status.HTTP_409_CONFLICT,
-            detail=detail
+            detail=detail,
         )
 
 

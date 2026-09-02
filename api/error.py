@@ -118,7 +118,7 @@ async def get_error_info(
     # 构建基础响应
     response = ErrorInfoResponse(
         code=error_code,
-        message=message or _get_default_message(error_code),
+        message=message or _get_default_message(error_code, request),
         type=error_type or "UnknownError",
         timestamp=datetime.now().isoformat(),
         path=str(request.url.path) if request else None,
@@ -194,27 +194,46 @@ async def report_error(
     return {"status": "received", "message": "Error reported successfully"}
 
 
-def _get_default_message(error_code: int) -> str:
+def _get_default_message(error_code: int, request: Optional[Request] = None) -> str:
     """
-    根据错误码获取默认错误消息
-    
+    根据错误码与 `Accept-Language` 请求头获取默认错误消息
+
     Args:
         error_code: HTTP 状态码
-        
+        request: 请求对象（用于解析语言，可为 None）
+
     Returns:
-        str: 默认错误消息
+        str: 默认错误消息（已本地化，默认中文）
     """
+    from core.i18n import normalize_locale
+
+    locale = normalize_locale(request.headers.get("accept-language")) if request else "zh"
+
     messages = {
-        400: "请求错误",
-        401: "未授权",
-        403: "禁止访问",
-        404: "页面未找到",
-        408: "请求超时",
-        409: "资源冲突",
-        500: "服务器内部错误",
-        502: "网关错误",
-        503: "服务不可用",
-        504: "网关超时"
+        "zh": {
+            400: "请求错误",
+            401: "未授权",
+            403: "禁止访问",
+            404: "页面未找到",
+            408: "请求超时",
+            409: "资源冲突",
+            500: "服务器内部错误",
+            502: "网关错误",
+            503: "服务不可用",
+            504: "网关超时",
+        },
+        "en": {
+            400: "Bad Request",
+            401: "Unauthorized",
+            403: "Forbidden",
+            404: "Not Found",
+            408: "Request Timeout",
+            409: "Conflict",
+            500: "Internal Server Error",
+            502: "Bad Gateway",
+            503: "Service Unavailable",
+            504: "Gateway Timeout",
+        },
     }
-    return messages.get(error_code, "未知错误")
+    return messages.get(locale, messages["zh"]).get(error_code, "未知错误" if locale == "zh" else "Unknown Error")
 
