@@ -14,7 +14,7 @@ import {
   DeleteOutlined,
 } from '@ant-design/icons';
 import { EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, rectangularSelection, crosshairCursor, highlightActiveLine } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
+import { EditorState, Compartment } from '@codemirror/state';
 import { indentOnInput, syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
 import { history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { searchKeymap } from '@codemirror/search';
@@ -31,6 +31,8 @@ import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import EditorSkeleton from '../../components/skeleton/EditorSkeleton';
 import Markdown from '../../components/Markdown';
+import { CollabController } from '../../components/editor/collabController';
+import type { CollabParticipant } from '../../api/collabSocket';
 import { useRepositoriesStore } from '../../stores/repositories';
 import { chatApi } from '../../api/chat';
 import { chatSocket, type PresenceUser } from '../../api/chatSocket';
@@ -334,6 +336,8 @@ export default function EditorPage() {
   const [deleting, setDeleting] = useState(false);
   const [cursor, setCursor] = useState({ line: 1, col: 1 });
   const [onlinePresence, setOnlinePresence] = useState<PresenceUser[]>([]);
+  const [collabStatus, setCollabStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
+  const [docParticipants, setDocParticipants] = useState<CollabParticipant[]>([]);
   const { t } = useTranslation();
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -342,6 +346,9 @@ export default function EditorPage() {
   const handleSaveRef = useRef<() => void>(() => {});
   // 全局搜索结果跳转携带 ?line= 时, 编辑器就绪后滚动到该行
   const pendingLineRef = useRef<number | null>(null);
+  // F-204 协作编辑: collab 扩展经 Compartment 延迟装配 (init 后装配)
+  const collabComp = useRef(new Compartment());
+  const collabRef = useRef<CollabController | null>(null);
 
   const {
     currentRepo,
@@ -481,7 +488,8 @@ export default function EditorPage() {
     });
   }, [activeTab, currentRepo?.id, fetchBlob]);
 
-  // 保存: 将编辑器当前内容提交到默认分支
+  // 保存: 优先走协作会话 (以服务端权威文本提交, 全员同步保存结果);
+  // 会话不可用时回退 HTTP 直提编辑器当前内容
   const performSave = useCallback(async (message?: string) => {
     const repoId = currentRepo?.id;
     const path = activeTab;
@@ -489,6 +497,12 @@ export default function EditorPage() {
     const content = viewRef.current?.state.doc.toString() ?? currentBlob?.content ?? '';
     if (content === savedContentRef.current) {
       setIsDirty(false);
+      return;
+    }
+    const controller = collabRef.current;
+    if (controller?.isActive) {
+      setSaving(true);
+      controller.save(message || `Update ${path}`);
       return;
     }
     setSaving(true);
@@ -579,10 +593,12 @@ export default function EditorPage() {
     const content = currentBlob?.content ?? sampleCode;
     savedContentRef.current = content === sampleCode ? '\u0000-sample' : content;
     setIsDirty(false);
+    setDocParticipants([]);
     const lang = activeTab ? getLanguageExtension(activeTab) : undefined;
     const extensions = [
       basicSetup(() => handleSaveRef.current()),
       oneDark,
+      collabComp.current.of([]),
       EditorView.theme({ '&': { height: '100%' }, '.cm-scroller': { overflow: 'auto' } }),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
@@ -602,6 +618,41 @@ export default function EditorPage() {
       extensions,
     });
     viewRef.current = new EditorView({ state, parent: editorRef.current });
+
+    // F-204 协作: 打开文件即加入该文档的协作会话
+    const repoId = currentRepo?.id;
+    const branch = currentRepo?.default_branch || 'main';
+    let controller: CollabController | null = null;
+    if (repoId && activeTab && viewRef.current) {
+      controller = new CollabController({
+        docKey: `${repoId}:${branch}:${activeTab}`,
+        repositoryId: repoId,
+        branch,
+        path: activeTab,
+        onStatus: setCollabStatus,
+        onParticipants: setDocParticipants,
+        onSaved: (msg) => {
+          // 提交的是服务端权威文本快照: 本地仍有未确认变更时保持脏标记,
+          // 待下次保存, 避免把未提交内容误标为已保存
+          if (!controller?.hasPendingChanges()) {
+            savedContentRef.current = viewRef.current?.state.doc.toString() ?? '';
+            setIsDirty(false);
+          }
+          setSaving(false);
+          antdMessage.success(
+            t('app.codeEditor.collabSaved', { defaultValue: '协作编辑已提交' }) +
+              ` ${msg.commit_id.slice(0, 7)}`
+          );
+        },
+        onError: (err) => {
+          setSaving(false);
+          antdMessage.warning(err);
+        },
+      });
+      controller.attach(viewRef.current, collabComp.current);
+      collabRef.current = controller;
+    }
+
     const pendingLine = pendingLineRef.current;
     if (pendingLine && pendingLine > 0) {
       pendingLineRef.current = null;
@@ -612,10 +663,12 @@ export default function EditorPage() {
       }
     }
     return () => {
+      controller?.detach();
+      collabRef.current = null;
       viewRef.current?.destroy();
       viewRef.current = null;
     };
-  }, [loading, activeTab, currentBlob]);
+  }, [loading, activeTab, currentBlob, currentRepo, t]);
 
   const collaborators = useMemo(() => {
     return (onlinePresence as PresenceUser[]).map((u) => {
@@ -917,6 +970,23 @@ export default function EditorPage() {
           <div style={{ color: textTertiary, marginLeft: 'auto', fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
             <TeamOutlined style={{ fontSize: 14 }} />
             <strong style={{ color: textSecondary }}>{onlinePresence.length}</strong> {t('app.codeEditor.editorsOnline')}
+          </div>
+          <div style={{ color: textTertiary, fontSize: 11, display: 'flex', alignItems: 'center', gap: 5, marginLeft: 12 }}>
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: collabStatus === 'connected' ? green : collabStatus === 'connecting' ? yellow : '#6e7681',
+                boxShadow: collabStatus === 'connected' ? `0 0 6px ${green}` : 'none',
+              }}
+            />
+            {t('app.codeEditor.collab')}
+            {docParticipants.length > 0 && (
+              <span style={{ color: textSecondary }}>
+                · {docParticipants.length} {t('app.codeEditor.peersInFile')}
+              </span>
+            )}
           </div>
         </div>
 

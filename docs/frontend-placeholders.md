@@ -98,8 +98,9 @@
 
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
+| 协同编辑 | ✅ 已实现（F-204）：`components/editor/collabController.ts` 接入 `/ws/collab`，CodeMirror 6 collab OT 同步 + 远端光标/选区渲染（带用户名标签）+ 协作保存（以服务端权威文本提交 Git，回退 HTTP 直提）+ 断线重连自动 rejoin | 远端光标位置在本地有未确认变更时存在短暂偏移（自校正）；断线重连后本地未确认变更会被服务端快照覆盖（策略决策见 `docs/collab-f204-vs-cwm.md` 3.6）；不支持离线合并 | P2 |
 | Discussions 面板 | 空状态占位（mock 已移除） | 行内评论需后端锚定文件+行号存储，可复用 PR 评论模型扩展 | P3 |
-| 协作者 "viewing" 状态 | ✅ 已接 WS presence：在线协作者列表即 Editors tab 内容（批次 D） | — | P3 |
+| 协作者 "viewing" 状态 | ✅ 已接 WS presence：在线协作者列表即 Editors tab 内容（批次 D）；本文件会话参与者经 `collab_init`/peer 事件展示（F-204） | — | P3 |
 | "Online" 绿点 | ✅ 已接房间 presence（在线人数 > 0 亮绿）（批次 D） | — | P2 |
 | 面包屑点击 | cursor:pointer 无跳转 | 点击目录段切回该目录/根文件树，纯前端 | P2 |
 | 文件删除入口 | ✅ 已加文件树 hover 删除按钮 + 确认弹窗，调用 `deleteFileContent`，删除后刷新树并关闭对应标签 | — | P1 |

@@ -407,7 +407,13 @@
       "delete": "删除",
       "deleteFileConfirm": "确定要删除 {{file}} 吗？此操作将创建一次删除该文件的 Git 提交。",
       "fileDeleted": "已删除 {{file}}",
-      "editorsOnline": "位协作者在线"
+      "editorsOnline": "位协作者在线",
+      "collab": "实时协作",
+      "collabOffline": "协作离线",
+      "collabConnecting": "协作连接中",
+      "collabSaved": "协作编辑已提交",
+      "peersInFile": "人正在编辑此文件",
+      "saveViaCollab": "更改将以当前协作会话内容提交到默认分支"
     },
     "teamChat": {
       "title": "团队聊天",

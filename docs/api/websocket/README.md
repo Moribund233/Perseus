@@ -15,6 +15,7 @@
 4. [用户通知](#4-用户通知-wsnotifications)
 5. [仓库实时事件](#5-仓库实时事件-wsrepositoryid)
 6. [消息协议](#6-消息协议)
+7. [协作编辑](#7-协作编辑-wscollab-f-204)
 
 ---
 
@@ -351,6 +352,57 @@ ws://host:port/ws/repository/42?token=your_jwt_token
 |--------|------|
 | 1000 | 正常关闭 |
 | 1008 | 认证失败 / Token 无效 |
+
+---
+
+## 7. 协作编辑 `/ws/collab`（F-204）
+
+> **认证**: 必需（URL query `token`）
+> **消息上限**: 2MB（容纳批量粘贴产生的变更集）
+> **实现**: `services/realtime/collab_service.py` + `api/websocket/handlers/collab.py`
+> **前端集成**: `client/web/src/components/editor/collabController.ts`（CodeMirror 6 `@codemirror/collab`）
+
+文档会话标识 `docKey = {repository_id}:{branch}:{path}`。
+服务端为每个会话维护权威文本 + 版本号 + 变更日志（乐观并发控制）：
+客户端 push 必须基于服务端当前版本，过期则拒绝并返回缺失变更，
+客户端（collab 扩展）rebase 本地未确认变更后重发。
+
+变更集（`changes`）为 CM6 `ChangeSet.toJSON()` 数组，一次 push 可携带多个顺序变更集。
+
+### 权限模型
+
+- `collab_join` 时一次性校验读权限（owner/admin/developer/viewer）与写权限
+  （owner/admin/developer），写权限缓存在会话参与者上（`can_write`）
+- `collab_push` / `collab_save` 直接使用缓存权限，不逐次查库；
+  仓库角色变更在重新 join 后生效
+- 消息上限 2MB（按 UTF-8 字节数，容纳批量粘贴产生的变更集）
+
+### 断线与重连
+
+- 连接断开时服务端将该连接移出所有会话（会话无人时销毁）
+- 客户端重连成功后必须重新 `collab_join`（前端已实现：状态重置 + 自动重新加入）
+
+### 消息协议
+
+| 消息 | 方向 | 说明 |
+|------|------|------|
+| `collab_join` | C→S | 加入会话 `{repository_id, branch, path, clientID}`（join 需读权限） |
+| `collab_init` | S→C | 会话快照 `{docKey, doc, version, participants}`（含权威文本） |
+| `collab_push` | C→S | 推送变更 `{docKey, version, changes[], clientID}`（需写权限） |
+| `collab_update` | S→C | 变更广播 `{docKey, changes[], clientID, version}`（全员，含发送者：自身更新由 clientID 识别并确认） |
+| `collab_reject` | S→C | 版本过期 `{docKey, version, changes[], resync}`（changes 为缺失变更） |
+| `collab_pull` | C→S | 增量拉取 `{docKey, version}` |
+| `collab_resync` | S→C | 版本超出日志窗口，需重新 join |
+| `collab_cursor` | C→S / S→C | 光标/选区 `{anchor, head}`（C→S 附带本地同步版本号） |
+| `collab_save` | C→S | 协作保存 `{docKey, message}`（以服务端权威文本提交 Git commit，需写权限） |
+| `collab_saved` / `collab_save_ack` | S→C | 保存结果广播 / 提交者回执 `{commit_id, saved_by, path, branch, message}` |
+| `collab_leave` / `collab_peer_left` | C→S / S→C | 离开会话 / 成员离开广播 |
+
+### 会话生命周期
+
+- 首个协作者 `collab_join` 时从 Git 分支文件内容创建会话
+- 最后一个协作者离开（或连接断开）时销毁会话（内存态，不持久化）
+- 二进制文件不支持协作编辑
 
 ---
 

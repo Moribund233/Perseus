@@ -407,7 +407,13 @@
       "delete": "Delete",
       "deleteFileConfirm": "Delete {{file}}? This will create a Git commit that removes the file.",
       "fileDeleted": "Deleted {{file}}",
-      "editorsOnline": "editors online"
+      "editorsOnline": "editors online",
+      "collab": "Realtime",
+      "collabOffline": "Collab offline",
+      "collabConnecting": "Collab connecting",
+      "collabSaved": "Collaborative edit committed",
+      "peersInFile": "editing this file",
+      "saveViaCollab": "Changes will be committed from the current collab session to the default branch"
     },
     "teamChat": {
       "title": "Team Chat",

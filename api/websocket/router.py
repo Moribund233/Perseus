@@ -17,6 +17,9 @@ import uuid
 # WebSocket 消息大小限制（256KB）
 MAX_WS_MESSAGE_SIZE = 262144
 
+# 协作编辑端点消息上限（2MB，容纳批量粘贴的变更集）
+COLLAB_MAX_MESSAGE_SIZE = 2097152
+
 
 async def safe_receive_json(websocket: WebSocket) -> dict:
     """带大小限制的安全 JSON 接收"""
@@ -303,6 +306,82 @@ async def notifications_websocket(
     
     finally:
         if connection:
+            await manager.disconnect(connection)
+
+
+@router.websocket("/collab")
+async def collab_websocket(
+    websocket: WebSocket,
+    token: str = Query(..., description="认证token（必需）")
+):
+    """
+    F-204 协作文本编辑专用端点（需要认证）
+
+    连接URL格式:
+    - ws://host:port/ws/collab?token=your_jwt_token
+
+    协议: 见 api/websocket/handlers/collab.py 模块注释
+    (collab_join / collab_push / collab_pull / collab_cursor / collab_save / collab_leave)
+    """
+    from api.websocket.handlers.collab import cleanup_connection_docs, handle_collab_message
+
+    connection: Optional[Connection] = None
+
+    try:
+        user_info = await authenticate_websocket(websocket)
+    except WebSocketAuthError as e:
+        await websocket.close(code=e.code, reason=e.message)
+        return
+
+    try:
+        connection = await manager.connect(websocket)
+        if user_info:
+            await manager.bind_user(
+                connection,
+                user_id=user_info["user_id"],
+                username=user_info["username"]
+            )
+
+        await connection.send({
+            "type": "connected",
+            "connection_id": connection.connection_id,
+            "authenticated": connection.user_id is not None,
+            "channel": "collab",
+            "message": "协作编辑通道已连接"
+        })
+
+        while connection.is_alive:
+            try:
+                raw = await websocket.receive_text()
+                # 协作变更集可能较大 (批量粘贴), 上限放宽到 2MB (按 UTF-8 字节数)
+                raw_bytes = len(raw.encode("utf-8"))
+                if raw_bytes > COLLAB_MAX_MESSAGE_SIZE:
+                    await connection.send({
+                        "type": "error",
+                        "error": f"Message too large: {raw_bytes} > {COLLAB_MAX_MESSAGE_SIZE}",
+                    })
+                    continue
+                connection.update_ping()
+                try:
+                    data = _json.loads(raw)
+                except ValueError:
+                    await connection.send({"type": "error", "error": "无效的 JSON 消息"})
+                    continue
+                await handle_collab_message(connection, data)
+            except WebSocketDisconnect:
+                break
+            except Exception as e:
+                logger.error(f"协作WebSocket异常: {e}")
+                try:
+                    await connection.send({"type": "error", "error": f"消息处理失败: {str(e)}"})
+                except Exception:
+                    break
+
+    except Exception as e:
+        logger.error(f"协作WebSocket连接异常: {e}")
+    finally:
+        if connection:
+            await cleanup_connection_docs(connection.connection_id)
             await manager.disconnect(connection)
 
 

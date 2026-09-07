@@ -338,11 +338,11 @@ class ConnectionManager:
     async def send_to_connection(self, connection_id: str, message: Dict[str, Any]) -> bool:
         """
         发送消息到指定连接
-        
+
         Args:
             connection_id: 连接ID
             message: 消息字典
-            
+
         Returns:
             bool: 发送成功返回True
         """
@@ -351,6 +351,23 @@ class ConnectionManager:
         if connection and connection.is_alive:
             return await connection.send(message)
         return False
+
+    async def send_to_connection_list(self, connection_ids, message: Dict[str, Any]) -> int:
+        """
+        发送消息到一组连接 (协作会话广播等场景)
+
+        Args:
+            connection_ids: 连接ID列表/集合
+            message: 消息字典
+
+        Returns:
+            int: 成功发送的连接数
+        """
+        success_count = 0
+        for conn_id in set(connection_ids):
+            if await self.send_to_connection(conn_id, message):
+                success_count += 1
+        return success_count
     
     async def send_to_user(self, user_id: uuid.UUID, message: Dict[str, Any]) -> int:
         """
