@@ -27,7 +27,12 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     # 确保 init_app() 先执行环境变量检查
     from core.lifespan import app_lifespan
     from core.config import get_config
+    from core.init import init_app
     from utils.logging import get_logger
+
+    # 应用初始化：配置校验、日志、数据库表与管理员引导、仓库目录
+    if not init_app():
+        raise RuntimeError("应用初始化失败，请检查启动日志")
 
     # 获取 logger
     logger = get_logger("app")

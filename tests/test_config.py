@@ -20,9 +20,11 @@ from core.exception import ConfigValidationException
 class TestConfigManager:
     """ConfigManager 集成测试类"""
 
+    _ENV_BACKUP: dict = {}
+
     def setup_method(self):
         """每个测试方法前重置 ConfigManager 单例和环境变量"""
-        # 先清除所有可能影响的环境变量
+        # 快照环境变量 (teardown 恢复, 避免污染其他测试的 create_app 初始化)
         env_vars_to_clear = [
             "DATABASE_URL",
             "PERSEUS_STRESS_TEST",
@@ -31,14 +33,21 @@ class TestConfigManager:
             "PERSEUS_APP_TITLE",
             "PERSEUS_DATABASE_URL",
         ]
+        self._ENV_BACKUP = {var: os.environ.get(var) for var in env_vars_to_clear}
+        # 先清除所有可能影响的环境变量
         for var in env_vars_to_clear:
-            if var in os.environ:
-                del os.environ[var]
+            os.environ.pop(var, None)
         # 然后重置单例
         reset_module_config_manager()
 
     def teardown_method(self):
         """每个测试方法后清理"""
+        # 恢复环境变量快照
+        for var, value in self._ENV_BACKUP.items():
+            if value is None:
+                os.environ.pop(var, None)
+            else:
+                os.environ[var] = value
         reset_module_config_manager()
 
     def test_config_toml_merge_with_env(self):
@@ -310,21 +319,31 @@ if __name__ == "__main__":
 class TestConfigValidation:
     """配置完整性校验测试类"""
 
+    _ENV_BACKUP: dict = {}
+
     def setup_method(self):
         """每个测试方法前重置 ConfigManager 单例"""
         from core.config import reset_module_config_manager
+
+        # 快照环境变量 (teardown 恢复, 避免污染其他测试的 create_app 初始化)
         env_vars_to_clear = [
             "DATABASE_URL", "PERSEUS_STRESS_TEST",
             "PERSEUS_SECURITY_SECRET_KEY", "PERSEUS_APP_DEBUG",
         ]
+        self._ENV_BACKUP = {var: os.environ.get(var) for var in env_vars_to_clear}
         for var in env_vars_to_clear:
-            if var in os.environ:
-                del os.environ[var]
+            os.environ.pop(var, None)
         reset_module_config_manager()
 
     def teardown_method(self):
         """每个测试方法后清理"""
         from core.config import reset_module_config_manager
+
+        for var, value in self._ENV_BACKUP.items():
+            if value is None:
+                os.environ.pop(var, None)
+            else:
+                os.environ[var] = value
         reset_module_config_manager()
 
     def test_validate_config_valid_defaults(self):

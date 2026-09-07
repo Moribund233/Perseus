@@ -8,6 +8,7 @@ import os
 from typing import Optional
 
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker, Session
 
 from models import Base
@@ -112,7 +113,14 @@ class DatabaseInitializer:
                 is_admin=True,
             )
             session.add(admin)
-            session.commit()
+            try:
+                session.commit()
+            except IntegrityError:
+                # 多进程/多 worker 并发启动时的竞态：唯一约束冲突
+                # 说明管理员已由其他进程创建，视为成功
+                session.rollback()
+                logger.info(f"管理员用户已由其他进程创建: {username}")
+                return True
 
             logger.info(f"管理员用户已自动创建: {username} <{email}>")
             return True

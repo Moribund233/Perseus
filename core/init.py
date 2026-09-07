@@ -35,13 +35,13 @@ from typing import Any, Dict, Optional, List, Callable
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
-# 尝试加载 .env 文件（如果存在）
-# 在导入其他模块之前加载，确保环境变量可用
-try:
-    from dotenv import load_dotenv
-    load_dotenv(encoding='utf-8')
-except ImportError:
-    pass  # python-dotenv 未安装，跳过
+# 注意：.env 加载被延迟到 AppInitializer.initialize() 内执行，
+# 避免模块导入期的隐式环境注入污染测试进程与 CLI 工具
+
+
+def _in_pytest() -> bool:
+    """当前是否处于 pytest 测试进程"""
+    return "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ
 
 
 class InitStage(Enum):
@@ -319,6 +319,20 @@ class AppInitializer:
 
         return True
 
+    _dotenv_loaded = False
+
+    def _load_dotenv_once(self) -> None:
+        """延迟加载 .env 文件 (进程内仅一次, 真实环境变量优先不被覆盖)"""
+        if AppInitializer._dotenv_loaded:
+            return
+        AppInitializer._dotenv_loaded = True
+        try:
+            from dotenv import load_dotenv
+
+            load_dotenv(encoding="utf-8", override=False)
+        except ImportError:
+            pass  # python-dotenv 未安装, 跳过
+
     def _init_secret_key(self) -> bool:
         """检查 JWT Secret Key 是否已通过环境变量设置"""
         secret_key = os.environ.get("PERSEUS_SECURITY_SECRET_KEY")
@@ -380,13 +394,14 @@ class AppInitializer:
         执行完整初始化流程
 
         初始化顺序：
-        1. 环境变量检查（最高优先级）
-        2. 延迟导入依赖模块
-        3. 配置文件初始化
-        4. 日志系统初始化
-        5. 安全密钥检查
-        6. 数据库初始化（创建表 + 自动引导管理员）
-        7. 仓库目录初始化
+        1. .env 加载（延迟执行，测试进程跳过）
+        2. 环境变量检查（最高优先级）
+        3. 延迟导入依赖模块
+        4. 配置文件初始化
+        5. 日志系统初始化
+        6. 安全密钥检查
+        7. 数据库初始化（创建表 + 自动引导管理员；测试进程跳过）
+        8. 仓库目录初始化
 
         Args:
             init_db: 是否初始化数据库
@@ -394,36 +409,44 @@ class AppInitializer:
         Returns:
             bool: 初始化是否全部成功
         """
-        # ========== 阶段 0: 环境变量检查（最高优先级） ==========
+        # ========== 阶段 0: .env 加载（延迟执行） ==========
+        # pytest 进程禁止加载 .env: 测试环境变量由容器/conftest 显式控制,
+        # 开发机 .env 中的 PERSEUS_ADMIN_* 会与测试 fixture 冲突
+        if not _in_pytest():
+            self._load_dotenv_once()
+
+        # ========== 阶段 1: 环境变量检查（最高优先级） ==========
         if not self._check_all_env_vars():
             return False
 
-        # ========== 阶段 1: 延迟导入依赖模块 ==========
+        # ========== 阶段 2: 延迟导入依赖模块 ==========
         if not self._init_imports():
             return False
 
-        # ========== 阶段 2: 配置文件 ==========
+        # ========== 阶段 3: 配置文件 ==========
         if not self._init_config():
             return False
 
-        # ========== 阶段 3: 配置完整性校验 (F-009) ==========
+        # ========== 阶段 4: 配置完整性校验 (F-009) ==========
         if not self._validate_config():
             return False
 
-        # ========== 阶段 4: 日志系统 ==========
+        # ========== 阶段 5: 日志系统 ==========
         if not self._init_logging():
             return False
 
-        # ========== 阶段 5: 安全密钥 ==========
+        # ========== 阶段 6: 安全密钥 ==========
         if not self._init_secret_key():
             return False
 
-        # ========== 阶段 6: 数据库 ==========
-        if init_db:
+        # ========== 阶段 7: 数据库 ==========
+        # 测试进程跳过: 表结构与管理员由 tests/conftest.py 的 fixture 负责,
+        # 引导管理员会与测试用户数据 (如 admin@example.com) 产生唯一约束冲突
+        if init_db and not _in_pytest():
             if not self._init_database():
                 return False
 
-        # ========== 阶段 7: 仓库目录 ==========
+        # ========== 阶段 8: 仓库目录 ==========
         if not self._init_repository_root():
             return False
 

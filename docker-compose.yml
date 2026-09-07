@@ -1,4 +1,62 @@
 services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:16-alpine
+    container_name: perseus-postgres
+    environment:
+      POSTGRES_USER: perseus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?必需设置数据库密码}
+      POSTGRES_DB: perseus
+      TZ: Asia/Shanghai
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U perseus -d perseus"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+    restart: unless-stopped
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Redis（可选缓存，为空则应用不使用）
+  redis:
+    image: redis:7-alpine
+    container_name: perseus-redis
+    command: ["redis-server", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+    restart: unless-stopped
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 320M
+
   # FastAPI 后端
   app:
     build:
@@ -6,8 +64,8 @@ services:
       dockerfile: Dockerfile
     container_name: perseus-app
     environment:
-      DATABASE_URL: postgresql://perseus:Perseus_2024!@capella-pg:5432/perseus
-      REDIS_URL: redis://capella-redis:6379/0
+      DATABASE_URL: postgresql://perseus:${POSTGRES_PASSWORD:?必需设置数据库密码}@postgres:5432/perseus
+      REDIS_URL: redis://redis:6379/0
       PERSEUS_SECURITY_SECRET_KEY: ${PERSEUS_SECURITY_SECRET_KEY:?必需设置 JWT 密钥}
       PERSEUS_APP_DEBUG: "${PERSEUS_APP_DEBUG:-false}"
       PERSEUS_STRESS_TEST: "false"
@@ -15,9 +73,10 @@ services:
       PERSEUS_STORAGE_REPO_ROOT: /data/repositories
       TZ: Asia/Shanghai
       PERSEUS_ADMIN_USERNAME: admin
-      PERSEUS_ADMIN_PASSWORD: perseus_admin_2024
+      PERSEUS_ADMIN_PASSWORD: ${PERSEUS_ADMIN_PASSWORD:-perseus_admin_2024}
       PERSEUS_ADMIN_EMAIL: admin@perseus.local
     volumes:
+      - ./config.toml:/app/config.toml:ro
       - repos:/data/repositories
       - app-logs:/app/logs
     logging:
@@ -34,9 +93,13 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - default
-      - capella-room_default
     deploy:
       resources:
         limits:
@@ -85,6 +148,8 @@ services:
     depends_on:
       app:
         condition: service_healthy
+      git-cgi:
+        condition: service_started
     deploy:
       resources:
         limits:
@@ -101,10 +166,9 @@ services:
     volumes:
       - repos:/data/repositories
     environment:
-      PERSEUS_DB_URL: "host=capella-pg dbname=perseus user=perseus password=Perseus_2024!"
+      PERSEUS_DB_URL: "host=postgres dbname=perseus user=perseus password=${POSTGRES_PASSWORD:?必需设置数据库密码}"
     networks:
       - default
-      - capella-room_default
     restart: unless-stopped
     depends_on:
       app:
@@ -115,15 +179,50 @@ services:
           cpus: '0.5'
           memory: 64M
 
+  # 测试容器（专用 profile: docker compose --profile test run --rm test [pytest 参数]）
+  test:
+    build:
+      context: .
+      dockerfile: docker/test/Dockerfile.test
+    profiles: ["test"]
+    environment:
+      DATABASE_URL: sqlite:///./test_perseus.db
+      PERSEUS_SECURITY_SECRET_KEY: test-secret-key-not-for-production
+      PERSEUS_STRESS_TEST: "false"
+      LOG_LEVEL: warning
+      TZ: Asia/Shanghai
+    volumes:
+      # 挂载源码, 测试始终运行最新代码, 无需重建镜像
+      - ./config.toml:/app/config.toml:ro
+      - ./tests:/app/tests
+      - ./services:/app/services
+      - ./api:/app/api
+      - ./core:/app/core
+      - ./models:/app/models
+      - ./utils:/app/utils
+      - ./middleware:/app/middleware
+      - ./controller:/app/controller
+      - ./app.py:/app/app.py
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+
 volumes:
   repos:
     driver: local
   app-logs:
+    driver: local
+  postgres-data:
     driver: local
 
 networks:
   default:
     name: perseus-network
     driver: bridge
-  capella-room_default:
-    external: true
