@@ -3,24 +3,29 @@ import { ConfigProvider, App as AntApp, Spin } from 'antd';
 import { initGateway, useGatewayStore } from './stores/gateway';
 import { useWorkspaceStore } from './stores/workspace';
 import { useServersStore } from './stores/servers';
+import { useNavigationStore } from './stores/navigation';
 import { listWorkspaces } from './api/workspaces';
 import { perseusTheme } from './styles/theme';
-import Welcome from './views/Welcome';
+import PortalShell from './layouts/PortalShell';
 import IdeShell from './layouts/IdeShell';
-import ServerShell from './layouts/ServerShell';
 import ErrorPage from './views/ErrorPage';
 import './styles/desktop.css';
 
 export default function App() {
   const ready = useGatewayStore((s) => s.ready);
   const current = useWorkspaceStore((s) => s.current);
-  const currentServerId = useServersStore((s) => s.currentServerId);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     initGateway()
       .then(() => Promise.all([listWorkspaces(), useServersStore.getState().fetchServers()]))
-      .then(([list]) => useWorkspaceStore.getState().setWorkspaces(list))
+      .then(([list]) => {
+        useWorkspaceStore.getState().setWorkspaces(list);
+        // 已有持久化服务器时直接进入仓库门户，否则停留在启动台。
+        if (useServersStore.getState().currentServerId) {
+          useNavigationStore.getState().navigate('repositories');
+        }
+      })
       .catch((e) => setError(String(e)));
   }, []);
 
@@ -35,10 +40,8 @@ export default function App() {
     );
   } else if (current) {
     body = <IdeShell workspace={current} />;
-  } else if (currentServerId) {
-    body = <ServerShell />;
   } else {
-    body = <Welcome />;
+    body = <PortalShell />;
   }
 
   return (

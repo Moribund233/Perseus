@@ -276,6 +276,7 @@
   },
   "desktop": {
     "app": {
+      "name": "Perseus Desktop",
       "welcomeTitle": "欢迎使用 Perseus Desktop",
       "connecting": "正在连接本地网关…",
       "gatewayError": "网关初始化失败：{{error}}",
@@ -296,7 +297,136 @@
       "cloneCredentialPh": "访问令牌 — 仅当 URL 不属于已注册服务器时需要",
       "recent": "最近工作区",
       "noWorkspaces": "还没有工作区",
-      "open": "打开"
+      "open": "打开",
+      "tagline": "远程 Perseus 客户端 + 本地工作区。",
+      "tagline2": "IDE 优先的协作开发工具 — 代码编辑、Git 与团队协作一站完成。",
+      "actions": {
+        "connect": "连接服务器",
+        "connectDesc": "注册远程 Perseus 服务器，浏览并 Clone 仓库",
+        "openLocal": "打开本地目录",
+        "openLocalDesc": "将现有目录添加为工作区，离线完全可用",
+        "clone": "Clone 仓库",
+        "cloneDesc": "通过 URL 克隆，凭据自动进系统密钥库"
+      },
+      "hints": {
+        "commandPalette": "命令面板",
+        "save": "保存",
+        "sidebar": "侧栏",
+        "terminal": "终端"
+      },
+      "viewAll": "查看全部",
+      "recentUpdated": "{{branch}} · {{time}}",
+      "gatewayStatus": "本地网关已就绪",
+      "serverRowLast": "上次连接 {{time}}",
+      "serverRowOffline": "离线，显示缓存",
+      "serverRowCurrent": "当前",
+      "serverRowManage": "管理"
+    },
+    "timeAgo": {
+      "never": "从未",
+      "justNow": "刚刚",
+      "minutes": "{{count}} 分钟前",
+      "hours": "{{count}} 小时前",
+      "days": "{{count}} 天前"
+    },
+    "portal": {
+      "crumb": {
+        "welcome": "启动台",
+        "repositories": "仓库",
+        "servers": "服务器",
+        "settings": "设置"
+      },
+      "manageServers": "管理服务器…",
+      "searchPlaceholder": "搜索仓库、文件、Issue…",
+      "searchKbd": "Ctrl K",
+      "notifications": "通知",
+      "offlineBanner": "{{name}} 不可达 — 正在显示离线缓存数据（只读），联网后自动恢复",
+      "retry": "重试",
+      "phase2": "该交互将在 Phase 2 提供。"
+    },
+    "repos": {
+      "sub": "{{name}} · {{count}} 个仓库",
+      "filterPlaceholder": "筛选仓库…",
+      "gridView": "网格视图",
+      "listView": "列表视图",
+      "new": "新建仓库",
+      "newTitle": "新建仓库",
+      "createName": "名称",
+      "createNamePh": "仓库名称",
+      "createNameRequired": "请输入仓库名称",
+      "createDesc": "描述",
+      "createDescPh": "简短描述",
+      "createVisibility": "可见性",
+      "createVisPublic": "公开 — 服务器上所有人可见",
+      "createVisPrivate": "私有 — 仅你与协作成员可见",
+      "createOk": "已创建仓库 \"{{name}}\"",
+      "createFail": "创建仓库失败",
+      "cacheTag": "只读缓存",
+      "error": "加载仓库失败"
+    },
+    "settings": {
+      "gateway": {
+        "title": "本地网关",
+        "desc": "前端所有请求经本地网关代理到 Perseus 服务器，Token 在 Go 侧注入，前端不接触密钥。",
+        "addr": "网关地址",
+        "addrCopied": "已复制网关地址",
+        "running": "运行中",
+        "tokenLabel": "网关会话 Token",
+        "tokenGenerated": "已生成（仅内存）",
+        "tokenProtect": "X-Gateway-Token 防本地 CSRF",
+        "tokenMissing": "未生成",
+        "workspaces": "工作区数量",
+        "servers": "已注册服务器",
+        "manage": "管理 →",
+        "cache": "离线缓存",
+        "cacheValue": "只读 GET 幂等（规划中）",
+        "cacheHint": "仅缓存只读请求，TLS 校验失败不落盘"
+      },
+      "appearance": {
+        "title": "外观",
+        "desc": "自定义 Perseus Desktop 的显示方式。",
+        "theme": "主题",
+        "dark": "深色",
+        "light": "浅色",
+        "system": "跟随系统",
+        "themeComing": "该主题将在后续版本提供。",
+        "language": "界面语言"
+      },
+      "editor": {
+        "title": "编辑器",
+        "desc": "Monaco 编辑器与文件工作区偏好。",
+        "fontSize": "字体大小",
+        "fontName": "JetBrains Mono",
+        "indent": "缩进",
+        "indentValue": "空格 · 2",
+        "autoSave": "自动保存",
+        "autoSaveValue": "开启",
+        "autoSaveHint": "失焦后 1s 自动写入本地文件",
+        "largeFile": "大文件策略",
+        "largeFileValue": ">2MB 只读",
+        "largeFileHint": "超出部分懒加载，保护滚动性能",
+        "collab": "协同编辑",
+        "collabValue": "Yjs 统一底座",
+        "collabHint": "断线变更本地保留，重连自动合并"
+      },
+      "keys": {
+        "title": "快捷键",
+        "desc": "常用操作默认绑定（可在命令面板中查看全部命令）。",
+        "cmd": "命令面板",
+        "save": "保存当前文件",
+        "sidebar": "切换侧栏",
+        "explorerSearchScm": "资源管理器 / 搜索 / 源代码管理",
+        "terminal": "切换终端面板",
+        "commit": "提交（焦点在提交框）",
+        "close": "关闭弹层 / 命令面板"
+      },
+      "about": {
+        "title": "关于",
+        "desc": "远程 Perseus 客户端 + 本地工作区。",
+        "version": "v0.4.0 · Wails v2 · WebView2 · Windows",
+        "check": "检查更新",
+        "latest": "当前已是最新版本"
+      }
     },
     "ide": {
       "gateway": "网关: {{url}}"
@@ -381,7 +511,14 @@
       "updateCredRequired": "服务器地址变更时必须同时输入新密码",
       "updateCredRequiredToken": "服务器地址变更时必须同时输入新 token",
       "deleteConfirm": "删除服务器 \"{{name}}\"？其存储的令牌也会一并移除。",
-      "loginFailed": "登录失败: {{error}}"
+      "loginFailed": "登录失败: {{error}}",
+      "sub": "已注册 {{count}} 台 · 凭据存放于 Windows Credential Manager",
+      "metaAuth": "认证方式：{{method}}",
+      "metaLast": "上次连接：{{time}}",
+      "metaOffline": "离线缓存可用（只读）",
+      "connect": "连接",
+      "lanTitle": "局域网发现",
+      "lanDesc": "当 Perseus 服务器发布 {{mdns}}（mDNS）后，此处将自动列出可连接的服务器；服务端就绪前该能力自动降级，不影响手动添加。"
     },
     "serverShell": {
       "back": "返回",

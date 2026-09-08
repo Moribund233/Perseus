@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, type ReactNode } from 'react';
-import { Layout, Button, Avatar, Tabs, Tag, Spin, Empty, message, App as AntApp } from 'antd';
+import { Layout, Button, Avatar, Tabs, Tag, Spin, Empty, message, App as AntApp, Input, Modal, Radio, Tooltip } from 'antd';
 import type { TabsProps } from 'antd';
 import {
   FolderOutlined,
@@ -9,6 +9,10 @@ import {
   ForkOutlined,
   ReadOutlined,
   CloudDownloadOutlined,
+  PlusOutlined,
+  SearchOutlined,
+  AppstoreOutlined,
+  UnorderedListOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import {
@@ -24,6 +28,7 @@ import PullRequestsView from './PullRequestsView';
 import PullRequestDetail from './PullRequestDetail';
 import type { Issue } from '../../api/issues';
 import type { PR } from '../../api/pullRequests';
+import { timeAgo } from '../../utils/time';
 
 const { Sider, Content } = Layout;
 
@@ -205,6 +210,22 @@ export default function RepositoriesView() {
   const [isStarred, setIsStarred] = useState(false);
   const [cloning, setCloning] = useState(false);
   const fetchRepositories = useRepositoriesStore((s) => s.fetchRepositories);
+  const createRepository = useRepositoriesStore((s) => s.createRepository);
+
+  // 列表视图：筛选 / 视图切换 / 新建仓库。
+  const [filter, setFilter] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const [createDesc, setCreateDesc] = useState('');
+  const [createPublic, setCreatePublic] = useState(true);
+  const [creating, setCreating] = useState(false);
+
+  const filtered = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return repositories;
+    return repositories.filter((r) => r.name.toLowerCase().includes(q) || r.path.toLowerCase().includes(q));
+  }, [repositories, filter]);
 
   // 列表视图：加载仓库列表。
   useEffect(() => {
@@ -301,40 +322,128 @@ export default function RepositoriesView() {
 
   // ---- 列表视图 ----
   if (!currentRepo) {
+    const onCreate = async () => {
+      if (!createName.trim()) return;
+      setCreating(true);
+      try {
+        await createRepository({ name: createName.trim(), description: createDesc.trim() || undefined, is_public: createPublic });
+        message.success(t('desktop.repos.createOk', { name: createName.trim() }));
+        setCreateOpen(false);
+        setCreateName('');
+        setCreateDesc('');
+      } catch (e) {
+        message.error(`${t('desktop.repos.createFail')}: ${(e as Error).message}`);
+      } finally {
+        setCreating(false);
+      }
+    };
+
     return (
-      <Content style={{ padding: '24px 32px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexShrink: 0 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: textPrimary }}>{t('app.repositories.title')}</h2>
+      <div className="page">
+        <div className="page-head">
+          <h2>{t('app.repositories.title')}</h2>
+          <span className="sub">{t('desktop.repos.sub', { name: server?.name ?? '', count: repositories.length })}</span>
+          <div className="right">
+            <Input
+              className="filter-input"
+              prefix={<SearchOutlined />}
+              placeholder={t('desktop.repos.filterPlaceholder')}
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              allowClear
+            />
+            <div className="viewtoggle">
+              <Tooltip title={t('desktop.repos.gridView')}>
+                <button className={viewMode === 'grid' ? 'on' : ''} onClick={() => setViewMode('grid')}><AppstoreOutlined /></button>
+              </Tooltip>
+              <Tooltip title={t('desktop.repos.listView')}>
+                <button className={viewMode === 'list' ? 'on' : ''} onClick={() => setViewMode('list')}><UnorderedListOutlined /></button>
+              </Tooltip>
+            </div>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+              {t('desktop.repos.new')}
+            </Button>
+          </div>
         </div>
-        {isLoading && <Spin style={{ marginTop: 40 }} />}
-        {error && <ErrorBanner>{error}</ErrorBanner>}
-        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-          {repositories.length === 0 && !isLoading && !error && (
+
+        {error && <ErrorBanner>{`${t('desktop.repos.error')}: ${error}`}</ErrorBanner>}
+
+        <div className="repo-scroll scroll">
+          {isLoading && <Spin style={{ marginTop: 40, display: 'block' }} />}
+          {filtered.length === 0 && !isLoading && !error && (
             <Empty style={{ marginTop: 48 }} description={t('app.repositories.noRepos')} />
           )}
-          {repositories.map((r) => (
-            <div
-              key={r.id}
-              onClick={() => openRepo(r)}
-              style={{ padding: '12px 16px', border: `1px solid ${borderColor}`, borderRadius: 8, marginBottom: 8, cursor: 'pointer', background: bgSecondary, display: 'flex', alignItems: 'center', gap: 12, transition: 'background 0.15s' }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = bgSecondary; }}
-            >
-              <FolderOutlined style={{ fontSize: 20, color: blueLight, flexShrink: 0 }} />
-              <span style={{ flex: 1, color: textPrimary, fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
-              <Tag color={r.is_public ? 'default' : 'blue'} style={{ marginInlineEnd: 0 }}>
-                {r.is_public ? t('app.repositories.visibility.public') : t('app.repositories.visibility.private')}
-              </Tag>
-              <span style={{ color: textSecondary, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                <StarOutlined style={{ fontSize: 12 }} /> {r.star_count}
-              </span>
-              <span style={{ color: textSecondary, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                <ForkOutlined style={{ fontSize: 12 }} /> {r.fork_count}
-              </span>
+          {viewMode === 'grid' ? (
+            <div className="repo-grid">
+              {filtered.map((r) => (
+                <div className="repo-card" key={r.id} onClick={() => openRepo(r)}>
+                  <div className="rc-head">
+                    <span className="rc-ic"><FolderOutlined /></span>
+                    <b>{r.name}</b>
+                    <span className={`pill ${r.is_public ? '' : 'blue'}`}>
+                      {r.is_public ? t('app.repositories.visibility.public') : t('app.repositories.visibility.private')}
+                    </span>
+                  </div>
+                  <p>{r.description || r.path}</p>
+                  <div className="rc-foot">
+                    <span><StarOutlined />{r.star_count}</span>
+                    <span><ForkOutlined />{r.fork_count}</span>
+                    <span className="rc-time">{timeAgo(r.updated_at, t)}</span>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          ) : (
+            <div className="repo-rows">
+              {filtered.map((r) => (
+                <div className="repo-row" key={r.id} onClick={() => openRepo(r)}>
+                  <span className="rc-ic"><FolderOutlined /></span>
+                  <b className="row-name">{r.name}</b>
+                  <span className={`pill ${r.is_public ? '' : 'blue'}`}>
+                    {r.is_public ? t('app.repositories.visibility.public') : t('app.repositories.visibility.private')}
+                  </span>
+                  <span className="row-ago">{timeAgo(r.updated_at, t)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      </Content>
+
+        <Modal
+          open={createOpen}
+          title={t('desktop.repos.newTitle')}
+          okText={t('desktop.repos.new')}
+          confirmLoading={creating}
+          onCancel={() => setCreateOpen(false)}
+          onOk={onCreate}
+        >
+          <div className="field">
+            <label>{t('desktop.repos.createName')}</label>
+            <Input
+              placeholder={t('desktop.repos.createNamePh')}
+              value={createName}
+              onChange={(e) => setCreateName(e.target.value)}
+              onPressEnter={onCreate}
+            />
+          </div>
+          <div className="field">
+            <label>{t('desktop.repos.createDesc')}</label>
+            <Input.TextArea
+              autoSize={{ minRows: 2, maxRows: 4 }}
+              placeholder={t('desktop.repos.createDescPh')}
+              value={createDesc}
+              onChange={(e) => setCreateDesc(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label>{t('desktop.repos.createVisibility')}</label>
+            <Radio.Group value={createPublic} onChange={(e) => setCreatePublic(e.target.value)}>
+              <Radio value>{t('desktop.repos.createVisPublic')}</Radio>
+              <Radio value={false}>{t('desktop.repos.createVisPrivate')}</Radio>
+            </Radio.Group>
+          </div>
+        </Modal>
+      </div>
     );
   }
 

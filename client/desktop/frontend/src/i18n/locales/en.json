@@ -276,6 +276,7 @@
   },
   "desktop": {
     "app": {
+      "name": "Perseus Desktop",
       "welcomeTitle": "Welcome to Perseus Desktop",
       "connecting": "Connecting to local gateway...",
       "gatewayError": "Gateway init failed: {{error}}",
@@ -296,7 +297,136 @@
       "cloneCredentialPh": "Access token — only needed when the URL is not a registered server",
       "recent": "Recent Workspaces",
       "noWorkspaces": "No workspaces yet",
-      "open": "Open"
+      "open": "Open",
+      "tagline": "Remote Perseus client + local workspace.",
+      "tagline2": "An IDE-first collaboration tool — editing, Git and teamwork in one place.",
+      "actions": {
+        "connect": "Connect to a Server",
+        "connectDesc": "Register a remote Perseus server, browse and clone repositories",
+        "openLocal": "Open Local Directory",
+        "openLocalDesc": "Add an existing directory as a workspace, fully usable offline",
+        "clone": "Clone Repository",
+        "cloneDesc": "Clone by URL; credentials go to the OS keychain"
+      },
+      "hints": {
+        "commandPalette": "Command Palette",
+        "save": "Save",
+        "sidebar": "Sidebar",
+        "terminal": "Terminal"
+      },
+      "viewAll": "View all",
+      "recentUpdated": "{{branch}} · {{time}}",
+      "gatewayStatus": "Local gateway ready",
+      "serverRowLast": "Last connected {{time}}",
+      "serverRowOffline": "Offline, showing cache",
+      "serverRowCurrent": "Current",
+      "serverRowManage": "Manage"
+    },
+    "timeAgo": {
+      "never": "Never",
+      "justNow": "Just now",
+      "minutes": "{{count}} min ago",
+      "hours": "{{count}} hr ago",
+      "days": "{{count}} days ago"
+    },
+    "portal": {
+      "crumb": {
+        "welcome": "Launcher",
+        "repositories": "Repositories",
+        "servers": "Servers",
+        "settings": "Settings"
+      },
+      "manageServers": "Manage servers…",
+      "searchPlaceholder": "Search repos, files, issues…",
+      "searchKbd": "Ctrl K",
+      "notifications": "Notifications",
+      "offlineBanner": "{{name}} unreachable — showing read-only offline cache, auto-recovers when back online",
+      "retry": "Retry",
+      "phase2": "This interaction ships in Phase 2."
+    },
+    "repos": {
+      "sub": "{{name}} · {{count}} repositories",
+      "filterPlaceholder": "Filter repositories…",
+      "gridView": "Grid view",
+      "listView": "List view",
+      "new": "New repository",
+      "newTitle": "New repository",
+      "createName": "Name",
+      "createNamePh": "Repository name",
+      "createNameRequired": "Please enter a repository name",
+      "createDesc": "Description",
+      "createDescPh": "Short description",
+      "createVisibility": "Visibility",
+      "createVisPublic": "Public — visible to everyone on the server",
+      "createVisPrivate": "Private — visible only to you and collaborators",
+      "createOk": "Repository \"{{name}}\" created",
+      "createFail": "Failed to create repository",
+      "cacheTag": "Read-only cache",
+      "error": "Failed to load repositories"
+    },
+    "settings": {
+      "gateway": {
+        "title": "Local Gateway",
+        "desc": "All requests are proxied to the Perseus server through the local gateway; the token is injected on the Go side and never touches the frontend.",
+        "addr": "Gateway URL",
+        "addrCopied": "Gateway URL copied",
+        "running": "Running",
+        "tokenLabel": "Gateway session token",
+        "tokenGenerated": "Generated (in-memory only)",
+        "tokenProtect": "X-Gateway-Token anti-CSRF",
+        "tokenMissing": "Not generated",
+        "workspaces": "Workspaces",
+        "servers": "Registered servers",
+        "manage": "Manage →",
+        "cache": "Offline cache",
+        "cacheValue": "Read-only GET idempotent (planned)",
+        "cacheHint": "Caches read-only requests only; never persists on TLS failure"
+      },
+      "appearance": {
+        "title": "Appearance",
+        "desc": "Customize how Perseus Desktop looks.",
+        "theme": "Theme",
+        "dark": "Dark",
+        "light": "Light",
+        "system": "System",
+        "themeComing": "This theme ships in a later version.",
+        "language": "Interface language"
+      },
+      "editor": {
+        "title": "Editor",
+        "desc": "Monaco editor and file workspace preferences.",
+        "fontSize": "Font size",
+        "fontName": "JetBrains Mono",
+        "indent": "Indentation",
+        "indentValue": "Spaces · 2",
+        "autoSave": "Auto save",
+        "autoSaveValue": "On",
+        "autoSaveHint": "Writes to local file 1s after blur",
+        "largeFile": "Large file policy",
+        "largeFileValue": ">2MB read-only",
+        "largeFileHint": "Lazy-load large parts to protect scroll performance",
+        "collab": "Collaborative editing",
+        "collabValue": "Yjs foundation",
+        "collabHint": "Offline changes are kept locally, merged on reconnect"
+      },
+      "keys": {
+        "title": "Keyboard shortcuts",
+        "desc": "Default bindings for common actions (view all commands in the command palette).",
+        "cmd": "Command palette",
+        "save": "Save current file",
+        "sidebar": "Toggle sidebar",
+        "explorerSearchScm": "Explorer / Search / Source Control",
+        "terminal": "Toggle terminal panel",
+        "commit": "Commit (focus in commit box)",
+        "close": "Dismiss popup / command palette"
+      },
+      "about": {
+        "title": "About",
+        "desc": "Remote Perseus client + local workspace.",
+        "version": "v0.4.0 · Wails v2 · WebView2 · Windows",
+        "check": "Check for updates",
+        "latest": "You are up to date"
+      }
     },
     "ide": {
       "gateway": "Gateway: {{url}}"
@@ -381,7 +511,14 @@
       "updateCredRequired": "Changing the server URL requires a new password",
       "updateCredRequiredToken": "Changing the server URL requires a new token",
       "deleteConfirm": "Delete server \"{{name}}\"? Its stored token will also be removed.",
-      "loginFailed": "Login failed: {{error}}"
+      "loginFailed": "Login failed: {{error}}",
+      "sub": "{{count}} registered · credentials stored in Windows Credential Manager",
+      "metaAuth": "Auth: {{method}}",
+      "metaLast": "Last connected: {{time}}",
+      "metaOffline": "Offline cache available (read-only)",
+      "connect": "Connect",
+      "lanTitle": "LAN discovery",
+      "lanDesc": "When a Perseus server publishes {{mdns}} (mDNS), connectable servers appear here automatically; until then this gracefully degrades and manual adding keeps working."
     },
     "serverShell": {
       "back": "Back",
