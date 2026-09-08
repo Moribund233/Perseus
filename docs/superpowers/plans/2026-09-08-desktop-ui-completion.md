@@ -74,22 +74,24 @@
 - Consumes: `useRepositoriesStore.currentRepo`、`useServersStore`.
 - Produces: 新增 desktop API 层：`webhooks`（list/create/delete）/`collaborators`（list/add/remove），经 `proxyRequest`；`RepositorySettings` 视图含两个分区（Webhooks CRUD + 协作者增删）。
 
-- [ ] **Step 1: 新增 API 层**
+- [x] **Step 1: 新增 API 层**
 
 `api/repositorySettings.ts`，参考后端既有端点（web 端 `api/settings.ts` 语义），全部 `proxyRequest` 化（serverId 前置）。
 > **前置核对**：确认后端已暴露 webhooks/collaborators 端点；若缺，需先在后端补（该增量留待确认后单列）。
+> 前置核对结论：`controller/webhook_controller.py`（`/api/v1/repositories` 前缀：GET/POST/PATCH/DELETE webhooks + POST `/test` + GET `/deliveries`）、`controller/repository_member_controller.py`（GET/POST/PUT/DELETE members + PUT `/role` + activate/deactivate）均已存在，无需后端新增。`listWebhooks` 兼容分页 `{items}` 与裸数组两种响应；协作者添加使用 `GET /api/v1/users` 列表做用户下拉。
 
-- [ ] **Step 2: 写 RepositorySettings 视图**
+- [x] **Step 2: 写 RepositorySettings 视图**
 
 `RepositorySettings.tsx`：Tabs「Webhooks / 协作者」；Webhooks 列表 + 新建（url/secret/events）+ 删除；协作者列表 + 添加（username/role）+ 移除。破坏性操作二次确认。
+> 事件全集取自 `models/webhook.py::WEBHOOK_EVENTS`（18 个事件）；角色集合 `owner/admin/developer/readonly`；新增 root 事件徽标或 Tag 样式沿用现有设计语言。
 
-- [ ] **Step 3: 接线 RepositoriesView**
+- [x] **Step 3: 接线 RepositoriesView**
 
 `RepositoriesView.tsx` 的 `tabItems` 已含 `settings`（line 454），在 `Content` 内 `activeTab === 'settings'` 渲染 `<RepositorySettings repoId={currentRepo.id} />`。
 
-- [ ] **Step 4: build 验证 + Commit**
+- [x] **Step 4: build 验证 + Commit**
 
-`npm run build` 通过后提交。
+`npm run build` 通过后提交 commit `de0bf39`。
 
 ---
 
