@@ -14,6 +14,7 @@ Perseus .env 生成脚本
     PERSEUS_SECURITY_SECRET_KEY   JWT 签名密钥（必需）
     POSTGRES_PASSWORD             PostgreSQL 密码（compose 中 db 服务与 DATABASE_URL 共用）
     PERSEUS_ADMIN_PASSWORD        初始管理员密码
+    PERSEUS_COLLAB_INTERNAL_SECRET  协作网关 (collab) 与 app 的服务间共享密钥
     PERSEUS_APP_DEBUG             调试模式（固定 false，可手动改）
     LOG_LEVEL                     日志级别（固定 info，可手动改）
 """
@@ -61,6 +62,7 @@ GENERATED_VARS: dict[str, tuple] = {
     "PERSEUS_SECURITY_SECRET_KEY": (lambda: generate_secret(64), "JWT 签名密钥"),
     "POSTGRES_PASSWORD": (lambda: generate_password(), "PostgreSQL 密码"),
     "PERSEUS_ADMIN_PASSWORD": (lambda: generate_password(), "初始管理员密码"),
+    "PERSEUS_COLLAB_INTERNAL_SECRET": (lambda: generate_secret(48), "协作网关内部共享密钥"),
 }
 
 # 非密钥的默认项（已存在则不覆盖）

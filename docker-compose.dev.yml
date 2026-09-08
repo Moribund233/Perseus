@@ -64,6 +64,8 @@ services:
       PERSEUS_ADMIN_USERNAME: ${PERSEUS_ADMIN_USERNAME:-admin}
       PERSEUS_ADMIN_PASSWORD: ${PERSEUS_ADMIN_PASSWORD}
       PERSEUS_ADMIN_EMAIL: ${PERSEUS_ADMIN_EMAIL:-admin@example.com}
+      # 协作内部端点密钥 (与 collab 服务共享; 未设置时用开发默认值)
+      PERSEUS_COLLAB_INTERNAL_SECRET: ${PERSEUS_COLLAB_INTERNAL_SECRET:-dev-collab-internal-secret}
     volumes:
       # 代码挂载（支持热重载）
       - .:/app
@@ -91,6 +93,32 @@ services:
     # 使用 host.docker.internal 访问宿主机上的外部服务
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  # =============================================
+  # 协作编辑 Yjs 网关 (Hocuspocus 哑管道, 开发模式热重载)
+  # =============================================
+  collab:
+    build:
+      context: .
+      dockerfile: docker/collab/Dockerfile
+    container_name: perseus-collab-dev
+    command: ["node", "--watch", "server.mjs"]
+    environment:
+      PERSEUS_APP_URL: http://app:8000
+      PERSEUS_COLLAB_INTERNAL_SECRET: ${PERSEUS_COLLAB_INTERNAL_SECRET:-dev-collab-internal-secret}
+      TZ: Asia/Shanghai
+    volumes:
+      # 源码挂载 (支持热重载)
+      - ./collab-gateway:/app/gateway
+      # 屏蔽宿主 node_modules (Windows 二进制与 Linux 容器不兼容), 使用镜像内依赖
+      - collab_gateway_node_modules:/app/gateway/node_modules
+    depends_on:
+      - app
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   # =============================================
   # 一次性测试容器（运行后自动退出）
@@ -166,6 +194,7 @@ services:
     depends_on:
       - app
       - git-cgi
+      - collab
     restart: unless-stopped
     deploy:
       resources:
@@ -179,6 +208,8 @@ volumes:
   repos_dev:
     driver: local
   lfs_dev:
+    driver: local
+  collab_gateway_node_modules:
     driver: local
 
 # =============================================

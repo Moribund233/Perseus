@@ -1,6 +1,8 @@
 # F-204 × Code with Me 差距分析与演进规划
 
-> **日期**: 2026-09-07
+> **日期**: 2026-09-07；**2026-09-08 更新**: Yjs 统一底座已落地（5.1 方案 B / D1 决策实施完成）——
+> Hocuspocus 哑管道网关 + web `y-codemirror.next` 迁移完成，3.6 方案 B（断线变更保留）随 CRDT 天然解决；
+> desktop 待 `y-monaco` 接入。下文现状描述保留为迁移前记录，供追溯。
 > **状态**: 规划参考文档（非实施承诺）
 > **定位**: 以 JetBrains Code with Me（下称 CwM）为直接参照，梳理 F-204 协作文本编辑的功能差异，按"影响用户体验 → web 端取舍 → desktop 端深化"三层组织，供后续里程碑规划使用。
 > **关联**: [`docs/api/websocket/README.md`](api/websocket/README.md) 第 7 节（协议）、[`docs/roadmap.md`](roadmap.md)（阶段三）、[`docs/superpowers/specs/2026-08-03-desktop-app-design.md`](superpowers/specs/2026-08-03-desktop-app-design.md)（desktop 基线）、[`docs/frontend-placeholders.md`](frontend-placeholders.md)（已知限制）
@@ -141,7 +143,7 @@ F-204 是以**服务端会话 + Git 提交为权威**的**轻协作能力**（�
 > 基线：desktop spec（Wails v2 + React + **Monaco Editor**，定位"远程 Perseus 客户端 + 本地工作区"）。
 > CwM 的 host-centric 模型恰好与 desktop 的"本地文件系统权威"定位同构 —— **desktop 是承接 CwM 完整体验的合适载体**（协作场景在 desktop spec 中标注为"非目标（首版）"，本文档为后续版本规划输入）。
 
-### 5.1 编辑器内核与协同协议选型 — **首要决策点**
+### 5.1 编辑器内核与协同协议选型 — **✅ 已冻结（2026-09-07 决策 D1）**
 
 - **现状**：web 端 CM6 + `@codemirror/collab`（ChangeSet JSON 协议）；desktop spec 选定 **Monaco**（VS Code 同源、monaco-languageclient 生态）。
 - **冲突**：Monaco 无原生 OT 协同，与 F-204 协议不兼容；重写 Monaco OT 适配成本高。
@@ -149,7 +151,7 @@ F-204 是以**服务端会话 + Git 提交为权威**的**轻协作能力**（�
   - **A. desktop 嵌入 CM6**（编辑器区域用 CM6，其余 IDE 布局不变）：零协议适配直接复用 `/ws/collab` 全栈，但与 Monaco/LSP 生态割裂，编辑器内核双轨。
   - **B. 统一协同层 Yjs**：web/desktop 均迁 Yjs（y-codemirror.next + y-monaco），服务端 y-websocket/Y 网关；CRDT 天然支持离线合并（连带解决 3.6 方案 B），但需重写 F-204 服务端与前端同步层，Git 快照落盘逻辑需重接。
   - **C. F-204 协议 + Monaco 适配层**：在 Monaco 上实现 ChangeSet 协议客户端（自维护 OT 映射），成本最高，不建议。
-- **建议**：短期 desktop 若只做协作**查看/轻编辑**，选 A 快速复用；若 desktop 定位升级为协作 host（5.2），值得评估 B 的一次性迁移。**该决策应在 desktop 协作排期前冻结。**
+- **✅ 决策：方案 B**——两端统一 Yjs 协同底座，现在冻结并作为独立里程碑（Y 网关基建 + web 端先行迁移，desktop `y-monaco` 随后接入）；LSP 桥（spec §8）与 Yjs 正交，Phase 3 不受阻塞。落地依赖与排期见 [`superpowers/specs/2026-09-07-desktop-decisions.md`](superpowers/specs/2026-09-07-desktop-decisions.md) D1。
 
 ### 5.2 Host 会话模型（desktop 独有能力）
 

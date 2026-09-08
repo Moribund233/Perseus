@@ -154,7 +154,7 @@ Nginx/OpenResty (反向代理)
 | 房间/频道管理 | `services/realtime/room.py` | ✅ Phase 2 |
 | 团队聊天 | `services/realtime/chat.py` | ✅ Phase 2 |
 | 业务事件广播 | `services/realtime/event_service.py` | ✅ Phase 2 |
-| 协作文本编辑 | `services/realtime/collab_service.py`<br>`api/websocket/handlers/collab.py` | ✅ F-204 完成 |
+| 协作文本编辑 | `collab-gateway/`（Hocuspocus 网关）<br>`controller/collab_internal_controller.py` | ✅ F-204 完成（Yjs 底座） |
 | 在线状态 | `services/realtime/room_service.py`<br>`api/websocket/manager.py` | ✅ Phase 2 |
 | 通知系统（实时推送） | `services/realtime/notify.py` | ⏳ Phase 2 |
 | 文件上传 | ✅ (代码附件) | ✅ |
@@ -171,6 +171,10 @@ Nginx/OpenResty (反向代理)
 - **阶段三（高级功能）**：
   - **已完成** ✅：LFS、站内/邮件通知系统与偏好、Webhook 签名与投递、构建状态 API、单仓库代码搜索、Release 附件上传、实时房间/聊天/在线状态/业务事件广播
   - **已完成** ✅：跨仓库代码搜索（F-038）、搜索索引自动维护（F-039）、CI/CD 触发闭环（F-046 后端 PR merge 触发 Build）、Webhook 重试机制（F-031）
-  - **已完成** ✅：协作文本编辑（F-204，CM6 collab OT + 会话↔Git 文件保存模型，见 `docs/api/websocket/README.md` 第 7 节；与 Code with Me 的差距分析与演进规划见 `docs/collab-f204-vs-cwm.md`）
+  - **已完成** ✅：协作文本编辑（F-204）— **2026-09-08 迁移至 Yjs 统一协同底座**（D1 决策落地）：
+    Hocuspocus 哑管道网关（`collab-gateway/`，独立容器）+ app 内部回调端点（鉴权/文档加载/Git 保存），
+    web 端 `y-codemirror.next`；断线本地编辑保留（CRDT 重连收敛）、只读连接服务端强制、
+    显式保存落 Git 语义保留。协议详见 `docs/api/websocket/README.md` 第 7 节；
+    与 Code with Me 的差距分析与演进规划见 `docs/collab-f204-vs-cwm.md`
   - **未开始** 🔴：独立实时通知模块（F-205）、国际化（F-048~050）
 - **阶段四（生产准备）**：Docker 基础、Nginx 反向代理、基础中间件审计已就绪；监控、压测、安全审计、日志告警 — **待开发** 🔴

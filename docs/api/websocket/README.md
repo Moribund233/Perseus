@@ -355,54 +355,66 @@ ws://host:port/ws/repository/42?token=your_jwt_token
 
 ---
 
-## 7. 协作编辑 `/ws/collab`（F-204）
+## 7. 协作编辑 `/ws/collab`（F-204，Yjs 底座）
 
-> **认证**: 必需（URL query `token`）
-> **消息上限**: 2MB（容纳批量粘贴产生的变更集）
-> **实现**: `services/realtime/collab_service.py` + `api/websocket/handlers/collab.py`
-> **前端集成**: `client/web/src/components/editor/collabController.ts`（CodeMirror 6 `@codemirror/collab`）
+> **架构**: Hocuspocus 哑管道网关（`collab-gateway/`，独立容器）+ app 内部回调端点
+> **同步协议**: y-websocket（CRDT，`Y.Doc` 文档模型）；光标/在线状态走 Awareness
+> **前端集成**: `client/web/src/components/editor/collabController.ts`（CM6 `y-codemirror.next`）
+> **desktop 接入**: `y-monaco`（D1 决策，待排期）
 
-文档会话标识 `docKey = {repository_id}:{branch}:{path}`。
-服务端为每个会话维护权威文本 + 版本号 + 变更日志（乐观并发控制）：
-客户端 push 必须基于服务端当前版本，过期则拒绝并返回缺失变更，
-客户端（collab 扩展）rebase 本地未确认变更后重发。
+文档会话标识 `docKey = {repository_id}:{branch}:{path}`（经 provider 协议消息传输，
+不依赖 URL 路径）。`Y.Doc` 中唯一共享文本类型为 `getText("content")`，
+客户端必须以同名 ytext 绑定编辑器扩展。
 
-变更集（`changes`）为 CM6 `ChangeSet.toJSON()` 数组，一次 push 可携带多个顺序变更集。
+### 职责边界（git-cgi 同构的哑管道模式）
 
-### 权限模型
+| 层 | 职责 | 实现 |
+|----|------|------|
+| collab-gateway 容器 | CRDT 同步、Awareness（光标/参与）、只读强制、stateless 转发 | `@hocuspocus/server`，零业务代码 |
+| app（FastAPI） | 用户鉴权、仓库权限、Git 文档加载与提交 | `controller/collab_internal_controller.py` |
 
-- `collab_join` 时一次性校验读权限（owner/admin/developer/viewer）与写权限
-  （owner/admin/developer），写权限缓存在会话参与者上（`can_write`）
-- `collab_push` / `collab_save` 直接使用缓存权限，不逐次查库；
-  仓库角色变更在重新 join 后生效
-- 消息上限 2MB（按 UTF-8 字节数，容纳批量粘贴产生的变更集）
+### app 内部回调端点（服务间调用，共享密钥门禁）
 
-### 断线与重连
+请求头 `X-Collab-Internal-Secret: $PERSEUS_COLLAB_INTERNAL_SECRET`（未配置时端点整体 503；
+compose 由 `scripts/generate_env.py` 生成并注入 app 与 collab 两容器）：
 
-- 连接断开时服务端将该连接移出所有会话（会话无人时销毁）
-- 客户端重连成功后必须重新 `collab_join`（前端已实现：状态重置 + 自动重新加入）
+| 端点 | 网关钩子 | 说明 |
+|------|---------|------|
+| `POST /api/v1/collab/auth` | `onAuthenticate` | `{token, docKey}` → 校验 JWT + 仓库读写角色 → `{user_id, username, can_write}`；401/403/404 原因经 `writePermissionDenied` 送达客户端 |
+| `GET /api/v1/collab/doc` | `onLoadDocument` | Git 读取文件内容作为文档种子；二进制 415 / 不存在 404 |
+| `POST /api/v1/collab/save` | `onStateless("collab-save")` | `{token, docKey, content, message}` → 实时校验写权限（不缓存）→ 以提交者身份 `commit_file` → `{commit_id, saved_by, ...}` |
 
-### 消息协议
+### stateless 消息（显式保存语义，与旧 F-204 一致）
 
 | 消息 | 方向 | 说明 |
 |------|------|------|
-| `collab_join` | C→S | 加入会话 `{repository_id, branch, path, clientID}`（join 需读权限） |
-| `collab_init` | S→C | 会话快照 `{docKey, doc, version, participants}`（含权威文本） |
-| `collab_push` | C→S | 推送变更 `{docKey, version, changes[], clientID}`（需写权限） |
-| `collab_update` | S→C | 变更广播 `{docKey, changes[], clientID, version}`（全员，含发送者：自身更新由 clientID 识别并确认） |
-| `collab_reject` | S→C | 版本过期 `{docKey, version, changes[], resync}`（changes 为缺失变更） |
-| `collab_pull` | C→S | 增量拉取 `{docKey, version}` |
-| `collab_resync` | S→C | 版本超出日志窗口，需重新 join |
-| `collab_cursor` | C→S / S→C | 光标/选区 `{anchor, head}`（C→S 附带本地同步版本号） |
-| `collab_save` | C→S | 协作保存 `{docKey, message}`（以服务端权威文本提交 Git commit，需写权限） |
-| `collab_saved` / `collab_save_ack` | S→C | 保存结果广播 / 提交者回执 `{commit_id, saved_by, path, branch, message}` |
-| `collab_leave` / `collab_peer_left` | C→S / S→C | 离开会话 / 成员离开广播 |
+| `collab-save` | C→S | `{message}` → 网关回调 app 提交 Git（需写权限） |
+| `collab-saved` | S→C 广播 | `{docKey, commit_id, saved_by, message, branch, path}` 全员广播（含提交者），驱动"Git 已提交"徽标 |
+| `collab-save-error` | S→C（点对点） | `{error}` 保存失败原因 |
 
-### 会话生命周期
+`onStoreDocument`（debounce/断开自动触发）为 no-op：**仅显式保存落 Git**，防止高频自动 commit。
+自动落盘（TTL/草稿分支）见 `docs/collab-f204-vs-cwm.md` 3.2 长期方案，暂未启用。
 
-- 首个协作者 `collab_join` 时从 Git 分支文件内容创建会话
-- 最后一个协作者离开（或连接断开）时销毁会话（内存态，不持久化）
-- 二进制文件不支持协作编辑
+### 权限与只读
+
+- 连接时校验读权限（owner/admin/developer/viewer）与写权限（owner/admin/developer）
+- 只读连接由 Hocuspocus 服务端强制（`connectionConfig.readOnly`）：
+  其 update 被拒绝并 nak，无需客户端配合；本地 awareness 光标仍正常广播
+- 保存前在 app 侧实时复核写权限（token 随连接上下文携带）
+
+### 断线与重连（CRDT 优势）
+
+- 断线期间本地编辑保留在客户端内存文档中，重连后由 provider 自动同步收敛
+  （解决旧 F-204 "重连整篇覆盖丢输入" 问题，即 3.6 方案 B）
+- 服务端 `Y.Doc` 驻留内存直至进程重启；会话 TTL/空闲卸载为待办（3.2 中期方案）
+
+### 部署与验证
+
+- 容器: `docker/collab/Dockerfile`（node:22-alpine），prod/dev compose `collab` 服务，
+  nginx `/ws/collab` 分流至网关（优先于 `/ws` 通配）
+- 测试: `collab-gateway/tests/gateway.test.mjs`（vitest，双客户端真实同步）、
+  `tests/test_collab_internal_api.py`（app 端点契约）、
+  `scripts` 侧 E2E 冒烟（注册→建仓→双端同步→保存→Git 落盘回读）
 
 ---
 

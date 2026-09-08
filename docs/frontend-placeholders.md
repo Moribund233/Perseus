@@ -1,6 +1,6 @@
 # 前端占位实现清单与开发规划
 
-> **更新日期**: 2026-08-29
+> **更新日期**: 2026-09-08
 > **背景**: 前端多处 UI 为占位/装饰实现（无 onClick 的按钮、硬编码 mock 数据、假状态）。
 > 本文档梳理**尚未真实化**的占位点，作为后续迭代规划依据。
 >
@@ -98,7 +98,7 @@
 
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
-| 协同编辑 | ✅ 已实现（F-204）：`components/editor/collabController.ts` 接入 `/ws/collab`，CodeMirror 6 collab OT 同步 + 远端光标/选区渲染（带用户名标签）+ 协作保存（以服务端权威文本提交 Git，回退 HTTP 直提）+ 断线重连自动 rejoin | 远端光标位置在本地有未确认变更时存在短暂偏移（自校正）；断线重连后本地未确认变更会被服务端快照覆盖（策略决策见 `docs/collab-f204-vs-cwm.md` 3.6）；不支持离线合并 | P2 |
+| 协同编辑 | ✅ 已实现并迁移 **Yjs 底座**（2026-09-08，D1）：`components/editor/collabController.ts` 接入 `collab-gateway`（Hocuspocus）+ `y-codemirror.next`；远端光标/选区（awareness 标签）+ 协作保存（stateless → 网关 → Git commit 全员广播）+ **断线本地编辑保留**（CRDT 重连收敛，3.6 方案 B 天然解决） | 会话 TTL/空闲卸载未做（Y.Doc 驻留内存至网关重启）；"会话已同步/Git 已提交"双态徽标待接 `hasUnsyncedChanges`/`collab-saved`（原 3.3 项）；不支持离线合并（页面关闭即丢，与旧版一致） | P2 |
 | Discussions 面板 | 空状态占位（mock 已移除） | 行内评论需后端锚定文件+行号存储，可复用 PR 评论模型扩展 | P3 |
 | 协作者 "viewing" 状态 | ✅ 已接 WS presence：在线协作者列表即 Editors tab 内容（批次 D）；本文件会话参与者经 `collab_init`/peer 事件展示（F-204） | — | P3 |
 | "Online" 绿点 | ✅ 已接房间 presence（在线人数 > 0 亮绿）（批次 D） | — | P2 |

@@ -1,7 +1,7 @@
 # Perseus Desktop Phase 2A 设计（Spec）
 
 > 日期：2026-08-04
-> 状态：待评审
+> 状态：✅ 已交付（2026-09-07 回填，以代码为准）
 > 前置：Phase 1 已交付（store/keychain/fs/git/网关骨架/IdeShell/仓库工作区）
 > 范围：`client/desktop` — 服务器接入 + 协作能力的第一阶段（Phase 2 拆分为 2A/2B 两份 plan，本 spec 覆盖 2A）
 

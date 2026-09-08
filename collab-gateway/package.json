@@ -1,0 +1,20 @@
+{
+  "name": "perseus-collab-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Perseus Yjs 协作网关 (Hocuspocus 哑管道): CRDT 同步 + app 回调",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hocuspocus/server": "^4.6.0",
+    "yjs": "^13.6.0"
+  },
+  "devDependencies": {
+    "@hocuspocus/provider": "^4.6.0",
+    "vitest": "^3.0.0"
+  }
+}

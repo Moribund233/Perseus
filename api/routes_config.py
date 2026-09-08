@@ -45,6 +45,10 @@ def create_api_router() -> APIRouter:
     from controller.git_auth_controller import router as git_auth_router
     api_v1_router.include_router(git_auth_router, prefix=API_V1_PREFIX)
 
+    # 3a2. 协作编辑内部回调路由（collab-gateway/Hocuspocus 服务间调用）
+    from controller.collab_internal_controller import router as collab_internal_router
+    api_v1_router.include_router(collab_internal_router, prefix=API_V1_PREFIX)
+
     # 3b. OAuth 认证路由
     from controller.oauth_controller import router as oauth_router
     api_v1_router.include_router(oauth_router)

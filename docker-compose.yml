@@ -75,6 +75,7 @@ services:
       PERSEUS_ADMIN_USERNAME: admin
       PERSEUS_ADMIN_PASSWORD: ${PERSEUS_ADMIN_PASSWORD:-perseus_admin_2024}
       PERSEUS_ADMIN_EMAIL: admin@perseus.local
+      PERSEUS_COLLAB_INTERNAL_SECRET: ${PERSEUS_COLLAB_INTERNAL_SECRET:?必需设置协作网关内部密钥 (scripts/generate_env.py)}
     volumes:
       - ./config.toml:/app/config.toml:ro
       - repos:/data/repositories
@@ -108,6 +109,36 @@ services:
         reservations:
           cpus: '1'
           memory: 512M
+
+  # 协作编辑 Yjs 网关 (Hocuspocus 哑管道: CRDT 同步 + app 回调)
+  collab:
+    build:
+      context: .
+      dockerfile: docker/collab/Dockerfile
+    container_name: perseus-collab
+    environment:
+      PERSEUS_APP_URL: http://app:8000
+      PERSEUS_COLLAB_INTERNAL_SECRET: ${PERSEUS_COLLAB_INTERNAL_SECRET:?必需设置协作网关内部密钥 (scripts/generate_env.py)}
+      TZ: Asia/Shanghai
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.2'
+          memory: 128M
 
   # git-http-backend CGI
   git-cgi:
@@ -150,6 +181,8 @@ services:
         condition: service_healthy
       git-cgi:
         condition: service_started
+      collab:
+        condition: service_healthy
     deploy:
       resources:
         limits:

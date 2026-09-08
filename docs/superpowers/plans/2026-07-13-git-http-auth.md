@@ -1,5 +1,7 @@
 # Git HTTP 认证实现计划
 
+> **✅ 状态（2026-09-07 回填）**：已实现——`controller/git_auth_controller.py` + 生产 `docker/gateway/nginx.conf` `auth_request` 均已在库中；desktop push/pull 依赖就此满足。
+
 **Goal:** 为 Git Smart HTTP 协议添加 JWT 认证，防止未经授权的 clone/push
 
 **Architecture:** Nginx `auth_request` 在 Git 请求到达 git-cgi 前发送子请求到 FastAPI 端点验证 JWT 和仓库权限；支持 `Authorization: Bearer` 和 `Basic` 两种方案（Git 客户端可用 `http.extraHeader` 或 URL 嵌入 token）。
