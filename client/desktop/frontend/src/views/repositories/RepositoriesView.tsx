@@ -26,6 +26,7 @@ import IssuesView from './IssuesView';
 import IssueDetail from './IssueDetail';
 import PullRequestsView from './PullRequestsView';
 import PullRequestDetail from './PullRequestDetail';
+import RepositorySettings from './RepositorySettings';
 import type { Issue } from '../../api/issues';
 import type { PR } from '../../api/pullRequests';
 import { timeAgo } from '../../utils/time';
@@ -535,6 +536,11 @@ export default function RepositoriesView() {
               ) : (
                 <PullRequestsView repoId={currentRepo.id} onOpenPR={setSelectedPR} />
               )}
+            </div>
+          )}
+          {activeTab === 'settings' && (
+            <div style={{ flex: 1, minHeight: 0, padding: '16px 0 0', display: 'flex' }}>
+              <RepositorySettings repoId={currentRepo.id} />
             </div>
           )}
         </div>
