@@ -23,10 +23,16 @@ export interface RegisterServerInput {
 export interface UpdateServerInput {
   name?: string;
   base_url?: string;
+  username?: string;
+  /** password 档: 提供则重新登录换 token */
+  password?: string;
+  /** token 档: 提供则直接更换 */
+  token?: string;
 }
 
 export const serversApi = {
-  list: () => apiRequest<ServerRecord[]>('/api/local/servers'),
+  list: () =>
+    apiRequest<{ items: ServerRecord[] }>('/api/local/servers').then((r) => r.items ?? []),
   register: (data: RegisterServerInput) =>
     apiRequest<ServerRecord>('/api/local/servers', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: UpdateServerInput) =>

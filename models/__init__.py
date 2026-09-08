@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import QueuePool
 from sqlalchemy.engine import Engine
 import logging
-from typing import Optional
+from typing import Optional, Any
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ from utils.db_validation import (
 # 延迟初始化的全局变量
 _engine: Optional[Engine] = None
 SessionLocal = None
-Base = declarative_base()
+Base: Any = declarative_base()
 
 
 def _get_sqlite_connect_args(db_config):

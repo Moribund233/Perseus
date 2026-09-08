@@ -32,10 +32,28 @@ export interface GitStatus {
   untracked: string[];
 }
 
-export const listWorkspaces = () =>
-  apiRequest<{ items: Workspace[] }>('/api/local/workspaces').then((r) => r.items);
+export interface GitCredential {
+  type: 'none' | 'token' | 'ssh';
+  token?: string;
+  ssh_key_path?: string;
+}
 
-export const createWorkspace = (input: { name: string; path: string; url?: string; clone?: boolean }) =>
+export interface GitRemoteOpts {
+  remote?: string;
+  branch?: string;
+  credential?: GitCredential;
+}
+
+export const listWorkspaces = () =>
+  apiRequest<{ items: Workspace[] }>('/api/local/workspaces').then((r) => r.items ?? []);
+
+export const createWorkspace = (input: {
+  name?: string;
+  path?: string;
+  url?: string;
+  clone?: boolean;
+  credential?: GitCredential;
+}) =>
   apiRequest<Workspace>('/api/local/workspaces', { method: 'POST', body: JSON.stringify(input) });
 
 export const getTree = (wsId: string) =>
@@ -61,4 +79,16 @@ export const gitAdd = (wsId: string, paths: string[]) =>
 export const gitCommit = (wsId: string, message: string) =>
   apiRequest<{ ok: boolean }>(`/api/local/workspaces/${wsId}/git/commit`, {
     method: 'POST', body: JSON.stringify({ message }),
+  });
+
+export const gitPush = (wsId: string, opts: GitRemoteOpts = {}) =>
+  apiRequest<{ ok: boolean }>(`/api/local/workspaces/${wsId}/git/push`, {
+    method: 'POST',
+    body: JSON.stringify({ remote: opts.remote, branch: opts.branch, credential: opts.credential }),
+  });
+
+export const gitPull = (wsId: string, opts: GitRemoteOpts = {}) =>
+  apiRequest<{ ok: boolean }>(`/api/local/workspaces/${wsId}/git/pull`, {
+    method: 'POST',
+    body: JSON.stringify({ remote: opts.remote, branch: opts.branch, credential: opts.credential }),
   });

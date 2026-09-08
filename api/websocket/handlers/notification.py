@@ -162,7 +162,7 @@ async def handle_broadcast(connection: Connection, message: Dict[str, Any]) -> N
 
 # ==================== 服务端主动推送方法 ====================
 
-async def notify_commit_new(repository_id: uuid.UUID, commit_data: Dict[str, Any], exclude_user_id: uuid.UUID = None) -> int:
+async def notify_commit_new(repository_id: uuid.UUID, commit_data: Dict[str, Any], exclude_user_id: uuid.UUID | None = None) -> int:
     """
     通知仓库有新提交
     

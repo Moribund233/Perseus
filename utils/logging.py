@@ -14,7 +14,7 @@
 import logging
 import sys
 from pathlib import Path
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
 
@@ -343,7 +343,7 @@ def cleanup_old_logs(log_dir: str = "logs", keep_days: int = 30) -> int:
     return deleted_count
 
 
-def get_log_info(log_dir: str = "logs") -> Dict[str, any]:
+def get_log_info(log_dir: str = "logs") -> Dict[str, Any]:
     """
     获取日志系统信息
 
@@ -395,7 +395,7 @@ def get_log_info(log_dir: str = "logs") -> Dict[str, any]:
     }
 
 
-def _format_file_size(size_bytes: int) -> str:
+def _format_file_size(size_bytes: float) -> str:
     """格式化文件大小"""
     for unit in ["B", "KB", "MB", "GB"]:
         if size_bytes < 1024:

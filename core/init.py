@@ -31,6 +31,7 @@
 """
 import os
 import sys
+from pathlib import Path
 from typing import Any, Dict, Optional, List, Callable
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -214,8 +215,8 @@ class AppInitializer:
 
     def __init__(self, config_path: str = "config.toml"):
         self.config_path = config_path
-        self.config_manager = None
-        self._logger = None
+        self.config_manager: Any = None
+        self._logger: Any = None
         self._checker = EnvVarChecker()
 
     def _check_all_env_vars(self) -> bool:
@@ -456,9 +457,20 @@ class AppInitializer:
     def reset_config(self) -> None:
         """重置配置为默认值"""
         self._logger.info(f"重置配置文件: {self.config_path}")
-        default_config = self._gen_default_config()
-        self._write_config(default_config)
-        self.config_manager.get_config(force_reload=True)
+        import toml
+
+        example_path = Path(__file__).resolve().parent.parent / "config.example.toml"
+        if not example_path.exists():
+            self._logger.error("找不到默认配置模板 config.example.toml")
+            return
+        try:
+            with open(example_path, "r", encoding="utf-8") as f:
+                default_config = toml.load(f)
+            self.config_manager.update_config(default_config)
+            self.config_manager.get_config(force_reload=True)
+            self._logger.info("配置已重置为默认值")
+        except Exception as e:
+            self._logger.error(f"重置配置失败: {e}")
 
     def update_config(self, new_config: Dict[str, Any]) -> None:
         """更新配置"""

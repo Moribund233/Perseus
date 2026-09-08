@@ -80,7 +80,7 @@ func (s *Store) ListWorkspaces() ([]Workspace, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Workspace
+	out := []Workspace{}
 	for rows.Next() {
 		var ws Workspace
 		var ts string

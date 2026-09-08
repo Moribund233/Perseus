@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Index, Uuid as SAUuid
-from sqlalchemy.orm import relationship
+from sqlalchemy import Integer, String, Text, Boolean, DateTime, ForeignKey, Index, Uuid as SAUuid
+from sqlalchemy.orm import relationship, mapped_column
 from models.base import BaseModel
 
 
@@ -8,31 +8,31 @@ class Notification(BaseModel):
 
     __tablename__ = "notifications"
 
-    user_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    user_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     """接收通知的用户 ID"""
 
-    type = Column(String(50), nullable=False)
+    type = mapped_column(String(50), nullable=False)
     """通知类型: pull_request, issue, review, comment"""
 
-    title = Column(String(255), nullable=False)
+    title = mapped_column(String(255), nullable=False)
     """通知标题"""
 
-    message = Column(Text, nullable=False)
+    message = mapped_column(Text, nullable=False)
     """通知内容"""
 
-    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=True, index=True)
+    repository_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=True, index=True)
     """关联仓库 ID"""
 
-    target_type = Column(String(50), nullable=True)
+    target_type = mapped_column(String(50), nullable=True)
     """目标类型: pull_request, issue"""
 
-    target_id = Column(SAUuid(as_uuid=True), nullable=True)
+    target_id = mapped_column(SAUuid(as_uuid=True), nullable=True)
     """目标 ID"""
 
-    is_read = Column(Boolean, default=False, nullable=False)
+    is_read = mapped_column(Boolean, default=False, nullable=False)
     """是否已读"""
 
-    read_at = Column(DateTime(timezone=True), nullable=True)
+    read_at = mapped_column(DateTime(timezone=True), nullable=True)
     """阅读时间"""
 
     # Relationships

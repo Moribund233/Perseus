@@ -12,9 +12,11 @@ logger = logging.getLogger(__name__)
 
 async def record_activity(
     repository_id: uuid.UUID, actor_id: uuid.UUID, entity_type: str, entity_id: uuid.UUID,
-    action: str, details: str = None, db: AsyncSession = None,
+    action: str, details: str | None = None, db: AsyncSession | None = None,
 ) -> dict:
     """记录审计日志"""
+    if db is None:
+        raise ValueError("db session is required")
     activity = Activity(
         repository_id=repository_id, actor_id=actor_id,
         entity_type=entity_type, entity_id=entity_id,
@@ -37,7 +39,7 @@ async def record_activity(
 
 async def try_record_activity(
     repository_id: uuid.UUID, actor_id: uuid.UUID, entity_type: str, entity_id: uuid.UUID,
-    action: str, details: str = None, db: AsyncSession = None,
+    action: str, details: str | None = None, db: AsyncSession | None = None,
 ) -> None:
     """
     埋点封装：失败仅记日志，绝不影响主业务流程
@@ -56,7 +58,7 @@ async def try_record_activity(
 
 async def list_activities(
     repository_id: uuid.UUID, db: AsyncSession,
-    entity_type: str = None, actor_id: uuid.UUID = None,
+    entity_type: str | None = None, actor_id: uuid.UUID | None = None,
     page: int = 1, limit: int = 20,
 ) -> dict:
     """查询审计日志"""

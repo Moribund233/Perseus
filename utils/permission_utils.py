@@ -121,7 +121,7 @@ async def check_repository_permission(
     db: AsyncSession,
     repository_id: uuid.UUID,
     user_id: uuid.UUID,
-    required_roles: list = None
+    required_roles: list | None = None
 ) -> bool:
     """
     检查用户在仓库中的权限
@@ -176,7 +176,7 @@ async def require_repository_permission(
     db: AsyncSession,
     repository_id: uuid.UUID,
     user_id: uuid.UUID,
-    required_roles: list = None,
+    required_roles: list | None = None,
     action_description: str = "perform this action on this repository"
 ) -> None:
     """

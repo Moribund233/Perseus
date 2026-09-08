@@ -55,7 +55,11 @@ func (g *Gateway) handleCreateWorkspace(w http.ResponseWriter, r *http.Request) 
 		if abs == "" {
 			abs = defaultCloneDest(req.Name, req.URL)
 		}
-		if err := g.git.Clone(req.URL, abs, req.Cred); err != nil {
+		cred := req.Cred
+		if cred.Type == "" || cred.Type == "none" {
+			cred = g.matchServerCredential(req.URL)
+		}
+		if err := g.git.Clone(req.URL, abs, cred); err != nil {
 			writeError(w, http.StatusBadGateway, "GIT_CLONE", err.Error())
 			return
 		}
@@ -104,7 +108,11 @@ func (g *Gateway) handleCloneWorkspace(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "url required")
 		return
 	}
-	if err := g.git.Clone(body.URL, ws.Path, body.Cred); err != nil {
+	cred := body.Cred
+	if cred.Type == "" || cred.Type == "none" {
+		cred = g.matchServerCredential(body.URL)
+	}
+	if err := g.git.Clone(body.URL, ws.Path, cred); err != nil {
 		writeError(w, http.StatusBadGateway, "GIT_CLONE", err.Error())
 		return
 	}
@@ -190,13 +198,21 @@ func (g *Gateway) handleGitOp(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 	case "push":
-		if err := g.git.Push(ws.Path, body.Remote, body.Branch, body.Cred); err != nil {
+		cred := body.Cred
+		if cred.Type == "" || cred.Type == "none" {
+			cred = g.matchServerCredential(g.git.RemoteURL(ws.Path, body.Remote))
+		}
+		if err := g.git.Push(ws.Path, body.Remote, body.Branch, cred); err != nil {
 			writeError(w, http.StatusBadGateway, "GIT_PUSH", err.Error())
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 	case "pull":
-		if err := g.git.Pull(ws.Path, body.Remote, body.Branch, body.Cred); err != nil {
+		cred := body.Cred
+		if cred.Type == "" || cred.Type == "none" {
+			cred = g.matchServerCredential(g.git.RemoteURL(ws.Path, body.Remote))
+		}
+		if err := g.git.Pull(ws.Path, body.Remote, body.Branch, cred); err != nil {
 			writeError(w, http.StatusBadGateway, "GIT_PULL", err.Error())
 			return
 		}

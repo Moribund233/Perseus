@@ -10,7 +10,7 @@ import logging
 
 import json as _json
 from api.websocket.manager import manager, Connection
-from api.websocket.auth import authenticate_websocket
+from api.websocket.auth import authenticate_websocket, WebSocketAuthError
 from api.websocket.handlers import register_all_handlers
 import uuid
 
@@ -263,11 +263,15 @@ async def notifications_websocket(
             await websocket.close(code=e.code, reason=e.message)
             return
         
+        if not user_info:
+            await websocket.close(code=1008, reason="Not authenticated")
+            return
+        
         # 接受连接
         connection = await manager.connect(websocket)
         
         # 绑定用户
-        manager.bind_user(
+        await manager.bind_user(
             connection,
             user_id=user_info["user_id"],
             username=user_info["username"]

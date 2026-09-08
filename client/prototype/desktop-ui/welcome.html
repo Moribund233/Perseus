@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>S1 启动台 · Perseus Desktop 原型</title>
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" href="assets/screens.css">
+<script src="assets/sprite.js"></script>
+<script src="assets/app.js" defer></script>
+</head>
+<body>
+
+<nav class="proto-bar">
+  <span class="pb-title"><svg class="ic" style="stroke:none"><use href="#i-logo"/></svg>Perseus Desktop</span>
+  <span class="pb-tag">高保真原型 v1</span>
+  <a class="pb-screen on" href="welcome.html">启动台</a>
+  <a class="pb-screen" href="repositories.html">仓库列表</a>
+  <a class="pb-screen" href="repo-detail.html">仓库详情</a>
+  <a class="pb-screen" href="issues.html">Issues</a>
+  <a class="pb-screen" href="pull-requests.html">Pull Requests</a>
+  <a class="pb-screen" href="chat.html">团队聊天</a>
+  <a class="pb-screen" href="ide.html">IDE 工作区</a>
+  <a class="pb-screen" href="servers.html">服务器管理</a>
+  <a class="pb-screen" href="settings.html">设置</a>
+  <div class="pb-right">
+    <span class="pb-note">图标为占位示意 · 正式实现沿用 web 端图标体系</span>
+    <button class="pb-chip" id="chip-toast">触发 Toast</button>
+  </div>
+</nav>
+
+<div class="win">
+  <header class="titlebar">
+    <svg class="ic" style="width:20px;height:20px;stroke:none"><use href="#i-logo"/></svg>
+    <span class="tb-app">Perseus Desktop</span>
+    <span class="tb-sep"></span>
+    <span class="tb-crumb">启动台</span>
+    <div class="tb-right">
+      <div class="winctl">
+        <button title="最小化"><svg class="ic"><use href="#i-min"/></svg></button>
+        <button title="最大化"><svg class="ic"><use href="#i-max"/></svg></button>
+        <button class="close" title="关闭"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <div class="welcome-body scroll">
+    <div class="welcome-grid">
+
+      <div class="welcome-brand">
+        <svg class="wb-logo"><use href="#i-logo"/></svg>
+        <h1>Perseus Desktop</h1>
+        <p>远程 Perseus 客户端 + 本地工作区。<br>IDE 优先的协作开发工具 — 代码编辑、Git 与团队协作一站完成。</p>
+        <div class="wb-meta">
+          <span class="pill blue">v0.4.0</span>
+          <span class="pill">Windows</span>
+          <span class="pill mono">Wails v2</span>
+          <span class="pill green">本地网关就绪</span>
+        </div>
+        <div class="wb-actions">
+          <div class="wb-action" data-nav="servers">
+            <svg class="ic"><use href="#i-server"/></svg>
+            <b>连接服务器</b><span>注册远程 Perseus 服务器，浏览并 Clone 仓库</span>
+          </div>
+          <div class="wb-action" data-toast="已打开系统文件夹选择对话框" data-toast-kind="info">
+            <svg class="ic"><use href="#i-folder"/></svg>
+            <b>打开本地目录</b><span>将现有目录添加为工作区，离线完全可用</span>
+          </div>
+          <div class="wb-action" data-toast="请输入仓库 URL（原型示意）" data-toast-kind="info">
+            <svg class="ic"><use href="#i-download"/></svg>
+            <b>Clone 仓库</b><span>通过 URL 克隆，凭据自动进系统密钥库</span>
+          </div>
+        </div>
+        <div class="wb-hint">
+          <kbd>Ctrl</kbd>+<kbd>K</kbd> 命令面板&nbsp;&nbsp;·&nbsp;&nbsp;<kbd>Ctrl</kbd>+<kbd>S</kbd> 保存&nbsp;&nbsp;·&nbsp;&nbsp;<kbd>Ctrl</kbd>+<kbd>B</kbd> 侧栏&nbsp;&nbsp;·&nbsp;&nbsp;<kbd>Ctrl</kbd>+<kbd>`</kbd> 终端
+        </div>
+      </div>
+
+      <div class="welcome-side">
+        <div class="card">
+          <div class="card-h"><b>最近工作区</b><button class="btn sm ghost">查看全部</button></div>
+          <div class="ws-row">
+            <svg class="ic"><use href="#i-folder"/></svg>
+            <div class="ws-main"><b>perseus</b><span class="mono">D:\Projects\perseus</span></div>
+            <div class="ws-side">
+              <span class="pill"><svg class="ic" style="width:10px;height:10px"><use href="#i-branch"/></svg>main · 2 分钟前</span>
+              <button class="btn sm primary" data-nav="ide">打开</button>
+            </div>
+          </div>
+          <div class="ws-row">
+            <svg class="ic"><use href="#i-folder"/></svg>
+            <div class="ws-main"><b>collab-gateway</b><span class="mono">D:\Projects\collab-gateway</span></div>
+            <div class="ws-side">
+              <span class="pill"><svg class="ic" style="width:10px;height:10px"><use href="#i-branch"/></svg>feat/yjs · 昨天</span>
+              <button class="btn sm primary" data-nav="ide">打开</button>
+            </div>
+          </div>
+          <div class="ws-row">
+            <svg class="ic"><use href="#i-folder"/></svg>
+            <div class="ws-main"><b>docs-site</b><span class="mono">D:\Projects\docs-site</span></div>
+            <div class="ws-side">
+              <span class="pill"><svg class="ic" style="width:10px;height:10px"><use href="#i-branch"/></svg>main · 3 天前</span>
+              <button class="btn sm primary" data-nav="ide">打开</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h"><b>服务器</b><button class="btn sm ghost" data-nav="servers">管理</button></div>
+          <div class="ws-row" data-nav="repos" style="cursor:pointer">
+            <span class="dot on"></span>
+            <div class="ws-main"><b>dev-server</b><span class="mono">https://dev.perseus.local · 上次连接 5 分钟前</span></div>
+            <div class="ws-side"><svg class="ic" style="color:var(--t3)"><use href="#i-chev-r"/></svg></div>
+          </div>
+          <div class="ws-row" style="cursor:pointer" data-toast="staging 离线 — 可查看缓存数据" data-toast-kind="info">
+            <span class="dot off"></span>
+            <div class="ws-main"><b>staging</b><span class="mono">https://staging.perseus.local · 离线，显示缓存</span></div>
+            <div class="ws-side"><svg class="ic" style="color:var(--t3)"><use href="#i-chev-r"/></svg></div>
+          </div>
+        </div>
+
+        <div class="wb-status"><span class="dot on"></span>本地网关已就绪&nbsp;·&nbsp;<span class="mono">127.0.0.1:52114</span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<div class="toast-wrap"></div>
+</body>
+</html>

@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, ForeignKey, Table, Uuid as SAUuid
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, mapped_column
 from models.base import BaseModel
 from models import Base
 
@@ -21,31 +21,31 @@ class Issue(BaseModel):
     """
     __tablename__ = "issues"
     
-    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
+    repository_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
     """所属仓库ID"""
     
-    issue_number = Column(Integer, nullable=False)
+    issue_number = mapped_column(Integer, nullable=False)
     """Issue 编号（每个仓库内自增）"""
     
-    title = Column(String(255), nullable=False)
+    title = mapped_column(String(255), nullable=False)
     """标题"""
     
-    description = Column(Text, nullable=True)
+    description = mapped_column(Text, nullable=True)
     """描述（支持 Markdown）"""
     
-    author_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    author_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     """创建者ID"""
     
-    status = Column(String(20), default="open")
+    status = mapped_column(String(20), default="open")
     """状态：open/closed"""
     
-    priority = Column(String(20), default="medium")
+    priority = mapped_column(String(20), default="medium")
     """优先级：low/medium/high/critical"""
     
-    assignee_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    assignee_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     """指派给的用户ID"""
     
-    closed_by = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    closed_by = mapped_column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     """关闭者ID"""
     
     # 关联关系
@@ -66,16 +66,16 @@ class Label(BaseModel):
     """
     __tablename__ = "labels"
     
-    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
+    repository_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
     """所属仓库ID"""
     
-    name = Column(String(50), nullable=False)
+    name = mapped_column(String(50), nullable=False)
     """标签名称"""
     
-    color = Column(String(7), nullable=False, default="#cccccc")
+    color = mapped_column(String(7), nullable=False, default="#cccccc")
     """标签颜色（十六进制）"""
     
-    description = Column(String(255), nullable=True)
+    description = mapped_column(String(255), nullable=True)
     """标签描述"""
     
     # 关联关系
@@ -88,13 +88,13 @@ class IssueComment(BaseModel):
     """
     __tablename__ = "issue_comments"
     
-    issue_id = Column(SAUuid(as_uuid=True), ForeignKey("issues.id"), nullable=False)
+    issue_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("issues.id"), nullable=False)
     """所属 Issue ID"""
     
-    author_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    author_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     """作者ID"""
     
-    content = Column(Text, nullable=False)
+    content = mapped_column(Text, nullable=False)
     """评论内容"""
     
     # 关联关系

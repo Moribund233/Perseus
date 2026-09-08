@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # 物理仓库存在状态缓存（仓库ID -> (存在状态, 缓存时间)）
 # 缓存有效期30秒，减少频繁的磁盘IO检查
-_repo_exists_cache: Dict[int, Tuple[bool, datetime]] = {}
+_repo_exists_cache: Dict[uuid.UUID, Tuple[bool, datetime]] = {}
 _REPO_EXISTS_CACHE_TTL_SECONDS = 30
 
 
@@ -199,7 +199,10 @@ async def _enrich_repos_with_physical_status(repos: list) -> list[dict]:
     )
 
     return [
-        build_repo_response(repo, check if not isinstance(check, Exception) else False)
+        build_repo_response(
+            repo,
+            isinstance(check, bool) and check,
+        )
         for repo, check in zip(repos, physical_checks)
     ]
 
@@ -553,7 +556,7 @@ async def get_public_repositories(db: AsyncSession):
     return await _enrich_repos_with_physical_status(list(repos))
 
 
-async def check_repository_access(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, required_role: str = None):
+async def check_repository_access(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, required_role: str | None = None):
     """
     检查用户对仓库的访问权限
 

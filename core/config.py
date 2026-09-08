@@ -356,6 +356,7 @@ class ConfigManager:
     """配置管理器 - 单例模式"""
     _instance: Optional['ConfigManager'] = None
     _config: Optional[Config] = None
+    _config_path: str = "config.toml"
 
     def __new__(cls, config_path: str = "config.toml"):
         if cls._instance is None:
@@ -480,11 +481,46 @@ class ConfigManager:
     @property
     def config(self) -> Config:
         """获取配置对象"""
+        if self._config is None:
+            raise RuntimeError("Config has not been initialized")
         return self._config
 
     def reload(self):
         """重新加载配置"""
         self._load_config()
+
+    def get_config(self, force_reload: bool = False) -> Config:
+        """获取配置对象，force_reload=True 时强制从文件重新加载"""
+        if force_reload:
+            self.reload()
+        return self.config
+
+    def update_config(self, new_config: Dict[str, Any]) -> None:
+        """更新配置并写回配置文件"""
+        for section, section_data in new_config.items():
+            if not isinstance(section_data, dict):
+                continue
+            sub_model = getattr(self._config, section, None)
+            if sub_model is None:
+                continue
+            scalar_updates: Dict[str, Any] = {}
+            for key, value in section_data.items():
+                if isinstance(value, dict):
+                    self._merge_nested_sub_model(sub_model, key, value)
+                else:
+                    scalar_updates[key] = value
+            if scalar_updates:
+                setattr(
+                    self._config,
+                    section,
+                    sub_model.model_copy(update=scalar_updates),
+                )
+        self._write_config_file(new_config)
+
+    def _write_config_file(self, config_data: Dict[str, Any]) -> None:
+        """将配置写回 TOML 文件"""
+        with open(self._config_path, "w", encoding="utf-8") as f:
+            toml.dump(config_data, f)
 
 
 def get_config(config_path: str = "config.toml") -> Config:

@@ -28,7 +28,7 @@ def _get_security_config():
 
 class TokenData:
     """Token 数据类"""
-    def __init__(self, user_id: uuid.UUID, username: str, scopes: list = None, oauth_provider: Optional[str] = None):
+    def __init__(self, user_id: uuid.UUID, username: str, scopes: list | None = None, oauth_provider: Optional[str] = None):
         self.user_id = user_id
         self.username = username
         self.scopes = scopes or []

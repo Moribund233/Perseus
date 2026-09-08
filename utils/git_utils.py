@@ -5,8 +5,9 @@ Git 操作工具模块
 """
 import os
 import asyncio
+import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, List, cast
 import uuid
 import pygit2
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,8 @@ from sqlalchemy import select
 from core.exception import NotFoundException, ValidationException
 from models import Repository
 import uuid
+
+logger = logging.getLogger(__name__)
 
 # 创建线程池用于执行同步IO操作
 _git_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="git_utils")
@@ -300,15 +303,18 @@ class GitService:
                 raise ValidationException(detail="Cannot find merge base for rebase")
 
             # 获取源分支上需要重放的提交列表（从旧到新）
-            commits_to_replay = []
-            current = source_commit
-            while current.id != merge_base:
+            commits_to_replay: List[pygit2.Commit] = []
+            current: pygit2.Commit | None = source_commit
+            while current is not None and current.id != merge_base:
                 commits_to_replay.insert(0, current)  # 插入到开头，保持顺序
                 if len(current.parents) == 0:
                     break
                 # parents[0] 返回的是 Commit 对象，需要获取其 id
                 parent_commit = current.parents[0]
-                current = self.repo.get(parent_commit.id)
+                obj = self.repo.get(parent_commit.id)
+                if obj is None or not isinstance(obj, pygit2.Commit):
+                    raise ValidationException(detail="Cannot resolve parent commit for rebase")
+                current = obj
 
             if not commits_to_replay:
                 # 没有需要重放的提交，直接返回目标分支
@@ -331,7 +337,10 @@ class GitService:
                 )
 
                 last_commit_oid = commit_oid
-                parent_commit = self.repo.get(commit_oid)
+                obj = self.repo.get(commit_oid)
+                if obj is None or not isinstance(obj, pygit2.Commit):
+                    raise ValidationException(detail="Failed to resolve replayed commit")
+                parent_commit = obj
 
             return str(last_commit_oid)
 
@@ -979,12 +988,12 @@ def commit_file_changes(
         if len(segments) == 1:
             tb.insert(name, blob_id, pygit2.GIT_FILEMODE_BLOB)
         else:
-            subtree = None
+            subtree: Optional[pygit2.Tree] = None
             if tree is not None:
                 try:
                     entry = tree[name]
                     if entry.type == pygit2.GIT_OBJECT_TREE:
-                        subtree = repo[entry.id]
+                        subtree = cast(pygit2.Tree, repo[entry.id])
                 except KeyError:
                     subtree = None
             child_id = _upsert(subtree, segments[1:])
@@ -1039,9 +1048,15 @@ def delete_file_changes(
                 raise NotFoundException(detail=f"File not found: {file_path}")
             if entry.type != pygit2.GIT_OBJECT_TREE:
                 raise NotFoundException(detail=f"File not found: {file_path}")
-            child_id = _remove(repo[entry.id], segments[1:])
+            child_obj = repo[entry.id]
+            if not isinstance(child_obj, pygit2.Tree):
+                raise NotFoundException(detail=f"File not found: {file_path}")
+            child_id = _remove(child_obj, segments[1:])
             # 子树删空后一并移除该目录项 (git 不会保留空目录)
-            if len(repo[child_id]) == 0:
+            child_tree = repo[child_id]
+            if not isinstance(child_tree, pygit2.Tree):
+                raise NotFoundException(detail=f"File not found: {file_path}")
+            if len(child_tree) == 0:
                 tb.remove(name)
             else:
                 tb.insert(name, child_id, pygit2.GIT_FILEMODE_TREE)

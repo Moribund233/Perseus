@@ -24,6 +24,11 @@ func (g *Git) Pull(dir, remote, branch string, cred Credential) error {
 	return err
 }
 
+// RemoteURL 读取 remote 的配置 URL (供凭据匹配; 无该 remote 返回空串)
+func (g *Git) RemoteURL(dir, remote string) string {
+	return remoteURL(g, dir, remote)
+}
+
 func remoteURL(g *Git, dir, remote string) string {
 	out, err := g.run(dir, "config", "--get", "remote."+remote+".url")
 	if err != nil {

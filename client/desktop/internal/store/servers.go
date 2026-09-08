@@ -38,7 +38,7 @@ func (s *Store) ListServers() ([]Server, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Server
+	out := []Server{}
 	for rows.Next() {
 		var srv Server
 		if err := scanServer(rows, &srv); err != nil {

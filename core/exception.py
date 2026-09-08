@@ -19,7 +19,7 @@ class BaseException(HTTPException):
     def __init__(self,
                  status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
                  detail: str = "Internal Server Error",
-                 headers: dict = None,
+                 headers: dict | None = None,
                  error_code: str | None = None):
         super().__init__(
             status_code=status_code,
@@ -195,16 +195,21 @@ class AppServiceException(BaseException):
 
     用于处理应用服务层操作失败的情况
     """
-    def __init__(self, detail: str = "App Service Error"):
+    def __init__(self,
+                 detail: str = "App Service Error",
+                 status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+                 error_code: str | None = None):
         """
         初始化应用服务异常
 
         Args:
             detail: 错误详情
+            status_code: HTTP 状态码
         """
         super().__init__(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=detail
+            status_code=status_code,
+            detail=detail,
+            error_code=error_code,
         )
 
 
@@ -223,5 +228,5 @@ class ConfigValidationException(AppServiceException):
         """
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=detail
+            detail=detail,
         )

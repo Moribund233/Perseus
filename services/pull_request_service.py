@@ -278,7 +278,7 @@ async def publish_draft(repo_id: uuid.UUID, pr_number: int, user_id: uuid.UUID, 
     if not pr.is_draft:
         raise ValidationException(detail="Pull request is not a draft")
 
-    await check_resource_author_or_admin(db, pr.author_id, user_id, "publish this draft")
+    await check_resource_author_or_admin(db, pr.author_id, user_id, repo_id, "publish this draft")
     pr.is_draft = False
     await db.commit()
     await db.refresh(pr)

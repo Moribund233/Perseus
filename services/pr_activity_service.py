@@ -6,7 +6,7 @@ from models.pr_activity import PRActivity
 
 
 async def record_activity(pr_id: uuid.UUID, actor_id: uuid.UUID, action: str,
-                          details: str = None, db: AsyncSession = None) -> dict:
+                          details: str | None = None, db: AsyncSession | None = None) -> dict:
     """
     记录 PR 活动
 
@@ -20,6 +20,8 @@ async def record_activity(pr_id: uuid.UUID, actor_id: uuid.UUID, action: str,
     Returns:
         dict: 活动记录
     """
+    if db is None:
+        raise ValueError("db session is required")
     activity = PRActivity(
         pull_request_id=pr_id, actor_id=actor_id, action=action, details=details,
     )

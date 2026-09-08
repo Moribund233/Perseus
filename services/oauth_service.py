@@ -101,6 +101,8 @@ class OAuthService:
 
         if account:
             user = await db.get(User, account.user_id)
+            if user is None:
+                raise AuthenticationException("Linked OAuth account has no matching user")
             account.access_token = token_resp.access_token
             if token_resp.refresh_token:
                 account.refresh_token = token_resp.refresh_token

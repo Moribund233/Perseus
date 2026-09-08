@@ -1,6 +1,6 @@
-from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, Uuid as SAUuid
+from sqlalchemy import String, Integer, Text, DateTime, ForeignKey, Uuid as SAUuid
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, mapped_column
 from models.base import BaseModel
 
 
@@ -12,34 +12,34 @@ class Commit(BaseModel):
     """
     __tablename__ = "commits"  # 数据库表名
     
-    hash = Column(String(40), unique=True, nullable=False)
+    hash = mapped_column(String(40), unique=True, nullable=False)
     """提交哈希值，唯一，长度为40个字符(sha1)"""
     
-    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
+    repository_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
     """仓库ID，外键关联到repositories表"""
     
-    branch_id = Column(SAUuid(as_uuid=True), ForeignKey("branches.id"), nullable=False)
+    branch_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("branches.id"), nullable=False)
     """分支ID，外键关联到branches表"""
     
-    author_name = Column(String(100), nullable=False)
+    author_name = mapped_column(String(100), nullable=False)
     """作者名称，长度不超过100个字符"""
     
-    author_email = Column(String(100), nullable=False)
+    author_email = mapped_column(String(100), nullable=False)
     """作者邮箱，长度不超过100个字符"""
     
-    committer_name = Column(String(100), nullable=False)
+    committer_name = mapped_column(String(100), nullable=False)
     """提交者名称，长度不超过100个字符"""
     
-    committer_email = Column(String(100), nullable=False)
+    committer_email = mapped_column(String(100), nullable=False)
     """提交者邮箱，长度不超过100个字符"""
     
-    commit_message = Column(Text, nullable=False)
+    commit_message = mapped_column(Text, nullable=False)
     """提交信息"""
     
-    commit_date = Column(DateTime(timezone=True), server_default=func.now())
+    commit_date = mapped_column(DateTime(timezone=True), server_default=func.now())
     """提交时间，默认值为当前时间"""
     
-    parent_hashes = Column(Text, nullable=True)
+    parent_hashes = mapped_column(Text, nullable=True)
     """父提交哈希值，多个哈希值用逗号分隔"""
     
     # 关系定义

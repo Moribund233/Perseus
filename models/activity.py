@@ -1,6 +1,6 @@
 """通用审计日志模型"""
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, Uuid as SAUuid
-from sqlalchemy.orm import relationship
+from sqlalchemy import Integer, String, Text, ForeignKey, Uuid as SAUuid
+from sqlalchemy.orm import relationship, mapped_column
 from models.base import BaseModel
 
 
@@ -13,12 +13,12 @@ class Activity(BaseModel):
     """
     __tablename__ = "activities"
 
-    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
-    actor_id      = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    entity_type   = Column(String(50), nullable=False)
-    entity_id     = Column(SAUuid(as_uuid=True), nullable=False)
-    action        = Column(String(50), nullable=False)
-    details       = Column(Text, nullable=True)
+    repository_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
+    actor_id      = mapped_column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    entity_type   = mapped_column(String(50), nullable=False)
+    entity_id     = mapped_column(SAUuid(as_uuid=True), nullable=False)
+    action        = mapped_column(String(50), nullable=False)
+    details       = mapped_column(Text, nullable=True)
 
     repository = relationship("Repository", backref="activities")
     actor      = relationship("User", backref="activities")

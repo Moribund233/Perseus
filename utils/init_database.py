@@ -37,7 +37,7 @@ class DatabaseInitializer:
     def __init__(self, db_url: Optional[str] = None):
         self.db_url = db_url
         self._engine = None
-        self._SessionLocal = None
+        self._SessionLocal: sessionmaker | None = None
 
     def _get_sync_engine(self):
         """获取同步引擎（create_tables 需要同步连接）"""

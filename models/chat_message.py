@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Index, Uuid as SAUuid
-from sqlalchemy.orm import relationship
+from sqlalchemy import Integer, String, Text, DateTime, ForeignKey, Index, Uuid as SAUuid
+from sqlalchemy.orm import relationship, mapped_column
 from sqlalchemy import JSON
 
 from models.base import BaseModel
@@ -8,13 +8,13 @@ from models.base import BaseModel
 class ChatMessage(BaseModel):
     __tablename__ = "chat_messages"
 
-    room_id = Column(SAUuid(as_uuid=True), ForeignKey("realtime_rooms.id", ondelete="CASCADE"), nullable=False, index=True)
-    sender_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    message_type = Column(String(20), default="text", nullable=False)
-    content = Column(Text, nullable=False)
-    reply_to_id = Column(SAUuid(as_uuid=True), ForeignKey("chat_messages.id"), nullable=True)
-    edited_at = Column(DateTime, nullable=True)
-    metadata_ = Column("metadata", JSON, nullable=True)
+    room_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("realtime_rooms.id", ondelete="CASCADE"), nullable=False, index=True)
+    sender_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    message_type = mapped_column(String(20), default="text", nullable=False)
+    content = mapped_column(Text, nullable=False)
+    reply_to_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("chat_messages.id"), nullable=True)
+    edited_at = mapped_column(DateTime, nullable=True)
+    metadata_ = mapped_column("metadata", JSON, nullable=True)
 
     __table_args__ = (
         Index("ix_chat_messages_room_created", "room_id", "created_at"),

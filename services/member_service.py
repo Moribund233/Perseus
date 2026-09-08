@@ -57,7 +57,7 @@ async def get_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, db: Asyn
     return member
 
 
-async def add_repository_member(repo_id: uuid.UUID, member_data: dict, db: AsyncSession, operator_id: uuid.UUID = None):
+async def add_repository_member(repo_id: uuid.UUID, member_data: dict, db: AsyncSession, operator_id: uuid.UUID | None = None):
     """
     添加仓库成员
 
@@ -113,7 +113,7 @@ async def add_repository_member(repo_id: uuid.UUID, member_data: dict, db: Async
     return db_member
 
 
-async def update_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, member_data: dict, db: AsyncSession, operator_id: uuid.UUID = None):
+async def update_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, member_data: dict, db: AsyncSession, operator_id: uuid.UUID | None = None):
     """
     更新仓库成员信息
 
@@ -143,7 +143,7 @@ async def update_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, membe
     return db_member
 
 
-async def remove_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, operator_id: uuid.UUID = None):
+async def remove_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, operator_id: uuid.UUID | None = None):
     """
     删除仓库成员
 
@@ -172,7 +172,7 @@ async def remove_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, db: A
     return {"message": "Member removed successfully"}
 
 
-async def update_member_role(repo_id: uuid.UUID, user_id: uuid.UUID, role: str, db: AsyncSession, operator_id: uuid.UUID = None):
+async def update_member_role(repo_id: uuid.UUID, user_id: uuid.UUID, role: str, db: AsyncSession, operator_id: uuid.UUID | None = None):
     """
     更新成员角色
 
@@ -267,7 +267,7 @@ async def check_member_permission(repo_id: uuid.UUID, user_id: uuid.UUID, requir
     return user_role_priority >= required_role_priority
 
 
-async def activate_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, operator_id: uuid.UUID = None):
+async def activate_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, operator_id: uuid.UUID | None = None):
     """
     激活仓库成员
 
@@ -286,7 +286,7 @@ async def activate_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, db:
     return await update_repository_member(repo_id, user_id, {"is_active": True}, db, operator_id=operator_id)
 
 
-async def deactivate_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, operator_id: uuid.UUID = None):
+async def deactivate_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, operator_id: uuid.UUID | None = None):
     """
     停用仓库成员
 

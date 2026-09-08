@@ -41,7 +41,7 @@ def filter_sensitive_data(
     if sensitive_fields is None:
         sensitive_fields = DEFAULT_SENSITIVE_FIELDS
 
-    filtered = {}
+    filtered: Dict[str, Any] = {}
     for key, value in data.items():
         # 检查键名是否包含敏感字段
         if any(field in key.lower() for field in sensitive_fields):
@@ -195,7 +195,7 @@ def validate_password_strength(password: str) -> Dict[str, Any]:
     Returns:
         dict: 包含验证结果和强度评分
     """
-    result = {
+    result: Dict[str, Any] = {
         "is_valid": False,
         "score": 0,
         "errors": []

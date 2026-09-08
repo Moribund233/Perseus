@@ -67,7 +67,7 @@ async def add_message_reaction(
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
-    emoji = (payload or {}).get("emoji")
+    emoji: str = (payload or {}).get("emoji") or ""
     return await ChatService.add_reaction(db, msg_id, current_user.id, emoji)
 
 
@@ -79,5 +79,5 @@ async def remove_message_reaction(
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
-    emoji = (payload or {}).get("emoji")
+    emoji: str = (payload or {}).get("emoji") or ""
     return await ChatService.remove_reaction(db, msg_id, current_user.id, emoji)

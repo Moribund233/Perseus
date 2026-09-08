@@ -64,7 +64,7 @@ async def fork_repository(
     # 检查权限（只能 Fork 公开仓库或有权限的私有仓库）
     if not source_repo.is_public:
         has_permission = await check_repository_permission(
-            db, source_repository_id, user_id, "read"
+            db, source_repository_id, user_id, ["read"]
         )
         if not has_permission:
             raise AuthorizationException(detail="Not authorized to fork this repository")
@@ -132,15 +132,15 @@ async def fork_repository(
 
         # 使用 git clone --bare 创建 Fork
         import subprocess
-        result = subprocess.run(
+        clone_result = subprocess.run(
             ["git", "clone", "--bare", source_repo_path, forked_repo_path],
             capture_output=True,
             text=True,
             encoding="utf-8"
         )
 
-        if result.returncode != 0:
-            raise ValidationException(detail=f"Failed to fork repository: {result.stderr}")
+        if clone_result.returncode != 0:
+            raise ValidationException(detail=f"Failed to fork repository: {clone_result.stderr}")
 
         # 更新源仓库的 Fork 计数
         source_repo.fork_count += 1
@@ -364,7 +364,7 @@ async def sync_fork(
 
     # 执行 git fetch
     import subprocess
-    result = subprocess.run(
+    fetch_result = subprocess.run(
         ["git", "fetch", "origin"],
         cwd=fork_repo_path,
         capture_output=True,
@@ -372,8 +372,8 @@ async def sync_fork(
         encoding="utf-8"
     )
 
-    if result.returncode != 0:
-        raise ValidationException(detail=f"Failed to sync repository: {result.stderr}")
+    if fetch_result.returncode != 0:
+        raise ValidationException(detail=f"Failed to sync repository: {fetch_result.stderr}")
 
     return {
         "success": True,

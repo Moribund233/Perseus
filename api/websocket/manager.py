@@ -555,7 +555,7 @@ class ConnectionManager:
     async def get_room_online_users(self, room_id: uuid.UUID) -> List[Dict[str, Any]]:
         """获取房间的在线用户列表（按用户去重）"""
         connections = await self.get_room_connections(room_id)
-        seen: Dict[int, Dict[str, Any]] = {}
+        seen: Dict[uuid.UUID, Dict[str, Any]] = {}
         for conn in connections:
             if conn.user_id is not None and conn.user_id not in seen:
                 seen[conn.user_id] = {

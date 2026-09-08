@@ -194,7 +194,8 @@ async def set_default_branch(
     Raises:
         NotFoundException: 分支不存在时抛出404异常
     """
-    return await service_set_default_branch(repo_id, branch_name, db)
+    branch = await service_get_branch(repo_id, branch_name, db)
+    return await service_set_default_branch(repo_id, branch.id, db)
 
 
 @router.put("/{repo_id}/branches/{branch_name}/protect")
@@ -202,7 +203,7 @@ async def protect_branch(
     request: Request,
     repo_id: uuid.UUID,
     branch_name: str,
-    protection_settings: dict = None,
+    protection_settings: dict | None = None,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ):

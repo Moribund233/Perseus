@@ -8,6 +8,7 @@ import uuid
 import hmac
 import hashlib
 import asyncio
+import logging
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from urllib.parse import urljoin
@@ -24,6 +25,8 @@ from core.exception import NotFoundException, ValidationException, Authorization
 from utils.permission_utils import check_repository_permission
 from utils.db_utils import paginate
 from utils.response_builder import build_pagination_response
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -55,7 +58,7 @@ async def list_webhooks(
     """
     # 检查权限
     has_permission = await check_repository_permission(
-        db, repository_id, user_id, "read"
+        db, repository_id, user_id, ["read"]
     )
     if not has_permission:
         raise AuthorizationException(detail="Not authorized to view webhooks")
@@ -98,7 +101,7 @@ async def get_webhook(
     """
     # 检查权限
     has_permission = await check_repository_permission(
-        db, repository_id, user_id, "read"
+        db, repository_id, user_id, ["read"]
     )
     if not has_permission:
         raise AuthorizationException(detail="Not authorized to view webhook")
@@ -149,7 +152,7 @@ async def create_webhook(
     """
     # 检查权限（需要管理员权限）
     has_permission = await check_repository_permission(
-        db, repository_id, user_id, "admin"
+        db, repository_id, user_id, ["admin"]
     )
     if not has_permission:
         raise AuthorizationException(detail="Not authorized to create webhook")
@@ -222,7 +225,7 @@ async def update_webhook(
     """
     # 检查权限
     has_permission = await check_repository_permission(
-        db, repository_id, user_id, "admin"
+        db, repository_id, user_id, ["admin"]
     )
     if not has_permission:
         raise AuthorizationException(detail="Not authorized to update webhook")
@@ -288,7 +291,7 @@ async def delete_webhook(
     """
     # 检查权限
     has_permission = await check_repository_permission(
-        db, repository_id, user_id, "admin"
+        db, repository_id, user_id, ["admin"]
     )
     if not has_permission:
         raise AuthorizationException(detail="Not authorized to delete webhook")
@@ -334,7 +337,7 @@ async def test_webhook(
     """
     # 检查权限
     has_permission = await check_repository_permission(
-        db, repository_id, user_id, "admin"
+        db, repository_id, user_id, ["admin"]
     )
     if not has_permission:
         raise AuthorizationException(detail="Not authorized to test webhook")
@@ -428,7 +431,10 @@ async def trigger_webhooks(
     ]
 
     # 使用 gather 并发执行，但不等待结果（fire and forget）
-    asyncio.create_task(asyncio.gather(*tasks, return_exceptions=True))
+    async def _dispatch() -> None:
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    asyncio.create_task(_dispatch())
 
 
 async def _deliver_webhook_async(
@@ -445,9 +451,13 @@ async def _deliver_webhook_async(
         payload: 事件数据
     """
     # 创建新的数据库会话
-    from models.async_db import AsyncSessionLocal
+    from models.async_db import get_async_session_maker
 
-    async with AsyncSessionLocal() as db:
+    session_maker = get_async_session_maker()
+    if session_maker is None:
+        logger.error("无法获取异步数据库会话（引擎未初始化）")
+        return
+    async with session_maker() as db:
         await _deliver_webhook(webhook, event, payload, db)
 
 
@@ -645,7 +655,7 @@ async def list_webhook_deliveries(
     """
     # 检查权限
     has_permission = await check_repository_permission(
-        db, repository_id, user_id, "admin"
+        db, repository_id, user_id, ["admin"]
     )
     if not has_permission:
         raise AuthorizationException(detail="Not authorized to view deliveries")
@@ -699,7 +709,7 @@ async def get_webhook_delivery(
     """
     # 检查权限
     has_permission = await check_repository_permission(
-        db, repository_id, user_id, "admin"
+        db, repository_id, user_id, ["admin"]
     )
     if not has_permission:
         raise AuthorizationException(detail="Not authorized to view delivery")

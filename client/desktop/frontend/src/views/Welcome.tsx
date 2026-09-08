@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Button, Card, Empty, Input, List, Space, Tag } from 'antd';
+import { Button, Card, Collapse, Empty, Input, List, Space, Tag } from 'antd';
 import { FolderOpenOutlined, CloudServerOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { createWorkspace, listWorkspaces, Workspace } from '../api/workspaces';
 import { useWorkspaceStore } from '../stores/workspace';
-import { useServersStore } from '../stores/servers';
+import { useServersStore, MANAGER_VIEW } from '../stores/servers';
 
 const healthColor: Record<string, string> = { online: 'success', offline: 'error', unknown: 'default' };
 
@@ -16,6 +16,7 @@ export default function Welcome() {
   const servers = useServersStore((s) => s.servers);
   const setCurrentServer = useServersStore((s) => s.setCurrent);
   const [url, setUrl] = useState('');
+  const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,9 +39,17 @@ export default function Welcome() {
     setBusy(true);
     try {
       const name = url.split('/').pop()?.replace(/\.git$/, '') ?? 'repo';
-      await createWorkspace({ name, path: '', url: url.trim(), clone: true });
+      await createWorkspace({
+        name,
+        path: '',
+        url: url.trim(),
+        clone: true,
+        // 已注册服务器由网关自动注入 token; 此处仅透传手动输入的凭据
+        credential: token.trim() ? { type: 'token', token: token.trim() } : undefined,
+      });
       setWorkspaces(await listWorkspaces());
       setUrl('');
+      setToken('');
     } catch (e) {
       setError(String(e));
     } finally {
@@ -51,11 +60,11 @@ export default function Welcome() {
   return (
     <div className="welcome">
       <h2>{t('desktop.app.welcomeTitle')}</h2>
-      <Space direction="vertical" size="middle" style={{ width: 520 }}>
+      <Space orientation="vertical" size="middle" style={{ width: 520 }}>
         <Card title={t('desktop.welcome.servers')}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span className="muted">{t('desktop.welcome.serversDesc')}</span>
-            <Button size="small" onClick={() => setCurrentServer('__manager__')}>
+            <Button size="small" onClick={() => setCurrentServer(MANAGER_VIEW)}>
               {t('desktop.servers.manage')}
             </Button>
           </div>
@@ -92,6 +101,21 @@ export default function Welcome() {
               {t('desktop.welcome.clone')}
             </Button>
           </Space.Compact>
+          <Collapse
+            ghost
+            size="small"
+            items={[{
+              key: 'cred',
+              label: t('desktop.welcome.cloneCredential', { defaultValue: '凭据（可选）' }),
+              children: (
+                <Input.Password
+                  placeholder={t('desktop.welcome.cloneCredentialPh', { defaultValue: '访问令牌 — 仅当 URL 不属于已注册服务器时需要' })}
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                />
+              ),
+            }]}
+          />
         </Card>
         {error && <div className="error-text">{error}</div>}
         <Card title={t('desktop.welcome.recent')}>

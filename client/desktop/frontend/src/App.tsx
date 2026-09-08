@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ConfigProvider, App as AntApp, Button } from 'antd';
-import { useTranslation } from 'react-i18next';
+import { ConfigProvider, App as AntApp, Spin } from 'antd';
 import { initGateway, useGatewayStore } from './stores/gateway';
 import { useWorkspaceStore } from './stores/workspace';
 import { useServersStore } from './stores/servers';
@@ -9,10 +8,10 @@ import { perseusTheme } from './styles/theme';
 import Welcome from './views/Welcome';
 import IdeShell from './layouts/IdeShell';
 import ServerShell from './layouts/ServerShell';
+import ErrorPage from './views/ErrorPage';
 import './styles/desktop.css';
 
 export default function App() {
-  const { t } = useTranslation();
   const ready = useGatewayStore((s) => s.ready);
   const current = useWorkspaceStore((s) => s.current);
   const currentServerId = useServersStore((s) => s.currentServerId);
@@ -27,14 +26,13 @@ export default function App() {
 
   let body: React.ReactNode;
   if (error) {
+    body = <ErrorPage error={error} />;
+  } else if (!ready) {
     body = (
-      <div style={{ padding: 24 }}>
-        <div>{t('desktop.app.gatewayError', { error })}</div>
-        <Button onClick={() => window.location.reload()}>{t('desktop.app.retry')}</Button>
+      <div className="app-boot">
+        <Spin size="large" />
       </div>
     );
-  } else if (!ready) {
-    body = <div style={{ padding: 24 }}>{t('desktop.app.connecting')}</div>;
   } else if (current) {
     body = <IdeShell workspace={current} />;
   } else if (currentServerId) {

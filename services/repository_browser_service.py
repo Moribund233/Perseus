@@ -8,7 +8,7 @@
 - 代码对比
 """
 import os
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, cast
 from datetime import datetime
 
 import pygit2
@@ -97,7 +97,7 @@ def _get_tree(repo: pygit2.Repository, commit: pygit2.Commit, path: str = "") ->
     try:
         entry = commit.tree[path]
         if entry.type == pygit2.GIT_OBJECT_TREE:
-            return repo[entry.id]
+            return cast(pygit2.Tree, repo[entry.id])
         else:
             raise InvalidPathException(detail=f"'{path}' is not a directory")
     except KeyError:
@@ -127,7 +127,7 @@ def _get_file_last_commit(repo: pygit2.Repository, commit: pygit2.Commit, path: 
     except KeyError:
         return None
 
-    walker = repo.walk(commit.id, pygit2.GIT_SORT_TIME)
+    walker = repo.walk(commit.id, pygit2.enums.SortMode.TIME)
     walker.simplify_first_parent()
     for c in walker:
         return {
@@ -187,7 +187,7 @@ async def get_tree_entries(
     # 构建条目列表
     entries = []
     for entry in tree:
-        entry_data = {
+        entry_data: Dict[str, Any] = {
             "name": entry.name,
             "type": "tree" if entry.type == pygit2.GIT_OBJECT_TREE else "blob",
             "path": f"{path}/{entry.name}" if path else entry.name,
@@ -197,11 +197,12 @@ async def get_tree_entries(
 
         # 如果是文件，添加大小信息
         if entry.type == pygit2.GIT_OBJECT_BLOB:
-            blob = repo[entry.id]
+            blob = cast(pygit2.Blob, repo[entry.id])
             entry_data["size"] = blob.size
             if last_commit:
+                full_path: str = f"{path}/{entry.name}" if path else str(entry.name)
                 entry_data["last_commit"] = _get_file_last_commit(
-                    repo, commit, f"{path}/{entry.name}" if path else entry.name
+                    repo, commit, full_path
                 )
 
         entries.append(entry_data)
@@ -219,7 +220,7 @@ async def get_tree_entries(
 async def get_blob_content(
     repo_path: str,
     ref: str = "HEAD",
-    path: str = None
+    path: str | None = None
 ) -> Dict[str, Any]:
     """
     获取文件内容
@@ -269,7 +270,7 @@ async def get_blob_content(
     if entry.type != pygit2.GIT_OBJECT_BLOB:
         raise InvalidPathException(detail=f"'{path}' is not a valid file")
     
-    blob = repo[entry.id]
+    blob = cast(pygit2.Blob, repo[entry.id])
     
     # 尝试解码为文本
     try:
@@ -301,7 +302,7 @@ async def get_blob_content(
 async def get_commits(
     repo_path: str,
     ref: str = "HEAD",
-    path: str = None,
+    path: str | None = None,
     page: int = 1,
     per_page: int = 30
 ) -> Dict[str, Any]:
@@ -338,7 +339,7 @@ async def get_commits(
         }
 
     commits = []
-    walker = repo.walk(commit.id, pygit2.GIT_SORT_TIME)
+    walker = repo.walk(commit.id, pygit2.enums.SortMode.TIME)
     
     # 如果指定了路径，只获取该文件的提交
     if path:
@@ -380,9 +381,9 @@ async def get_commits(
 
 async def get_diff(
     repo_path: str,
-    base: str = None,
-    head: str = None,
-    path: str = None
+    base: str | None = None,
+    head: str | None = None,
+    path: str | None = None
 ) -> Dict[str, Any]:
     """
     获取代码差异
@@ -425,7 +426,7 @@ async def get_diff(
         # 创建一个空的树
         empty_tree_builder = repo.TreeBuilder()
         empty_tree_id = empty_tree_builder.write()
-        empty_tree = repo[empty_tree_id]
+        empty_tree = cast(pygit2.Tree, repo[empty_tree_id])
         diff = empty_tree.diff_to_tree(head_commit.tree)
     
     # 如果指定了路径，过滤差异
@@ -434,6 +435,8 @@ async def get_diff(
     
     files = []
     for patch in diff:
+        if patch is None:
+            continue
         file_data = {
             "old_path": patch.delta.old_file.path,
             "new_path": patch.delta.new_file.path,
@@ -446,7 +449,7 @@ async def get_diff(
         if patch.delta.status != pygit2.GIT_DELTA_DELETED:
             hunks = []
             for hunk in patch.hunks:
-                hunk_data = {
+                hunk_data: Dict[str, Any] = {
                     "old_start": hunk.old_start,
                     "old_lines": hunk.old_lines,
                     "new_start": hunk.new_start,
@@ -744,7 +747,7 @@ async def get_readme_content(
         try:
             entry = tree[name]
             if entry.type == pygit2.GIT_OBJECT_BLOB:
-                blob = repo[entry.id]
+                blob = cast(pygit2.Blob, repo[entry.id])
 
                 # 尝试解码为文本
                 try:
@@ -779,7 +782,7 @@ async def get_readme_content(
 async def get_file_symbols(
     repo_path: str,
     ref: str = "HEAD",
-    path: str = None
+    path: str | None = None
 ) -> Dict[str, Any]:
     """
     获取文件中的符号（函数、类、变量等）

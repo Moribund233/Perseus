@@ -440,16 +440,16 @@ async def create_release(
     # 如果未指定提交哈希，使用当前 HEAD
     if not commit_hash:
         import subprocess
-        result = subprocess.run(
+        rev_parse_result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             cwd=repo_path,
             capture_output=True,
             text=True,
             encoding="utf-8"
         )
-        if result.returncode != 0:
+        if rev_parse_result.returncode != 0:
             raise ValidationException(detail="Failed to get HEAD commit hash")
-        commit_hash = result.stdout.strip()
+        commit_hash = rev_parse_result.stdout.strip()
 
     # 创建 Git 标签
     if create_git_tag:
@@ -530,7 +530,7 @@ async def update_release(
     if release.author_id != user_id:
         # 检查是否为仓库管理员
         has_permission = await check_repository_permission(
-            db, repository_id, user_id, "admin"
+            db, repository_id, user_id, ["admin"]
         )
         if not has_permission:
             raise AuthorizationException(detail="Not authorized to update this release")
@@ -593,7 +593,7 @@ async def delete_release(
     # 检查权限
     if release.author_id != user_id:
         has_permission = await check_repository_permission(
-            db, repository_id, user_id, "admin"
+            db, repository_id, user_id, ["admin"]
         )
         if not has_permission:
             raise AuthorizationException(detail="Not authorized to delete this release")
@@ -661,7 +661,7 @@ async def add_release_asset(
     # 检查权限
     if release.author_id != user_id:
         has_permission = await check_repository_permission(
-            db, repository_id, user_id, "admin"
+            db, repository_id, user_id, ["admin"]
         )
         if not has_permission:
             raise AuthorizationException(detail="Not authorized to add assets to this release")
@@ -730,7 +730,7 @@ async def delete_release_asset(
     # 检查权限
     if release.author_id != user_id:
         has_permission = await check_repository_permission(
-            db, repository_id, user_id, "admin"
+            db, repository_id, user_id, ["admin"]
         )
         if not has_permission:
             raise AuthorizationException(detail="Not authorized to delete assets from this release")

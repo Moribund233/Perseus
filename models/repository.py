@@ -1,5 +1,5 @@
-from sqlalchemy import Column, String, Boolean, Integer, Text, ForeignKey, Uuid as SAUuid
-from sqlalchemy.orm import relationship
+from sqlalchemy import String, Boolean, Integer, Text, ForeignKey, Uuid as SAUuid
+from sqlalchemy.orm import relationship, mapped_column
 from models.base import BaseModel
 
 
@@ -11,35 +11,35 @@ class Repository(BaseModel):
     """
     __tablename__ = "repositories"  # 数据库表名
     
-    name = Column(String(100), index=True, nullable=False)
+    name = mapped_column(String(100), index=True, nullable=False)
     """仓库名称，长度不超过100个字符"""
     
-    path = Column(String(255), unique=True, nullable=False)
+    path = mapped_column(String(255), unique=True, nullable=False)
     """仓库路径，唯一，长度不超过255个字符"""
     
-    description = Column(Text, nullable=True)
+    description = mapped_column(Text, nullable=True)
     """仓库描述，可选"""
     
-    is_public = Column(Boolean, default=True)
+    is_public = mapped_column(Boolean, default=True)
     """是否公开仓库，默认为True"""
     
-    owner_id = Column(SAUuid(as_uuid=True), nullable=False)
+    owner_id = mapped_column(SAUuid(as_uuid=True), nullable=False)
     """仓库所有者ID，关联用户表"""
     
-    default_branch = Column(String(50), default="master")
+    default_branch = mapped_column(String(50), default="master")
     """默认分支名称，默认为master"""
     
     # Fork 相关字段
-    forked_from_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=True)
+    forked_from_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=True)
     """Fork 来源仓库ID，为空表示不是 Fork"""
     
-    fork_count = Column(Integer, default=0)
+    fork_count = mapped_column(Integer, default=0)
     """被 Fork 的次数"""
 
-    star_count = Column(Integer, default=0)
+    star_count = mapped_column(Integer, default=0)
     """Star 数量"""
 
-    is_archived = Column(Boolean, default=False)
+    is_archived = mapped_column(Boolean, default=False)
     """是否已归档"""
     
     # 关系定义

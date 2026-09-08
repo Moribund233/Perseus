@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>S5 Pull Requests · Perseus Desktop 原型</title>
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" href="assets/screens.css">
+<script src="assets/sprite.js"></script>
+<script src="assets/app.js" defer></script>
+</head>
+<body>
+
+<nav class="proto-bar">
+  <span class="pb-title"><svg class="ic" style="stroke:none"><use href="#i-logo"/></svg>Perseus Desktop</span>
+  <span class="pb-tag">高保真原型 v1</span>
+  <a class="pb-screen" href="welcome.html">启动台</a>
+  <a class="pb-screen" href="repositories.html">仓库列表</a>
+  <a class="pb-screen" href="repo-detail.html">仓库详情</a>
+  <a class="pb-screen" href="issues.html">Issues</a>
+  <a class="pb-screen on" href="pull-requests.html">Pull Requests</a>
+  <a class="pb-screen" href="chat.html">团队聊天</a>
+  <a class="pb-screen" href="ide.html">IDE 工作区</a>
+  <a class="pb-screen" href="servers.html">服务器管理</a>
+  <a class="pb-screen" href="settings.html">设置</a>
+  <div class="pb-right">
+    <span class="pb-note">图标为占位示意 · 正式实现沿用 web 端图标体系</span>
+    <button class="pb-chip" id="chip-offline"><span class="dot warn"></span>模拟服务器离线</button>
+    <button class="pb-chip" id="chip-toast">触发 Toast</button>
+  </div>
+</nav>
+
+<div class="win">
+  <header class="titlebar">
+    <button class="tb-back" data-nav="repos"><svg class="ic" style="width:14px;height:14px"><use href="#i-arrow-l"/></svg>仓库</button>
+    <span class="tb-sep"></span>
+    <span class="tb-crumb">仓库 <svg class="ic"><use href="#i-chev-r"/></svg> <b>perseus</b> <svg class="ic"><use href="#i-chev-r"/></svg> Pull Requests</span>
+    <div class="tb-right">
+      <div class="tb-search" title="搜索 PR（原型示意）"><svg class="ic"><use href="#i-search"/></svg>搜索 PR…<kbd>Ctrl K</kbd></div>
+      <button class="tb-icon" title="通知"><svg class="ic"><use href="#i-bell"/></svg></button>
+      <span class="avatar" style="background:linear-gradient(135deg,#1f6feb,#bc8cff);margin-right:6px" title="张伟">ZW</span>
+      <div class="winctl">
+        <button><svg class="ic"><use href="#i-min"/></svg></button>
+        <button><svg class="ic"><use href="#i-max"/></svg></button>
+        <button class="close"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <div class="offline-banner">
+    <svg class="ic"><use href="#i-plug"/></svg>
+    <b>dev-server 不可达</b>&nbsp;— PR 列表显示离线缓存
+    <button class="btn sm ghost" style="margin-left:auto" data-toast="正在重连 dev-server…" data-toast-kind="info">重试</button>
+  </div>
+
+  <div class="listpage">
+    <div class="list-toolbar">
+      <h2>Pull Requests</h2>
+      <div class="fgroup">
+        <button class="on" data-f><svg class="ic" style="width:13px;height:13px;color:var(--green)"><use href="#i-merge"/></svg>打开 <span class="cnt">3</span></button>
+        <button data-f><svg class="ic" style="width:13px;height:13px;color:var(--purple)"><use href="#i-merge"/></svg>已合并 <span class="cnt">12</span></button>
+        <button data-f><svg class="ic" style="width:13px;height:13px;color:var(--red)"><use href="#i-x"/></svg>已关闭 <span class="cnt">5</span></button>
+      </div>
+      <div class="right">
+        <button class="btn ghost"><svg class="ic"><use href="#i-list"/></svg>筛选</button>
+        <button class="btn primary" data-toast="从 feature 分支新建 PR（原型示意）" data-toast-kind="info"><svg class="ic"><use href="#i-plus"/></svg>新建 Pull Request</button>
+      </div>
+    </div>
+
+    <div class="split">
+      <div class="list-col scroll">
+        <div class="lrow sel">
+          <span class="st-ic"><svg class="ic open"><use href="#i-merge"/></svg></span>
+          <div class="lr-main">
+            <div class="lr-title">修复网关离线缓存穿透 <span class="num">#42</span></div>
+            <div class="lr-meta"><span class="mono">feature/gateway-cache → main</span> · 张伟 于 40 分钟前</div>
+          </div>
+          <div class="lr-side">
+            <span class="diffstat"><span class="plus">+120</span><span class="minus">−18</span></span>
+            <div class="avatar-stack">
+              <span class="avatar" style="background:#3fb950">李</span>
+              <span class="avatar" style="background:#bc8cff">王</span>
+            </div>
+          </div>
+        </div>
+        <div class="lrow" data-toast="原型：切换 PR 详情" data-toast-kind="info">
+          <span class="st-ic"><svg class="ic open"><use href="#i-merge"/></svg></span>
+          <div class="lr-main">
+            <div class="lr-title">Yjs 文档模型接入快照落盘 <span class="num">#41</span></div>
+            <div class="lr-meta"><span class="mono">feat/yjs-snapshot → main</span> · 李娜 于 3 小时前</div>
+          </div>
+          <div class="lr-side">
+            <span class="diffstat"><span class="plus">+342</span><span class="minus">−96</span></span>
+            <div class="avatar-stack"><span class="avatar" style="background:#1f6feb">张</span></div>
+          </div>
+        </div>
+        <div class="lrow" data-toast="原型：切换 PR 详情" data-toast-kind="info">
+          <span class="st-ic"><svg class="ic draft"><use href="#i-merge"/></svg></span>
+          <div class="lr-main">
+            <div class="lr-title">编辑器：大文件懒加载渲染 <span class="num">#40</span><span class="tag p-low">草稿</span></div>
+            <div class="lr-meta"><span class="mono">perf/large-file → main</span> · 王强 于 昨天</div>
+          </div>
+          <div class="lr-side">
+            <span class="diffstat"><span class="plus">+88</span><span class="minus">−31</span></span>
+            <div class="avatar-stack"><span class="avatar" style="background:#3fb950">李</span></div>
+          </div>
+        </div>
+        <div class="lrow" data-toast="原型：切换 PR 详情" data-toast-kind="info">
+          <span class="st-ic"><svg class="ic merged"><use href="#i-merge"/></svg></span>
+          <div class="lr-main">
+            <div class="lr-title">配置：默认开启离线缓存 <span class="num">#39</span></div>
+            <div class="lr-meta">由 张伟 于 2 天前 合并</div>
+          </div>
+          <div class="lr-side"><span class="cmt"><svg class="ic"><use href="#i-msg"/></svg>4</span></div>
+        </div>
+        <div class="lrow" data-toast="原型：切换 PR 详情" data-toast-kind="info">
+          <span class="st-ic"><svg class="ic closed"><use href="#i-x"/></svg></span>
+          <div class="lr-main">
+            <div class="lr-title">临时：调试日志开关 <span class="num">#38</span></div>
+            <div class="lr-meta">由 王强 于 3 天前 关闭（未合并）</div>
+          </div>
+          <div class="lr-side"><span class="cmt"><svg class="ic"><use href="#i-msg"/></svg>1</span></div>
+        </div>
+      </div>
+
+      <div class="detail-col scroll">
+        <div class="dt-head">
+          <span class="st-ic"><svg class="ic open"><use href="#i-merge"/></svg></span>
+          <h3>修复网关离线缓存穿透 <span class="num">#42</span></h3>
+          <button class="btn ghost sm" style="margin-top:3px" data-toast="返回 PR 列表（原型示意）" data-toast-kind="info"><svg class="ic"><use href="#i-arrow-l"/></svg>列表</button>
+        </div>
+        <div class="dt-meta">
+          <span class="tag open">打开</span>
+          <span class="avatar" style="background:#1f6feb">张</span><b>张伟</b> 请求合并
+          <span class="mono" style="color:var(--blue-l)">feature/gateway-cache</span> → <span class="mono">main</span>
+          <span class="diffstat"><span class="plus">+120</span><span class="minus">−18</span></span>
+          <span>8 个文件</span>
+        </div>
+        <div class="dt-body">
+          <div class="dt-main">
+            <div class="bubble">
+              <div class="bubble-h"><span class="avatar" style="background:#1f6feb;width:22px;height:22px;font-size:8.5px">张</span><b>张伟</b><time>40 分钟前</time><span class="role">作者</span></div>
+              <div class="bubble-b">
+                <p>LRU 条目过期后直接返回 <code>cached:null</code> 导致穿透。改为：<b>命中但过期 → 先返回旧值，同时后台回源刷新</b>；容量提升至 500 条 / 32MB。</p>
+                <p>关联 Issue <code>#57</code>。</p>
+              </div>
+            </div>
+            <div class="bubble">
+              <div class="bubble-h"><span class="avatar" style="background:#3fb950;width:22px;height:22px;font-size:8.5px">李</span><b>李娜</b><time>15 分钟前</time><span class="role approved">已批准</span></div>
+              <div class="bubble-b"><p><code>gateway/cache.go</code> 逻辑 LGTM，建议补一条 TTL 后台刷新的回归测试。</p></div>
+            </div>
+            <div class="comment-editor">
+              <div class="ce-h">添加审查评论</div>
+              <div class="ce-b"><textarea class="input" rows="2" style="width:100%;background:var(--bg2)" placeholder="留下你的评论… 支持 Markdown"></textarea></div>
+              <div class="ce-f">
+                <button class="btn ghost sm">请求修改</button>
+                <button class="btn green sm" data-toast="已批准 PR #42（原型示意）"><svg class="ic"><use href="#i-check"/></svg>批准</button>
+              </div>
+            </div>
+            <div class="merge-box">
+              <div class="mb-state">
+                <svg class="ic"><use href="#i-check-c"/></svg>
+                <div>
+                  <b>此分支无冲突，可合并</b>
+                  <p>2 项检查通过 · 1 位审查者已批准</p>
+                </div>
+              </div>
+              <div class="mb-btns">
+                <button class="btn green" data-toast="已合并 PR #42 到 main"><svg class="ic"><use href="#i-merge"/></svg>Squash and merge</button>
+                <button class="btn ghost" data-toast="Rebase 合并（原型示意）" data-toast-kind="info">Rebase and merge</button>
+              </div>
+            </div>
+          </div>
+          <div class="dt-side">
+            <div class="side-sec">
+              <b class="ss-t">审查者</b>
+              <div class="ss-v"><span class="avatar" style="background:#3fb950;width:20px;height:20px;font-size:8px">李</span>李娜
+                <svg class="ic" style="width:13px;height:13px;color:var(--green)"><use href="#i-check-c"/></svg></div>
+              <div class="ss-v"><span class="avatar" style="background:#bc8cff;width:20px;height:20px;font-size:8px">王</span>王强 <span class="faint">待审查</span></div>
+            </div>
+            <div class="side-sec">
+              <b class="ss-t">检查</b>
+              <div class="ss-v"><svg class="ic" style="width:14px;height:14px;color:var(--green)"><use href="#i-check-c"/></svg>ci / lint <span class="faint mono">38s</span></div>
+              <div class="ss-v"><svg class="ic" style="width:14px;height:14px;color:var(--green)"><use href="#i-check-c"/></svg>ci / test <span class="faint mono">1m12s</span></div>
+            </div>
+            <div class="side-sec">
+              <b class="ss-t">提交</b>
+              <div class="ss-v mono" style="font-size:11.5px">a1b2c3d <span class="faint">fix: TTL 后台刷新</span></div>
+              <div class="ss-v mono" style="font-size:11.5px">e4f5g6h <span class="faint">chore: LRU 容量 500</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast-wrap"></div>
+</body>
+</html>

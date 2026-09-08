@@ -279,6 +279,9 @@
       "welcomeTitle": "欢迎使用 Perseus Desktop",
       "connecting": "正在连接本地网关…",
       "gatewayError": "网关初始化失败：{{error}}",
+      "errorTitle": "无法连接本地网关",
+      "errorDesc": "Perseus 桌面端依赖本地网关进程。请确认没有旧实例占用端口, 然后重试。",
+      "errorDetail": "错误详情",
       "retry": "重试"
     },
     "welcome": {
@@ -289,6 +292,8 @@
       "cloneTitle": "Clone 仓库（手动 URL）",
       "clonePlaceholder": "https://server/owner/repo.git 或 git@host:owner/repo.git",
       "clone": "Clone",
+      "cloneCredential": "凭据（可选）",
+      "cloneCredentialPh": "访问令牌 — 仅当 URL 不属于已注册服务器时需要",
       "recent": "最近工作区",
       "noWorkspaces": "还没有工作区",
       "open": "打开"
@@ -303,7 +308,12 @@
       "selectFile": "选择左侧文件开始编辑",
       "binary": "二进制文件（{{size}} bytes）不可编辑",
       "truncated": "文件过大，仅读入前 2MB",
-      "save": "保存"
+      "save": "保存",
+      "closeTab": "关闭标签",
+      "closeConfirmTitle": "未保存的更改",
+      "closeConfirm": "“{{path}}” 有未保存的更改，关闭将丢弃。",
+      "closeDiscard": "丢弃并关闭",
+      "closeCancel": "取消"
     },
     "git": {
       "loading": "加载状态…",
@@ -311,15 +321,26 @@
       "commitMessage": "提交信息",
       "stage": "暂存",
       "commit": "提交",
+      "push": "Push",
+      "pull": "Pull",
+      "pushOk": "Push 成功",
+      "pushFail": "Push 失败",
+      "pullOk": "Pull 成功",
+      "pullFail": "Pull 失败",
       "noChanges": "暂无更改"
     },
     "settings": {
       "title": "设置",
+      "gatewayCard": "本地网关",
       "gateway": "网关地址",
-      "token": "会话 token: {{state}}",
+      "tokenLabel": "网关会话 token",
       "tokenGenerated": "已生成（仅内存）",
       "tokenMissing": "未生成",
-      "placeholder": "Phase 1 占位。数据目录持久化、主题、SSH 密钥等在后续阶段实现。"
+      "workspaces": "工作区数量",
+      "serversCount": "已注册服务器",
+      "language": "语言 / Language",
+      "about": "关于",
+      "aboutDesc": "远程 Perseus 客户端 + 本地工作区（Wails v2）"
     },
     "servers": {
       "title": "服务器",
@@ -350,6 +371,15 @@
       "healthTag": "健康状态: {{health}}",
       "refresh": "刷新",
       "added": "已添加服务器 \"{{name}}\"",
+      "edit": "编辑",
+      "editTitle": "编辑 {{name}}",
+      "save": "保存",
+      "updated": "已更新 \"{{name}}\"",
+      "newPassword": "新密码（留空则不更换凭据）",
+      "newToken": "新 token（留空则不更换凭据）",
+      "baseUrlEditHint": "修改地址需同时输入新凭据",
+      "updateCredRequired": "服务器地址变更时必须同时输入新密码",
+      "updateCredRequiredToken": "服务器地址变更时必须同时输入新 token",
       "deleteConfirm": "删除服务器 \"{{name}}\"？其存储的令牌也会一并移除。",
       "loginFailed": "登录失败: {{error}}"
     },

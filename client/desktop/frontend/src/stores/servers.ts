@@ -3,10 +3,18 @@ import type { ServerRecord } from '../api/servers';
 import { serversApi } from '../api/servers';
 
 const CURRENT_KEY = 'perseus.currentServerId';
+// Welcome「管理服务器」按钮的内存态路由值: 仅本会话有效, 不持久化,
+// 否则下次启动会直接进入 ServerShell 管理页而跳过 Welcome。
+export const MANAGER_VIEW = '__manager__';
 
 function readCurrent(): string | null {
   try {
-    return localStorage.getItem(CURRENT_KEY);
+    const v = localStorage.getItem(CURRENT_KEY);
+    if (v === MANAGER_VIEW) {
+      localStorage.removeItem(CURRENT_KEY);
+      return null;
+    }
+    return v;
   } catch {
     return null;
   }
@@ -51,15 +59,13 @@ export const useServersStore = create<ServersState>((set, get) => ({
     }),
 
   setCurrent: (id) => {
-    if (id) {
-      try {
+    try {
+      if (id && id !== MANAGER_VIEW) {
         localStorage.setItem(CURRENT_KEY, id);
-      } catch { /* ignore */ }
-    } else {
-      try {
+      } else {
         localStorage.removeItem(CURRENT_KEY);
-      } catch { /* ignore */ }
-    }
+      }
+    } catch { /* ignore */ }
     set({ currentServerId: id });
   },
 

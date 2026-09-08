@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Button, Dropdown, Space, Tag, Avatar, App as AntApp } from 'antd';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeftOutlined, CloudServerOutlined, ReloadOutlined, SettingOutlined, UserOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, CloudServerOutlined, ReloadOutlined, SettingOutlined, SlidersOutlined, UserOutlined } from '@ant-design/icons';
 import { useServersStore } from '../stores/servers';
 import { useIdentityStore } from '../stores/identity';
 import ServerManager from '../views/servers/ServerManager';
 import RepositoriesView from '../views/repositories/RepositoriesView';
+import Settings from '../views/Settings';
 import { useRepositoriesStore } from '../stores/repositories';
 
 const healthColor: Record<string, string> = { online: 'success', offline: 'error', unknown: 'default' };
@@ -35,11 +36,11 @@ export default function ServerShell() {
   const me = useIdentityStore((s) => s.me);
   const fetchIdentity = useIdentityStore((s) => s.fetchIdentity);
   const clearIdentity = useIdentityStore((s) => s.clear);
-  const [view, setView] = useState<'repositories' | 'manager'>('repositories');
+  const [view, setView] = useState<'repositories' | 'manager' | 'settings'>('repositories');
 
   const current = servers.find((s) => s.id === currentServerId) ?? null;
   // 无法解析的 currentServerId（如从 Welcome 直达管理页）→ 直接显示管理器。
-  const showManager = view === 'manager' || (!!currentServerId && !current);
+  const showManager = view === 'manager' || (!!currentServerId && !current && view !== 'settings');
 
   useEffect(() => {
     useServersStore.getState().fetchServers();
@@ -128,10 +129,18 @@ export default function ServerShell() {
         >
           {t('desktop.serverShell.manageServers')}
         </Button>
+        <Button
+          icon={<SlidersOutlined />}
+          onClick={() => setView(view === 'settings' ? 'repositories' : 'settings')}
+        >
+          {t('desktop.settings.title')}
+        </Button>
       </header>
 
       <main style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
-        {showManager ? (
+        {view === 'settings' ? (
+          <Settings />
+        ) : showManager ? (
           <ServerManager />
         ) : current ? (
           <RepositoriesView />

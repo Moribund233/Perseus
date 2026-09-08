@@ -241,7 +241,7 @@ def get_authorized_keys_path() -> str:
     return auth_keys_path
 
 
-async def sync_authorized_keys(db: AsyncSession, auth_keys_path: str = None) -> None:
+async def sync_authorized_keys(db: AsyncSession, auth_keys_path: str | None = None) -> None:
     """
     同步所有 SSH Key 到 authorized_keys 文件
 

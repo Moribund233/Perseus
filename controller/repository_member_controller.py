@@ -15,6 +15,7 @@ from utils.permission_utils import (
     require_repository_permission,
     require_repository_owner_or_admin,
 )
+from core.exception import ValidationException
 from services.member_service import (
     get_repository_members as service_get_repository_members,
     get_repository_member as service_get_repository_member,
@@ -187,6 +188,8 @@ async def update_member_role(
     """
     await require_repository_owner_or_admin(db, repo_id, current_user.id, "update member role")
     role = role_data.get("role")
+    if not isinstance(role, str) or not role:
+        raise ValidationException(detail="role 字段缺失或无效")
     return await service_update_member_role(repo_id, user_id, role, db, operator_id=current_user.id)
 
 

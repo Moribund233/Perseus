@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>S9 团队聊天 · Perseus Desktop 原型</title>
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" href="assets/screens.css">
+<script src="assets/sprite.js"></script>
+<script src="assets/app.js" defer></script>
+</head>
+<body>
+
+<nav class="proto-bar">
+  <span class="pb-title"><svg class="ic" style="stroke:none"><use href="#i-logo"/></svg>Perseus Desktop</span>
+  <span class="pb-tag">高保真原型 v1</span>
+  <a class="pb-screen" href="welcome.html">启动台</a>
+  <a class="pb-screen" href="repositories.html">仓库列表</a>
+  <a class="pb-screen" href="repo-detail.html">仓库详情</a>
+  <a class="pb-screen" href="issues.html">Issues</a>
+  <a class="pb-screen" href="pull-requests.html">Pull Requests</a>
+  <a class="pb-screen on" href="chat.html">团队聊天</a>
+  <a class="pb-screen" href="ide.html">IDE 工作区</a>
+  <a class="pb-screen" href="servers.html">服务器管理</a>
+  <a class="pb-screen" href="settings.html">设置</a>
+  <div class="pb-right">
+    <span class="pb-note">图标为占位示意 · 正式实现沿用 web 端图标体系</span>
+    <button class="pb-chip" id="chip-offline"><span class="dot warn"></span>模拟服务器离线</button>
+    <button class="pb-chip" id="chip-toast">触发 Toast</button>
+  </div>
+</nav>
+
+<div class="win">
+  <header class="titlebar">
+    <button class="tb-back" data-nav="welcome"><svg class="ic" style="width:14px;height:14px"><use href="#i-arrow-l"/></svg>工作区</button>
+    <span class="tb-sep"></span>
+    <div class="tb-server">
+      <button class="tb-server-btn" data-dd="dd-srv"><span class="dot on"></span>dev-server<svg class="ic"><use href="#i-chev-r"/></svg></button>
+      <div class="tb-dd" id="dd-srv">
+        <button class="dd-item" data-nav="chat"><span class="dot on"></span>dev-server<small>当前 · 在线</small></button>
+        <button class="dd-item" data-toast="staging 离线 — 聊天不可用，历史消息只读" data-toast-kind="info"><span class="dot off"></span>staging<small>离线</small></button>
+        <div class="dd-div"></div>
+        <button class="dd-item mgmt" data-nav="servers"><svg class="ic" style="width:13px;height:13px"><use href="#i-gear"/></svg>管理服务器…</button>
+      </div>
+    </div>
+    <span class="tb-crumb">团队聊天 <svg class="ic"><use href="#i-chev-r"/></svg> <b>#dev-协作</b></span>
+    <div class="tb-right">
+      <span class="pill green ws-ok" style="margin-right:8px">实时已连接</span>
+      <span class="pill ws-off" style="margin-right:8px;color:var(--orange);border-color:rgba(240,136,62,.5)">重连中…</span>
+      <div class="tb-search" title="搜索消息（原型示意）"><svg class="ic"><use href="#i-search"/></svg>搜索消息…<kbd>Ctrl K</kbd></div>
+      <button class="tb-icon" title="通知"><svg class="ic"><use href="#i-bell"/></svg></button>
+      <span class="avatar" style="background:linear-gradient(135deg,#1f6feb,#bc8cff);margin-right:6px" title="张伟">ZW</span>
+      <div class="winctl">
+        <button><svg class="ic"><use href="#i-min"/></svg></button>
+        <button><svg class="ic"><use href="#i-max"/></svg></button>
+        <button class="close"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <div class="offline-banner">
+    <svg class="ic"><use href="#i-plug"/></svg>
+    <b>实时连接已断开</b>&nbsp;— 新消息将加入本地队列，重连后自动发送；历史消息可正常浏览
+    <button class="btn sm ghost" style="margin-left:auto" data-toast="正在重连 dev-server…" data-toast-kind="info">重连</button>
+  </div>
+
+  <div class="chat-body">
+
+    <!-- 左栏：频道 / 私信 -->
+    <aside class="chat-side">
+      <div class="cs-head">
+        <b>Perseus 团队</b>
+        <div class="sub"><span class="dot on" style="width:6px;height:6px"></span>dev-server · 5 人 · 3 人在线</div>
+        <div class="input cs-search"><svg class="ic"><use href="#i-search"/></svg><input placeholder="搜索频道或成员…"></div>
+      </div>
+      <div class="cs-scroll">
+        <div class="cs-group">频道 <span class="cnt">5</span>
+          <button class="icon-btn sm" title="新建频道" data-toast="新建频道（原型示意）" data-toast-kind="info"><svg class="ic"><use href="#i-plus"/></svg></button>
+        </div>
+        <div class="chan-row on">
+          <svg class="ic"><use href="#i-msg"/></svg><span class="nm">dev-协作</span>
+        </div>
+        <div class="chan-row">
+          <svg class="ic"><use href="#i-msg"/></svg><span class="nm">公告</span><span class="unread">3</span>
+        </div>
+        <div class="chan-row">
+          <svg class="ic"><use href="#i-msg"/></svg><span class="nm">release</span>
+        </div>
+        <div class="chan-row">
+          <svg class="ic"><use href="#i-msg"/></svg><span class="nm">random</span>
+        </div>
+        <div class="chan-row">
+          <svg class="ic"><use href="#i-key"/></svg><span class="nm">infra</span><span class="pill" style="font-size:9.5px;padding:0 7px">私有</span>
+        </div>
+        <div class="cs-group">私信 <span class="cnt">4</span></div>
+        <div class="chan-row">
+          <span class="dm-av"><span class="avatar" style="background:linear-gradient(135deg,#1f6feb,#bc8cff)">张</span><i style="background:var(--green)"></i></span>
+          <span class="nm">张伟（你）</span>
+        </div>
+        <div class="chan-row">
+          <span class="dm-av"><span class="avatar" style="background:#3fb950">李</span><i style="background:var(--green)"></i></span>
+          <span class="nm">李娜</span><span class="unread">2</span>
+        </div>
+        <div class="chan-row">
+          <span class="dm-av"><span class="avatar" style="background:#bc8cff">王</span><i style="background:var(--yellow)"></i></span>
+          <span class="nm">王强</span>
+        </div>
+        <div class="chan-row">
+          <span class="dm-av"><span class="avatar" style="background:#6e7681">CI</span><i style="background:var(--green)"></i></span>
+          <span class="nm">构建机器人</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 中栏：会话 -->
+    <div class="chat-main">
+      <div class="cm-head">
+        <svg class="ic"><use href="#i-msg"/></svg>
+        <b>dev-协作</b>
+        <span class="meta">4 人在线 · 主题：网关离线缓存</span>
+        <div class="actions">
+          <button class="icon-btn on" id="mem-toggle" title="成员面板"><svg class="ic"><use href="#i-user"/></svg></button>
+          <button class="icon-btn" title="频道内搜索" data-toast="频道内搜索（原型示意）" data-toast-kind="info"><svg class="ic"><use href="#i-search"/></svg></button>
+          <button class="icon-btn" title="更多" data-toast="置顶 / 通知设置 / 离开频道（原型示意）" data-toast-kind="info"><svg class="ic"><use href="#i-more"/></svg></button>
+        </div>
+      </div>
+
+      <div class="cm-msgs scroll" id="chat-msgs">
+        <div class="date-div"><span>今天</span></div>
+
+        <div class="msg-row">
+          <span class="avatar" style="background:#3fb950">李</span>
+          <div class="m-main">
+            <div class="m-head"><b>李娜</b><time>10:32</time></div>
+            <div class="m-text">网关缓存 PR #42 我看完了，逻辑 LGTM，记得补一条 TTL 后台刷新的回归测试。</div>
+            <div class="reactions">
+              <span class="react on" data-r>+1 · 3</span>
+              <span class="react" data-r>LGTM · 1</span>
+              <span class="react add" data-toast="选择表情（原型示意）" data-toast-kind="info">+</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="msg-row">
+          <span class="avatar" style="background:linear-gradient(135deg,#1f6feb,#bc8cff)">张</span>
+          <div class="m-main">
+            <div class="m-head"><b>张伟（你）</b><time>10:34</time></div>
+            <div class="m-text">收到，这就补。顺手把 LRU 容量提到 <code>500 条 / 32MB</code>。</div>
+          </div>
+        </div>
+
+        <div class="msg-row">
+          <span class="avatar" style="background:#bc8cff">王</span>
+          <div class="m-main">
+            <div class="m-head"><b>王强</b><time>10:41</time></div>
+            <div class="m-text">IDE 里 pyright 直接报错了，<code>resolve_target</code> 没定义：</div>
+            <div class="code-snip">
+              <div class="csn-t">services/collab_service.py · Ln 38 · pyright</div>
+              <pre>doc_id=<span class="uerr">resolve_target</span>(workspace_id),
+<span style="color:#8b949e"># reportUndefinedVariable: 未定义名称 "resolve_target"</span></pre>
+            </div>
+            <div class="reactions">
+              <span class="react" data-r>收到 · 1</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="msg-row">
+          <span class="avatar" style="background:#3fb950">李</span>
+          <div class="m-main">
+            <div class="m-head"><b>李娜</b><time>10:43</time></div>
+            <div class="m-text"><span class="mention">@张伟</span> Issues #57 我更新了复现步骤，麻烦看下，和这个 PR 是同一个根因。</div>
+            <div class="reactions">
+              <span class="react on" data-r>+1 · 2</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="msg-row">
+          <span class="avatar" style="background:linear-gradient(135deg,#1f6feb,#bc8cff)">张</span>
+          <div class="m-main">
+            <div class="m-head"><b>张伟（你）</b><time>10:44</time></div>
+            <div class="m-text">在看，一会儿直接在 IDE 工作区里修，改完 push 到 feature/gateway-cache。</div>
+          </div>
+        </div>
+
+        <div class="typing">
+          <span class="dots"><i></i><i></i><i></i></span>李娜 正在输入…
+        </div>
+      </div>
+
+      <div class="composer">
+        <div class="composer-box">
+          <textarea id="chat-input" rows="1" placeholder="给 #dev-协作 发送消息… 支持 Markdown"></textarea>
+          <div class="composer-bar">
+            <button class="icon-btn" title="附件" data-toast="上传附件（原型示意）" data-toast-kind="info"><svg class="ic"><use href="#i-file"/></svg></button>
+            <button class="icon-btn" title="表情" data-toast="表情面板（原型示意）" data-toast-kind="info"><svg class="ic"><use href="#i-msg"/></svg></button>
+            <button class="icon-btn" title="粗体 **text**" data-toast="Markdown：**粗体**" data-toast-kind="info"><svg class="ic"><use href="#i-edit"/></svg></button>
+            <button class="icon-btn" title="代码 `code`" data-toast="Markdown：`行内代码`" data-toast-kind="info"><svg class="ic"><use href="#i-doc"/></svg></button>
+            <button class="icon-btn" title="链接 [text](url)" data-toast="Markdown：[文本](链接)" data-toast-kind="info"><svg class="ic"><use href="#i-key"/></svg></button>
+            <span class="hint">Enter 发送 · Shift+Enter 换行</span>
+            <button class="send-btn" id="chat-send" title="发送"><svg class="ic"><use href="#i-send"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右栏：成员 -->
+    <aside class="chat-members open" id="chat-members">
+      <div class="cm-scroll">
+        <div class="cs-group"><span class="dot on" style="width:7px;height:7px"></span>在线 · 3</div>
+        <div class="mem-row"><span class="avatar" style="background:linear-gradient(135deg,#1f6feb,#bc8cff)">张<i style="background:var(--green)"></i></span>张伟<span class="role">你 · 管理员</span></div>
+        <div class="mem-row"><span class="avatar" style="background:#3fb950">李<i style="background:var(--green)"></i></span>李娜<span class="role">后端</span></div>
+        <div class="mem-row"><span class="avatar" style="background:#bc8cff">王<i style="background:var(--yellow)"></i></span>王强<span class="role">前端 · 离开</span></div>
+        <div class="cs-group" style="margin-top:10px">机器人 · 1</div>
+        <div class="mem-row"><span class="avatar" style="background:#6e7681">CI<i style="background:var(--green)"></i></span>构建机器人<span class="role">CI</span></div>
+        <div class="cs-group" style="margin-top:10px"><span class="dot off" style="width:7px;height:7px"></span>离线 · 1</div>
+        <div class="mem-row"><span class="avatar" style="background:#d29922">陈<i style="background:var(--t3)"></i></span>陈晨<span class="role">测试</span></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="toast-wrap"></div>
+</body>
+</html>

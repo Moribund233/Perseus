@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Perseus Desktop · 高保真原型</title>
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" href="assets/screens.css">
+<script src="assets/sprite.js"></script>
+<script src="assets/app.js" defer></script>
+</head>
+<body>
+
+<nav class="proto-bar">
+  <span class="pb-title"><svg class="ic" style="stroke:none"><use href="#i-logo"/></svg>Perseus Desktop</span>
+  <span class="pb-tag">高保真原型 v1</span>
+  <div class="pb-right">
+    <span class="pb-note">Wails v2 · 远程客户端 + 本地工作区 · IDE 优先 · 图标为占位示意（正式实现沿用 web 端图标体系）</span>
+  </div>
+</nav>
+
+<div class="idx-wrap">
+
+  <header class="idx-hero">
+    <svg class="ic"><use href="#i-logo"/></svg>
+    <div>
+      <h1>Perseus Desktop — 页面设计原型</h1>
+      <p>
+        桌面端定位为「远程 Perseus 客户端 + 本地工作区」，<b>IDE 优先、协作为辅</b>。
+        视觉沿用 web 端 GitHub Dark 设计语言（antd token 对齐），交互按桌面习惯深化：
+        无框窗口、命令面板、活动栏/侧栏/底部面板三段式 IDE 布局、离线优先的状态反馈。
+        实时能力涵盖 Yjs 协同编辑与团队聊天（WS 透传服务器事件流）。
+        点击下方卡片进入各界面，原型条可切换页面、模拟离线与 Toast。
+      </p>
+    </div>
+  </header>
+
+  <section class="idx-grid">
+    <a class="idx-card" href="welcome.html">
+      <span class="no">01</span><b>启动台</b>
+      <span>首次启动 / 工作区入口：最近工作区、服务器、打开本地目录、Clone、快捷键引导</span>
+    </a>
+    <a class="idx-card" href="repositories.html">
+      <span class="no">02</span><b>仓库列表</b>
+      <span>连接服务器后的浏览视图：服务器切换、全局搜索入口、仓库网格卡片</span>
+    </a>
+    <a class="idx-card" href="repo-detail.html">
+      <span class="no">03</span><b>仓库详情 · 代码</b>
+      <span>资源管理器 + 文件树筛选、最新提交条、文件列表、README 渲染、Clone 到工作区</span>
+    </a>
+    <a class="idx-card" href="issues.html">
+      <span class="no">04</span><b>Issues</b>
+      <span>列表/详情双栏：状态与优先级筛选、时间线评论、负责人与标签侧栏</span>
+    </a>
+    <a class="idx-card" href="pull-requests.html">
+      <span class="no">05</span><b>Pull Requests</b>
+      <span>列表/详情双栏：open/merged/closed 状态色、diff 统计、审查流与合并盒</span>
+    </a>
+    <a class="idx-card" href="ide.html">
+      <span class="no">06</span><b>IDE 工作区 ★核心</b>
+      <span>活动栏（Explorer/搜索/Git/PR/Issue/聊天）、Monaco 标签页、LSP Problems、终端、命令面板（Ctrl+K）</span>
+    </a>
+    <a class="idx-card" href="chat.html">
+      <span class="no">07</span><b>团队聊天 · realtime</b>
+      <span>频道/私信三栏、代码片段、表情回应、在线成员与输入中指示；离线时消息入队，重连自动补发</span>
+    </a>
+    <a class="idx-card" href="servers.html">
+      <span class="no">08</span><b>服务器管理</b>
+      <span>多服务器注册表：健康状态、设为当前、添加/编辑/删除，凭据进系统密钥库</span>
+    </a>
+    <a class="idx-card" href="settings.html">
+      <span class="no">09</span><b>设置</b>
+      <span>本地网关信息、外观主题、编辑器偏好、快捷键表、关于与更新</span>
+    </a>
+  </section>
+
+  <section class="idx-sec">
+    <h2>设计令牌（与 web 端 theme.ts 对齐）</h2>
+    <div class="swatches">
+      <div class="sw"><i style="background:#0d1117"></i><span>bg1 · #0d1117</span></div>
+      <div class="sw"><i style="background:#161b22"></i><span>bg2 · #161b22</span></div>
+      <div class="sw"><i style="background:#1c2128"></i><span>bg3 · #1c2128</span></div>
+      <div class="sw"><i style="background:#21262d"></i><span>line · #21262d</span></div>
+      <div class="sw"><i style="background:#1f6feb"></i><span>primary · #1f6feb</span></div>
+      <div class="sw"><i style="background:#58a6ff"></i><span>info · #58a6ff</span></div>
+      <div class="sw"><i style="background:#3fb950"></i><span>success · #3fb950</span></div>
+      <div class="sw"><i style="background:#d29922"></i><span>warning · #d29922</span></div>
+      <div class="sw"><i style="background:#f85149"></i><span>danger · #f85149</span></div>
+      <div class="sw"><i style="background:#bc8cff"></i><span>merged · #bc8cff</span></div>
+    </div>
+    <ul style="margin-top:18px">
+      <li>字体：Inter（界面）/ JetBrains Mono（代码、路径、哈希）；圆角：卡片 12 / 按钮·输入 8 / 树节点 6 / 胶囊 10–12</li>
+      <li>状态色语义：Issue open 绿 / closed 灰；PR open 绿 / merged 紫 / closed 红；服务器 在线绿 / 离线灰</li>
+      <li>交互原则：hover 统一 <b>#1c2333</b>；过渡 0.15s；破坏性操作二次确认；空态/骨架屏/离线横幅为一级公民</li>
+      <li>桌面差异化：无框窗口 + 系统窗控、Ctrl+K 命令面板、活动栏徽标、底部 Problems/终端面板、蓝底状态栏（分支/服务器/LSP/光标）</li>
+      <li>实时能力：Yjs 协同编辑（D1 决策）+ 团队聊天（WS 透传，D4 排期项）；聊天离线语义与 IDE 一致 — 本地队列 + 重连补发</li>
+      <li>离线语义：服务器不可达 → 横幅提示 + 缓存只读 + Push 本地保留（在原型条开启「模拟服务器离线」体验）</li>
+    </ul>
+  </section>
+
+</div>
+<div class="toast-wrap"></div>
+</body>
+</html>

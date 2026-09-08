@@ -114,7 +114,7 @@ async def get_unread_count(db: AsyncSession, user_id: uuid.UUID) -> int:
         Notification.is_read == False,
     )
     result = await db.execute(stmt)
-    return result.scalar()
+    return int(result.scalar() or 0)
 
 
 async def mark_as_read(db: AsyncSession, notification_id: uuid.UUID, user_id: uuid.UUID) -> dict:

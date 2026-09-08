@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Uuid as SAUuid
-from sqlalchemy.orm import relationship
+from sqlalchemy import Integer, String, Boolean, ForeignKey, Uuid as SAUuid
+from sqlalchemy.orm import relationship, mapped_column
 from models.base import BaseModel
 
 
@@ -11,16 +11,16 @@ class RepositoryMember(BaseModel):
     """
     __tablename__ = "repository_members"  # 数据库表名
     
-    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
+    repository_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
     """仓库ID，外键关联到repositories表"""
     
-    user_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     """用户ID，外键关联到users表"""
     
-    role = Column(String(20), nullable=False, default="developer")
+    role = mapped_column(String(20), nullable=False, default="developer")
     """成员角色，可选值：owner, admin, developer, readonly，默认为developer"""
     
-    is_active = Column(Boolean, default=True)
+    is_active = mapped_column(Boolean, default=True)
     """成员是否激活，默认为True"""
     
     # 关系定义

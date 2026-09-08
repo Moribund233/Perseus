@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>S6 IDE 工作区 · Perseus Desktop 原型</title>
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" href="assets/screens.css">
+<script src="assets/sprite.js"></script>
+<script src="assets/app.js" defer></script>
+</head>
+<body>
+
+<nav class="proto-bar">
+  <span class="pb-title"><svg class="ic" style="stroke:none"><use href="#i-logo"/></svg>Perseus Desktop</span>
+  <span class="pb-tag">高保真原型 v1</span>
+  <a class="pb-screen" href="welcome.html">启动台</a>
+  <a class="pb-screen" href="repositories.html">仓库列表</a>
+  <a class="pb-screen" href="repo-detail.html">仓库详情</a>
+  <a class="pb-screen" href="issues.html">Issues</a>
+  <a class="pb-screen" href="pull-requests.html">Pull Requests</a>
+  <a class="pb-screen" href="chat.html">团队聊天</a>
+  <a class="pb-screen on" href="ide.html">IDE 工作区</a>
+  <a class="pb-screen" href="servers.html">服务器管理</a>
+  <a class="pb-screen" href="settings.html">设置</a>
+  <div class="pb-right">
+    <span class="pb-note">图标为占位示意 · 正式实现沿用 web 端图标体系</span>
+    <button class="pb-chip" id="chip-offline"><span class="dot warn"></span>模拟服务器离线</button>
+    <button class="pb-chip" id="chip-palette">命令面板</button>
+    <button class="pb-chip" id="chip-toast">触发 Toast</button>
+  </div>
+</nav>
+
+<div class="win">
+  <header class="titlebar">
+    <svg class="ic" style="width:18px;height:18px;stroke:none"><use href="#i-logo"/></svg>
+    <span class="tb-app">Perseus Desktop</span>
+    <div class="tb-menu">
+      <button>文件</button><button>编辑</button><button>查看</button><button>终端</button><button>帮助</button>
+    </div>
+    <span class="tb-crumb" style="margin-left:4px"><b>perseus</b><span class="mono faint" style="font-size:10.5px">D:\Projects\perseus</span></span>
+    <div class="tb-right">
+      <div class="tb-search" id="palette-open" style="cursor:pointer" title="命令面板"><svg class="ic"><use href="#i-zap"/></svg>命令面板…<kbd>Ctrl K</kbd></div>
+      <span class="avatar" style="background:linear-gradient(135deg,#1f6feb,#bc8cff);margin-right:8px" title="张伟 · 在线">ZW</span>
+      <div class="winctl">
+        <button><svg class="ic"><use href="#i-min"/></svg></button>
+        <button><svg class="ic"><use href="#i-max"/></svg></button>
+        <button class="close"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <div class="ide-body">
+
+    <!-- 活动栏 -->
+    <nav class="activity">
+      <button class="act on" data-side="explorer" title="资源管理器 (Ctrl+Shift+E)"><svg class="ic"><use href="#i-folder"/></svg></button>
+      <button class="act" data-side="search" title="搜索 (Ctrl+Shift+F)"><svg class="ic"><use href="#i-search"/></svg></button>
+      <button class="act" data-side="git" title="源代码管理 (Ctrl+Shift+G)"><svg class="ic"><use href="#i-branch"/></svg><i class="badge">3</i></button>
+      <button class="act" data-side="prs" title="Pull Requests"><svg class="ic"><use href="#i-merge"/></svg><i class="badge" style="background:#238636">3</i></button>
+      <button class="act" data-side="issues" title="Issues"><svg class="ic"><use href="#i-err"/></svg><i class="badge" style="background:#6e7681">8</i></button>
+      <button class="act" data-nav="chat" title="团队聊天"><svg class="ic"><use href="#i-msg"/></svg><i class="badge" style="background:#f85149">2</i></button>
+      <span class="sp"></span>
+      <button class="act" data-nav="servers" title="服务器管理"><svg class="ic"><use href="#i-server"/></svg></button>
+      <button class="act" data-nav="settings" title="设置"><svg class="ic"><use href="#i-gear"/></svg></button>
+    </nav>
+
+    <!-- 侧栏 -->
+    <aside class="sidebar">
+      <!-- 资源管理器 -->
+      <div class="sb-pane on" data-pane="explorer">
+        <div class="sb-head">资源管理器 · PERSEUS
+          <span class="right">
+            <button class="icon-btn sm" title="新建文件" data-toast="新建文件（原型示意）" data-toast-kind="info"><svg class="ic"><use href="#i-plus"/></svg></button>
+            <button class="icon-btn sm" title="刷新" data-toast="文件树已刷新（fs 事件驱动）" data-toast-kind="info"><svg class="ic"><use href="#i-refresh"/></svg></button>
+          </span>
+        </div>
+        <div class="tree">
+          <div class="open">
+            <div class="frow has-kids"><svg class="ic chev"><use href="#i-chev-r"/></svg><svg class="ic" style="color:var(--blue-l)"><use href="#i-folder"/></svg>api</div>
+            <div class="kids" style="margin-left:16px">
+              <div class="frow"><svg class="ic chev leaf"><use href="#i-chev-r"/></svg><span class="fc py">PY</span>__init__.py</div>
+              <div class="frow"><svg class="ic chev leaf"><use href="#i-chev-r"/></svg><span class="fc py">PY</span>routes.py</div>
+            </div>
+          </div>
+          <div class="open">
+            <div class="frow has-kids"><svg class="ic chev"><use href="#i-chev-r"/></svg><svg class="ic" style="color:var(--blue-l)"><use href="#i-folder"/></svg>core</div>
+            <div class="kids" style="margin-left:16px">
+              <div class="frow"><svg class="ic chev leaf"><use href="#i-chev-r"/></svg><span class="fc py">PY</span>config.py</div>
+              <div class="frow"><svg class="ic chev leaf"><use href="#i-chev-r"/></svg><span class="fc py">PY</span>gateway.py</div>
+            </div>
+          </div>
+          <div class="open">
+            <div class="frow has-kids"><svg class="ic chev"><use href="#i-chev-r"/></svg><svg class="ic" style="color:var(--blue-l)"><use href="#i-folder"/></svg>services</div>
+            <div class="kids" style="margin-left:16px">
+              <div class="frow sel"><svg class="ic chev leaf"><use href="#i-chev-r"/></svg><span class="fc py">PY</span>collab_service.py</div>
+            </div>
+          </div>
+          <div>
+            <div class="frow has-kids"><svg class="ic chev"><use href="#i-chev-r"/></svg><svg class="ic" style="color:var(--blue-l)"><use href="#i-folder"/></svg>tests</div>
+            <div class="kids" style="margin-left:16px">
+              <div class="frow"><svg class="ic chev leaf"><use href="#i-chev-r"/></svg><span class="fc py">PY</span>test_gateway.py</div>
+            </div>
+          </div>
+          <div class="frow"><svg class="ic chev leaf"><use href="#i-chev-r"/></svg><span class="fc py">PY</span>app.py</div>
+          <div class="frow"><svg class="ic chev leaf"><use href="#i-chev-r"/></svg><span class="fc toml">TOML</span>config.toml</div>
+          <div class="frow"><svg class="ic chev leaf"><use href="#i-chev-r"/></svg><span class="fc md">MD</span>README.md</div>
+        </div>
+      </div>
+
+      <!-- 搜索 -->
+      <div class="sb-pane" data-pane="search">
+        <div class="sb-head">搜索</div>
+        <div style="padding:0 12px 10px;display:flex;flex-direction:column;gap:8px">
+          <div class="input"><svg class="ic"><use href="#i-search"/></svg><input value="resolve_target"></div>
+          <div class="input"><svg class="ic"><use href="#i-edit"/></svg><input placeholder="替换为…"></div>
+          <label style="display:flex;gap:7px;align-items:center;font-size:11.5px;color:var(--t2)">
+            <span style="width:13px;height:13px;border-radius:3px;background:var(--blue);display:inline-grid;place-items:center;flex:none"><svg class="ic" style="width:9px;height:9px;stroke-width:3"><use href="#i-check"/></svg></span>
+            区分大小写 · 全词匹配 · 含子目录
+          </label>
+        </div>
+        <div style="padding:6px 14px;font-size:11px;color:var(--t3);border-top:1px solid var(--line)">3 个结果 · 2 个文件 · 本地 ripgrep</div>
+        <div class="tree">
+          <div class="open">
+            <div class="frow has-kids" style="color:var(--t1)"><svg class="ic chev"><use href="#i-chev-r"/></svg><span class="fc py">PY</span>services/collab_service.py<span class="faint mono" style="margin-left:auto;font-size:10px">2</span></div>
+            <div class="kids" style="margin-left:16px">
+              <div class="frow" style="font:11px var(--mono);color:var(--t2)"><span class="mono" style="color:var(--t3)">14</span>…doc_id=<span style="color:var(--yellow)">resolve_target</span>(…</div>
+              <div class="frow" style="font:11px var(--mono);color:var(--t2)"><span class="mono" style="color:var(--t3)">38</span>…doc_id=<span style="color:var(--yellow)">resolve_target</span>(…</div>
+            </div>
+          </div>
+          <div class="open">
+            <div class="frow has-kids" style="color:var(--t1)"><svg class="ic chev"><use href="#i-chev-r"/></svg><span class="fc py">PY</span>core/gateway.py<span class="faint mono" style="margin-left:auto;font-size:10px">1</span></div>
+            <div class="kids" style="margin-left:16px">
+              <div class="frow" style="font:11px var(--mono);color:var(--t2)"><span class="mono" style="color:var(--t3)">22</span>…target = <span style="color:var(--yellow)">resolve_target</span>(…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 源代码管理 -->
+      <div class="sb-pane gitpane" data-pane="git">
+        <div class="sb-head">源代码管理
+          <span class="right">
+            <button class="icon-btn sm" title="暂存全部" data-toast="已暂存全部更改（原型示意）" data-toast-kind="info"><svg class="ic"><use href="#i-plus"/></svg></button>
+            <button class="icon-btn sm" title="刷新" data-toast="git status 已刷新" data-toast-kind="info"><svg class="ic"><use href="#i-refresh"/></svg></button>
+          </span>
+        </div>
+        <div class="git-branch-row">
+          <svg class="ic"><use href="#i-branch"/></svg>main
+          <span class="ab"><span style="color:var(--green)">↑2</span><span style="color:var(--yellow)">↓0</span></span>
+        </div>
+        <div class="git-commit-area">
+          <textarea class="input" rows="2" id="git-msg" placeholder="提交信息 (Ctrl+Enter 提交)" style="width:100%"></textarea>
+          <div class="row">
+            <button class="btn primary" style="flex:1" id="git-commit"><svg class="ic"><use href="#i-check"/></svg>提交</button>
+            <button class="icon-btn" title="撤销暂存" style="border:1px solid var(--line2);border-radius:7px"><svg class="ic"><use href="#i-x"/></svg></button>
+          </div>
+        </div>
+        <div class="git-changes scroll">
+          <div class="git-group">更改 <span class="cnt">(3)</span></div>
+          <div class="git-file"><span class="st M">M</span><span class="path">services/collab_service.py</span>
+            <button class="icon-btn sm" title="打开 diff" data-toast="打开 Monaco Diff 视图（原型示意）" data-toast-kind="info"><svg class="ic"><use href="#i-file"/></svg></button>
+          </div>
+          <div class="git-file"><span class="st M">M</span><span class="path">core/gateway.py</span>
+            <button class="icon-btn sm" title="打开 diff" data-toast="打开 Monaco Diff 视图（原型示意）" data-toast-kind="info"><svg class="ic"><use href="#i-file"/></svg></button>
+          </div>
+          <div class="git-file"><span class="st U">U</span><span class="path">docs/notes.md</span>
+            <button class="icon-btn sm" title="打开 diff" data-toast="打开 Monaco Diff 视图（原型示意）" data-toast-kind="info"><svg class="ic"><use href="#i-file"/></svg></button>
+          </div>
+          <div style="padding:12px 8px;font-size:11.5px;color:var(--t3);line-height:1.7">
+            本地 Git 操作完全离线可用。<br>Push / Pull 凭据由网关按 remote 自动注入密钥库 token。
+          </div>
+        </div>
+        <div style="padding:10px 12px;border-top:1px solid var(--line);display:flex;gap:6px;flex:none">
+          <button class="btn ghost sm" style="flex:1" id="git-push"><svg class="ic"><use href="#i-up"/></svg>Push · 2</button>
+          <button class="btn ghost sm" style="flex:1" id="git-pull"><svg class="ic"><use href="#i-down"/></svg>Pull · 0</button>
+        </div>
+      </div>
+
+      <!-- PR 快速列表 -->
+      <div class="sb-pane" data-pane="prs">
+        <div class="sb-head">PULL REQUESTS · PERSEUS
+          <span class="right"><button class="icon-btn sm" data-nav="prs" title="打开完整视图"><svg class="ic"><use href="#i-chev-r"/></svg></button></span>
+        </div>
+        <div>
+          <div class="lrow" data-nav="prs">
+            <span class="st-ic"><svg class="ic open"><use href="#i-merge"/></svg></span>
+            <div class="lr-main">
+              <div class="lr-title" style="font-size:12.5px">修复网关离线缓存穿透 <span class="num">#42</span></div>
+              <div class="lr-meta"><span class="diffstat"><span class="plus">+120</span><span class="minus">−18</span></span> · 40 分钟前</div>
+            </div>
+          </div>
+          <div class="lrow" data-nav="prs">
+            <span class="st-ic"><svg class="ic open"><use href="#i-merge"/></svg></span>
+            <div class="lr-main">
+              <div class="lr-title" style="font-size:12.5px">Yjs 文档模型接入快照落盘 <span class="num">#41</span></div>
+              <div class="lr-meta"><span class="diffstat"><span class="plus">+342</span><span class="minus">−96</span></span> · 3 小时前</div>
+            </div>
+          </div>
+          <div class="lrow" data-nav="prs">
+            <span class="st-ic"><svg class="ic draft"><use href="#i-merge"/></svg></span>
+            <div class="lr-main">
+              <div class="lr-title" style="font-size:12.5px">大文件懒加载渲染 <span class="num">#40</span><span class="tag p-low">草稿</span></div>
+              <div class="lr-meta"><span class="diffstat"><span class="plus">+88</span><span class="minus">−31</span></span> · 昨天</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Issue 快速列表 -->
+      <div class="sb-pane" data-pane="issues">
+        <div class="sb-head">ISSUES · PERSEUS
+          <span class="right"><button class="icon-btn sm" data-nav="issues" title="打开完整视图"><svg class="ic"><use href="#i-chev-r"/></svg></button></span>
+        </div>
+        <div>
+          <div class="lrow" data-nav="issues">
+            <span class="st-ic"><svg class="ic open"><use href="#i-err"/></svg></span>
+            <div class="lr-main">
+              <div class="lr-title" style="font-size:12.5px">网关离线时缓存命中率下降 <span class="num">#57</span><span class="tag p-high">高</span></div>
+              <div class="lr-meta">张伟 · 2 小时前</div>
+            </div>
+          </div>
+          <div class="lrow" data-nav="issues">
+            <span class="st-ic"><svg class="ic open"><use href="#i-err"/></svg></span>
+            <div class="lr-main">
+              <div class="lr-title" style="font-size:12.5px">LSP 重命名未刷新 Problems <span class="num">#56</span><span class="tag p-medium">中</span></div>
+              <div class="lr-meta">李娜 · 5 小时前</div>
+            </div>
+          </div>
+          <div class="lrow" data-nav="issues">
+            <span class="st-ic"><svg class="ic open"><use href="#i-err"/></svg></span>
+            <div class="lr-main">
+              <div class="lr-title" style="font-size:12.5px">大文件滚动卡顿 <span class="num">#55</span><span class="tag p-critical">紧急</span></div>
+              <div class="lr-meta">王强 · 昨天</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 编辑器列 -->
+    <div class="editor-col">
+      <div data-tabs>
+        <div class="tabbar">
+          <div class="etab on" data-tab="py"><span class="fc py">PY</span>collab_service.py<i class="dirty" title="未保存"></i>
+            <span class="x"><svg class="ic"><use href="#i-x"/></svg></span>
+          </div>
+          <div class="etab" data-tab="toml"><span class="fc toml">TOML</span>config.toml
+            <span class="x"><svg class="ic"><use href="#i-x"/></svg></span>
+          </div>
+          <div class="etab" data-tab="md"><span class="fc md">MD</span>README.md
+            <span class="x"><svg class="ic"><use href="#i-x"/></svg></span>
+          </div>
+          <div class="tab-actions">
+            <button class="icon-btn on" id="aux-toggle" title="辅助面板（PR / Issue / 成员）"><svg class="ic"><use href="#i-panel-r"/></svg></button>
+            <button class="icon-btn bp-toggle-btn" title="底部面板"><svg class="ic"><use href="#i-panel-b"/></svg></button>
+            <button class="icon-btn" title="更多"><svg class="ic"><use href="#i-more"/></svg></button>
+          </div>
+        </div>
+
+        <!-- Python 主编辑器（Monaco 示意） -->
+        <div class="editor-wrap">
+          <div class="epane on" data-pane="py">
+            <div class="code-area">
+              <div class="crumbs">
+                <b>perseus</b><svg class="ic"><use href="#i-chev-r"/></svg>services
+                <svg class="ic"><use href="#i-chev-r"/></svg><b>collab_service.py</b>
+                <svg class="ic"><use href="#i-chev-r"/></svg><span class="decl">CollabService</span>
+                <svg class="ic"><use href="#i-chev-r"/></svg>join
+                <span class="faint" style="margin-left:auto;font-size:10.5px">Ctrl+S 保存 · 文件 2.1 KB</span>
+              </div>
+              <div class="code-scroll">
+                <div class="code-line"><span class="ln">1</span><span class="lc"><span class="s">"""Collab 会话服务 — Yjs 文档模型与 Git 快照落盘."""</span></span></div>
+                <div class="code-line"><span class="ln">2</span><span class="lc"><span class="k">from</span> <span class="v">__future__</span> <span class="k">import</span> annotations</span></div>
+                <div class="code-line"><span class="ln">3</span><span class="lc"><span class="k">import</span> <span class="squiggle warn" title='未使用的导入 "os" (pyright)'>os</span>  <span class="c"># TODO: 移除未使用导入</span></span></div>
+                <div class="code-line"><span class="ln">4</span><span class="lc"> </span></div>
+                <div class="code-line"><span class="ln">5</span><span class="lc"><span class="k">import</span> asyncio</span></div>
+                <div class="code-line"><span class="ln">6</span><span class="lc"><span class="k">from</span> dataclasses <span class="k">import</span> dataclass, field</span></div>
+                <div class="code-line"><span class="ln">7</span><span class="lc"> </span></div>
+                <div class="code-line"><span class="ln">8</span><span class="lc"><span class="k">from</span> <span class="cls">core.config</span> <span class="k">import</span> <span class="cls">GatewayConfig</span></span></div>
+                <div class="code-line"><span class="ln">9</span><span class="lc"><span class="k">from</span> <span class="cls">core.events</span> <span class="k">import</span> <span class="cls">EventBus</span></span></div>
+                <div class="code-line"><span class="ln">10</span><span class="lc"> </span></div>
+                <div class="code-line"><span class="ln">11</span><span class="lc"><span class="n">MAX_SNAPSHOT_BYTES</span> = <span class="n">2</span> * <span class="n">1024</span> * <span class="n">1024</span></span></div>
+                <div class="code-line"><span class="ln">12</span><span class="lc"> </span></div>
+                <div class="code-line"><span class="ln">13</span><span class="lc"> </span></div>
+                <div class="code-line"><span class="ln">14</span><span class="lc"><span class="dec">@dataclass</span>(slots=<span class="k">True</span>)</span></div>
+                <div class="code-line"><span class="ln">15</span><span class="lc"><span class="k">class</span> <span class="cls">CollabSession</span>:</span></div>
+                <div class="code-line"><span class="ln">16</span><span class="lc">    workspace_id: <span class="cls">str</span></span></div>
+                <div class="code-line"><span class="ln">17</span><span class="lc">    doc_id: <span class="cls">str</span></span></div>
+                <div class="code-line"><span class="ln">18</span><span class="lc">    participants: <span class="cls">set</span>[<span class="cls">str</span>] = field(default_factory=<span class="cls">set</span>)</span></div>
+                <div class="code-line"><span class="ln">19</span><span class="lc">    dirty: <span class="cls">bool</span> = <span class="k">False</span></span></div>
+                <div class="code-line"><span class="ln">20</span><span class="lc"> </span></div>
+                <div class="code-line"><span class="ln">21</span><span class="lc">    <span class="k">def</span> <span class="f">touch</span>(<span class="v">self</span>) -&gt; <span class="k">None</span>:</span></div>
+                <div class="code-line"><span class="ln">22</span><span class="lc">        <span class="v">self</span>.dirty = <span class="k">True</span></span></div>
+                <div class="code-line"><span class="ln">23</span><span class="lc"> </span></div>
+                <div class="code-line"><span class="ln">24</span><span class="lc"> </span></div>
+                <div class="code-line"><span class="ln">25</span><span class="lc"><span class="k">class</span> <span class="cls">CollabService</span>:</span></div>
+                <div class="code-line"><span class="ln">26</span><span class="lc">    <span class="s">"""维护协同会话，并将 Yjs 快照持久化到 Git 工作区."""</span></span></div>
+                <div class="code-line"><span class="ln">27</span><span class="lc"> </span></div>
+                <div class="code-line"><span class="ln">28</span><span class="lc">    <span class="k">def</span> <span class="f">__init__</span>(<span class="v">self</span>, bus: <span class="cls">EventBus</span>, config: <span class="cls">GatewayConfig</span>) -&gt; <span class="k">None</span>:</span></div>
+                <div class="code-line"><span class="ln">29</span><span class="lc">        <span class="v">self</span>._bus = bus</span></div>
+                <div class="code-line"><span class="ln">30</span><span class="lc">        <span class="v">self</span>._config = config</span></div>
+                <div class="code-line"><span class="ln">31</span><span class="lc">        <span class="v">self</span>._sessions: <span class="cls">dict</span>[<span class="cls">str</span>, <span class="cls">CollabSession</span>] = {}</span></div>
+                <div class="code-line"><span class="ln">32</span><span class="lc"> </span></div>
+                <div class="code-line"><span class="ln">33</span><span class="lc">    <span class="k">async def</span> <span class="f">join</span>(<span class="v">self</span>, workspace_id: <span class="cls">str</span>, user: <span class="cls">str</span>) -&gt; <span class="cls">CollabSession</span>:</span></div>
+                <div class="code-line"><span class="ln">34</span><span class="lc">        session = <span class="v">self</span>._sessions.get(workspace_id)</span></div>
+                <div class="code-line"><span class="ln">35</span><span class="lc">        <span class="k">if</span> session <span class="k">is</span> <span class="k">None</span>:</span></div>
+                <div class="code-line"><span class="ln">36</span><span class="lc">            session = <span class="cls">CollabSession</span>(</span></div>
+                <div class="code-line"><span class="ln">37</span><span class="lc">                workspace_id=workspace_id,</span></div>
+                <div class="code-line hl"><span class="ln">38</span><span class="lc">                doc_id=<span class="squiggle err">resolve_target<span class="diag-tip"><div class="dth"><svg class="ic" style="width:13px;height:13px"><use href="#i-err"/></svg>未定义名称 "resolve_target"</div><div>此名称可能来自 <b>core.routing</b>，是否需要导入？</div><div class="dts">pyright · Ln 38, Col 22 · reportUndefinedVariable</div></span></span>(workspace_id),</span></div>
+                <div class="code-line"><span class="ln">39</span><span class="lc">            )</span></div>
+                <div class="code-line"><span class="ln">40</span><span class="lc">            <span class="v">self</span>._sessions[workspace_id] = session</span></div>
+                <div class="code-line"><span class="ln">41</span><span class="lc">        session.participants.add(user)</span></div>
+                <div class="code-line"><span class="ln">42</span><span class="lc">        <span class="k">await</span> <span class="v">self</span>._bus.<span class="f">publish</span>(<span class="s">"collab:join"</span>, {<span class="s">"user"</span>: user})</span></div>
+                <div class="code-line"><span class="ln">43</span><span class="lc">        <span class="k">return</span> session</span></div>
+              </div>
+            </div>
+            <div class="minimap" title="Minimap（示意）"></div>
+          </div>
+
+          <!-- config.toml -->
+          <div class="epane" data-pane="toml">
+            <div class="simple-pane">
+              <pre>[gateway]
+bind = "127.0.0.1:0"          <span style="color:#8b949e"># 动态端口</span>
+cors_origins = ["wails://localhost", "http://localhost:34115"]
+
+[cache]
+enabled = true                <span style="color:#8b949e"># 离线缓存（只读 GET）</span>
+max_entries = 500
+max_bytes = "32MB"
+ttl = "24h"
+
+[git]
+credential_helper = "keyring" <span style="color:#8b949e"># Windows Credential Manager</span>
+</pre>
+            </div>
+          </div>
+
+          <!-- README 预览 -->
+          <div class="epane" data-pane="md">
+            <div class="simple-pane readme-body" style="padding-top:8px">
+              <h1 style="font-size:20px">perseus</h1>
+              <p>基于 Git 的本地化协作开发平台。本工作区克隆自 <span class="mono">dev-server/acme/perseus</span>。</p>
+              <h2 style="font-size:15px">目录</h2>
+              <ul><li>api/ — HTTP 接口层</li><li>core/ — 网关与配置</li><li>services/ — 协作会话服务</li></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部面板 -->
+      <div class="bottom-panel" id="bottom-panel" data-tabs>
+        <div class="bp-tabs">
+          <button class="bpt on" data-tab="problems">问题 <span class="cnt">3</span></button>
+          <button class="bpt" data-tab="output">输出</button>
+          <button class="bpt" data-tab="terminal">终端</button>
+          <span class="right">
+            <button class="icon-btn sm" id="bp-toggle" title="收起/展开"><svg class="ic"><use href="#i-chev-r" style="transform:rotate(90deg)"/></svg></button>
+            <button class="icon-btn sm" title="关闭面板"><svg class="ic"><use href="#i-x"/></svg></button>
+          </span>
+        </div>
+        <div class="bp-body on" data-pane="problems">
+          <div class="prob-row"><svg class="ic e"><use href="#i-err"/></svg>未定义名称 "resolve_target"<span class="where">services/collab_service.py [Ln 38, Col 22]</span><span class="src">pyright</span></div>
+          <div class="prob-row"><svg class="ic w"><use href="#i-warn"/></svg>未使用的导入 "os"<span class="where">services/collab_service.py [Ln 3, Col 8]</span><span class="src">pyright</span></div>
+          <div class="prob-row"><svg class="ic w"><use href="#i-warn"/></svg>建议为 "snapshot_size" 添加类型标注<span class="where">core/gateway.py [Ln 22, Col 9]</span><span class="src">pyright</span></div>
+        </div>
+        <div class="bp-body" data-pane="output">
+          <div><span class="log-time">[12:04:18]</span> <span class="term-out">网关就绪: http://127.0.0.1:52114</span></div>
+          <div><span class="log-time">[12:04:19]</span> <span class="term-out">服务器 dev-server 连接成功 (38ms)</span></div>
+          <div><span class="log-time">[12:04:22]</span> <span class="term-out">LSP: pyright 已启动 (workspace: perseus)</span></div>
+          <div><span class="log-time">[12:04:35]</span> <span class="term-out">git: status --porcelain=v2 → 3 个变更</span></div>
+          <div><span class="log-time">[12:05:02]</span> <span class="term-out">Yjs: 文档 doc-42 快照已写入暂存区 (18.4 KB)</span></div>
+        </div>
+        <div class="bp-body" data-pane="terminal">
+          <div><span class="term-prompt">PS D:\Projects\perseus&gt;</span> <span class="term-cmd">git status</span></div>
+          <div class="term-out">On branch main</div>
+          <div class="term-out">Your branch is ahead of 'origin/main' by 2 commits.</div>
+          <div class="term-out">&nbsp;</div>
+          <div class="term-out">Changes not staged for commit:</div>
+          <div class="term-out">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;modified:&nbsp;&nbsp; services/collab_service.py</div>
+          <div class="term-out">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;modified:&nbsp;&nbsp; core/gateway.py</div>
+          <div class="term-out">&nbsp;</div>
+          <div class="term-out">Untracked files:</div>
+          <div class="term-out">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;docs/notes.md</div>
+          <div><span class="term-prompt">PS D:\Projects\perseus&gt;</span> <span style="background:var(--t2);width:7px;height:14px;display:inline-block;vertical-align:middle"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧辅助面板 -->
+    <aside class="aux open" id="aux">
+      <div class="aux-h">协作 · 经 dev-server 代理<span class="live"><span class="dot on" style="width:7px;height:7px"></span>3 人在线</span></div>
+      <div class="aux-body">
+        <div class="aux-card">
+          <div class="ac-t"><svg class="ic"><use href="#i-merge"/></svg>待处理 PR</div>
+          <div class="pr-line"><svg class="ic" style="width:13px;height:13px;color:var(--green)"><use href="#i-merge"/></svg><b>#42 修复网关离线缓存穿透</b></div>
+          <div class="ac-row"><span class="diffstat"><span class="plus">+120</span><span class="minus">−18</span></span><span class="faint">feature/gateway-cache → main</span></div>
+          <div class="ac-row">
+            <span class="avatar-stack">
+              <span class="avatar" style="background:#3fb950">李</span>
+              <span class="avatar" style="background:#bc8cff">王</span>
+            </span>
+            <span class="faint">6 条评论 · 1 已批准</span>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:9px">
+            <button class="btn sm ghost" style="flex:1" data-nav="prs">查看详情</button>
+            <button class="btn sm primary" data-toast="已打开编辑器内讨论（原型示意）" data-toast-kind="info">讨论</button>
+          </div>
+        </div>
+        <div class="aux-card">
+          <div class="ac-t"><svg class="ic"><use href="#i-err"/></svg>相关 Issue</div>
+          <div class="pr-line"><svg class="ic" style="width:13px;height:13px;color:var(--green)"><use href="#i-err"/></svg><b>#57 离线缓存命中率下降</b></div>
+          <div class="ac-row"><span class="tag p-high">高</span><span class="faint">李娜 处理中</span></div>
+        </div>
+        <div class="aux-card">
+          <div class="ac-t"><svg class="ic"><use href="#i-user"/></svg>成员</div>
+          <div class="member-row"><span class="avatar" style="background:#1f6feb">张<i style="background:var(--green)"></i></span>张伟<span class="role">你 · 编辑中</span></div>
+          <div class="member-row"><span class="avatar" style="background:#3fb950">李<i style="background:var(--green)"></i></span>李娜<span class="role">查看 #57</span></div>
+          <div class="member-row"><span class="avatar" style="background:#bc8cff">王<i style="background:var(--yellow)"></i></span>王强<span class="role">离开</span></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- 状态栏 -->
+  <footer class="statusbar">
+    <span class="sb-item"><svg class="ic"><use href="#i-branch"/></svg>main</span>
+    <span class="sb-item"><svg class="ic"><use href="#i-up"/></svg>2<svg class="ic" style="margin-left:4px"><use href="#i-down"/></svg>0</span>
+    <span class="sb-item" title="同步" data-toast="已同步 origin/main" ><svg class="ic"><use href="#i-refresh"/></svg></span>
+    <span class="sp"></span>
+    <span class="sb-item sb-err" title="打开问题面板"><svg class="ic"><use href="#i-err"/></svg>1</span>
+    <span class="sb-item sb-warn" title="打开问题面板"><svg class="ic"><use href="#i-warn"/></svg>2</span>
+    <span class="sb-item sb-server" title="服务器状态"><i class="sb-dot"></i><span class="sb-server-on">dev-server · 在线</span><span class="sb-server-off">dev-server · 离线</span></span>
+    <span class="sb-item" title="语言服务"><svg class="ic"><use href="#i-check-c"/></svg>pyright</span>
+    <span class="sb-item">Ln 38, Col 22</span>
+    <span class="sb-item">空格: 2</span>
+    <span class="sb-item">UTF-8</span>
+    <span class="sb-item">Python</span>
+  </footer>
+</div>
+
+<!-- 命令面板 -->
+<div class="palette-veil" id="palette-veil">
+  <div class="palette">
+    <div class="p-input"><svg class="ic"><use href="#i-zap"/></svg><input placeholder="输入命令，或直接输入文件名跳转…"></div>
+    <div class="p-list">
+      <div class="p-row sel" data-toast="已打开：转到文件（原型示意）"><svg class="ic"><use href="#i-file"/></svg>转到文件…<span class="grp">转到</span></div>
+      <div class="p-row" data-toast="已提交 3 个文件（原型示意）"><svg class="ic"><use href="#i-branch"/></svg>Git: 提交全部更改<span class="grp">Git</span></div>
+      <div class="p-row" data-toast="已推送到 origin/main（原型示意）"><svg class="ic"><use href="#i-up"/></svg>Git: Push<span class="grp">Git</span></div>
+      <div class="p-row" data-toast="新建终端（原型示意）" data-toast-kind="info"><svg class="ic"><use href="#i-terminal"/></svg>终端: 新建 PowerShell<span class="grp">终端</span></div>
+      <div class="p-row" data-toast="正在刷新服务器健康状态…"><svg class="ic"><use href="#i-server"/></svg>服务器: 刷新健康状态<span class="grp">服务器</span></div>
+      <div class="p-row" data-nav="settings"><svg class="ic"><use href="#i-gear"/></svg>设置: 打开设置<span class="grp">设置</span></div>
+    </div>
+    <div class="p-foot">
+      <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
+      <span><kbd>Enter</kbd> 确认</span>
+      <span><kbd>Esc</kbd> 关闭</span>
+      <span style="margin-left:auto"><kbd>Ctrl K</kbd> 随时呼出</span>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap"></div>
+</body>
+</html>

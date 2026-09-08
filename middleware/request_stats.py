@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
+from typing import Deque
 
 
 class RequestStats:
@@ -22,8 +23,8 @@ class RequestStats:
         self._total = 0
         self._success = 0
         self._failed = 0
-        self._response_times = deque(maxlen=10000)  # 保留最近10000个响应时间
-        self._requests_per_minute = deque(maxlen=window_minutes)  # 每分钟请求数
+        self._response_times: Deque[float] = deque(maxlen=10000)  # 保留最近10000个响应时间
+        self._requests_per_minute: Deque[Dict[str, Any]] = deque(maxlen=window_minutes)  # 每分钟请求数
         self._last_minute = datetime.now()
         self._current_minute_count = 0
 

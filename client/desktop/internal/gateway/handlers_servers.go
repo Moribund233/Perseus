@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -53,6 +54,39 @@ func (g *Gateway) handleRegisterServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = g.store.SetSetting("default_server_id", srv.ID)
+	writeJSON(w, http.StatusOK, srv)
+}
+
+func (g *Gateway) handleUpdateServer(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var req registerServerReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+		return
+	}
+	srv, err := g.servers.UpdateServer(id, server.UpdateInput{
+		Name:     req.Name,
+		BaseURL:  req.BaseURL,
+		Username: req.Username,
+		Password: req.Password,
+		Token:    req.Token,
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "SERVER_NOT_FOUND", "server not found")
+			return
+		}
+		if errors.Is(err, server.ErrLoginFailed) {
+			writeError(w, http.StatusUnauthorized, "LOGIN_FAILED", err.Error())
+			return
+		}
+		if errors.Is(err, server.ErrInvalidAuth) {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "SERVER_UPDATE", err.Error())
+		return
+	}
 	writeJSON(w, http.StatusOK, srv)
 }
 

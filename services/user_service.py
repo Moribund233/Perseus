@@ -124,7 +124,7 @@ async def create_user(user_data: dict, db: AsyncSession):
     return user_to_dict(db_user)
 
 
-async def update_user(user_id: uuid.UUID, user_data: dict, db: AsyncSession, current_user: User = None):
+async def update_user(user_id: uuid.UUID, user_data: dict, db: AsyncSession, current_user: User | None = None):
     """
     更新用户信息
 

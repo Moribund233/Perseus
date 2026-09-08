@@ -18,6 +18,15 @@ type AddInput struct {
 	Token      string
 }
 
+// UpdateInput 编辑注册项的可选字段（空串 = 保持不变）
+type UpdateInput struct {
+	Name     string
+	BaseURL  string
+	Username string
+	Password string // password 档: 提供则重新登录换 token
+	Token    string // token 档: 提供则直接更换
+}
+
 var ErrInvalidAuth = errors.New("invalid auth input")
 
 // Registry 服务器注册表：包装 store 元数据 + 密钥库 token + 远端 client。
@@ -86,6 +95,75 @@ func (rg *Registry) AddServer(in AddInput) (store.Server, error) {
 }
 
 func (rg *Registry) Update(srv store.Server) error { return rg.store.UpdateServer(srv) }
+
+// UpdateServer 编辑注册项：
+//   - name 可独立修改
+//   - base_url 变更视为接入新服务器, 必须同时提供新凭据
+//     (password 档重登录 / token 档提供新 token), 否则拒绝
+//   - password 档提供新 password → 用(新)地址重登录换 token
+//   - 凭据写入密钥库成功后才更新元数据, 随后探测刷新健康状态
+func (rg *Registry) UpdateServer(id string, in UpdateInput) (store.Server, error) {
+	srv, err := rg.store.GetServer(id)
+	if err != nil {
+		return store.Server{}, err
+	}
+
+	name := srv.Name
+	if in.Name != "" {
+		name = in.Name
+	}
+	baseURL := srv.BaseURL
+	if in.BaseURL != "" {
+		baseURL = in.BaseURL
+	}
+	urlChanged := baseURL != srv.BaseURL
+
+	newToken := ""
+	switch srv.AuthMethod {
+	case "password":
+		if in.Password != "" {
+			username := in.Username
+			if username == "" {
+				username = srv.Username
+			}
+			t, err := rg.client.Login(baseURL, username, in.Password)
+			if err != nil {
+				return store.Server{}, err
+			}
+			newToken = t
+		} else if urlChanged {
+			return store.Server{}, ErrInvalidAuth
+		}
+	case "token":
+		if in.Token != "" {
+			newToken = in.Token
+		} else if urlChanged {
+			return store.Server{}, ErrInvalidAuth
+		}
+	default:
+		return store.Server{}, ErrInvalidAuth
+	}
+
+	if newToken != "" {
+		if err := rg.keychain.Set(tokenService, tokenAccount(id), newToken); err != nil {
+			return store.Server{}, err
+		}
+	}
+
+	username := srv.Username
+	if in.Username != "" {
+		username = in.Username
+	}
+	updated := srv
+	updated.Name = name
+	updated.BaseURL = baseURL
+	updated.Username = username
+	if err := rg.store.UpdateServer(updated); err != nil {
+		return store.Server{}, err
+	}
+	_ = rg.Probe(id)
+	return rg.store.GetServer(id)
+}
 
 // Delete 删除注册表记录与密钥库 token（best-effort）。
 func (rg *Registry) Delete(id string) error {

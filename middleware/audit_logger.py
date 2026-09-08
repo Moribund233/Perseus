@@ -7,7 +7,7 @@ import json
 import time
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -102,7 +102,7 @@ class AuditLoggerMiddleware(BaseHTTPMiddleware):
 
     def _get_user_info(self, request: Request) -> dict:
         """获取用户信息"""
-        user_info = {"user_id": None, "username": None, "auth_type": None}
+        user_info: Dict[str, Any] = {"user_id": None, "username": None, "auth_type": None}
 
         if hasattr(request.state, "user"):
             user = request.state.user

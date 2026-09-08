@@ -279,6 +279,9 @@
       "welcomeTitle": "Welcome to Perseus Desktop",
       "connecting": "Connecting to local gateway...",
       "gatewayError": "Gateway init failed: {{error}}",
+      "errorTitle": "Cannot reach the local gateway",
+      "errorDesc": "Perseus Desktop depends on its local gateway process. Make sure no stale instance is holding the port, then retry.",
+      "errorDetail": "Error detail",
       "retry": "Retry"
     },
     "welcome": {
@@ -289,6 +292,8 @@
       "cloneTitle": "Clone Repository (manual URL)",
       "clonePlaceholder": "https://server/owner/repo.git or git@host:owner/repo.git",
       "clone": "Clone",
+      "cloneCredential": "Credentials (optional)",
+      "cloneCredentialPh": "Access token — only needed when the URL is not a registered server",
       "recent": "Recent Workspaces",
       "noWorkspaces": "No workspaces yet",
       "open": "Open"
@@ -303,7 +308,12 @@
       "selectFile": "Select a file on the left to start editing",
       "binary": "Binary file ({{size}} bytes) is not editable",
       "truncated": "File too large, only first 2MB loaded",
-      "save": "Save"
+      "save": "Save",
+      "closeTab": "Close tab",
+      "closeConfirmTitle": "Unsaved changes",
+      "closeConfirm": "\"{{path}}\" has unsaved changes. Closing will discard them.",
+      "closeDiscard": "Discard & close",
+      "closeCancel": "Cancel"
     },
     "git": {
       "loading": "Loading status...",
@@ -311,15 +321,26 @@
       "commitMessage": "Commit message",
       "stage": "Stage",
       "commit": "Commit",
+      "push": "Push",
+      "pull": "Pull",
+      "pushOk": "Pushed",
+      "pushFail": "Push failed",
+      "pullOk": "Pulled",
+      "pullFail": "Pull failed",
       "noChanges": "No changes"
     },
     "settings": {
       "title": "Settings",
+      "gatewayCard": "Local Gateway",
       "gateway": "Gateway URL",
-      "token": "Session token: {{state}}",
+      "tokenLabel": "Gateway session token",
       "tokenGenerated": "Generated (in-memory only)",
       "tokenMissing": "Not generated",
-      "placeholder": "Phase 1 placeholder. Data directory persistence, themes, and SSH keys arrive in later phases."
+      "workspaces": "Workspaces",
+      "serversCount": "Registered servers",
+      "language": "Language / Language",
+      "about": "About",
+      "aboutDesc": "Remote Perseus client + local workspace (Wails v2)"
     },
     "servers": {
       "title": "Servers",
@@ -350,6 +371,15 @@
       "healthTag": "Health: {{health}}",
       "refresh": "Refresh",
       "added": "Added server \"{{name}}\"",
+      "edit": "Edit",
+      "editTitle": "Edit {{name}}",
+      "save": "Save",
+      "updated": "Updated \"{{name}}\"",
+      "newPassword": "New password (leave empty to keep credentials)",
+      "newToken": "New token (leave empty to keep credentials)",
+      "baseUrlEditHint": "Changing the URL also requires new credentials",
+      "updateCredRequired": "Changing the server URL requires a new password",
+      "updateCredRequiredToken": "Changing the server URL requires a new token",
       "deleteConfirm": "Delete server \"{{name}}\"? Its stored token will also be removed.",
       "loginFailed": "Login failed: {{error}}"
     },

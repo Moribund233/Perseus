@@ -18,6 +18,7 @@ func (g *Gateway) buildRouter() http.Handler {
 	// 服务器注册表
 	mux.HandleFunc("GET /api/local/servers", g.handleListServers)
 	mux.HandleFunc("POST /api/local/servers", g.handleRegisterServer)
+	mux.HandleFunc("PUT /api/local/servers/{id}", g.handleUpdateServer)
 	mux.HandleFunc("DELETE /api/local/servers/{id}", g.handleDeleteServer)
 	mux.HandleFunc("GET /api/local/servers/{id}/health", g.handleServerHealth)
 	mux.HandleFunc("POST /api/local/servers/{id}/refresh", g.handleRefreshServer)

@@ -1,5 +1,5 @@
-from sqlalchemy import Column, String, Boolean, Integer, ForeignKey, Uuid as SAUuid
-from sqlalchemy.orm import relationship
+from sqlalchemy import String, Boolean, Integer, ForeignKey, Uuid as SAUuid
+from sqlalchemy.orm import relationship, mapped_column
 from models.base import BaseModel
 
 
@@ -11,22 +11,22 @@ class Branch(BaseModel):
     """
     __tablename__ = "branches"  # 数据库表名
     
-    name = Column(String(50), nullable=False)
+    name = mapped_column(String(50), nullable=False)
     """分支名称，长度不超过50个字符"""
     
-    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
+    repository_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
     """仓库ID，外键关联到repositories表"""
     
-    is_protected = Column(Boolean, default=False)
+    is_protected = mapped_column(Boolean, default=False)
     """分支是否受保护，默认为False"""
     
-    require_code_review = Column(Boolean, default=False)
+    require_code_review = mapped_column(Boolean, default=False)
     """是否需要代码审查，默认为False"""
     
-    require_status_checks = Column(Boolean, default=False)
+    require_status_checks = mapped_column(Boolean, default=False)
     """是否需要状态检查，默认为False"""
     
-    is_default = Column(Boolean, default=False)
+    is_default = mapped_column(Boolean, default=False)
     """是否为默认分支，默认为False"""
     
     # 关系定义

@@ -63,7 +63,7 @@ class LogBuffer:
         """获取日志统计信息"""
         async with self._lock:
             total = len(self._buffer)
-            level_counts = {}
+            level_counts: Dict[str, int] = {}
             for entry in self._buffer:
                 level_counts[entry.level] = level_counts.get(entry.level, 0) + 1
 

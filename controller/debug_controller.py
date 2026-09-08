@@ -18,7 +18,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from core.config import get_config
+from core.config import get_config, reset_module_config_manager, ConfigManager
 from api.dependencies import get_current_user
 from models.user import User
 from services.database_manager import DatabaseResetManager

@@ -1,15 +1,15 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint, Uuid as SAUuid
-from sqlalchemy.orm import relationship
+from sqlalchemy import Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint, Uuid as SAUuid
+from sqlalchemy.orm import relationship, mapped_column
 from models.base import BaseModel
 
 
 class RealtimeRoom(BaseModel):
     __tablename__ = "realtime_rooms"
 
-    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False, unique=True, index=True)
-    name = Column(String(100), nullable=False)
-    topic = Column(String(500), nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)
+    repository_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False, unique=True, index=True)
+    name = mapped_column(String(100), nullable=False)
+    topic = mapped_column(String(500), nullable=True)
+    is_active = mapped_column(Boolean, default=True, nullable=False)
 
     repository = relationship("Repository", backref="realtime_room")
 
@@ -20,12 +20,12 @@ class RealtimeRoom(BaseModel):
 class RoomMember(BaseModel):
     __tablename__ = "room_members"
 
-    room_id = Column(SAUuid(as_uuid=True), ForeignKey("realtime_rooms.id"), nullable=False, index=True)
-    user_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    role = Column(String(20), nullable=False, default="member")
-    joined_at = Column(DateTime(timezone=True), nullable=False)
-    last_read_at = Column(DateTime(timezone=True), nullable=True)
-    is_muted = Column(Boolean, default=False, nullable=False)
+    room_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("realtime_rooms.id"), nullable=False, index=True)
+    user_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    role = mapped_column(String(20), nullable=False, default="member")
+    joined_at = mapped_column(DateTime(timezone=True), nullable=False)
+    last_read_at = mapped_column(DateTime(timezone=True), nullable=True)
+    is_muted = mapped_column(Boolean, default=False, nullable=False)
 
     room = relationship("RealtimeRoom", backref="members")
     user = relationship("User", backref="room_memberships")

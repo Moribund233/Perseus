@@ -30,7 +30,7 @@ class DatabaseConnectionError(DatabaseValidationError):
     pass
 
 
-def check_driver_installed(db_type: str, url: str = None) -> Tuple[bool, Optional[str]]:
+def check_driver_installed(db_type: str, url: str | None = None) -> Tuple[bool, Optional[str]]:
     """
     Check if the database driver is installed
     

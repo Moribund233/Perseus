@@ -115,7 +115,7 @@ async def paginate(
     result = await db.execute(paginated_stmt)
     results = result.scalars().all()
 
-    return results, total
+    return list(results), int(total or 0)
 
 
 async def get_next_sequence_number(

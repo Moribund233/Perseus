@@ -1,5 +1,5 @@
-from sqlalchemy import Boolean, Column, Integer, String, Text, ForeignKey, Uuid as SAUuid
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy import Boolean, Integer, String, Text, ForeignKey, Uuid as SAUuid
+from sqlalchemy.orm import relationship, backref, mapped_column
 from models.base import BaseModel
 
 
@@ -11,38 +11,38 @@ class PullRequest(BaseModel):
     """
     __tablename__ = "pull_requests"
     
-    repository_id = Column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
+    repository_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
     """所属仓库ID"""
     
-    pr_number = Column(Integer, nullable=False)
+    pr_number = mapped_column(Integer, nullable=False)
     """PR 编号（每个仓库内自增）"""
     
-    title = Column(String(255), nullable=False)
+    title = mapped_column(String(255), nullable=False)
     """PR 标题"""
     
-    description = Column(Text, nullable=True)
+    description = mapped_column(Text, nullable=True)
     """PR 描述（支持 Markdown）"""
     
-    source_branch = Column(String(100), nullable=False)
+    source_branch = mapped_column(String(100), nullable=False)
     """源分支（要合并的分支）"""
     
-    target_branch = Column(String(100), nullable=False)
+    target_branch = mapped_column(String(100), nullable=False)
     """目标分支（合并到的分支）"""
     
-    author_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    author_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     """创建者ID"""
     
-    status = Column(String(20), default="open")
+    status = mapped_column(String(20), default="open")
     """PR 状态：open/merged/closed"""
 
-    is_draft = Column(Boolean, default=False)
+    is_draft = mapped_column(Boolean, default=False)
     """是否为草稿 PR"""
     
     # 合并相关信息
-    merged_by = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    merged_by = mapped_column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     """合并者ID"""
     
-    merged_commit_hash = Column(String(40), nullable=True)
+    merged_commit_hash = mapped_column(String(40), nullable=True)
     """合并后的提交哈希"""
     
     # 关联关系
@@ -63,26 +63,26 @@ class PRComment(BaseModel):
     """
     __tablename__ = "pr_comments"
     
-    pull_request_id = Column(SAUuid(as_uuid=True), ForeignKey("pull_requests.id"), nullable=False)
+    pull_request_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("pull_requests.id"), nullable=False)
     """所属 PR ID"""
     
-    author_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    author_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     """评论作者ID"""
     
-    content = Column(Text, nullable=False)
+    content = mapped_column(Text, nullable=False)
     """评论内容"""
     
     # 行级评论定位
-    file_path = Column(String(500), nullable=True)
+    file_path = mapped_column(String(500), nullable=True)
     """评论的文件路径（行级评论时必填）"""
     
-    line_number = Column(Integer, nullable=True)
+    line_number = mapped_column(Integer, nullable=True)
     """行号（行级评论时必填）"""
     
-    commit_hash = Column(String(40), nullable=True)
+    commit_hash = mapped_column(String(40), nullable=True)
     """评论针对的提交哈希"""
     
-    parent_id = Column(SAUuid(as_uuid=True), ForeignKey("pr_comments.id"), nullable=True)
+    parent_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("pr_comments.id"), nullable=True)
     """父评论ID（支持回复）"""
     
     # 关联关系
@@ -99,16 +99,16 @@ class PRReview(BaseModel):
     """
     __tablename__ = "pr_reviews"
     
-    pull_request_id = Column(SAUuid(as_uuid=True), ForeignKey("pull_requests.id"), nullable=False)
+    pull_request_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("pull_requests.id"), nullable=False)
     """所属 PR ID"""
     
-    reviewer_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    reviewer_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     """审查者ID"""
     
-    status = Column(String(20), nullable=False, default="pending")
+    status = mapped_column(String(20), nullable=False, default="pending")
     """审查状态：pending/approved/changes_requested"""
     
-    comment = Column(Text, nullable=True)
+    comment = mapped_column(Text, nullable=True)
     """审查意见"""
     
     # 关联关系

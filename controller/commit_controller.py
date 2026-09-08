@@ -32,7 +32,7 @@ router = APIRouter(prefix=get_route_prefix("commits"), tags=["commits"])
 @router.get("/{repo_id}/commits/history")
 async def get_commit_history(
     repo_id: uuid.UUID,
-    branch_name: str = None,
+    branch_name: str | None = None,
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_async_db)
 ):
@@ -112,7 +112,7 @@ async def get_commits_by_author(
 
 
 @router.get("/{repo_id}/commits/latest")
-async def get_latest_commit(repo_id: uuid.UUID, branch_name: str = None, db: AsyncSession = Depends(get_async_db)):
+async def get_latest_commit(repo_id: uuid.UUID, branch_name: str | None = None, db: AsyncSession = Depends(get_async_db)):
     """
     获取仓库的最新提交
     

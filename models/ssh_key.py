@@ -4,8 +4,8 @@ SSH Key 模型
 F-019: SSH Key 管理
 """
 
-from sqlalchemy import Column, String, Integer, ForeignKey, Text, Uuid as SAUuid
-from sqlalchemy.orm import relationship
+from sqlalchemy import String, Integer, ForeignKey, Text, Uuid as SAUuid
+from sqlalchemy.orm import relationship, mapped_column
 from models.base import BaseModel
 
 
@@ -17,16 +17,16 @@ class SSHKey(BaseModel):
     """
     __tablename__ = "ssh_keys"
 
-    name = Column(String(100), nullable=False)
+    name = mapped_column(String(100), nullable=False)
     """Key 名称，用户自定义，如 'My Laptop'"""
 
-    public_key = Column(Text, nullable=False)
+    public_key = mapped_column(Text, nullable=False)
     """SSH 公钥内容"""
 
-    fingerprint = Column(String(100), nullable=False, index=True)
+    fingerprint = mapped_column(String(100), nullable=False, index=True)
     """Key 的 fingerprint，用于唯一标识和查找"""
 
-    user_id = Column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    user_id = mapped_column(SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     """所属用户 ID"""
 
     # 关联关系

@@ -162,7 +162,7 @@ async def create_commit(commit_data: dict, db: AsyncSession):
     return db_commit
 
 
-async def get_commit_history(repo_id: uuid.UUID, db: AsyncSession, branch_name: str = None, limit: int = 50):
+async def get_commit_history(repo_id: uuid.UUID, db: AsyncSession, branch_name: str | None = None, limit: int = 50):
     """
     获取仓库的提交历史树
 

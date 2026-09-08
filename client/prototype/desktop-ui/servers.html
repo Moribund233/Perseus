@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>S7 服务器管理 · Perseus Desktop 原型</title>
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" href="assets/screens.css">
+<script src="assets/sprite.js"></script>
+<script src="assets/app.js" defer></script>
+</head>
+<body>
+
+<nav class="proto-bar">
+  <span class="pb-title"><svg class="ic" style="stroke:none"><use href="#i-logo"/></svg>Perseus Desktop</span>
+  <span class="pb-tag">高保真原型 v1</span>
+  <a class="pb-screen" href="welcome.html">启动台</a>
+  <a class="pb-screen" href="repositories.html">仓库列表</a>
+  <a class="pb-screen" href="repo-detail.html">仓库详情</a>
+  <a class="pb-screen" href="issues.html">Issues</a>
+  <a class="pb-screen" href="pull-requests.html">Pull Requests</a>
+  <a class="pb-screen" href="chat.html">团队聊天</a>
+  <a class="pb-screen" href="ide.html">IDE 工作区</a>
+  <a class="pb-screen on" href="servers.html">服务器管理</a>
+  <a class="pb-screen" href="settings.html">设置</a>
+  <div class="pb-right">
+    <span class="pb-note">图标为占位示意 · 正式实现沿用 web 端图标体系</span>
+    <button class="pb-chip" id="chip-toast">触发 Toast</button>
+  </div>
+</nav>
+
+<div class="win">
+  <header class="titlebar">
+    <button class="tb-back" data-nav="welcome"><svg class="ic" style="width:14px;height:14px"><use href="#i-arrow-l"/></svg>工作区</button>
+    <span class="tb-sep"></span>
+    <span class="tb-crumb"><b>服务器</b></span>
+    <div class="tb-right">
+      <div class="winctl">
+        <button><svg class="ic"><use href="#i-min"/></svg></button>
+        <button><svg class="ic"><use href="#i-max"/></svg></button>
+        <button class="close"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page">
+    <div class="page-head">
+      <h2>服务器</h2><span class="sub">已注册 2 台 · 凭据存放于 Windows Credential Manager</span>
+      <div class="right">
+        <button class="btn primary" data-open-modal="#modal-add-server"><svg class="ic"><use href="#i-plus"/></svg>添加服务器</button>
+      </div>
+    </div>
+
+    <div class="srv-wrap scroll">
+      <div class="srv-card current">
+        <div class="srv-st on"><svg class="ic"><use href="#i-server"/></svg></div>
+        <div class="srv-main">
+          <div class="r1"><b>dev-server</b><span class="pill green">在线</span><span class="current-chip"><svg class="ic" style="width:10px;height:10px"><use href="#i-check"/></svg>当前</span></div>
+          <div class="url">https://dev.perseus.local</div>
+          <div class="meta"><span>认证方式：访问令牌</span><span>上次连接：5 分钟前</span><span>延迟 38ms</span></div>
+        </div>
+        <div class="srv-actions">
+          <button class="btn sm ghost" data-toast="健康状态：在线 · 38ms"><svg class="ic"><use href="#i-refresh"/></svg>刷新</button>
+          <button class="btn sm ghost" data-open-modal="#modal-add-server"><svg class="ic"><use href="#i-edit"/></svg>编辑</button>
+          <button class="icon-btn danger" title="删除" data-toast="删除前需二次确认（原型示意）" data-toast-kind="err"><svg class="ic"><use href="#i-trash"/></svg></button>
+        </div>
+      </div>
+
+      <div class="srv-card">
+        <div class="srv-st off"><svg class="ic"><use href="#i-server"/></svg></div>
+        <div class="srv-main">
+          <div class="r1"><b>staging</b><span class="pill">离线</span></div>
+          <div class="url">https://staging.perseus.local</div>
+          <div class="meta"><span>认证方式：用户名 &amp; 密码</span><span>上次连接：2 天前</span><span>离线缓存可用（只读）</span></div>
+        </div>
+        <div class="srv-actions">
+          <button class="btn sm ghost set-current" title="尝试连接"><svg class="ic"><use href="#i-plug"/></svg>连接</button>
+          <button class="btn sm ghost" data-toast="staging 不可达 — 显示缓存状态" data-toast-kind="err"><svg class="ic"><use href="#i-refresh"/></svg>刷新</button>
+          <button class="btn sm ghost" data-open-modal="#modal-add-server"><svg class="ic"><use href="#i-edit"/></svg>编辑</button>
+          <button class="icon-btn danger" title="删除" data-toast="删除前需二次确认（原型示意）" data-toast-kind="err"><svg class="ic"><use href="#i-trash"/></svg></button>
+        </div>
+      </div>
+
+      <div class="card" style="padding:14px 18px;display:flex;gap:10px;align-items:flex-start;margin-top:18px">
+        <svg class="ic" style="color:var(--blue-l);margin-top:2px"><use href="#i-info"/></svg>
+        <div style="font-size:12.5px;color:var(--t2);line-height:1.7">
+          <b style="color:var(--t1)">局域网发现</b> — 当 Perseus 服务器发布 <span class="mono">_perseus._tcp</span>（mDNS）后，此处将自动列出可连接的服务器；服务端就绪前该能力自动降级，不影响手动添加。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 添加 / 编辑服务器弹窗 -->
+<div class="modal-veil" id="modal-add-server">
+  <div class="modal">
+    <div class="modal-h"><b>添加服务器</b><button class="icon-btn" data-close-modal><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="modal-b">
+      <div class="field">
+        <label>名称</label>
+        <div class="input"><input placeholder="如 dev"></div>
+      </div>
+      <div class="field">
+        <label>服务器地址</label>
+        <div class="input"><input placeholder="http://127.0.0.1:8080" value="https://dev.perseus.local"></div>
+        <div class="hint"><svg class="ic"><use href="#i-info"/></svg>连接时自动探测健康状态；修改地址需同时更新凭据</div>
+      </div>
+      <div class="field">
+        <label>认证方式</label>
+        <div class="radio-row">
+          <div class="radio-chip on" data-toast-kind="info">访问令牌</div>
+          <div class="radio-chip">用户名 &amp; 密码</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>访问令牌</label>
+        <div class="input"><svg class="ic"><use href="#i-key"/></svg><input type="password" value="················"></div>
+        <div class="hint"><svg class="ic"><use href="#i-key"/></svg>令牌仅存入 Windows Credential Manager，网关进程内不落盘明文</div>
+      </div>
+      <div class="field">
+        <div class="probe-chip"><svg class="ic" style="width:13px;height:13px"><use href="#i-check-c"/></svg>探测成功 · dev-server · 延迟 38ms</div>
+      </div>
+    </div>
+    <div class="modal-f">
+      <button class="btn ghost" data-close-modal>取消</button>
+      <button class="btn primary" data-close-modal data-toast="已添加服务器 dev-server"><svg class="ic"><use href="#i-plus"/></svg>连接并添加</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap"></div>
+</body>
+</html>

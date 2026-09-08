@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"desktop/internal/git"
@@ -84,7 +86,23 @@ func (g *Gateway) Stop() error {
 func (g *Gateway) Handler() http.Handler { return g.handler }
 
 func (g *Gateway) originAllowed(origin string) bool {
-	return g.origins[origin]
+	if g.origins[origin] {
+		return true
+	}
+	// dev 模式: 前端由 Vite/Wails DevServer 提供, 端口不固定, 且 WebView2 中
+	// Wails dev server 的 origin 是 http://wails.localhost:<port>。
+	// 放行本机回环/保留域 (*.localhost, RFC 6761, 仅本机解析) 的 http(s) origin;
+	// 数据安全边界仍是随机 gateway token (外部页面拿不到 token, 请求会 401),
+	// CORS 只是第二道门。
+	if u, err := url.Parse(origin); err == nil {
+		host := u.Hostname()
+		loopback := host == "localhost" || host == "127.0.0.1" || host == "::1" ||
+			strings.HasSuffix(host, ".localhost")
+		if (u.Scheme == "http" || u.Scheme == "https") && loopback {
+			return true
+		}
+	}
+	return false
 }
 
 func (g *Gateway) validToken(t string) bool {
