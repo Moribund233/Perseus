@@ -97,7 +97,10 @@ kbd { font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; font-si
 .btn.primary:hover { background: #388bfd; border-color: #58a6ff; color: #fff; }
 
 /* ---- 标题栏 ---- */
-.titlebar { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 12px; border-bottom: 1px solid #21262d; background: #161b22; flex-shrink: 0; }
+/* Frameless：整个标题栏为拖拽区（--wails-draggable: drag 由 wails 注入代码识别，
+   → WM_NCLBUTTONDOWN/HTCAPTION 走原生拖拽）；交互控件显式写 no-drag 覆盖继承。 */
+.titlebar { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 12px; border-bottom: 1px solid #21262d; background: #161b22; flex-shrink: 0; --wails-draggable: drag; user-select: none; }
+.titlebar button, .titlebar input, .titlebar a, .titlebar .avatar, .titlebar .ant-avatar { --wails-draggable: no-drag; }
 .tb-brand { display: inline-flex; align-items: center; gap: 8px; }
 .tb-app { font-weight: 600; font-size: 13.5px; color: #e6edf3; }
 .tb-sep { width: 1px; height: 16px; background: #30363d; flex-shrink: 0; }
@@ -116,6 +119,10 @@ kbd { font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; font-si
 .tb-icon { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: none; background: transparent; color: #8b949e; font-size: 15px; cursor: pointer; transition: background 0.15s, color 0.15s; }
 .tb-icon:hover { background: #1c2333; color: #e6edf3; }
 .tb-avatar { border: 1px solid #30363d; flex: none; }
+.win-controls { display: inline-flex; margin-right: -12px; height: 44px; align-items: stretch; --wails-draggable: no-drag; }
+.wc-btn { width: 46px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; color: #8b949e; font-size: 14px; cursor: pointer; transition: background 0.12s, color 0.12s; }
+.wc-btn:hover { background: #1c2333; color: #e6edf3; }
+.wc-btn.closer:hover { background: #f85149; color: #fff; }
 
 .dd-srv-item { display: inline-flex; align-items: center; gap: 8px; min-width: 210px; font-size: 13px; }
 .dd-srv-item b { font-weight: 600; }

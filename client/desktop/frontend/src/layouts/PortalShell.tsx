@@ -17,6 +17,7 @@ import { useRepositoriesStore } from '../stores/repositories';
 import { useGatewayStore } from '../stores/gateway';
 import { getAvatarColor, getInitials } from '../utils/avatar';
 import Brand from '../components/Brand';
+import WindowControls from '../components/WindowControls';
 import Welcome from '../views/Welcome';
 import ServerManager from '../views/servers/ServerManager';
 import RepositoriesView from '../views/repositories/RepositoriesView';
@@ -116,6 +117,12 @@ export default function PortalShell() {
 
   const phase2 = () => message.info(t('desktop.portal.phase2'));
 
+  // 双击标题栏空白/拖拽区 = 最大化/还原（交互控件上不触发）。
+  const onTitlebarDblClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button, input, a, .win-controls, .avatar, .ant-avatar')) return;
+    window.runtime?.WindowToggleMaximise();
+  };
+
   const showOfflineBanner = view === 'repositories' && !!current && current.health === 'offline';
 
   let content: React.ReactNode;
@@ -145,7 +152,7 @@ export default function PortalShell() {
 
   return (
     <div className="portal">
-      <header className="titlebar">
+      <header className="titlebar" onDoubleClick={onTitlebarDblClick}>
         {view === 'welcome' ? (
           <>
             <span className="tb-brand">
@@ -154,6 +161,9 @@ export default function PortalShell() {
             </span>
             <span className="tb-sep" />
             <span className="tb-crumb">{t(CRUMB_KEYS.welcome)}</span>
+            <div className="tb-right">
+              <WindowControls />
+            </div>
           </>
         ) : (
           <>
@@ -198,6 +208,7 @@ export default function PortalShell() {
                   {identityInitials}
                 </Avatar>
               )}
+              <WindowControls />
             </div>
           </>
         )}

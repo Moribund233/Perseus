@@ -1,5 +1,11 @@
 declare global {
   interface Window {
+    runtime?: {
+      WindowMinimise: () => void;
+      WindowToggleMaximise: () => void;
+      WindowIsMaximised: () => Promise<boolean>;
+      Quit: () => void;
+    };
     go?: {
       main: {
         App: {

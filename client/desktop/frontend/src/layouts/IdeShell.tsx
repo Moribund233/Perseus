@@ -29,6 +29,7 @@ import OutputPanel from '../views/workspace/OutputPanel';
 import TerminalPanel from '../views/workspace/TerminalPanel';
 import StatusBar, { type BottomTab } from '../views/workspace/StatusBar';
 import CommandPalette, { type PaneId } from '../views/workspace/CommandPalette';
+import WindowControls from '../components/WindowControls';
 import { lspShutdown } from '../views/workspace/lspSession';
 
 export const PANES: Array<{ id: PaneId; icon: ReactNode; title: string }> = [
@@ -144,6 +145,12 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
     return null;
   };
 
+  // 双击标题栏空白/拖拽区 = 最大化/还原（交互控件上不触发）。
+  const onTitlebarDblClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button, input, a, .win-controls, .avatar, .ant-avatar')) return;
+    window.runtime?.WindowToggleMaximise();
+  };
+
   const paletteActions = useMemo(
     () => ({
       onOpenPane: (p: PaneId) => setPane(p),
@@ -157,7 +164,7 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
 
   return (
     <div className="ide">
-      <header className="titlebar">
+      <header className="titlebar" onDoubleClick={onTitlebarDblClick}>
         <div className="tb-brand">
           <span className="brand-mark" style={{ width: 20, height: 20, borderRadius: 6 }}>
             <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Z" opacity=".9" /></svg>
@@ -185,6 +192,7 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
           <div className="avatar" style={{ background: hashColor(me?.username ?? 'perseus') }}>
             {(me?.username ?? 'P').slice(0, 2).toUpperCase()}
           </div>
+          <WindowControls />
         </div>
       </header>
 
