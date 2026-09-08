@@ -429,10 +429,56 @@
       }
     },
     "ide": {
-      "gateway": "Gateway: {{url}}"
+      "gateway": "Gateway: {{url}}",
+      "searchWorkspace": "Search or run a command…"
+    },
+    "menu": {
+      "file": "File",
+      "edit": "Edit",
+      "view": "View",
+      "terminal": "Terminal",
+      "help": "Help",
+      "newFile": "New File",
+      "refresh": "Refresh",
+      "undo": "Undo",
+      "redo": "Redo",
+      "palette": "Command Palette",
+      "explorer": "Explorer",
+      "search": "Search",
+      "git": "Source Control",
+      "prs": "Pull Requests",
+      "issues": "Issues",
+      "problems": "Problems",
+      "output": "Output",
+      "exit": "Exit workspace",
+      "settings": "Settings",
+      "chat": "Chat",
+      "kill": "Kill terminal session",
+      "killHint": "Terminal sessions are released by the gateway when the connection closes",
+      "about": "About"
+    },
+    "log": {
+      "explorerLoaded": "File tree loaded",
+      "searchDone": "Local search done",
+      "gitFail": "git status failed",
+      "termConnect": "Terminal: connecting to gateway ConPTY session…",
+      "termExit": "Terminal process exited (code {{code}})"
+    },
+    "search": {
+      "title": "Search",
+      "placeholder": "Search in workspace…",
+      "optsHint": "{{name}} · local scan, ignoring .git / node_modules",
+      "searching": "Searching…",
+      "summary": "{{total}} matches",
+      "truncated": "over {{total}} matches, truncated",
+      "groups": "{{count}} files",
+      "fileBadge": "FILE"
     },
     "explorer": {
-      "noFiles": "No files"
+      "noFiles": "No files",
+      "refresh": "Refresh",
+      "newFile": "New file…",
+      "loadFail": "Failed to load file tree"
     },
     "editor": {
       "selectFile": "Select a file on the left to start editing",
@@ -445,19 +491,64 @@
       "closeDiscard": "Discard & close",
       "closeCancel": "Cancel"
     },
+    "diff": {
+      "back": "Back to editor",
+      "headNote": "HEAD → working tree"
+    },
+    "problems": {
+      "empty": "No problems ✓"
+    },
+    "output": {
+      "empty": "No output"
+    },
+    "terminal": {
+      "offline": "Terminal not connected ({{status}})",
+      "reconnect": "Reconnect"
+    },
+    "status": {
+      "branchTitle": "Current branch",
+      "problemsTitle": "Problems panel",
+      "problems": "Problems: {{count}}",
+      "lspTitle": "Language server status",
+      "lspIdle": "Language service",
+      "lspConnecting": "Language service: connecting",
+      "lspOff": "Language service: offline",
+      "lspOn": "Language service: {{lang}}",
+      "serverTitle": "Linked server",
+      "repoTitle": "Repository",
+      "noFile": "No file"
+    },
+    "quick": {
+      "prTitle": "PRs · {{name}}",
+      "issuesTitle": "Issues · {{name}}",
+      "openFull": "Open full view",
+      "noRemote": "Workspace has no linked remote, PR/Issue list unavailable.",
+      "loading": "Resolving repository…",
+      "notFound": "{{owner}}/{{repo}} not found on the server, PR/Issue list unavailable.",
+      "empty": "No open items"
+    },
     "git": {
       "loading": "Loading status...",
       "branch": "Branch: {{branch}} ({{ahead}}↑ {{behind}}↓)",
+      "title": "Source Control",
+      "stageAllTitle": "Stage all changes",
+      "refreshTitle": "Refresh",
+      "stagedAll": "Staged all changes",
       "commitMessage": "Commit message",
-      "stage": "Stage",
       "commit": "Commit",
+      "commitOk": "Committed",
+      "unstage": "Clear selection",
+      "stage": "Stage",
       "push": "Push",
       "pull": "Pull",
       "pushOk": "Pushed",
       "pushFail": "Push failed",
       "pullOk": "Pulled",
       "pullFail": "Pull failed",
-      "noChanges": "No changes"
+      "noChanges": "No changes",
+      "changes": "Changes",
+      "openDiff": "Open diff",
+      "offlineHint": "Local Git operations work fully offline. Push/Pull credentials are injected by the gateway from the credential store per remote."
     },
     "settings": {
       "title": "Settings",

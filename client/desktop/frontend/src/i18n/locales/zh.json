@@ -429,10 +429,56 @@
       }
     },
     "ide": {
-      "gateway": "网关: {{url}}"
+      "gateway": "网关: {{url}}",
+      "searchWorkspace": "搜索或运行命令…"
+    },
+    "menu": {
+      "file": "文件",
+      "edit": "编辑",
+      "view": "查看",
+      "terminal": "终端",
+      "help": "帮助",
+      "newFile": "新建文件",
+      "refresh": "刷新",
+      "undo": "撤销",
+      "redo": "重做",
+      "palette": "命令面板",
+      "explorer": "资源管理器",
+      "search": "搜索",
+      "git": "源代码管理",
+      "prs": "Pull Requests",
+      "issues": "Issues",
+      "problems": "问题",
+      "output": "输出",
+      "exit": "退出工作区",
+      "settings": "设置",
+      "chat": "聊天",
+      "kill": "终止终端会话",
+      "killHint": "终端会话由网关在其连接关闭时自动释放",
+      "about": "关于"
+    },
+    "log": {
+      "explorerLoaded": "文件树已加载",
+      "searchDone": "本地搜索完成",
+      "gitFail": "git status 失败",
+      "termConnect": "终端: 正在连接网关 ConPTY 会话…",
+      "termExit": "终端进程已退出 (code {{code}})"
+    },
+    "search": {
+      "title": "搜索",
+      "placeholder": "在工作区中搜索…",
+      "optsHint": "{{name}} · 本地检索，忽略 .git / node_modules 等",
+      "searching": "搜索中…",
+      "summary": "共 {{total}} 条命中",
+      "truncated": "超过 {{total}} 条，已截断",
+      "groups": "{{count}} 个文件",
+      "fileBadge": "FILE"
     },
     "explorer": {
-      "noFiles": "暂无文件"
+      "noFiles": "暂无文件",
+      "refresh": "刷新",
+      "newFile": "新建文件…",
+      "loadFail": "加载文件树失败"
     },
     "editor": {
       "selectFile": "选择左侧文件开始编辑",
@@ -445,19 +491,64 @@
       "closeDiscard": "丢弃并关闭",
       "closeCancel": "取消"
     },
+    "diff": {
+      "back": "返回编辑器",
+      "headNote": "HEAD → 工作区"
+    },
+    "problems": {
+      "empty": "暂无问题 ✓"
+    },
+    "output": {
+      "empty": "暂无输出"
+    },
+    "terminal": {
+      "offline": "终端未连接（{{status}}）",
+      "reconnect": "重新连接"
+    },
+    "status": {
+      "branchTitle": "当前分支",
+      "problemsTitle": "问题面板",
+      "problems": "问题: {{count}}",
+      "lspTitle": "语言服务器状态",
+      "lspIdle": "语言服务",
+      "lspConnecting": "语言服务: 连接中",
+      "lspOff": "语言服务: 离线",
+      "lspOn": "语言服务: {{lang}}",
+      "serverTitle": "关联服务器",
+      "repoTitle": "仓库",
+      "noFile": "无文件"
+    },
+    "quick": {
+      "prTitle": "PRs · {{name}}",
+      "issuesTitle": "Issues · {{name}}",
+      "openFull": "打开完整视图",
+      "noRemote": "工作区未关联远程仓库，无法获取 PR / Issue 列表。",
+      "loading": "正在解析仓库…",
+      "notFound": "在服务器上找不到 {{owner}}/{{repo}}，PR / Issue 列表不可用。",
+      "empty": "暂无开放记录"
+    },
     "git": {
       "loading": "加载状态…",
       "branch": "分支: {{branch}}（{{ahead}}↑ {{behind}}↓）",
+      "title": "源代码管理",
+      "stageAllTitle": "暂存全部更改",
+      "refreshTitle": "刷新",
+      "stagedAll": "已暂存全部更改",
       "commitMessage": "提交信息",
-      "stage": "暂存",
       "commit": "提交",
+      "commitOk": "提交成功",
+      "unstage": "取消全部选择",
+      "stage": "暂存",
       "push": "Push",
       "pull": "Pull",
       "pushOk": "Push 成功",
       "pushFail": "Push 失败",
       "pullOk": "Pull 成功",
       "pullFail": "Pull 失败",
-      "noChanges": "暂无更改"
+      "noChanges": "暂无更改",
+      "changes": "更改",
+      "openDiff": "打开 diff",
+      "offlineHint": "本地 Git 操作完全离线可用。Push / Pull 凭据由网关按 remote 自动注入密钥库 token。"
     },
     "settings": {
       "title": "设置",

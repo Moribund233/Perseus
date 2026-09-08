@@ -100,3 +100,29 @@ export const gitPull = (wsId: string, opts: GitRemoteOpts = {}) =>
 // touchWorkspace 记录最近打开时间（用于欢迎页"最近工作区"排序）。
 export const touchWorkspace = (wsId: string) =>
   apiRequest<{ ok: boolean }>(`/api/local/workspaces/${wsId}/touch`, { method: 'POST' });
+
+export interface DiffHunk {
+  header: string;
+  lines: string[];
+}
+
+// gitDiff 无颜色 diff hunks（a/b 为空 = 工作区未暂存 diff）。
+export const gitDiff = (wsId: string, a = '', b = '') =>
+  apiRequest<{ hunks: DiffHunk[] }>(`/api/local/workspaces/${wsId}/git/diff`, {
+    method: 'POST',
+    body: JSON.stringify({ a, b }),
+  });
+
+// gitShow 读取 HEAD 版本文件内容（供 Monaco Diff 视图做 original 侧）。
+export const gitShow = (wsId: string, path: string) =>
+  apiRequest<{ content: string }>(`/api/local/workspaces/${wsId}/git/show`, {
+    method: 'POST',
+    body: JSON.stringify({ path }),
+  });
+
+// gitLog 最近提交（用于 IDE 辅助/详情用途）。
+export const gitLog = (wsId: string) =>
+  apiRequest<{ commits: Array<{ hash: string; short: string; subject: string; author: string; date: string }> }>(
+    `/api/local/workspaces/${wsId}/git/log`,
+    { method: 'POST' },
+  );

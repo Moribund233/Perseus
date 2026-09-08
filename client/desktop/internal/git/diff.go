@@ -10,6 +10,11 @@ type DiffHunk struct {
 	Lines  []string `json:"lines"`
 }
 
+// Show 读取 HEAD 中指定文件的内容（Monaco Diff 视图 original 侧）。
+func (g *Git) Show(dir, path string) (string, error) {
+	return g.run(dir, "show", "HEAD:"+path)
+}
+
 func (g *Git) Diff(dir, a, b string) ([]DiffHunk, error) {
 	args := []string{"diff", "--no-color", "-U3"}
 	if a != "" {

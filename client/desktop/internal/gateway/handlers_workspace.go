@@ -199,6 +199,7 @@ func (g *Gateway) handleGitOp(w http.ResponseWriter, r *http.Request) {
 		Remote  string          `json:"remote"`
 		A       string          `json:"a"`
 		B       string          `json:"b"`
+		Path    string          `json:"path"`
 		Cred    git.Credential  `json:"credential"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
@@ -220,6 +221,13 @@ func (g *Gateway) handleGitOp(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"hunks": hunks})
+	case "show":
+		content, err := g.git.Show(ws.Path, body.Path)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "GIT_SHOW", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"content": content})
 	case "add":
 		if err := g.git.Add(ws.Path, body.Paths...); err != nil {
 			writeError(w, http.StatusBadGateway, "GIT_ADD", err.Error())

@@ -7,6 +7,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import './i18n'
 import './styles/index.css'
 import './styles/desktop.css'
+import '@xterm/xterm/css/xterm.css'
 
 self.MonacoEnvironment = {
   getWorker(_, label: string) {

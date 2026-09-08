@@ -47,3 +47,28 @@ func containsHunkLine(h DiffHunk, want string) bool {
 	}
 	return false
 }
+
+func TestShowReturnsHeadContent(t *testing.T) {
+	dir := t.TempDir()
+	runIn(t, dir, "init")
+	runIn(t, dir, "config", "user.email", "t@t")
+	runIn(t, dir, "config", "user.name", "T")
+	mkFile(t, dir, "a.txt")
+	runIn(t, dir, "add", ".")
+	runIn(t, dir, "commit", "-m", "one")
+
+	// 工作区改动不影响 HEAD 内容
+	appendTo(t, filepath.Join(dir, "a.txt"), "working\n")
+
+	g := NewGit(&store.FakeKeychain{})
+	content, err := g.Show(dir, "a.txt")
+	if err != nil {
+		t.Fatalf("Show: %v", err)
+	}
+	if content != "x" {
+		t.Fatalf("Show(a.txt) = %q, want %q", content, "x")
+	}
+	if _, err := g.Show(dir, "missing.txt"); err == nil {
+		t.Fatalf("Show(missing) expected error, got none")
+	}
+}
