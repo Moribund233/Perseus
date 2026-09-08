@@ -170,7 +170,21 @@
       "comments": "{{count}} comments",
       "reviews": "{{count}} reviews",
       "filter": "Filter",
-      "newPullRequest": "New Pull Request"
+      "newPullRequest": "New Pull Request",
+      "created": "Pull request created",
+      "creationFailed": "Failed to create pull request",
+      "newPRModal": {
+        "title": "New Pull Request",
+        "titleLabel": "Title",
+        "titleRequired": "Please enter a title",
+        "titlePlaceholder": "Short summary of this pull request",
+        "description": "Description",
+        "descriptionPlaceholder": "Add a description...",
+        "source": "Source branch",
+        "target": "Target branch",
+        "create": "Create pull request",
+        "cancel": "Cancel"
+      }
     },
     "codeEditor": {
       "title": "Code Editor",
@@ -284,6 +298,12 @@
       "errorDesc": "Perseus Desktop depends on its local gateway process. Make sure no stale instance is holding the port, then retry.",
       "errorDetail": "Error detail",
       "retry": "Retry"
+    },
+    "window": {
+      "minimize": "Minimize",
+      "maximize": "Maximize",
+      "restore": "Restore",
+      "close": "Close"
     },
     "welcome": {
       "servers": "Connect to a Server",

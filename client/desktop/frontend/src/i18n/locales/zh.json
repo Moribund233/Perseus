@@ -170,7 +170,21 @@
       "comments": "{{count}} 条评论",
       "reviews": "{{count}} 条审查",
       "filter": "筛选",
-      "newPullRequest": "新建 Pull Request"
+      "newPullRequest": "新建 Pull Request",
+      "created": "Pull Request 已创建",
+      "creationFailed": "创建 Pull Request 失败",
+      "newPRModal": {
+        "title": "新建 Pull Request",
+        "titleLabel": "标题",
+        "titleRequired": "请输入标题",
+        "titlePlaceholder": "Pull Request 的简短摘要",
+        "description": "描述",
+        "descriptionPlaceholder": "添加描述...",
+        "source": "源分支",
+        "target": "目标分支",
+        "create": "创建 Pull Request",
+        "cancel": "取消"
+      }
     },
     "codeEditor": {
       "title": "代码编辑器",
@@ -284,6 +298,12 @@
       "errorDesc": "Perseus 桌面端依赖本地网关进程。请确认没有旧实例占用端口, 然后重试。",
       "errorDetail": "错误详情",
       "retry": "重试"
+    },
+    "window": {
+      "minimize": "最小化",
+      "maximize": "最大化",
+      "restore": "还原",
+      "close": "关闭"
     },
     "welcome": {
       "servers": "连接服务器",

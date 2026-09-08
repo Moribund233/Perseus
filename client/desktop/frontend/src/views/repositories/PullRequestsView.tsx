@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Button } from 'antd';
+import { Button, Modal, Form, Input, Select, App as AntApp } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { PullRequestOutlined, MergeOutlined, CloseCircleOutlined, MessageOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
 import { usePullRequestsStore } from '../../stores/pullRequests';
+import { useRepositoriesStore } from '../../stores/repositories';
 import type { PR } from '../../api/pullRequests';
 
 const borderColor = '#21262d';
@@ -44,12 +45,46 @@ interface PullRequestsViewProps {
 
 export default function PullRequestsView({ repoId, onOpenPR }: PullRequestsViewProps) {
   const { t } = useTranslation();
-  const { pullRequests, fetchPullRequests } = usePullRequestsStore();
+  const { message } = AntApp.useApp();
+  const { pullRequests, fetchPullRequests, createPullRequest } = usePullRequestsStore();
+  const branches = useRepositoriesStore((s) => s.branches);
+  const fetchBranches = useRepositoriesStore((s) => s.fetchBranches);
   const [filter, setFilter] = useState<'open' | 'merged' | 'closed' | 'all'>('open');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form] = Form.useForm<{ title: string; description?: string; source_branch: string; target_branch: string }>();
 
   useEffect(() => {
     fetchPullRequests(repoId);
   }, [repoId, fetchPullRequests]);
+
+  const openCreate = () => {
+    fetchBranches(repoId);
+    setModalOpen(true);
+  };
+
+  const handleCreate = async () => {
+    let values: { title: string; description?: string; source_branch: string; target_branch: string };
+    try {
+      values = await form.validateFields();
+    } catch {
+      return;
+    }
+    setCreating(true);
+    try {
+      await createPullRequest(repoId, values);
+      message.success(t('app.pullRequests.created'));
+      setModalOpen(false);
+      form.resetFields();
+    } catch (e) {
+      message.error((e as Error).message || t('app.pullRequests.creationFailed'));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const branchOptions = branches.map((b) => ({ value: b.name, label: b.name }));
+  const defaultTarget = branches.find((b) => b.is_default)?.name;
 
   const filterCounts = {
     open: pullRequests.filter((p) => p.status === 'open').length,
@@ -100,7 +135,7 @@ export default function PullRequestsView({ repoId, onOpenPR }: PullRequestsViewP
             );
           })}
         </div>
-        <Button type="primary" icon={<PlusOutlined style={{ fontSize: 14 }} />} style={{ background: bluePrimary, borderColor: bluePrimary, borderRadius: 8 }}>
+        <Button type="primary" icon={<PlusOutlined style={{ fontSize: 14 }} />} style={{ background: bluePrimary, borderColor: bluePrimary, borderRadius: 8 }} onClick={openCreate}>
           {t('app.pullRequests.newPullRequest')}
         </Button>
       </div>
@@ -141,6 +176,31 @@ export default function PullRequestsView({ repoId, onOpenPR }: PullRequestsViewP
           ))
         )}
       </div>
+
+      <Modal
+        title={t('app.pullRequests.newPRModal.title')}
+        open={modalOpen}
+        onOk={handleCreate}
+        onCancel={() => setModalOpen(false)}
+        okText={t('app.pullRequests.newPRModal.create')}
+        cancelText={t('app.pullRequests.newPRModal.cancel')}
+        confirmLoading={creating}
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item name="title" label={t('app.pullRequests.newPRModal.titleLabel')} rules={[{ required: true, message: t('app.pullRequests.newPRModal.titleRequired') }]}>
+            <Input placeholder={t('app.pullRequests.newPRModal.titlePlaceholder')} maxLength={255} />
+          </Form.Item>
+          <Form.Item name="description" label={t('app.pullRequests.newPRModal.description')}>
+            <Input.TextArea rows={4} placeholder={t('app.pullRequests.newPRModal.descriptionPlaceholder')} />
+          </Form.Item>
+          <Form.Item name="source_branch" label={t('app.pullRequests.newPRModal.source')} rules={[{ required: true }]}>
+            <Select options={branchOptions} showSearch optionFilterProp="label" placeholder={t('app.pullRequests.newPRModal.source')} />
+          </Form.Item>
+          <Form.Item name="target_branch" label={t('app.pullRequests.newPRModal.target')} initialValue={defaultTarget} rules={[{ required: true }]}>
+            <Select options={branchOptions} showSearch optionFilterProp="label" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }
