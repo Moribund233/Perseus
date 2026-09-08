@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,12 +10,13 @@ import (
 )
 
 type Workspace struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Path      string    `json:"path"`
-	RemoteURL string    `json:"remote_url,omitempty"`
-	ServerID  string    `json:"server_id,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           string     `json:"id"`
+	Name         string     `json:"name"`
+	Path         string     `json:"path"`
+	RemoteURL    string     `json:"remote_url,omitempty"`
+	ServerID     string     `json:"server_id,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	LastOpenedAt *time.Time `json:"last_opened_at,omitempty"`
 }
 
 type Store struct {
@@ -37,7 +39,8 @@ func New(path string) (*Store, error) {
             path TEXT NOT NULL,
             remote_url TEXT NOT NULL DEFAULT '',
             server_id TEXT NOT NULL DEFAULT '',
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            last_opened_at TEXT NOT NULL DEFAULT ''
         );
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
@@ -58,6 +61,13 @@ func New(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	// 旧库迁移：workspaces.last_opened_at（幂等，忽略重复列错误）
+	if _, err := db.Exec(
+		`ALTER TABLE workspaces ADD COLUMN last_opened_at TEXT NOT NULL DEFAULT ''`,
+	); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+		db.Close()
+		return nil, err
+	}
 	return &Store{db: db}, nil
 }
 
@@ -67,15 +77,22 @@ func (s *Store) CreateWorkspace(ws Workspace) (Workspace, error) {
 	ws.ID = uuid.NewString()
 	ws.CreatedAt = time.Now().UTC()
 	_, err := s.db.Exec(
-		`INSERT INTO workspaces (id, name, path, remote_url, server_id, created_at) VALUES (?,?,?,?,?,?)`,
+		`INSERT INTO workspaces (id, name, path, remote_url, server_id, created_at, last_opened_at) VALUES (?,?,?,?,?,?,?)`,
 		ws.ID, ws.Name, ws.Path, ws.RemoteURL, ws.ServerID,
 		ws.CreatedAt.Format(time.RFC3339),
+		"",
 	)
 	return ws, err
 }
 
+// TouchWorkspace 记录最近打开时间。
+func (s *Store) TouchWorkspace(id string) error {
+	_, err := s.db.Exec(`UPDATE workspaces SET last_opened_at = ? WHERE id = ?`, time.Now().UTC().Format(time.RFC3339), id)
+	return err
+}
+
 func (s *Store) ListWorkspaces() ([]Workspace, error) {
-	rows, err := s.db.Query(`SELECT id, name, path, remote_url, server_id, created_at FROM workspaces ORDER BY created_at DESC`)
+	rows, err := s.db.Query(`SELECT id, name, path, remote_url, server_id, created_at, last_opened_at FROM workspaces ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -83,11 +100,7 @@ func (s *Store) ListWorkspaces() ([]Workspace, error) {
 	out := []Workspace{}
 	for rows.Next() {
 		var ws Workspace
-		var ts string
-		if err := rows.Scan(&ws.ID, &ws.Name, &ws.Path, &ws.RemoteURL, &ws.ServerID, &ts); err != nil {
-			return nil, err
-		}
-		if ws.CreatedAt, err = time.Parse(time.RFC3339, ts); err != nil {
+		if err := scanWorkspace(rows.Scan, &ws); err != nil {
 			return nil, err
 		}
 		out = append(out, ws)
@@ -95,17 +108,39 @@ func (s *Store) ListWorkspaces() ([]Workspace, error) {
 	return out, rows.Err()
 }
 
+// scanFn 统一行解析签名，方便 List 与 Get 复用。
+type scanFn func(dest ...any) error
+
+func scanWorkspace(scan scanFn, ws *Workspace) error {
+	var ts string
+	var last string
+	if err := scan(&ws.ID, &ws.Name, &ws.Path, &ws.RemoteURL, &ws.ServerID, &ts, &last); err != nil {
+		return err
+	}
+	created, err := time.Parse(time.RFC3339, ts)
+	if err != nil {
+		return err
+	}
+	ws.CreatedAt = created
+	if last != "" {
+		if t, err := time.Parse(time.RFC3339, last); err == nil {
+			ws.LastOpenedAt = &t
+		}
+	}
+	return nil
+}
+
 func (s *Store) GetWorkspace(id string) (Workspace, error) {
 	var ws Workspace
-	var ts string
-	err := s.db.QueryRow(
-		`SELECT id, name, path, remote_url, server_id, created_at FROM workspaces WHERE id = ?`, id,
-	).Scan(&ws.ID, &ws.Name, &ws.Path, &ws.RemoteURL, &ws.ServerID, &ts)
+	err := scanWorkspace(func(dest ...any) error {
+		return s.db.QueryRow(
+			`SELECT id, name, path, remote_url, server_id, created_at, last_opened_at FROM workspaces WHERE id = ?`, id,
+		).Scan(dest...)
+	}, &ws)
 	if err != nil {
 		return Workspace{}, err
 	}
-	ws.CreatedAt, err = time.Parse(time.RFC3339, ts)
-	return ws, err
+	return ws, nil
 }
 
 func (s *Store) DeleteWorkspace(id string) error {

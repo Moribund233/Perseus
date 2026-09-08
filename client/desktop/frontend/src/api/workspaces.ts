@@ -5,6 +5,10 @@ export interface Workspace {
   name: string;
   path: string;
   remote_url?: string;
+  server_id?: string;
+  created_at?: string;
+  last_opened_at?: string | null;
+  branch?: string;
 }
 
 export interface FileNode {
@@ -92,3 +96,7 @@ export const gitPull = (wsId: string, opts: GitRemoteOpts = {}) =>
     method: 'POST',
     body: JSON.stringify({ remote: opts.remote, branch: opts.branch, credential: opts.credential }),
   });
+
+// touchWorkspace 记录最近打开时间（用于欢迎页"最近工作区"排序）。
+export const touchWorkspace = (wsId: string) =>
+  apiRequest<{ ok: boolean }>(`/api/local/workspaces/${wsId}/touch`, { method: 'POST' });

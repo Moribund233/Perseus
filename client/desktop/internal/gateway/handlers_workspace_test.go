@@ -69,6 +69,50 @@ func TestWorkspaceLifecycle(t *testing.T) {
 	}
 }
 
+func TestWorkspaceTouch(t *testing.T) {
+	g, _ := newTestGateway(t)
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "proj"), 0o755)
+
+	rr := authedReq(t, g, "POST", "/api/local/workspaces",
+		map[string]string{"name": "proj", "path": filepath.Join(dir, "proj")})
+	if rr.Code != 200 {
+		t.Fatalf("create = %d body=%s", rr.Code, rr.Body.String())
+	}
+	var ws struct {
+		ID       string `json:"id"`
+		LastOpen any    `json:"last_opened_at"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &ws); err != nil {
+		t.Fatal(err)
+	}
+	if ws.LastOpen != nil {
+		t.Fatalf("expected null last_opened_at on fresh create, got %v", ws.LastOpen)
+	}
+
+	rr = authedReq(t, g, "POST", "/api/local/workspaces/"+ws.ID+"/touch", nil)
+	if rr.Code != 200 {
+		t.Fatalf("touch = %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	rr = authedReq(t, g, "GET", "/api/local/workspaces/"+ws.ID, nil)
+	if rr.Code != 200 {
+		t.Fatalf("get = %d body=%s", rr.Code, rr.Body.String())
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &ws); err != nil {
+		t.Fatal(err)
+	}
+	if ws.LastOpen == nil {
+		t.Fatal("expected last_opened_at after touch")
+	}
+
+	// 不存在的 workspace touch → 404
+	rr = authedReq(t, g, "POST", "/api/local/workspaces/nope/touch", nil)
+	if rr.Code != 404 {
+		t.Fatalf("touch missing = %d, want 404", rr.Code)
+	}
+}
+
 func TestWorkspaceCloneAndGit(t *testing.T) {
 	g, _ := newTestGateway(t)
 	src := t.TempDir()

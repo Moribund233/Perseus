@@ -25,7 +25,42 @@ func (g *Gateway) handleListWorkspaces(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "STORE_LIST", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+	enriched := make([]any, 0, len(items))
+	for i := range items {
+		enriched = append(enriched, g.enrichWorkspace(items[i]))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": enriched})
+}
+
+// enrichWorkspace 附带实时 git 分支（本地目录非 git 仓库时忽略错误）。
+func (g *Gateway) enrichWorkspace(ws store.Workspace) map[string]any {
+	out := map[string]any{
+		"id":             ws.ID,
+		"name":           ws.Name,
+		"path":           ws.Path,
+		"remote_url":     ws.RemoteURL,
+		"server_id":      ws.ServerID,
+		"created_at":     ws.CreatedAt,
+		"last_opened_at": ws.LastOpenedAt,
+	}
+	if branch, err := g.git.CurrentBranch(ws.Path); err == nil && branch != "" {
+		out["branch"] = branch
+	}
+	return out
+}
+
+// handleTouchWorkspace 记录最近打开时间：POST /api/local/workspaces/{id}/touch
+func (g *Gateway) handleTouchWorkspace(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if _, err := g.store.GetWorkspace(id); err != nil {
+		writeError(w, http.StatusNotFound, "STORE_NOT_FOUND", "workspace not found")
+		return
+	}
+	if err := g.store.TouchWorkspace(id); err != nil {
+		writeError(w, http.StatusInternalServerError, "STORE_TOUCH", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
 func (g *Gateway) handleCreateWorkspace(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +122,7 @@ func (g *Gateway) handleGetWorkspace(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "STORE_NOT_FOUND", "workspace not found")
 		return
 	}
-	writeJSON(w, http.StatusOK, ws)
+	writeJSON(w, http.StatusOK, g.enrichWorkspace(ws))
 }
 
 func (g *Gateway) handleCloneWorkspace(w http.ResponseWriter, r *http.Request) {

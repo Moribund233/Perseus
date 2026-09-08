@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"desktop/internal/git"
+	"desktop/internal/lsp"
 	"desktop/internal/server"
 	"desktop/internal/store"
 )
@@ -18,6 +19,8 @@ type Config struct {
 	Store          *store.Store
 	Git            *git.Git
 	Servers        *server.Registry
+	LSP            *lsp.Manager
+	TermFactory    termFactory
 	AllowedOrigins []string
 }
 
@@ -25,6 +28,7 @@ type Gateway struct {
 	store    *store.Store
 	git      *git.Git
 	servers  *server.Registry
+	lsp      *lsp.Manager
 	origins  map[string]bool
 	token    string
 	addr     string
@@ -33,16 +37,21 @@ type Gateway struct {
 	handler  http.Handler
 	cache    *proxyCache
 	proxy    *http.Client
+	termFactory termFactory
 }
 
 func New(cfg Config) *Gateway {
 	if len(cfg.AllowedOrigins) == 0 {
 		cfg.AllowedOrigins = []string{"http://localhost:34115", "wails://localhost"}
 	}
+	if cfg.LSP == nil {
+		cfg.LSP = lsp.NewManager()
+	}
 	g := &Gateway{
 		store:   cfg.Store,
 		git:     cfg.Git,
 		servers: cfg.Servers,
+		lsp:     cfg.LSP,
 		origins: map[string]bool{},
 		token:   newToken(),
 		cache:   newProxyCache(200, 10<<20, 24*time.Hour),
@@ -51,6 +60,7 @@ func New(cfg Config) *Gateway {
 	for _, o := range cfg.AllowedOrigins {
 		g.origins[o] = true
 	}
+	g.setupTermFactory(cfg)
 	g.handler = g.buildRouter()
 	return g
 }

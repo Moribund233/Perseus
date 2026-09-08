@@ -10,6 +10,12 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// isWebSocketUpgrade 判断请求是否为 WebSocket 升级请求。
+func isWebSocketUpgrade(r *http.Request) bool {
+	return strings.EqualFold(r.Header.Get("Upgrade"), "websocket") &&
+		strings.Contains(strings.ToLower(r.Header.Get("Connection")), "upgrade")
+}
+
 var wsUpgrader = websocket.Upgrader{
 	CheckOrigin:    func(r *http.Request) bool { return true }, // 已被网关中间件鉴权
 	ReadBufferSize: 4096,
