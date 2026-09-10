@@ -194,17 +194,17 @@
 
 ---
 
-### Task 7: IDE 协作辅助栏（aux/collab）
+### Task 7: IDE 协作辅助栏（aux/collab）— ✅ 已完成（2026-09-10，commit `19587ee`）
 
 **Files:**
-- Modify: `layouts/IdeShell.tsx`（右侧 aux 抽屉）
+- Create: `views/workspace/CollabAuxPanel.tsx`、`hooks/useWorkspaceChatRoom.ts`
+- Modify: `layouts/IdeShell.tsx`（标题栏切换按钮 + 右侧 aux）、`views/chat/ActivityChatPanel.tsx`（复用 hook）、`i18n`
 - Consumes: `useChatStore`（成员/presence）+ 后续 Task 9 collab awareness.
 
 **Interfaces:**
 - Produces: 对齐 `ide.html` 右侧「协作：待处理 PR / 相关 Issue / 成员在线」辅助栏（`aux`），接线现有 PR/Issue 快速列表 + chat presence。
 
-- [ ] **Step 1: aux 面板组件**
-- [ ] **Step 2: 接线 IdeShell**
+> 落地：标题栏 TeamOutlined 切换按钮；`useWorkspaceChatRoom` hook 抽取工作区→房间关联（ActivityChatPanel 同步复用，消除重复）；PR/Issue 经 `useWorkspaceRepo` 限定当前仓库，presence 来自活跃房间 `onlineUsers`。
 
 ---
 
