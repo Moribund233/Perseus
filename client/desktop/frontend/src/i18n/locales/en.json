@@ -230,6 +230,57 @@
         "commentedOnIssue": "commented on issue <strong>#{{id}}</strong> in <strong>{{repo}}</strong>"
       }
     },
+    "issues": {
+      "title": "Issues",
+      "backToRepo": "Back to repository",
+      "searchPlaceholder": "Filter by label / author…",
+      "filters": {
+        "open": "Open",
+        "closed": "Closed",
+        "all": "All"
+      },
+      "newIssue": "New Issue",
+      "noIssues": "No issues match this filter",
+      "openedBy": "opened by {{author}} {{time}}",
+      "created": "Issue created",
+      "creationFailed": "Failed to create issue",
+      "newIssueModal": {
+        "title": "New Issue",
+        "titleLabel": "Title",
+        "titlePlaceholder": "Issue title",
+        "titleRequired": "Please enter a title",
+        "description": "Description",
+        "descriptionPlaceholder": "Add more context...",
+        "priority": "Priority",
+        "priorityLow": "Low",
+        "priorityMedium": "Medium",
+        "priorityHigh": "High",
+        "priorityCritical": "Critical",
+        "create": "Create issue",
+        "cancel": "Cancel"
+      },
+      "detail": {
+        "backToIssues": "Back to issues",
+        "open": "Open",
+        "closed": "Closed",
+        "openedBy": "opened by {{author}}",
+        "assignee": "Assignee: {{name}}",
+        "unassigned": "Unassigned",
+        "assigneeHeader": "Assignee",
+        "labelsHeader": "Labels",
+        "stateHeader": "Status",
+        "participantsHeader": "Participants",
+        "closeIssue": "Close issue",
+        "reopenIssue": "Reopen issue",
+        "noDescription": "No description provided.",
+        "noLabels": "No labels",
+        "comments": "{{count}} comments",
+        "leaveComment": "Leave a comment",
+        "commentPlaceholder": "Leave a comment… Markdown supported",
+        "submitComment": "Comment",
+        "commentFailed": "Failed to post comment"
+      }
+    },
     "pullRequests": {
       "title": "Pull Requests",
       "filters": {
@@ -255,6 +306,27 @@
         "source": "Source branch",
         "target": "Target branch",
         "create": "Create pull request",
+        "cancel": "Cancel"
+      },
+      "detail": {
+        "backToPullRequests": "Back to pull requests",
+        "open": "Open",
+        "merged": "Merged",
+        "closed": "Closed",
+        "openedByPR": "opened by {{author}}",
+        "closePR": "Close pull request",
+        "mergePR": "Merge",
+        "mergeMerge": "Create a merge commit",
+        "mergeSquash": "Squash and merge",
+        "mergeRebase": "Rebase and merge",
+        "noDescription": "No description provided.",
+        "comments": "{{count}} comments",
+        "leaveComment": "Leave a comment",
+        "commentPlaceholder": "Leave a comment… Markdown supported",
+        "submitComment": "Comment",
+        "commentFailed": "Failed to post comment",
+        "threadClosed": "This pull request is closed. Comments are locked.",
+        "save": "Save",
         "cancel": "Cancel"
       }
     },
@@ -550,6 +622,9 @@
       "createVisPublic": "Public — visible to everyone on the server",
       "createVisPrivate": "Private — visible only to you and collaborators",
       "createOk": "Repository \"{{name}}\" created",
+      "fork": "Fork",
+      "forkOk": "Repository \"{{name}}\" forked",
+      "forkFail": "Fork failed",
       "createFail": "Failed to create repository",
       "cacheTag": "Read-only cache",
       "error": "Failed to load repositories"
@@ -675,6 +750,8 @@
       "binary": "Binary file ({{size}} bytes) is not editable",
       "truncated": "File too large, only first 2MB loaded",
       "save": "Save",
+      "saveHint": "Ctrl+S to save · {{size}} KB",
+      "bottomPanel": "Bottom panel",
       "closeTab": "Close tab",
       "closeConfirmTitle": "Unsaved changes",
       "closeConfirm": "\"{{path}}\" has unsaved changes. Closing will discard them.",

@@ -218,13 +218,18 @@ def build_pr_review_response(review) -> Dict[str, Any]:
     }
 
 
-def build_repo_response(repo, physical_exists: bool = False) -> Dict[str, Any]:
+def build_repo_response(
+    repo,
+    physical_exists: bool = False,
+    languages: Optional[Dict[str, int]] = None,
+) -> Dict[str, Any]:
     """
     构建仓库响应数据
 
     Args:
         repo: Repository 模型对象
         physical_exists: 物理仓库是否存在
+        languages: 语言分布 {语言标识: 文件数}，默认空 dict
 
     Returns:
         dict: 仓库数据
@@ -241,10 +246,12 @@ def build_repo_response(repo, physical_exists: bool = False) -> Dict[str, Any]:
         "updated_at": repo.updated_at,
         "is_archived": repo.is_archived,
         "star_count": repo.star_count,
+        "fork_count": repo.fork_count,
         "physical_exists": physical_exists,
         "status": {
             "initialized": physical_exists
-        }
+        },
+        "languages": languages or {},
     }
 
 

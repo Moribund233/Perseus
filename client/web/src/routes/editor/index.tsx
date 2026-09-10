@@ -36,6 +36,7 @@ import { useRepositoriesStore } from '../../stores/repositories';
 import { chatApi } from '../../api/chat';
 import { chatSocket, type PresenceUser } from '../../api/chatSocket';
 import type { RepoFile } from '../../api/repositories';
+import { FloatingTreePanel } from '../../components/FloatingTreePanel';
 
 const { Sider, Content } = Layout;
 
@@ -54,12 +55,18 @@ const bgTertiary = '#1c2128';
 const green = '#3fb950';
 const yellow = '#d29922';
 
-interface TreeNode {
+export interface TreeNode {
   title: string;
   key: string;
   type: 'folder' | 'file';
   fileType?: 'ts' | 'json' | 'md' | 'css' | 'py' | 'html';
   children?: TreeNode[];
+}
+
+interface FloatPanelPos {
+  key: string;
+  left: number;
+  top: number;
 }
 
 const avatarColors = ['#1f6feb', '#3fb950', '#58a6ff', '#bc8cff', '#d29922', '#f85149', '#f0883e', '#7956d9'];
@@ -217,28 +224,31 @@ function FileIcon({ type, fileType }: { type: 'folder' | 'file'; fileType?: stri
 
 function TreeNodeView({
   node,
-  depth,
   selectedKey,
   onSelect,
   onDelete,
+  onDirPin,
 }: {
   node: TreeNode;
-  depth: number;
   selectedKey: string;
   onSelect: (key: string) => void;
   onDelete?: (node: TreeNode) => void;
+  onDirPin?: (key: string, element: HTMLElement) => void;
 }) {
   const isSelected = selectedKey === node.key;
   const hasChildren = node.children && node.children.length > 0;
-  const [expanded, setExpanded] = useState(hasChildren);
   const { t } = useTranslation();
 
   return (
     <div>
       <div
-        onClick={() => {
+        data-dir-path={node.type === 'folder' ? node.key : undefined}
+        onClick={(e) => {
+          if (node.type === 'folder') {
+            if (hasChildren && onDirPin) onDirPin(node.key, e.currentTarget);
+            return;
+          }
           onSelect(node.key);
-          if (hasChildren) setExpanded(!expanded);
         }}
         className="cm-file-tree-row"
         style={{
@@ -267,9 +277,6 @@ function TreeNodeView({
           }
         }}
       >
-        {Array.from({ length: depth }).map((_, i) => (
-          <span key={i} style={{ width: 16, flexShrink: 0 }} />
-        ))}
         <FileIcon type={node.type} fileType={node.fileType} />
         <span>{node.title}</span>
         {onDelete && node.type === 'file' && (
@@ -301,13 +308,6 @@ function TreeNodeView({
           </Tooltip>
         )}
       </div>
-      {expanded && hasChildren && (
-        <div>
-          {node.children!.map((child) => (
-            <TreeNodeView key={child.key} node={child} depth={depth + 1} selectedKey={selectedKey} onSelect={onSelect} onDelete={onDelete} />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -319,6 +319,7 @@ export default function EditorPage() {
   const [openTabs, setOpenTabs] = useState<string[]>([]);
   const [panelTab, setPanelTab] = useState('discussions');
   const [selectedTreeKey, setSelectedTreeKey] = useState<string>('');
+  const [pinnedChain, setPinnedChain] = useState<FloatPanelPos[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -455,6 +456,7 @@ export default function EditorPage() {
 
   const handleSelectFile = useCallback(async (key: string) => {
     setSelectedTreeKey(key);
+    setPinnedChain([]);
     const node = findFileByKey(fileTree, key);
     if (!node || node.type !== 'file') return;
     setActiveTab(key);
@@ -468,6 +470,36 @@ export default function EditorPage() {
       }
     }
   }, [fileTree, currentRepo?.id, fetchBlob]);
+
+const handleTreePin = useCallback((key: string, el: HTMLElement) => {
+    const rect = el.getBoundingClientRect();
+    setPinnedChain((prev) => {
+      if (prev.length === 1 && prev[0].key === key) return [];
+      return [{ key, left: rect.right + 4, top: rect.top }];
+    });
+  }, []);
+
+  const handlePanelPin = useCallback((level: number, key: string, el: HTMLElement) => {
+    const rect = el.getBoundingClientRect();
+    setPinnedChain((prev) => {
+      const base = prev.slice(0, level + 1);
+      const reaching = prev.length === level + 2 && prev[level + 1]?.key === key;
+      if (reaching) return base;
+      return [...base, { key, left: rect.right + 4, top: rect.top }];
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!pinnedChain.length) return;
+    const handle = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.cm-floating-panel') && !target.closest('[data-dir-path]')) {
+        setPinnedChain([]);
+      }
+    };
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [pinnedChain.length]);
 
   const closeTab = useCallback((key: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -767,19 +799,49 @@ export default function EditorPage() {
             </button>
           </Tooltip>
         </div>
-        <div style={{ flex: 1, overflow: 'auto', padding: '4px 0' }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: '4px 0', position: 'relative' }}>
           {fileTree.map((node) => (
             <TreeNodeView
               key={node.key}
               node={node}
-              depth={0}
               selectedKey={selectedTreeKey}
               onSelect={handleSelectFile}
               onDelete={setDeleteTarget}
+              onDirPin={handleTreePin}
             />
           ))}
         </div>
       </Sider>
+
+      {(() => {
+        const displayChain = pinnedChain;
+        if (!displayChain.length) return null;
+        const activeKeys = new Set(displayChain.slice(1).map((p) => p.key));
+        return (
+          <>
+            {displayChain.map((pos, i) => {
+              const node = findFileByKey(fileTree, pos.key);
+              if (!node || node.type !== 'folder' || !node.children?.length) return null;
+              return (
+                <div
+                  key={pos.key}
+                  className="floating-tree-anchor"
+                  style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 200 }}
+                >
+                  <FloatingTreePanel
+                    node={node}
+                    level={i}
+                    activeKeys={activeKeys}
+                    onItemClick={handlePanelPin}
+                    onSelectFile={handleSelectFile}
+                    onDelete={setDeleteTarget}
+                  />
+                </div>
+              );
+            })}
+          </>
+        );
+      })()}
 
       {/* Main Editor Area */}
       <Layout style={{ background: 'transparent' }}>

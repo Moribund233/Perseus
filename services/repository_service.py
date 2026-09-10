@@ -20,6 +20,7 @@ from core.exception import ValidationException, NotFoundException, ConflictExcep
 from utils.git_utils import init_bare_repo, get_repository_storage_path, repo_exists_async, enable_receive_pack, GitError
 from utils.response_builder import build_repo_response, build_pagination_response
 from utils.db_utils import exists, paginate
+from services.language_service import detect_repo_languages
 from core.constants import ROLE_PRIORITY
 
 # 日志记录器
@@ -197,13 +198,29 @@ async def _enrich_repos_with_physical_status(repos: list) -> list[dict]:
         *[_check_physical_repo_exists_async(repo) for repo in repos],
         return_exceptions=True
     )
+    exists_flags = [isinstance(c, bool) and c for c in physical_checks]
+
+    language_map: Dict[str, dict] = {}
+    queries = [
+        detect_repo_languages(get_repository_storage_path(repo.path), repo.default_branch or "HEAD")
+        for repo, ok in zip(repos, exists_flags)
+        if ok
+    ]
+    if queries:
+        results = await asyncio.gather(*queries, return_exceptions=True)
+        it = iter(results)
+        for repo, ok in zip(repos, exists_flags):
+            if ok:
+                lang_result = next(it)
+                language_map[repo.id] = lang_result if isinstance(lang_result, dict) else {}
 
     return [
         build_repo_response(
             repo,
-            isinstance(check, bool) and check,
+            ok,
+            language_map.get(repo.id, {}),
         )
-        for repo, check in zip(repos, physical_checks)
+        for repo, ok in zip(repos, exists_flags)
     ]
 
 
@@ -281,7 +298,8 @@ async def get_repository_by_id(repo_id: uuid.UUID, db: AsyncSession):
         raise NotFoundException(detail="Repository not found")
     await sync_repository_default_branch(repo, db)
     physical_exists = await _check_physical_repo_exists_async(repo)
-    return build_repo_response(repo, physical_exists)
+    languages = await detect_repo_languages(get_repository_storage_path(repo.path), repo.default_branch or "HEAD") if physical_exists else {}
+    return build_repo_response(repo, physical_exists, languages)
 
 
 async def get_repository_by_path(owner: str, repo_name: str, db: AsyncSession):
@@ -308,7 +326,8 @@ async def get_repository_by_path(owner: str, repo_name: str, db: AsyncSession):
         raise NotFoundException(detail="Repository not found")
     await sync_repository_default_branch(repo, db)
     physical_exists = await _check_physical_repo_exists_async(repo)
-    return build_repo_response(repo, physical_exists)
+    languages = await detect_repo_languages(get_repository_storage_path(repo.path), repo.default_branch or "HEAD") if physical_exists else {}
+    return build_repo_response(repo, physical_exists, languages)
 
 
 async def get_accessible_repository_ids(db: AsyncSession, user_id: uuid.UUID) -> list[uuid.UUID]:

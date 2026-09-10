@@ -161,7 +161,7 @@ export const useRepositoriesStore = create<RepositoriesState>((set, get) => ({
     const sid = serverId();
     if (!sid) return;
     try {
-      const entries = await repositoriesApi.getTree(sid, repoId, ref, path);
+      const entries = await repositoriesApi.getTree(sid, repoId, ref, path, { last_commit: true });
       if (path) {
         set((state) => {
           const merged = new Map(state.files.map((f) => [f.path, f]));

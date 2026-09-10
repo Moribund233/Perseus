@@ -339,9 +339,50 @@ kbd { font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; font-si
 .frow.sel { background: var(--active); }
 .frow .chev { width: 10px; height: 10px; color: var(--t3); flex: none; transition: transform 0.12s; font-size: 10px; }
 .frow .chev.open { transform: rotate(90deg); }
-.frow .chev.leaf { opacity: 0.35; }
+.frow .chev-placeholder { width: 10px; height: 10px; flex: none; }
+.frow.dir-row { position: relative; }
 .frow .fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .kids { margin-left: 16px; }
+
+/* ---- 浮动文件树面板 ---- */
+.floating-tree-anchor { pointer-events: none; width: 0; height: 0; }
+.floating-item-wrap { position: relative; }
+.floating-tree-panel {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  margin-left: 8px;
+  pointer-events: auto;
+  min-width: 190px;
+  max-width: 320px;
+  background: var(--bg2);
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.25);
+  padding: 4px;
+  animation: float-panel-enter .15s ease-out;
+}
+.floating-tree-panel.level-1 { box-shadow: 0 12px 40px rgba(0,0,0,.55), 0 4px 12px rgba(0,0,0,.3); }
+.floating-tree-panel.level-2, .floating-tree-panel.level-3 { box-shadow: 0 16px 48px rgba(0,0,0,.6), 0 6px 16px rgba(0,0,0,.35); }
+.floating-tree-panel-inner {
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+.floating-tree-panel-inner::-webkit-scrollbar { width: 4px; }
+.floating-tree-panel-inner::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 2px; }
+.floating-item { position: relative; }
+.floating-tree-panel .floating-item {
+  margin: 0 2px;
+  border-radius: 5px;
+  padding: 3px 6px 3px 8px;
+}
+.floating-tree-panel .floating-item:hover { background: var(--hover); }
+@keyframes float-panel-enter {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
+}
 .fc {
   width: 17px; height: 17px; border-radius: 4px; display: inline-grid; place-items: center; flex: none;
   font: 700 7.5px var(--mono); letter-spacing: 0.5px;

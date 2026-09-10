@@ -18,11 +18,12 @@ interface Props {
   workspace: Workspace;
   file: string | null;
   lang: string | null;
+  cursor?: { line: number; column: number } | null;
   onOpenBottom?: (tab: BottomTab) => void;
 }
 
 // StatusBar：分支 / 问题数 / 语言服务 / 服务器 / 当前文件。数据全部来自真实 store。
-export default function StatusBar({ workspace, file, lang, onOpenBottom }: Props) {
+export default function StatusBar({ workspace, file, lang, cursor, onOpenBottom }: Props) {
   const { t } = useTranslation();
   const status: GitStatus | null = useGitStore((s) => s.status);
   const problems = useProblemsStore((s) => s.diagnostics.length);
@@ -72,11 +73,16 @@ export default function StatusBar({ workspace, file, lang, onOpenBottom }: Props
         {serverName}
       </span>
       <span className="sp" />
-      <span className="sb-item" title={file ?? ''}>
+      <span className="sb-item" title={(file ?? '')}>
         <FileTextOutlined />
         {fileLabel}
         {lang ? ` — ${lang}` : ''}
       </span>
+      {cursor && (
+        <span className="sb-item" style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>
+          Ln {cursor.line}, Col {cursor.column}
+        </span>
+      )}
       <span className="sb-item clickable" title={t('desktop.status.repoTitle', { defaultValue: '仓库' })}>
         <PushpinOutlined />
         {workspace.name}

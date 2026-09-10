@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Button, Tag, Input, Spin, Avatar, App as AntApp } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeftOutlined, ExclamationCircleOutlined, CheckCircleOutlined, SendOutlined } from '@ant-design/icons';
@@ -44,6 +44,15 @@ function getAvatarColor(initials: string): string {
   return avatarColors[Math.abs(hash) % avatarColors.length];
 }
 
+function SideSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: textSecondary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
 const priorityColors: Record<string, string> = {
   low: '#8b949e',
   medium: '#d29922',
@@ -79,6 +88,11 @@ export default function IssueDetail({ repoId, issueNumber, onBack }: IssueDetail
   }, [repoId, issueNumber, fetchIssue, fetchComments]);
 
   const authorName = currentIssue?.author?.full_name || currentIssue?.author?.username || 'Unknown';
+
+  const authors = [currentIssue?.author, ...comments.map((c) => c.author)].filter(
+    (a): a is { id: string; username: string; full_name: string | null } => !!a?.id,
+  );
+  const participants = authors.filter((a, i, arr) => arr.findIndex((x) => x.id === a.id) === i);
 
   const handleComment = async () => {
     if (!body.trim()) return;
@@ -161,33 +175,94 @@ export default function IssueDetail({ repoId, issueNumber, onBack }: IssueDetail
               </div>
             </div>
 
-            <h3 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 12px', color: textPrimary }}>
-              {t('app.issues.detail.comments', { count: comments.length })}
-            </h3>
-            {comments.map((c) => (
-              <div key={c.id} style={{ border: `1px solid ${borderColor}`, borderRadius: 12, overflow: 'hidden', background: bgSecondary, marginBottom: 12 }}>
-                <div style={{ padding: '10px 16px', background: bgTertiary, borderBottom: `1px solid ${borderColor}`, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-                  <Avatar size={22} style={{ background: getAvatarColor(getInitials(c.author?.full_name || c.author?.username || '?')), fontSize: 9, fontWeight: 600 }}>
-                    {getInitials(c.author?.full_name || c.author?.username || '?')}
-                  </Avatar>
-                  <strong style={{ color: textPrimary }}>{c.author?.full_name || c.author?.username || 'Unknown'}</strong>
-                  <span style={{ color: textTertiary }}>· {relativeTime(c.created_at)}</span>
-                </div>
-                <div style={{ padding: '12px 16px', fontSize: 14, color: textPrimary, whiteSpace: 'pre-wrap' }}>{c.content}</div>
-              </div>
-            ))}
+            <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 12px', color: textPrimary }}>
+                  {t('app.issues.detail.comments', { count: comments.length })}
+                </h3>
+                {comments.map((c) => (
+                  <div key={c.id} style={{ border: `1px solid ${borderColor}`, borderRadius: 12, overflow: 'hidden', background: bgSecondary, marginBottom: 12 }}>
+                    <div style={{ padding: '10px 16px', background: bgTertiary, borderBottom: `1px solid ${borderColor}`, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+                      <Avatar size={22} style={{ background: getAvatarColor(getInitials(c.author?.full_name || c.author?.username || '?')), fontSize: 9, fontWeight: 600 }}>
+                        {getInitials(c.author?.full_name || c.author?.username || '?')}
+                      </Avatar>
+                      <strong style={{ color: textPrimary }}>{c.author?.full_name || c.author?.username || 'Unknown'}</strong>
+                      <span style={{ color: textTertiary }}>· {relativeTime(c.created_at)}</span>
+                    </div>
+                    <div style={{ padding: '12px 16px', fontSize: 14, color: textPrimary, whiteSpace: 'pre-wrap' }}>{c.content}</div>
+                  </div>
+                ))}
 
-            <div style={{ border: `1px solid ${borderColor}`, borderRadius: 10, overflow: 'hidden', background: bgSecondary, marginBottom: 24 }}>
-              <div style={{ padding: '10px 16px', background: bgTertiary, borderBottom: `1px solid ${borderColor}`, fontSize: 13, color: textSecondary }}>
-                {t('app.issues.detail.leaveComment')}
-              </div>
-              <div style={{ padding: 16 }}>
-                <Input.TextArea rows={3} value={body} onChange={(e) => setBody(e.target.value)} placeholder={t('app.issues.detail.commentPlaceholder')} />
-                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
-                  <Button type="primary" icon={<SendOutlined />} loading={submitting} disabled={!body.trim()} onClick={handleComment}>
-                    {t('app.issues.detail.submitComment')}
-                  </Button>
+                <div style={{ border: `1px solid ${borderColor}`, borderRadius: 10, overflow: 'hidden', background: bgSecondary, marginBottom: 24 }}>
+                  <div style={{ padding: '10px 16px', background: bgTertiary, borderBottom: `1px solid ${borderColor}`, fontSize: 13, color: textSecondary }}>
+                    {t('app.issues.detail.leaveComment')}
+                  </div>
+                  <div style={{ padding: 16 }}>
+                    <Input.TextArea rows={3} value={body} onChange={(e) => setBody(e.target.value)} placeholder={t('app.issues.detail.commentPlaceholder')} />
+                    <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                      <Button type="primary" icon={<SendOutlined />} loading={submitting} disabled={!body.trim()} onClick={handleComment}>
+                        {t('app.issues.detail.submitComment')}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
+              </div>
+
+              <div style={{ width: 220, flexShrink: 0, position: 'sticky', top: 0 }}>
+                <SideSection title={t('app.issues.detail.assigneeHeader')}>
+                  {currentIssue.assignee ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Avatar size={20} style={{ background: getAvatarColor(getInitials(currentIssue.assignee.full_name || currentIssue.assignee.username || '?')), fontSize: 8, fontWeight: 600 }}>
+                        {getInitials(currentIssue.assignee.full_name || currentIssue.assignee.username || '?')}
+                      </Avatar>
+                      <span style={{ color: textPrimary, fontSize: 13 }}>{currentIssue.assignee.full_name || currentIssue.assignee.username}</span>
+                    </div>
+                  ) : (
+                    <span style={{ color: textTertiary, fontSize: 13 }}>{t('app.issues.detail.unassigned')}</span>
+                  )}
+                </SideSection>
+                <SideSection title={t('app.issues.detail.labelsHeader')}>
+                  {currentIssue.labels && currentIssue.labels.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {currentIssue.labels.map((l) => (
+                        <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: l.color }} />
+                          <span style={{ fontSize: 12, color: textPrimary }}>{l.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span style={{ color: textTertiary, fontSize: 13 }}>{t('app.issues.detail.noLabels')}</span>
+                  )}
+                </SideSection>
+                <SideSection title={t('app.issues.detail.stateHeader')}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {currentIssue.status === 'open' ? <ExclamationCircleOutlined style={{ color: green }} /> : <CheckCircleOutlined style={{ color: textTertiary }} />}
+                    <span style={{ color: textPrimary, fontSize: 13 }}>
+                      {currentIssue.status === 'open' ? t('app.issues.detail.open') : t('app.issues.detail.closed')}
+                    </span>
+                  </div>
+                </SideSection>
+                <SideSection title={t('app.issues.detail.participantsHeader')}>
+                  {participants.length > 0 ? (
+                    <div style={{ display: 'flex' }}>
+                      {participants.map((p) => {
+                        const name = p.full_name || p.username;
+                        return (
+                          <Avatar
+                            key={p.id}
+                            size={24}
+                            style={{ background: getAvatarColor(getInitials(name)), fontSize: 9, fontWeight: 600, marginLeft: -6, border: `2px solid ${bgSecondary}` }}
+                          >
+                            {getInitials(name)}
+                          </Avatar>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <span style={{ color: textTertiary, fontSize: 13 }}>—</span>
+                  )}
+                </SideSection>
               </div>
             </div>
           </>

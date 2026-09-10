@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { App as AntApp, Modal } from 'antd';
+import { DownOutlined, TeamOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import * as monaco from 'monaco-editor';
 import { readFile, writeFile, type FileContent, type Workspace } from '../../api/workspaces';
@@ -8,6 +9,7 @@ import { CollabSession, type CollabParticipant, type CollabStatus } from '../../
 import { useWorkspaceRepo } from '../../hooks/useWorkspaceRepo';
 import { useProblemsStore } from '../../stores/problems';
 import CollabMonaco from './CollabMonaco';
+import { fileBadge } from './ExplorerPanel';
 import {
   fileUri, langForPath, lspOpen, lspChange, lspSave, lspClose, applyModelDiagnostics,
 } from './lspSession';
@@ -24,10 +26,13 @@ interface Props {
   workspace: Workspace;
   openPath: string | null;
   openLine?: number | null;
-  onCursor?: (path: string | null, lang: string | null, dirty: boolean) => void;
+  auxOpen?: boolean;
+  onToggleAux?: () => void;
+  onToggleBottom?: () => void;
+  onCursor?: (path: string | null, lang: string | null, dirty: boolean, cursor?: { line: number; column: number }) => void;
 }
 
-export default function EditorTabs({ workspaceId, workspacePath, workspace, openPath, openLine, onCursor }: Props) {
+export default function EditorTabs({ workspaceId, workspacePath, workspace, openPath, openLine, auxOpen, onToggleAux, onToggleBottom, onCursor }: Props) {
   const { t } = useTranslation();
   const { message } = AntApp.useApp();
   const repo = useWorkspaceRepo(workspace);
@@ -233,8 +238,8 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
   const dirty = current ? current.content.content !== current.savedContent : false;
 
   useEffect(() => {
-    onCursor?.(active, active ? langForPath(active) : null, dirty);
-  }, [active, dirty, onCursor]);
+    onCursor?.(active, active ? langForPath(active) : null, dirty, cursor);
+  }, [active, dirty, cursor, onCursor]);
 
   const onMount: OnMount = (editor) => {
     editorRef.current = editor;
@@ -262,6 +267,7 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
         {tabs.map((tb) => {
           const tbDirty = tb.content.content !== tb.savedContent;
           const name = tb.path.split(/[\\/]/).pop() ?? tb.path;
+          const badge = fileBadge(name);
           return (
             <span
               key={tb.path}
@@ -270,6 +276,7 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
               className={`etab${tb.path === active ? ' on' : ''}${tb.content.binary ? ' bin' : ''}`}
               onClick={() => setActive(tb.path)}
             >
+              <span className={badge.cls}>{badge.label}</span>
               <span className="tname">{name}</span>
               {tbDirty && <span className="dirty" />}
               <button
@@ -287,6 +294,17 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
         })}
         <span className="tab-actions">
           {current.content.truncated && <span className="warn">{t('desktop.editor.truncated')}</span>}
+          <button
+            className={`icon-btn${auxOpen ? ' on' : ''}`}
+            title={t('desktop.aux.toggle')}
+            onClick={onToggleAux}
+            style={auxOpen ? { color: '#58a6ff', background: 'var(--hover)' } : undefined}
+          >
+            <TeamOutlined />
+          </button>
+          <button className="icon-btn" title={t('desktop.editor.bottomPanel')} onClick={onToggleBottom}>
+            <DownOutlined />
+          </button>
           <button disabled={!dirty} onClick={() => void save()}>
             {t('desktop.editor.save')}
           </button>
@@ -311,6 +329,7 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
               onToggle={toggleCollab}
             />
           )}
+          <span className="faint">{t('desktop.editor.saveHint', { size: (current.content.size / 1024).toFixed(1) })}</span>
           <span className="cursor-info">
             Ln {cursor.line}, Col {cursor.column}
           </span>
@@ -318,6 +337,7 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
       </div>
       <Editor
         height="100%"
+        theme="vs-dark"
         path={fileUri(workspacePath, current.path)}
         language={language}
         value={current.content.content}

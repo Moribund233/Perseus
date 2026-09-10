@@ -10,7 +10,6 @@ import {
   MessageOutlined,
   DatabaseOutlined,
   SettingOutlined,
-  TeamOutlined,
 } from '@ant-design/icons';
 import type { Workspace } from '../api/workspaces';
 import { useWorkspaceStore } from '../stores/workspace';
@@ -72,6 +71,7 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
   const [palette, setPalette] = useState(false);
   const [file, setFile] = useState<string | null>(null);
   const [lang, setLang] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<{ line: number; column: number } | null>(null);
 
   useEffect(() => {
     lspShutdown();
@@ -188,9 +188,6 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
           <span className="faint" title={workspace.path}>{workspace.name}/{workspace.path.split(/[\\/]/).pop()}</span>
         </div>
         <div className="tb-right">
-          <button className={`tb-icon${auxOpen ? ' on' : ''}`} title={t('desktop.aux.toggle')} style={auxOpen ? { color: 'var(--blue-light, #58a6ff)' } : undefined} onClick={() => setAuxOpen((v) => !v)}>
-            <TeamOutlined />
-          </button>
           <button className="tb-search" onClick={() => setPalette(true)}>
             <SearchOutlined />
             <span>{t('desktop.ide.searchWorkspace')}</span>
@@ -242,7 +239,10 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
               workspace={workspace}
               openPath={openPath}
               openLine={openLine}
-              onCursor={(p, l) => { setFile(p); setLang(l); }}
+              auxOpen={auxOpen}
+              onToggleAux={() => setAuxOpen((v) => !v)}
+              onToggleBottom={() => setCollapsed((v) => !v)}
+              onCursor={(p, l, _d, pos) => { setFile(p); setLang(l); setCursor(pos ?? null); }}
             />
           )}
 
@@ -276,7 +276,7 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
         )}
       </div>
 
-      <StatusBar workspace={workspace} file={file} lang={lang} onOpenBottom={(b) => { setBottom(b); setCollapsed(false); }} />
+      <StatusBar workspace={workspace} file={file} lang={lang} cursor={cursor} onOpenBottom={(b) => { setBottom(b); setCollapsed(false); }} />
       <CommandPalette open={palette} onClose={() => setPalette(false)} actions={paletteActions} />
     </div>
   );

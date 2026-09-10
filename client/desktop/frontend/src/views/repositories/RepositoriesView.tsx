@@ -7,6 +7,7 @@ import {
   FileTextOutlined,
   StarOutlined,
   ForkOutlined,
+  BranchesOutlined,
   ReadOutlined,
   CloudDownloadOutlined,
   PlusOutlined,
@@ -27,6 +28,10 @@ import IssueDetail from './IssueDetail';
 import PullRequestsView from './PullRequestsView';
 import PullRequestDetail from './PullRequestDetail';
 import RepositorySettings from './RepositorySettings';
+import Markdown from '../../components/Markdown';
+import { fileBadge } from '../workspace/ExplorerPanel';
+import { issuesApi } from '../../api/issues';
+import { pullRequestsApi } from '../../api/pullRequests';
 import type { Issue } from '../../api/issues';
 import type { PR } from '../../api/pullRequests';
 import { timeAgo } from '../../utils/time';
@@ -113,10 +118,47 @@ function getIconColor(name: string): string | undefined {
   }
 }
 
-function TreeIcon({ type, iconColor }: { type: 'folder' | 'file'; iconColor?: string }) {
-  const color = type === 'folder' ? blueLight : iconColor || textSecondary;
+// 语言标识 → GitHub 风格品牌色（与后端 detect_file_language 标识对应）。
+const LANG_COLORS: Record<string, string> = {
+  python: '#3572a5',
+  javascript: '#f1e05a',
+  typescript: '#3178c6',
+  html: '#e34c26',
+  css: '#563d7c',
+  scss: '#c6538c',
+  sass: '#a53b70',
+  less: '#1d365d',
+  go: '#00add8',
+  rust: '#dea584',
+  java: '#b07219',
+  json: '#292929',
+  markdown: '#8b949e',
+  yaml: '#cb171e',
+  xml: '#0060ac',
+  shell: '#89e051',
+  sql: '#e38c00',
+  dockerfile: '#384d54',
+  makefile: '#427819',
+};
+
+function langLabel(lang: string): { name: string; color: string } {
+  const label = lang.charAt(0).toUpperCase() + lang.slice(1);
+  return { name: label, color: LANG_COLORS[lang] ?? textTertiary };
+}
+
+function repoPrimaryLang(repo: Repository): { name: string; color: string } | null {
+  if (!repo.languages) return null;
+  const top = Object.entries(repo.languages).sort((a, b) => b[1] - a[1])[0];
+  return top ? langLabel(top[0]) : null;
+}
+
+function TreeIcon({ type, iconColor, name }: { type: 'folder' | 'file'; iconColor?: string; name?: string }) {
+  if (type === 'file' && name) {
+    const badge = fileBadge(name);
+    return <span className={badge.cls}>{badge.label}</span>;
+  }
   return (
-    <span style={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16, color }}>
+    <span style={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16, color: type === 'folder' ? blueLight : iconColor || textSecondary }}>
       {type === 'folder' ? <FolderOutlined /> : <FileOutlined />}
     </span>
   );
@@ -160,7 +202,7 @@ function TreeNodeView({
         {(loading && node.type === 'folder') ? (
           <Spin size="small" style={{ width: 16, height: 16, flexShrink: 0 }} />
         ) : (
-          <TreeIcon type={node.type} iconColor={node.iconColor} />
+          <TreeIcon type={node.type} iconColor={node.iconColor} name={node.type === 'file' ? node.name : undefined} />
         )}
         <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{node.name}</span>
         {depth === 0 && branchName && (
@@ -210,6 +252,9 @@ export default function RepositoriesView() {
   const [activeFilter, setActiveFilter] = useState<(typeof filters)[number]>('all');
   const [isStarred, setIsStarred] = useState(false);
   const [cloning, setCloning] = useState(false);
+  const [issueCount, setIssueCount] = useState<number | null>(null);
+  const [prCount, setPrCount] = useState<number | null>(null);
+  const [forking, setForking] = useState(false);
   const fetchRepositories = useRepositoriesStore((s) => s.fetchRepositories);
   const createRepository = useRepositoriesStore((s) => s.createRepository);
 
@@ -284,7 +329,7 @@ export default function RepositoriesView() {
     }
   };
 
-  // 详情：加载树/读me/分支/提交/star 状态。
+  // 详情：加载树/读me/分支/提交/star 状态 + Issue/PR 计数。
   useEffect(() => {
     if (!currentRepo) return;
     if (!currentRepo.status?.initialized) return;
@@ -296,7 +341,24 @@ export default function RepositoriesView() {
     fetchBranches(currentRepo.id);
     fetchCommits(currentRepo.id, { branch: ref });
     repositoriesApi.getStarStatus(sid, currentRepo.id).then((res) => setIsStarred(res.starred)).catch(() => {});
+    issuesApi.list(sid, currentRepo.id, { status: 'open', per_page: 1 }).then((d) => setIssueCount(d.total)).catch(() => {});
+    pullRequestsApi.list(sid, currentRepo.id, { status: 'open', per_page: 1 }).then((d) => setPrCount(d.total)).catch(() => {});
   }, [currentRepo, server?.id, fetchTree, fetchReadme, fetchBranches, fetchCommits]);
+
+  const onFork = async () => {
+    if (!currentRepo || !server) return;
+    setForking(true);
+    try {
+      await repositoriesApi.fork(server.id, currentRepo.id);
+      message.success(t('desktop.repos.forkOk', { name: currentRepo.name }));
+      const parts = currentRepo.path.split('/');
+      await fetchRepositoryByPath(parts[0], parts[1] ?? currentRepo.name);
+    } catch (e) {
+      message.error(`${t('desktop.repos.forkFail')}: ${(e as Error).message}`);
+    } finally {
+      setForking(false);
+    }
+  };
 
   // 选择文件 → 读 blob。
   useEffect(() => {
@@ -399,36 +461,54 @@ export default function RepositoriesView() {
           )}
           {viewMode === 'grid' ? (
             <div className="repo-grid">
-              {filtered.map((r) => (
-                <div className="repo-card" key={r.id} onClick={() => openRepo(r)}>
-                  <div className="rc-head">
-                    <span className="rc-ic"><FolderOutlined /></span>
-                    <b>{r.name}</b>
-                    <span className={`pill ${r.is_public ? '' : 'blue'}`}>
-                      {r.is_public ? t('app.repositories.visibility.public') : t('app.repositories.visibility.private')}
-                    </span>
+              {filtered.map((r) => {
+                const primaryLang = repoPrimaryLang(r);
+                return (
+                  <div className="repo-card" key={r.id} onClick={() => openRepo(r)}>
+                    <div className="rc-head">
+                      <span className="rc-ic"><FolderOutlined /></span>
+                      <b>{r.name}</b>
+                      <span className={`pill ${r.is_public ? '' : 'blue'}`}>
+                        {r.is_public ? t('app.repositories.visibility.public') : t('app.repositories.visibility.private')}
+                      </span>
+                    </div>
+                    <p>{r.description || r.path}</p>
+                    <div className="rc-foot">
+                      <span><StarOutlined />{r.star_count}</span>
+                      <span><ForkOutlined />{r.fork_count}</span>
+                      {primaryLang && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: primaryLang.color, flexShrink: 0 }} />
+                          {primaryLang.name}
+                        </span>
+                      )}
+                      <span className="rc-time">{timeAgo(r.updated_at, t)}</span>
+                    </div>
                   </div>
-                  <p>{r.description || r.path}</p>
-                  <div className="rc-foot">
-                    <span><StarOutlined />{r.star_count}</span>
-                    <span><ForkOutlined />{r.fork_count}</span>
-                    <span className="rc-time">{timeAgo(r.updated_at, t)}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="repo-rows">
-              {filtered.map((r) => (
-                <div className="repo-row" key={r.id} onClick={() => openRepo(r)}>
-                  <span className="rc-ic"><FolderOutlined /></span>
-                  <b className="row-name">{r.name}</b>
-                  <span className={`pill ${r.is_public ? '' : 'blue'}`}>
-                    {r.is_public ? t('app.repositories.visibility.public') : t('app.repositories.visibility.private')}
-                  </span>
-                  <span className="row-ago">{timeAgo(r.updated_at, t)}</span>
-                </div>
-              ))}
+              {filtered.map((r) => {
+                const primaryLang = repoPrimaryLang(r);
+                return (
+                  <div className="repo-row" key={r.id} onClick={() => openRepo(r)}>
+                    <span className="rc-ic"><FolderOutlined /></span>
+                    <b className="row-name">{r.name}</b>
+                    <span className={`pill ${r.is_public ? '' : 'blue'}`}>
+                      {r.is_public ? t('app.repositories.visibility.public') : t('app.repositories.visibility.private')}
+                    </span>
+                    {primaryLang && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: textSecondary, fontSize: 12 }}>
+                        <span style={{ width: 10, height: 10, borderRadius: '50%', background: primaryLang.color, flexShrink: 0 }} />
+                        {primaryLang.name}
+                      </span>
+                    )}
+                    <span className="row-ago">{timeAgo(r.updated_at, t)}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -471,10 +551,13 @@ export default function RepositoriesView() {
     );
   }
 
+  const tabCount = (n: number | null) =>
+    n != null ? <span style={{ fontSize: 11, background: '#0d1117', color: textTertiary, padding: '1px 7px', borderRadius: 10 }}>{n}</span> : null;
+
   const tabItems: TabsProps['items'] = [
     { key: 'code', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><FileTextOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.code')}</span> },
-    { key: 'pullRequests', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><GitPullRequestIco />{t('app.repositories.tabs.pullRequests')}</span> },
-    { key: 'issues', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><IssueIco />{t('app.repositories.tabs.issues')}</span> },
+    { key: 'pullRequests', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><GitPullRequestIco />{t('app.repositories.tabs.pullRequests')}{tabCount(prCount)}</span> },
+    { key: 'issues', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><IssueIco />{t('app.repositories.tabs.issues')}{tabCount(issueCount)}</span> },
     { key: 'settings', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><GearIco />{t('app.repositories.tabs.settings')}</span> },
   ];
 
@@ -524,9 +607,15 @@ export default function RepositoriesView() {
             <Tag color={currentRepo.is_public ? 'default' : 'blue'}>
               {currentRepo.is_public ? t('app.repositories.visibility.public') : t('app.repositories.visibility.private')}
             </Tag>
+            <Tag icon={<BranchesOutlined />} style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              {currentRepo.default_branch}
+            </Tag>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
               <Button icon={<StarOutlined style={{ color: isStarred ? '#e3b341' : undefined }} />} onClick={handleStarToggle}>
                 {isStarred ? t('app.repositories.actions.unstar') : t('app.repositories.actions.star')} {currentRepo.star_count}
+              </Button>
+              <Button icon={<ForkOutlined />} loading={forking} onClick={onFork}>
+                {t('desktop.repos.fork')} {currentRepo.fork_count}
               </Button>
               <Button icon={<CloudDownloadOutlined />} loading={cloning} onClick={onClone}>
                 {t('desktop.serverShell.clone')}
@@ -590,10 +679,22 @@ export default function RepositoriesView() {
                   style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', borderBottom: index === displayFiles.length - 1 ? 'none' : `1px solid ${borderColor}`, fontSize: 13, cursor: 'pointer', transition: 'background 0.15s' }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
-                  <span style={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16, color: file.type === 'directory' ? blueLight : getIconColor(file.name) || textSecondary }}>
-                    {file.type === 'directory' ? <FolderOutlined /> : <FileOutlined />}
-                  </span>
+                  {file.type === 'directory' ? (
+                    <span style={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16, color: blueLight }}>
+                      <FolderOutlined />
+                    </span>
+                  ) : (
+                    <span className={fileBadge(file.name).cls}>{fileBadge(file.name).label}</span>
+                  )}
                   <span style={{ flex: 1, color: textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</span>
+                  {file.type === 'file' && file.last_commit && (
+                    <>
+                      <span style={{ flex: 2, fontSize: 12, color: textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {file.last_commit.message.split('\n')[0]}
+                      </span>
+                      <span style={{ fontSize: 12, color: textTertiary, flexShrink: 0 }}>{timeAgo(file.last_commit.date, t)}</span>
+                    </>
+                  )}
                   {file.type === 'directory' && file.sha && (
                     <span style={{ color: textTertiary, fontSize: 12 }}>{t('desktop.serverShell.defaultBranch')}</span>
                   )}
@@ -625,7 +726,7 @@ export default function RepositoriesView() {
                   <ReadOutlined style={{ fontSize: 16 }} />README.md
                 </div>
                 <div className="readme-body" style={{ padding: 20, fontSize: 14, lineHeight: 1.7, color: textSecondary, maxHeight: 480, overflow: 'auto' }}>
-                  {readme}
+                  <Markdown>{readme}</Markdown>
                 </div>
               </div>
             )}

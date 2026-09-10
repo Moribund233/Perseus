@@ -281,3 +281,43 @@
 - **逻辑层先行的印证**：T1（`pullRequests.create` 已就绪）、T4（`chatSocket`/`chat store` 全就绪）、T5（`notifications store` 就绪）、T6（`myWork store` 就绪）均为**纯 UI 接线**；唯一逻辑层增量是 T2（仓库设置 API）与 T9（collab 代理）。
 - **collab 风险**：T9 是全计划唯一高风险项，已前置 spike（Step 0）并标注「collab-aware proxy」与 chat `?token=` 的机制差异，避免误用现有透传。
 - **无占位**：所有组件/方法在对应 Task 给出一等实现或明确降级路径（T6 可选、T8 预留）。
+
+---
+
+## 原型还原度批次（2026-09-10 追加）
+
+逐屏对照 `client/prototype/desktop-ui/` 审计后的修复记录：
+
+### F0 代码界面渲染一致性 — ✅ 已完成
+- **Monaco 主题缺失**（根因）：`@monaco-editor/react` 默认 `theme="light"`，EditorTabs 未传 → 亮色编辑器与全局 GitHub Dark 割裂。已补 `theme="vs-dark"`。
+- etab 标签补 `.fc` 文件类型色块（CSS 类已存在未使用，`fileBadge` 自 ExplorerPanel 导出复用）。
+- tab-actions 对齐原型：辅助面板/底部面板切换 icon（aux 自 titlebar 移入 tabbar）+ 保存按钮。
+- crumbs 右侧补「Ctrl+S 保存 · 文件 N KB」hint。
+
+### F1 功能缺陷修复 — ✅ 已完成
+- IssuesView「新建 Issue」按钮补 onClick（Modal 已有，2B 移植遗漏）。
+- 仓库详情文件表补 last-commit 两列（提交信息/时间；`getTree` 透传 `last_commit=true`，后端已支持）。
+- README 由纯文本改为 Markdown 渲染（复用 T4 引入的组件）。
+- 详情头部补 branch pill 与「复刻 · N」按钮（fork API 已就绪）；Tabs 补 Issues/PR 开放计数。
+
+### F2 Issue 详情右侧栏 + 列表增强 — ✅ 已完成
+- IssueDetail 右侧栏：负责人/标签/状态/参与（参与由作者+评论人 dedupe 推导；标签直接取后端 `label.color`）。
+- IssuesView 行增强：标签 chips（color 圆点 + 名称）、评论图标 + 计数、作者头像；工具栏补「按标签 / 作者筛选」输入（本地过滤：标题/作者/标签子串）。
+- **顺带修复**：desktop locales 整块缺失 `app.issues` 与 `app.pullRequests.detail`（沿用 web 规范文案，另增 assigneeHeader/labelsHeader/stateHeader/participantsHeader/unassigned/searchPlaceholder）——此前 Issues/PR 屏渲染的是裸 key。已用脚本全量校验 desktop 视图引用的 `app.*` 键在 zh/en 均存在。
+
+### F3 仓库树/状态栏/卡片语言 — ✅ 已完成
+- 仓库树 + 文件表文件类型色块统一为 `.fc` 芯片（`fileBadge` 复用，与 ExplorerPanel/editor 一致）。
+- StatusBar 新增 `Ln X, Col Y` 段（EditorTabs cursor 透传 IdeShell → StatusBar）。
+
+### F3 决策落地：后端 languages 聚合（产品拍板选方案 2）
+原型卡片 `repositories.html` 的 `<span class="lang">` 色块需要主语言数据，后端 Repository 原先只有单文件 `detect_file_language`：
+- **新增 `services/language_service.py`**：pygit2 遍历默认分支 tree → `detect_file_language` 统计 → `{语言标识: 文件数}` 降序（丢弃 text/binary）。
+- `utils/response_builder.build_repo_response` 增 `languages`（默认 `{}`）与 `fork_count`（此前缺失，F1 复刻按钮依赖它）。
+- `repository_service` 列表 `_enrich_repos_with_physical_status` 与 `get_repository_by_id`/`get_repository_by_path` 均并发注入；空仓/离线返回 `{}`。
+- 前端：`Repository.languages?: Record<string, number>`；`repoPrimaryLang()` 取 Top1，`LANG_COLORS` GitHub 风格色表；grid 卡片 + list 行显示色点 + 语言名。
+
+### 验证（2026-09-10）
+- 前端 `npm run build` 通过。
+- 后端代码同步至 WSL `~/perseus`（tar-pipe，排除 .git/.venv/node_modules/数据等），在 dev 编排 test 容器（`docker compose -f docker-compose.dev.yml run --rm test`）跑测：
+  - 定向：`test_repository_service_async / test_controller_repository / test_repo_list_query_async / test_repo_browser_controller` → **58 passed**。
+  - 全量：`pytest tests/ -v` → **856 passed, 3 skipped**。

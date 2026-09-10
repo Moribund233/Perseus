@@ -39,3 +39,49 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #484f58;
 }
+
+/* ---- 浮动文件树面板 ---- */
+.cm-floating-tree-row {
+  position: relative;
+}
+.floating-tree-anchor { pointer-events: none; width: 0; height: 0; }
+.cm-floating-item-wrap { position: relative; }
+.cm-floating-panel {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  margin-left: 8px;
+  pointer-events: auto;
+  min-width: 190px;
+  max-width: 320px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.25);
+  padding: 4px;
+  animation: cm-float-enter 0.15s ease-out;
+}
+.cm-floating-panel.level-1 {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.cm-floating-panel.level-2,
+.cm-floating-panel.level-3 {
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6), 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+.cm-floating-panel-inner {
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.cm-floating-panel .cm-floating-item {
+  margin: 1px 2px;
+  border-radius: 4px;
+}
+.cm-floating-item:hover .cm-tree-delete-btn,
+.cm-floating-panel .cm-floating-item:hover .cm-tree-delete-btn {
+  opacity: 1 !important;
+}
+@keyframes cm-float-enter {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
+}

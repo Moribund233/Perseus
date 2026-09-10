@@ -3,6 +3,7 @@
 > **背景**: 2026-09-07 决策 D2（见 [`specs/2026-09-07-desktop-decisions.md`](specs/2026-09-07-desktop-decisions.md)）——维持"拷贝移植"策略，以本清单跟踪两端功能差异，替代共享包改造。
 > **用法**: web 端新功能合入时在此登记（状态 ⬜）；移植 desktop 时更新状态与移植批次列；两端结构性分叉时在"备注"记录原因。
 > **2026-09-10**: UI 补全批次（T1-T7、T9）完成，主表全面回填；剩余欠项集中在 Builds/Releases、Dashboard 贡献图/活动流、用户中心。
+> **2026-09-10（原型还原度）**: 逐屏对照 `client/prototype/desktop-ui/` 审计并按 F0-F3 批次修复：Monaco 主题/etab 色块/crumbs hint（F0）、Issue 新建按钮/readme Markdown/last-commit 列/branch pill/复刻按钮/Tab 计数（F1）、Issue 详情侧栏与列表行标签（F2）、仓库树 `.fc` 芯片/StatusBar Ln/Col（F3）；**后端新增 `languages` 聚合**（`services/language_service.py`，卡片主语言，web 可复用，见 §4）。
 
 **状态**: ✅ 已移植 / 🟡 部分 / ⬜ 未移植 / ➖ 不适用（桌面模型替代或职责外）
 
@@ -11,7 +12,7 @@
 | 功能域 | web 端现状 | desktop 现状 | 移植批次 | 备注 |
 |--------|-----------|--------------|----------|------|
 | 认证/会话刷新 | ✅ 登录页 + 401 自动刷新 | ➖ 服务器注册表替代（登录换 token 进密钥库） | — | 模型不同, 不移植 |
-| 仓库浏览 | ✅ 列表/详情/树/blob | ✅ 移植（2A, proxy 化） | 2A | 文件内容 `<pre>` 只读, web 为编辑器 |
+| 仓库浏览 | ✅ 列表/详情/树/blob | ✅ 移植（2A, proxy 化）+ 原型还原度补全（F1：文件表 last-commit 列、README Markdown、branch pill、Tab 计数/复刻按钮；F3：卡片主语言色点取自 §4 聚合） | 2A | 文件内容 `<pre>` 只读, web 为编辑器 |
 | Issues | ✅ 列表/详情/创建/评论/关闭 | ✅ 移植（2B） | 2B | |
 | Pull Requests | ✅ 列表/详情/merge/close/review | ✅ 移植（T1 补创建 Modal） | T1 ✅ | |
 | 聊天 | ✅ 会话/频道/附件/reactions/presence | ✅ 移植（T4：门户三栏全屏页 + IDE 活动栏面板；后端补 `GET /api/v1/rooms`） | T4 | 频道=仓库房间语义与 web 一致；DM 私聊两端均未实现 |
@@ -38,3 +39,7 @@
 |------|----------|---------------------|
 | 2026-09-07 | F-204 协作编辑合入（含断线 rejoin/权限缓存等修复） | ~~协作能力整体~~ → ✅ 2026-09-10 T9 y-monaco 接入完成（Yjs 同底座） |
 | 2026-09-07 | Editor 状态栏协作 presence/双态徽标 | 🟡 presence 已有（T9 参与者头像 + aux 成员栏）；「会话已同步/Git 已提交」双态徽标两端均待做 |
+
+## 4. 后端共享增强（web/desktop 均可复用）
+
+- **仓库语言聚合**（2026-09-10，F3 决策落地）：`Repository.languages`（`{语言标识: 文件数}` 降序）由新 `services/language_service.py` 提供——网格卡片主语言色块直接取 Top1。web 仓库列表/详情可复用该字段补齐 GitHub 式语言条。旧版仅单文件 `detect_file_language`，无聚合数据。

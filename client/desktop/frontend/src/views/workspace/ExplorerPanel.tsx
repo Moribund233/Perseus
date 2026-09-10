@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Empty, Tooltip, message } from 'antd';
 import {
   FolderOutlined,
-  FolderOpenOutlined,
   ReloadOutlined,
   PlusOutlined,
   RightOutlined,
@@ -10,8 +9,9 @@ import {
 import { useTranslation } from 'react-i18next';
 import { getTree, type FileNode } from '../../api/workspaces';
 import { logInfo } from '../../stores/logs';
+import { FloatingTreePanel } from '../../components/FloatingTreePanel';
 
-function fileBadge(name: string): { cls: string; label: string } {
+export function fileBadge(name: string): { cls: string; label: string } {
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
   switch (ext) {
     case 'py': return { cls: 'fc py', label: 'PY' };
@@ -34,11 +34,30 @@ interface Props {
   onOpen: (path: string) => void;
 }
 
+interface FloatPanelPos {
+  key: string;
+  left: number;
+  top: number;
+}
+
 export default function ExplorerPanel({ workspaceId, workspaceName, onOpen }: Props) {
   const { t } = useTranslation();
   const [root, setRoot] = useState<FileNode[]>([]);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
+
+  const [pinnedChain, setPinnedChain] = useState<FloatPanelPos[]>([]);
+
+  const nodeMap = useMemo(() => {
+    const map = new Map<string, FileNode>();
+    const walk = (nodes: FileNode[]) => {
+      for (const n of nodes) {
+        map.set(n.path, n);
+        if (n.children) walk(n.children);
+      }
+    };
+    walk(root);
+    return map;
+  }, [root]);
 
   const load = useCallback(
     async (notify = true) => {
@@ -55,7 +74,7 @@ export default function ExplorerPanel({ workspaceId, workspaceName, onOpen }: Pr
 
   useEffect(() => {
     setRoot([]);
-    setExpanded(new Set());
+    setPinnedChain([]);
     void load(false);
   }, [workspaceId, load]);
 
@@ -65,53 +84,82 @@ export default function ExplorerPanel({ workspaceId, workspaceName, onOpen }: Pr
     return () => window.removeEventListener('ide:refresh-tree', onRefresh);
   }, [load]);
 
-  const splitChildren = (nodes: FileNode[]) => ({
-    dirs: nodes.filter((n) => n.is_dir),
-    files: nodes.filter((n) => !n.is_dir),
-  });
+  useEffect(() => {
+    if (pinnedChain.length === 0) return;
+    const handle = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.floating-tree-panel') && !target.closest('[data-dir-path]')) {
+        setPinnedChain([]);
+      }
+    };
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [pinnedChain.length]);
+
+  const handleTreePin = useCallback((key: string, el: HTMLElement) => {
+    const rect = el.getBoundingClientRect();
+    setPinnedChain((prev) => {
+      if (prev.length === 1 && prev[0].key === key) return [];
+      return [{ key, left: rect.right + 4, top: rect.top }];
+    });
+  }, []);
+
+  const handlePanelClick = useCallback((level: number, key: string, el: HTMLElement) => {
+    const rect = el.getBoundingClientRect();
+    setPinnedChain((prev) => {
+      const base = prev.slice(0, level + 1);
+      const reaching = prev.length === level + 2 && prev[level + 1]?.key === key;
+      if (reaching) return base;
+      return [...base, { key, left: rect.right + 4, top: rect.top }];
+    });
+  }, []);
+
+  const displayChain = pinnedChain;
+  const activeKeys = useMemo(() => {
+    const s = new Set<string>();
+    for (let i = 1; i < displayChain.length; i++) s.add(displayChain[i].key);
+    return s;
+  }, [displayChain]);
 
   const renderNode = (node: FileNode, depth: number): React.ReactNode => {
     if (node.is_dir) {
-      const open = expanded.has(node.path);
+      const hasChildren = node.children && node.children.length > 0;
       return (
         <div key={node.path}>
           <div
-            className={`frow${open ? ' open' : ''}`}
+            className={`frow dir-row${hasChildren ? ' has-kids' : ''}`}
+            data-dir-path={node.path}
             style={{ paddingLeft: 10 + depth * 14 }}
-            onClick={() =>
-              setExpanded((prev) => {
-                const next = new Set(prev);
-                if (next.has(node.path)) next.delete(node.path);
-                else next.add(node.path);
-                return next;
-              })
-            }
+            onClick={(e) => hasChildren && handleTreePin(node.path, e.currentTarget)}
           >
-            <RightOutlined className={`chev${open ? ' open' : ''}`} />
+            {hasChildren ? (
+              <RightOutlined className="chev" />
+            ) : (
+              <span className="chev-placeholder" />
+            )}
             <span className="fc folder">
-              {open ? <FolderOpenOutlined /> : <FolderOutlined />}
+              <FolderOutlined />
             </span>
             <span className="fname">{node.name}</span>
           </div>
-          {open && node.children && (
-            <div className="kids">{renderList(node.children, depth + 1)}</div>
-          )}
         </div>
       );
     }
     const b = fileBadge(node.name);
     return (
-      <div key={node.path} className="frow" style={{ paddingLeft: 10 + depth * 14 }} onClick={() => onOpen(node.path)}>
-        <RightOutlined className="chev leaf" />
+      <div
+        key={node.path}
+        className="frow file-row"
+        style={{ paddingLeft: 10 + depth * 14 }}
+        onClick={() => {
+          setPinnedChain([]);
+          onOpen(node.path);
+        }}
+      >
         <span className={b.cls}>{b.label}</span>
         <span className="fname">{node.name}</span>
       </div>
     );
-  };
-
-  const renderList = (nodes: FileNode[], depth: number): React.ReactNode => {
-    const { dirs, files } = splitChildren(nodes);
-    return [...dirs, ...files].map((n) => renderNode(n, depth));
   };
 
   return (
@@ -149,6 +197,26 @@ export default function ExplorerPanel({ workspaceId, workspaceName, onOpen }: Pr
           {root.map((n) => renderNode(n, 0))}
         </div>
       )}
+
+      {displayChain.map((pos, i) => {
+        const node = nodeMap.get(pos.key);
+        if (!node || !node.is_dir || !node.children?.length) return null;
+        return (
+          <div
+            key={pos.key}
+            className="floating-tree-anchor"
+            style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 200 }}
+          >
+            <FloatingTreePanel
+              node={node}
+              level={i}
+              activeKeys={activeKeys}
+              onItemClick={handlePanelClick}
+              onOpenFile={onOpen}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }

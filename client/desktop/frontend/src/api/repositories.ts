@@ -16,6 +16,7 @@ export interface Repository {
   owner?: { id: string; username: string; full_name: string | null };
   physical_exists?: boolean;
   status?: { initialized: boolean };
+  languages?: Record<string, number>;
 }
 
 export interface CreateRepoRequest {
@@ -37,6 +38,7 @@ export interface RepoFile {
   type: 'file' | 'directory' | 'symlink';
   size?: number;
   sha?: string;
+  last_commit?: { hash: string; message: string; author: string; date: string } | null;
 }
 
 export interface RepoBlob {
@@ -150,12 +152,13 @@ export const repositoriesApi = {
   checkAccess: (serverId: string, repoId: string, userId: string) =>
     proxyRequest<{ has_access: boolean; role?: string }>(serverId, `/api/v1/repositories/${repoId}/access?user_id=${encodeURIComponent(userId)}`),
 
-  getTree: async (serverId: string, repoId: string, ref?: string, path?: string) => {
+  getTree: async (serverId: string, repoId: string, ref?: string, path?: string, opts?: { last_commit?: boolean }) => {
     const params = new URLSearchParams();
     if (ref) params.set('ref', ref);
     if (path) params.set('path', path);
+    if (opts?.last_commit) params.set('last_commit', 'true');
     const qs = params.toString() ? `?${params.toString()}` : '';
-    const data = await proxyRequest<{ entries: Array<{ name: string; path: string; type: 'tree' | 'blob' | 'symlink'; size?: number; sha?: string }> }>(
+    const data = await proxyRequest<{ entries: Array<{ name: string; path: string; type: 'tree' | 'blob' | 'symlink'; size?: number; sha?: string; last_commit?: { hash: string; message: string; author: string; date: string } | null }> }>(
       serverId,
       `/api/v1/repositories/${repoId}/tree${qs}`
     );
