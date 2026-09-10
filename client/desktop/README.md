@@ -21,6 +21,8 @@
 │  │  /api/local/servers...   服务器注册表    │  │
 │  │  /api/local/proxy/{id}/* 通用反向代理    │  │
 │  │  /api/local/proxy/{id}/ws/*  WS 透传    │  │
+│  │  /api/local/proxy/{id}/collab 协作代理   │  │
+│  │  （Hocuspocus 首帧 token 注入）          │  │
 │  │  CORS 白名单 + 会话 token 防护           │  │
 │  └──────────────┬─────────────────────────┘  │
 │                 │ 系统密钥库(Windows CM)      │
@@ -70,9 +72,20 @@ cd frontend && npm run build
 - WS 透传：`/api/local/proxy/{serverId}/ws/{path}`，gorilla/websocket 双向帧转发 + 断线指数退避重连
 - 前端 ServerShell 双壳：顶栏服务器选择 + health 徽标；仓库页忠实移植 web（代码/设置可用，issues/PR 留 2B），支持 "Clone to workspace"（Git CLI 克隆 + 自动切入 IdeShell）
 
+## UI 补全范围（2026-09-10 批次，对齐 web 端能力）
+
+- **门户聚合搜索**（T3）：标题栏搜索 Modal，仓库/Issue/PR 三分组 + 深链直达；后端新增 `GET /api/v1/search/global`（两端可共用）
+- **PR 创建 Modal**（T1）：PullRequestsView 新建弹窗接线
+- **仓库设置 Tab**（T2）：Webhooks（CRUD/测试/投递记录）+ 协作者（增删/角色）
+- **团队聊天**（T4）：门户三栏全屏页（频道 = 仓库房间；Markdown/reactions/附件/typing/presence）+ IDE 活动栏精简面板，socket 常驻；后端补 `GET /api/v1/rooms`
+- **通知面板**（T5）：铃铛 Popover（未读计数/全部已读/删除，点击按 target_type 深链）
+- **我的工作**（T6）：跨仓库「我发起的 PR / 我的 Issue」聚合视图
+- **协作辅助栏**（T7）：IDE 右侧 aux（待处理 PR / 相关 Issue / 成员在线 presence）
+- **协作编辑（T9）**：接入 Yjs 统一底座 —— Go 网关 collab 代理（lib0 varint 编解码 + 首帧 AuthenticationMessage token 注入）+ `CollabSession`（HocuspocusProvider）+ `MonacoBinding`，与 web 共享 collab-gateway 与保存语义（stateless collab-save → Git commit 全员广播）
+
 ## 已知边界
 
 - 网关会话 token 仅存内存，随进程退出失效
-- 数据目录持久化在 `%APPDATA%\perseus\app.db`；设置项尚为占位
-- 多服务器注册表、Perseus 代理、离线缓存、LSP、SSH 推送等属 Phase 2+（见 `docs/superpowers/specs/2026-08-03-desktop-app-design.md`）
-- 2A 尚未移植 PR/Issue/聊天页面（Phase 2B）；Clone to workspace 走 Git CLI，私有仓库的 HTTP 认证将在后续阶段接入
+- 数据目录持久化在 `%APPDATA%\perseus\app.db`
+- Releases/Builds tab、Dashboard 贡献图/活动流、用户中心（SSH Keys/OAuth）尚未移植，两端差异以 [`docs/desktop-port-sync.md`](../docs/desktop-port-sync.md) 清单跟踪
+- Clone to workspace 走 Git CLI；SSH 推送、mDNS、托盘/单实例/NSIS 属 Phase 4（见 `docs/superpowers/specs/2026-08-03-desktop-app-design.md`）

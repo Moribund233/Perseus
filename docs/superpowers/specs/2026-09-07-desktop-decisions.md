@@ -36,11 +36,11 @@
 下一批（收尾批次, D3）
   → push/pull UI + clone 凭据 + 多标签编辑器 + Settings + servers.update 修复
 下一批之后二选一（可并行）:
-  → Phase 3 LSP 最小验证（pyright 诊断链路 → monaco providers）
+  → Phase 3 LSP 最小验证（pyright 诊断链路 → monaco providers）✅ LSP/终端 WS 桥已落地（2026-09-08）
   → Y 网关基建 + web 端 F-204 迁移 Yjs（D1 既定路线）✅ 2026-09-08 完成
 之后:
-  → desktop 接入 Yjs 协同（y-monaco）→ desktop 协作能力（follow/受限视图/host 模型）
-  → Phase 2C 聊天/通知（D4 推后, 重排期）
+  → desktop 接入 Yjs 协同（y-monaco）✅ 2026-09-10 完成（T9：Go 首帧 token 注入代理 + Monaco 绑定）
+  → Phase 2C 聊天/通知 🟡 已随 UI 补全批次完成（T4/T5，2026-09-10）；host 模型/follow/受限视图仍待排期
   → Phase 4 增强收尾（SSH 推送、mDNS、托盘/单实例/NSIS）
 ```
 

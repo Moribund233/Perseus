@@ -269,9 +269,9 @@
 **Interfaces:**
 - Consumes: Task 1-9 全部产物.
 
-- [ ] **Step 1**: desktop `npm run build` + `go build ./...` + `go test ./...` 全绿。
-- [ ] **Step 2**: README 新增「UI 补全范围」小节。
-- [ ] **Step 3**: 回填 `desktop-port-sync.md` 状态（聊天/通知/全局搜索/PR创建/仓库设置 → ✅/状态）。
+- [x] **Step 1**: desktop `npm run build` + `go build ./...` + `go test ./...` 全绿（2026-09-10 复验）。
+- [x] **Step 2**: README 新增「UI 补全范围」小节（T1-T9 逐项；架构图补 collab 代理行；已知边界更新为剩余欠项清单）。
+- [x] **Step 3**: 回填 `desktop-port-sync.md` 状态（PR 创建/仓库设置/聊天/通知/全局搜索/协作编辑 → ✅；Dashboard 🟡；Builds/Releases/用户中心 ⬜；移植债务两行更新）。
 
 ---
 
