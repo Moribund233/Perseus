@@ -489,6 +489,13 @@
       "sendHint": "Enter 发送 · Shift+Enter 换行",
       "placeholder": "给 #{{channel}} 发送消息… 支持 Markdown"
     },
+    "notifications": {
+      "title": "通知",
+      "unreadCount": "{{count}} 条未读",
+      "markAllRead": "全部已读",
+      "empty": "暂无通知",
+      "delete": "删除"
+    },
     "repos": {
       "sub": "{{name}} · {{count}} 个仓库",
       "filterPlaceholder": "筛选仓库…",

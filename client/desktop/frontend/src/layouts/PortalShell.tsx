@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { App as AntApp, Avatar, Badge, Button, Dropdown, Tag, Tooltip } from 'antd';
+import { App as AntApp, Avatar, Badge, Button, Dropdown, Popover, Tag, Tooltip } from 'antd';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowLeftOutlined,
@@ -24,6 +24,7 @@ import ServerManager from '../views/servers/ServerManager';
 import RepositoriesView from '../views/repositories/RepositoriesView';
 import GlobalSearchView from '../views/GlobalSearchView';
 import ChatView from '../views/chat/ChatView';
+import NotificationsPanel from '../views/notifications/NotificationsPanel';
 import Settings from '../views/Settings';
 
 const healthTag: Record<string, 'success' | 'error' | 'default'> = { online: 'success', offline: 'error', unknown: 'default' };
@@ -121,9 +122,8 @@ export default function PortalShell() {
     }
   };
 
-  const phase2 = () => message.info(t('desktop.portal.phase2'));
-
   const [searchOpen, setSearchOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
 
   // 双击标题栏空白/拖拽区 = 最大化/还原（交互控件上不触发）。
   const onTitlebarDblClick = (e: React.MouseEvent) => {
@@ -216,13 +216,23 @@ export default function PortalShell() {
                 </Tooltip>
               )}
               {view === 'repositories' && current && (
-                <Tooltip title={t('desktop.portal.notifications')}>
-                  <button className="tb-icon" onClick={phase2}>
-                    <Badge count={unreadCount} size="small" offset={[2, -2]}>
-                      <BellOutlined />
-                    </Badge>
-                  </button>
-                </Tooltip>
+                <Popover
+                  trigger="click"
+                  placement="bottomRight"
+                  arrow={false}
+                  open={notifOpen}
+                  onOpenChange={setNotifOpen}
+                  styles={{ root: { background: '#161b22', border: '1px solid #21262d', borderRadius: 10, padding: 0, overflow: 'hidden' } }}
+                  content={<NotificationsPanel onClose={() => setNotifOpen(false)} />}
+                >
+                  <Tooltip title={t('desktop.portal.notifications')}>
+                    <button className="tb-icon">
+                      <Badge count={unreadCount} size="small" offset={[2, -2]}>
+                        <BellOutlined />
+                      </Badge>
+                    </button>
+                  </Tooltip>
+                </Popover>
               )}
               {view === 'repositories' && me && (
                 <Avatar size={24} className="tb-avatar" style={{ background: getAvatarColor(identityInitials) }}>

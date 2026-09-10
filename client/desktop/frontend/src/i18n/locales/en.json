@@ -489,6 +489,13 @@
       "sendHint": "Enter to send · Shift+Enter for newline",
       "placeholder": "Message #{{channel}}… Markdown supported"
     },
+    "notifications": {
+      "title": "Notifications",
+      "unreadCount": "{{count}} unread",
+      "markAllRead": "Mark all as read",
+      "empty": "No notifications",
+      "delete": "Delete"
+    },
     "repos": {
       "sub": "{{name}} · {{count}} repositories",
       "filterPlaceholder": "Filter repositories…",
