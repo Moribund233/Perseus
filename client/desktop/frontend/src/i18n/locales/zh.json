@@ -520,6 +520,13 @@
         "closed": "已关闭"
       }
     },
+    "collab": {
+      "label": "协作",
+      "toggle": "开启/关闭协作编辑（Yjs 实时协同）",
+      "pending": "有未同步到服务端的变更（断线缓冲中）",
+      "saved": "协作编辑已提交 ({{commit}})",
+      "saveFailed": "协作保存失败"
+    },
     "aux": {
       "toggle": "协作辅助栏（PR / Issue / 成员）",
       "title": "协作",

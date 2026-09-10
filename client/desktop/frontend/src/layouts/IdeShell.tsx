@@ -239,6 +239,7 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
             <EditorTabs
               workspaceId={workspace.id}
               workspacePath={workspace.path}
+              workspace={workspace}
               openPath={openPath}
               openLine={openLine}
               onCursor={(p, l) => { setFile(p); setLang(l); }}

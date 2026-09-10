@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
-import { Modal } from 'antd';
+import { App as AntApp, Modal } from 'antd';
 import { useTranslation } from 'react-i18next';
 import * as monaco from 'monaco-editor';
-import { readFile, writeFile, type FileContent } from '../../api/workspaces';
+import { readFile, writeFile, type FileContent, type Workspace } from '../../api/workspaces';
+import { CollabSession, type CollabParticipant, type CollabStatus } from '../../api/collabSocket';
+import { useWorkspaceRepo } from '../../hooks/useWorkspaceRepo';
 import { useProblemsStore } from '../../stores/problems';
+import CollabMonaco from './CollabMonaco';
 import {
   fileUri, langForPath, lspOpen, lspChange, lspSave, lspClose, applyModelDiagnostics,
 } from './lspSession';
@@ -18,13 +21,16 @@ interface Tab {
 interface Props {
   workspaceId: string;
   workspacePath: string;
+  workspace: Workspace;
   openPath: string | null;
   openLine?: number | null;
   onCursor?: (path: string | null, lang: string | null, dirty: boolean) => void;
 }
 
-export default function EditorTabs({ workspaceId, workspacePath, openPath, openLine, onCursor }: Props) {
+export default function EditorTabs({ workspaceId, workspacePath, workspace, openPath, openLine, onCursor }: Props) {
   const { t } = useTranslation();
+  const { message } = AntApp.useApp();
+  const repo = useWorkspaceRepo(workspace);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +40,22 @@ export default function EditorTabs({ workspaceId, workspacePath, openPath, openL
   const tabsRef = useRef<Tab[]>([]);
   tabsRef.current = tabs;
 
+  // F-204 协作：按 tab path 管理会话；仅在 clone 工作区且远端仓库可解析时可用。
+  const [collabEnabled, setCollabEnabled] = useState<Record<string, boolean>>({});
+  const [collabStatus, setCollabStatus] = useState<CollabStatus>('disconnected');
+  const [participants, setParticipants] = useState<CollabParticipant[]>([]);
+  const [pending, setPending] = useState(false);
+  const sessionsRef = useRef<Record<string, CollabSession>>({});
+
   const diagnostics = useProblemsStore((s) => s.diagnostics);
+
+  const activePathRef = useRef<string | null>(null);
+  activePathRef.current = active;
+
+  const detachSession = useCallback((path: string) => {
+    sessionsRef.current[path]?.detach();
+    delete sessionsRef.current[path];
+  }, []);
 
   const getText = useCallback((path: string) => textRef.current.get(path) ?? '', []);
 
@@ -51,6 +72,11 @@ export default function EditorTabs({ workspaceId, workspacePath, openPath, openL
         );
         lspSave(tab.path);
         if (res && onCursor) onCursor(tab.path, langForPath(tab.path), false);
+        // 协作模式：本地写盘保持镜像后，再触发网关侧 Git 提交（全员广播 collab-saved）。
+        const session = sessionsRef.current[tab.path];
+        if (session?.isActive()) {
+          session.save(`collab: save ${tab.path}`);
+        }
       } catch (e) {
         setError(String(e));
       }
@@ -75,6 +101,8 @@ export default function EditorTabs({ workspaceId, workspacePath, openPath, openL
     setError(null);
     editorRef.current = null;
     textRef.current = new Map();
+    for (const s of Object.values(sessionsRef.current)) s.detach();
+    sessionsRef.current = {};
   }, [workspaceId]);
 
   useEffect(() => {
@@ -123,10 +151,58 @@ export default function EditorTabs({ workspaceId, workspacePath, openPath, openL
     if (editor) applyModelDiagnostics(editor.getModel());
   }, [diagnostics, active]);
 
+  // 协作会话：为启用协作且可协作的 tab 建立会话（onSynced 后以 Git 权威内容绑定）。
+  useEffect(() => {
+    const path = active;
+    const tab = path ? tabsRef.current.find((tb) => tb.path === path) : undefined;
+    const eligible =
+      !!path && !!repo.serverId && !!repo.repoId && !!collabEnabled[path] &&
+      !!tab && !tab.content.binary && !tab.content.truncated && !!editorRef.current;
+    if (!eligible || !path || !repo.serverId || !repo.repoId) return;
+    let session = sessionsRef.current[path];
+    if (session) return;
+    const branch = workspace.branch || repo.defaultBranch || 'main';
+    session = new CollabSession({
+      serverId: repo.serverId,
+      docKey: `${repo.repoId}:${branch}:${path}`,
+      onStatus: (s) => { if (activePathRef.current === path) setCollabStatus(s); },
+      onParticipants: (peers) => { if (activePathRef.current === path) setParticipants(peers); },
+      onSaved: (msg) => message.success(t('desktop.collab.saved', { commit: (msg.commit_id || '').slice(0, 7) })),
+      onError: (err) => message.error(`${t('desktop.collab.saveFailed')}: ${err}`),
+    });
+    sessionsRef.current[path] = session;
+    session.attach(editorRef.current!);
+  }, [active, collabEnabled, repo.serverId, repo.repoId, repo.defaultBranch, workspace.branch, message, t]);
+
+  // 未同步（断线缓冲）指示轮询。
+  useEffect(() => {
+    if (!active || !sessionsRef.current[active]) {
+      setPending(false);
+      return;
+    }
+    const timer = setInterval(() => {
+      setPending(sessionsRef.current[active!]?.hasPendingChanges() ?? false);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [active, collabStatus]);
+
+  const toggleCollab = () => {
+    const path = active;
+    if (!path) return;
+    if (collabEnabled[path]) {
+      detachSession(path);
+      setCollabStatus('disconnected');
+      setParticipants([]);
+      setPending(false);
+    }
+    setCollabEnabled((prev) => ({ ...prev, [path]: !prev[path] }));
+  };
+
   const close = (path: string) => {
     const tab = findTab(path);
     const doClose = () => {
       lspClose(path);
+      detachSession(path);
       textRef.current.delete(path);
       setTabs((prev) => {
         const idx = prev.findIndex((tb) => tb.path === path);
@@ -226,6 +302,15 @@ export default function EditorTabs({ workspaceId, workspacePath, openPath, openL
           ))}
         </span>
         <span className="right">
+          {repo.repoId && !current.content.binary && !current.content.truncated && (
+            <CollabMonaco
+              enabled={!!collabEnabled[current.path]}
+              status={collabStatus}
+              participants={participants}
+              pending={pending}
+              onToggle={toggleCollab}
+            />
+          )}
           <span className="cursor-info">
             Ln {cursor.line}, Col {cursor.column}
           </span>

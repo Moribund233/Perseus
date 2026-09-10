@@ -29,6 +29,8 @@ func (g *Gateway) buildRouter() http.Handler {
 	mux.HandleFunc("POST /api/local/servers/{id}/default", g.handleSetDefaultServer)
 	// 通用反向代理（HTTP 与 WS 透传）
 	mux.HandleFunc("GET /api/local/proxy/{serverId}/ws/{path...}", g.handleProxyWS)
+	// 协作专用 WS 代理（Hocuspocus 首帧 token 注入，不能走通用 ?token= 透传）
+	mux.HandleFunc("GET /api/local/proxy/{serverId}/collab", g.handleProxyCollab)
 	for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
 		mux.Handle(method+" /api/local/proxy/{serverId}/{path...}", http.HandlerFunc(g.handleProxy))
 	}

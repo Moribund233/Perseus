@@ -520,6 +520,13 @@
         "closed": "Closed"
       }
     },
+    "collab": {
+      "label": "Collab",
+      "toggle": "Toggle collaborative editing (Yjs realtime)",
+      "pending": "Unsynced changes buffered offline",
+      "saved": "Collaborative edit committed ({{commit}})",
+      "saveFailed": "Collaborative save failed"
+    },
     "aux": {
       "toggle": "Collab sidebar (PRs / Issues / members)",
       "title": "Collaboration",

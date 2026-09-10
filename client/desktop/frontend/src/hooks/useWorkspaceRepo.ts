@@ -8,6 +8,7 @@ export interface WorkspaceRepo {
   owner: string;
   repo: string;
   repoId: string | null;
+  defaultBranch: string | null;
   loading: boolean;
 }
 
@@ -26,17 +27,22 @@ export function useWorkspaceRepo(workspace: Workspace): WorkspaceRepo {
   const owner = parts?.owner ?? '';
   const repo = parts?.repo ?? '';
   const [repoId, setRepoId] = useState<string | null>(null);
+  const [defaultBranch, setDefaultBranch] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let alive = true;
     setRepoId(null);
+    setDefaultBranch(null);
     if (!serverId || !owner || !repo) return;
     setLoading(true);
     repositoriesApi
       .getByPath(serverId, owner, repo)
       .then((r) => {
-        if (alive) setRepoId(r.id);
+        if (alive) {
+          setRepoId(r.id);
+          setDefaultBranch(r.default_branch ?? null);
+        }
       })
       .catch(() => {
         if (alive) setRepoId(null);
@@ -49,5 +55,5 @@ export function useWorkspaceRepo(workspace: Workspace): WorkspaceRepo {
     };
   }, [serverId, owner, repo]);
 
-  return { serverId, owner, repo, repoId, loading };
+  return { serverId, owner, repo, repoId, defaultBranch, loading };
 }
