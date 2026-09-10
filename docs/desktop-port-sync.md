@@ -17,7 +17,7 @@
 | 通知 | ✅ 面板/未读/跳转 | ✅ 移植（T5：铃铛 Popover 面板 + 未读/已读/删除 + target_type 深链） | T5 | 偏好设置页未移植（desktop Settings 暂无对应 Tab） |
 | **协作编辑（F-204）** | ✅ **Yjs 底座**（Hocuspocus 网关 + y-codemirror.next，2026-09-08 迁移） | ⬜ | **y-monaco 接入**（D1） | CRDT 底座已就绪, desktop 仅需 y-monaco 绑定 + provider 接线, 无协议适配 |
 | 全局搜索 | ✅ 代码/issue 聚合搜索 | ✅ 门户聚合搜索（仓库/Issue/PR，T3；后端 `GET /api/v1/search/global` 两端可共用） | T3 | web 端 `GlobalSearch.tsx` 仍为纯代码搜索，可后续复用该端点增强 |
-| Dashboard（贡献图/活动流） | ✅ | ⬜ | 待排期 | |
+| Dashboard（贡献图/活动流） | ✅ | 🟡 我的工作（T6：跨仓库 PR/Issue 聚合）已移植；贡献图/活动流未移植 | T6（部分） | |
 | Builds / Releases / Webhooks / 仓库设置 | ✅ | ⬜（仓库 settings tab 空占位） | 待排期 | |
 | 用户中心（SSH Keys/OAuth /me） | ✅ | ⬜ | 待排期 | desktop identity 仅只读徽标 |
 | Editor 文件保存/删除 API | ✅（服务端 blob 提交） | ➖ 本地工作区直接读写文件系统 | — | 职责由本地 fs/git 替代 |

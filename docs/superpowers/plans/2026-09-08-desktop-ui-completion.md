@@ -180,17 +180,17 @@
 
 ---
 
-### Task 6: 我的工作（可选，视进度）
+### Task 6: 我的工作 — ✅ 已完成（2026-09-10，commit `21d1716`）
 
 **Files:**
 - Create: `client/desktop/frontend/src/views/MyWorkView.tsx`
-- Modify: `navigation.ts`、`PortalShell.tsx`
+- Modify: `navigation.ts`、`PortalShell.tsx`、`Welcome.tsx`（入口动作卡）、`i18n`
 
 **Interfaces:**
 - Consumes: `stores/myWork.ts`（`fetchMyPullRequests`/`fetchMyIssues` 已就绪）.
 - Produces: 聚合「我发起的 PR / 分配的 Issue」视图，跳转到仓库详情对应 Tab。
 
-> 若本批排期紧张可降级为 IDE 内 QuickList 增强，不单列门户视图。
+> 落地：PR/Issue 双 Tab + 状态筛选（open/closed/all，all 不传参）；行点击经 `repositories` store 映射 `repository_id→path` 后复用 `pendingOpen` 深链直达对应 Issue/PR 详情。Welcome 新增「我的工作」入口。
 
 ---
 
