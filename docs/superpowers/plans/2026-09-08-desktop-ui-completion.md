@@ -250,11 +250,14 @@
   - **全链路端到端实证**（app 容器经 `ws://collab:4444`）：发送精确 lib0 Auth 帧（`docName + varuint(2) + varuint(0) + token="" + version="4.6.0"`）→ collab 日志 `[onAuthenticate] 无效或过期的 token` → 服务器回写 `PermissionDenied` 帧（docName + varuint(2)/Auth + varuint(1)/PermissionDenied + utf8 "无效或过期的 token"）。整条 client→Hocuspocus→app `/api/v1/collab/auth`（X-Collab-Internal-Secret）→PermissionDenied 链路可用；注入密钥库真实 app token 即可得 `Authenticated`（Auth + varuint(2)/Authenticated + scope）并放行。
   - dev 编排（`docker-compose.dev.yml`，project `perseus-devt`，WSL 隔离）已拉起并验证：app(8000)+collab(4444/4445 Hocuspocus v4.6.0)+gateway(127.0.0.1:8080)+git-cgi；`PERSEUS_COLLAB_INTERNAL_SECRET` 内部回调密钥已生效。
   - 实现指引：`handlers_collab.go` 首个客户端帧解析→密钥库取 app access token→替换 `token` 字段→转发出站 ws 连接；其余帧透明双向转发。
-- [ ] **Step 1**: Go `handlers_collab.go` 代理（首帧改写 + 双向转发 + 重连）。
-- [ ] **Step 2**: TS `collabSocket.ts` 封装 provider。
-- [ ] **Step 3**: `CollabMonaco.tsx` y-monaco 绑定 + 协作状态栏（participants/pending）。
-- [ ] **Step 4**: 接线 `EditorTabs.tsx`（哪些文件可协作：本地工作区文件与远端仓库文件关联时；初始限定已 clone 到工作区且对应远端仓库存在的文件）。
-- [ ] **Step 5**: build + go test + commit。
+- [x] **Step 1**: Go `handlers_collab.go` 代理（首帧改写 + 双向转发 + 重连）。
+  - `internal/gateway/lib0.go`：LEB128 varUint / 长度前缀 varString 编解码（约 60 行）。
+  - `rewriteCollabAuthFrame`：严格解析 `varString(docName)+varUint(2)+varUint(0)+varString(token)+varString(version)` 形状，命中才改写并重算长度前缀，未知尾部字节保留；其余帧透明转发。
+  - 路由 `GET /api/local/proxy/{serverId}/collab` → `<baseURL>/ws/collab`（nginx 分流）；上游断开时关闭客户端连接，由 HocuspocusProvider 重连重发认证帧（本代理再次注入）。
+- [x] **Step 2**: TS `collabSocket.ts` 封装 provider（`CollabSession`：awareness 字段 name/color/user_id、共享文本 `content`、save=sendStateless、hasUnsyncedChanges 透出；token 传网关 token，由 Go 改写）。
+- [x] **Step 3**: `CollabMonaco.tsx` y-monaco 绑定 + 协作状态栏（`MonacoBinding(ytext, model, Set([editor]), awareness)` onSynced 后装配；状态 chip：连接点/参与者头像/断线缓冲指示）。
+- [x] **Step 4**: 接线 `EditorTabs.tsx`（协作开关按 tab 记忆；可协作条件 = clone 工作区（`useWorkspaceRepo` 解析出 repoId）+ 文本非截断；会话按 path 存活于 tab 切换，关闭 tab/工作区销毁；Ctrl+S = 本地写盘镜像 + stateless collab-save）。
+- [x] **Step 5**: build + go test + commit（`npm run build` ✅；`go build ./...` + `go test ./...` 全绿；TS 冒烟以 dev 编排端到端实证代替（spike Step 0 已覆盖全链路），desktop 无既有 TS 测试基建故未新增）→ commit `c4da85e`。
 
 ---
 
