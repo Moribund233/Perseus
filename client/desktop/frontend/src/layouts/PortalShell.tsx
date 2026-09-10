@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { App as AntApp, Avatar, Badge, Button, Dropdown, Tag, Tooltip } from 'antd';
 import { useTranslation } from 'react-i18next';
 import {
@@ -21,6 +21,7 @@ import WindowControls from '../components/WindowControls';
 import Welcome from '../views/Welcome';
 import ServerManager from '../views/servers/ServerManager';
 import RepositoriesView from '../views/repositories/RepositoriesView';
+import GlobalSearchView from '../views/GlobalSearchView';
 import Settings from '../views/Settings';
 
 const healthTag: Record<string, 'success' | 'error' | 'default'> = { online: 'success', offline: 'error', unknown: 'default' };
@@ -117,6 +118,8 @@ export default function PortalShell() {
 
   const phase2 = () => message.info(t('desktop.portal.phase2'));
 
+  const [searchOpen, setSearchOpen] = useState(false);
+
   // 双击标题栏空白/拖拽区 = 最大化/还原（交互控件上不触发）。
   const onTitlebarDblClick = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button, input, a, .win-controls, .avatar, .ant-avatar')) return;
@@ -187,7 +190,7 @@ export default function PortalShell() {
             <div className="tb-right">
               {view === 'repositories' && current && (
                 <Tooltip title={t('desktop.portal.searchPlaceholder')}>
-                  <button className="tb-search" onClick={phase2}>
+                  <button className="tb-search" onClick={() => setSearchOpen(true)}>
                     <SearchOutlined />
                     {t('desktop.portal.searchPlaceholder')}
                     <kbd>{t('desktop.portal.searchKbd')}</kbd>
@@ -227,6 +230,8 @@ export default function PortalShell() {
       )}
 
       <main className="portal-main">{content}</main>
+
+      <GlobalSearchView open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 }

@@ -434,7 +434,21 @@
       "notifications": "Notifications",
       "offlineBanner": "{{name}} unreachable — showing read-only offline cache, auto-recovers when back online",
       "retry": "Retry",
-      "phase2": "This interaction ships in Phase 2."
+      "phase2": "This interaction ships in Phase 2.",
+      "search": {
+        "placeholder": "Search repos, issues, PRs…",
+        "hint": "Type at least 2 characters to search",
+        "empty": "No matching results",
+        "failed": "Search failed — check server connection",
+        "groupRepos": "Repositories",
+        "groupIssues": "Issues",
+        "groupPRs": "Pull Requests",
+        "status": {
+          "open": "Open",
+          "closed": "Closed",
+          "merged": "Merged"
+        }
+      }
     },
     "repos": {
       "sub": "{{name}} · {{count}} repositories",

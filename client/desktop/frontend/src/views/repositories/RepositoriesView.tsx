@@ -235,6 +235,29 @@ export default function RepositoriesView() {
     }
   }, [currentRepo, fetchRepositories]);
 
+  // 门户搜索深链：打开目标仓库（必要时先拉取），命中后定位 Tab/详情。
+  const pendingOpen = useRepositoriesStore((s) => s.pendingOpen);
+  const setPendingOpen = useRepositoriesStore((s) => s.setPendingOpen);
+
+  useEffect(() => {
+    if (!pendingOpen || currentRepo) return;
+    const [owner, name] = pendingOpen.repoPath.split('/');
+    if (!owner || !name) { setPendingOpen(null); return; }
+    fetchRepositoryByPath(owner, name);
+  }, [pendingOpen, currentRepo, fetchRepositoryByPath, setPendingOpen]);
+
+  useEffect(() => {
+    if (!pendingOpen || !currentRepo) return;
+    if (currentRepo.path !== pendingOpen.repoPath) {
+      clearCurrent();
+      return;
+    }
+    if (pendingOpen.tab) setActiveTab(pendingOpen.tab);
+    if (pendingOpen.issueNumber != null) setSelectedIssue({ issue_number: pendingOpen.issueNumber } as Issue);
+    if (pendingOpen.prNumber != null) setSelectedPR({ pr_number: pendingOpen.prNumber } as PR);
+    setPendingOpen(null);
+  }, [pendingOpen, currentRepo, clearCurrent, setPendingOpen]);
+
   const openRepo = async (repo: Repository) => {
     clearCurrent();
     const parts = repo.path.split('/');

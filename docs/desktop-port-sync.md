@@ -16,7 +16,7 @@
 | 聊天 | ✅ 会话/频道/附件/reactions/presence | ⬜ | 2C（D4 推后） | 体量大: 会话流+附件+reactions |
 | 通知 | ✅ 面板/未读/跳转 | ⬜ | 2C（D4 推后） | |
 | **协作编辑（F-204）** | ✅ **Yjs 底座**（Hocuspocus 网关 + y-codemirror.next，2026-09-08 迁移） | ⬜ | **y-monaco 接入**（D1） | CRDT 底座已就绪, desktop 仅需 y-monaco 绑定 + provider 接线, 无协议适配 |
-| 全局搜索 | ✅ 代码/issue 聚合搜索 | ⬜ | 待排期 | |
+| 全局搜索 | ✅ 代码/issue 聚合搜索 | ✅ 门户聚合搜索（仓库/Issue/PR，T3；后端 `GET /api/v1/search/global` 两端可共用） | T3 | web 端 `GlobalSearch.tsx` 仍为纯代码搜索，可后续复用该端点增强 |
 | Dashboard（贡献图/活动流） | ✅ | ⬜ | 待排期 | |
 | Builds / Releases / Webhooks / 仓库设置 | ✅ | ⬜（仓库 settings tab 空占位） | 待排期 | |
 | 用户中心（SSH Keys/OAuth /me） | ✅ | ⬜ | 待排期 | desktop identity 仅只读徽标 |

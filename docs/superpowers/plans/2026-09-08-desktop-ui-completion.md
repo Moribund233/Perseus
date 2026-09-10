@@ -105,16 +105,19 @@
 - Consumes: 现有 `repositoriesApi`/`issues`/`pullRequests` 的 proxyRequest（聚合语义对齐 web 端 `/search` 聚合；若 desktop 无聚合端点则前端并发三接口本地合并）。
 - Produces: PortalShell 标题栏搜索框触发聚合搜索 UI（Modal/下拉），展示仓库/Issue/PR 三类分组结果，点击跳转对应详情（仓库→`openRepo`、Issue/PR→仓库详情对应 Tab）。
 
-- [ ] **Step 1: 写聚合视图**
+- [x] **Step 1: 写聚合视图**
 
 `GlobalSearchView.tsx`：输入触发防抖查询；三分类分组合并；点击导航。
 > **前置核对**：后端是否已有聚合搜索 API；若无，前端并发 `repositoriesApi.list` + issues/PR 列表本地筛选合并。
+> 前置核对结论（2026-09-10）：后端**无**仓库/Issue/PR 聚合端点（`/api/v1/search/code` 仅代码搜索；Issue `search` 仅 per-repo filter；PR 列表无关键词参数），前端本地合并受 N+1 请求与分页截断限制 → **采用后端增量**：新增 `GET /api/v1/search/global`（`search_controller.py`，DB 层 ilike 三表查询 + `get_accessible_repository_ids` 权限过滤，`per_type` 限流），web 端后续可复用。7 例后端测试（`TestGlobalSearchAPI`）于 WSL docker 测试容器通过。
 
-- [ ] **Step 2: 接线 PortalShell**
+- [x] **Step 2: 接线 PortalShell**
 
-`PortalShell.tsx:190` 的 `onClick={phase2}` 改为打开聚合搜索。
+`PortalShell.tsx` 搜索死按钮改为打开 `GlobalSearchView` Modal；结果点击经 `useRepositoriesStore.pendingOpen` 深链（`RepositoriesView` 消费：按 path 拉取仓库 → 定位 `issues`/`pullRequests` Tab → 打开对应 Issue/PR 详情）。
 
-- [ ] **Step 3: build 验证 + Commit**
+- [x] **Step 3: build 验证 + Commit**
+
+`npm run build` 通过后提交。
 
 ---
 

@@ -434,7 +434,21 @@
       "notifications": "通知",
       "offlineBanner": "{{name}} 不可达 — 正在显示离线缓存数据（只读），联网后自动恢复",
       "retry": "重试",
-      "phase2": "该交互将在 Phase 2 提供。"
+      "phase2": "该交互将在 Phase 2 提供。",
+      "search": {
+        "placeholder": "搜索仓库、Issue、PR…",
+        "hint": "输入至少 2 个字符开始搜索",
+        "empty": "未找到匹配结果",
+        "failed": "搜索失败，请检查服务器连接",
+        "groupRepos": "仓库",
+        "groupIssues": "Issue",
+        "groupPRs": "Pull Request",
+        "status": {
+          "open": "开启",
+          "closed": "已关闭",
+          "merged": "已合并"
+        }
+      }
     },
     "repos": {
       "sub": "{{name}} · {{count}} 个仓库",

@@ -68,7 +68,7 @@
 
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
-| 全局搜索框 | ✅ 已接线：受控输入 + 350ms 防抖 → 下拉结果（按仓库分组、可点击进 Editor 对应文件/行）+ Enter 进入 `/search` 结果页 | 复用了后端跨仓库代码搜索 `/api/v1/search/code`（已存在聚合端点） | P2 |
+| 全局搜索框 | ✅ 已接线：受控输入 + 350ms 防抖 → 下拉结果（按仓库分组、可点击进 Editor 对应文件/行）+ Enter 进入 `/search` 结果页 | 复用了后端跨仓库代码搜索 `/api/v1/search/code`（已存在聚合端点）。仓库/Issue/PR 聚合搜索后端端点已于 2026-09-10 新增（`GET /api/v1/search/global`，desktop T3 先行接入），web 端可复用增强为三类分组 | P2 |
 | 通知点击跳转 | ✅ 已按 `target_type` 映射路由（PR→pulls / Issue→issues / 其余→仓库），解析 repository_id→path | — | P1 |
 | 侧边栏未读徽标 | 已移除假数字（本批） | 若要恢复，需后端提供未读聚合端点 | P3 |
 

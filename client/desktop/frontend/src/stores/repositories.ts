@@ -16,6 +16,14 @@ function serverId(): string | null {
   return useServersStore.getState().currentServerId;
 }
 
+// 门户搜索结果 → 仓库详情深链：打开指定仓库并定位到 Issue/PR Tab。
+export interface RepoDeepLink {
+  repoPath: string;
+  tab?: 'issues' | 'pullRequests';
+  issueNumber?: number;
+  prNumber?: number;
+}
+
 interface RepositoriesState {
   repositories: Repository[];
   currentRepo: Repository | null;
@@ -27,6 +35,7 @@ interface RepositoriesState {
   members: RepoMember[];
   isLoading: boolean;
   error: string | null;
+  pendingOpen: RepoDeepLink | null;
 
   fetchRepositories: () => Promise<void>;
   fetchRepositoriesByUser: (userId: string) => Promise<void>;
@@ -44,6 +53,7 @@ interface RepositoriesState {
   starRepository: (repoId: string) => Promise<void>;
   unstarRepository: (repoId: string) => Promise<void>;
   clearCurrent: () => void;
+  setPendingOpen: (link: RepoDeepLink | null) => void;
 }
 
 export const useRepositoriesStore = create<RepositoriesState>((set, get) => ({
@@ -57,6 +67,7 @@ export const useRepositoriesStore = create<RepositoriesState>((set, get) => ({
   members: [],
   isLoading: false,
   error: null,
+  pendingOpen: null,
 
   fetchRepositories: async () => {
     const sid = serverId();
@@ -249,5 +260,9 @@ export const useRepositoriesStore = create<RepositoriesState>((set, get) => ({
       commits: [],
       members: [],
     });
+  },
+
+  setPendingOpen: (link) => {
+    set({ pendingOpen: link });
   },
 }));
