@@ -134,23 +134,25 @@
   - 全屏聊天视图（对齐 `chat.html`）：频道/私信侧栏、消息流（Markdown + 代码片段 + reactions + typing 指示）、成员面板、composer（附件/表情/发送）。
   - IDE 活动栏「聊天」入口打开真实聊天面板（替换 `IdeShell.tsx:225-230` 的 `phase2` 占位）。
 
-- [ ] **Step 1: ChatView 组件骨架**
+- [x] **Step 1: ChatView 组件骨架**
 
-仿 `chat.html` 三栏布局 + `useChatStore` 渲染房间/消息/成员；`useChatRoomList` 初始化房间。
+仿 `chat.html` 三栏布局（频道 240 / 会话 / 成员 220）+ `useChatStore` 渲染房间/消息/成员；频道列表对齐 web 端语义 = 用户仓库列表，点击 `openChannel(repoId)`（服务端按仓库访问权限 auto-join）。共享件拆分：`ChatMessages.tsx`（Markdown + reactions + typing + 日期分组 + 本人删除）、`ChatComposer.tsx`（附件/表情/Markdown 工具条/Enter 发送，断连禁用）。
 
-- [ ] **Step 2: store 补房间聚合**
+- [x] **Step 2: store 补房间聚合**
 
-`stores/chat.ts`：`fetchChatRooms()` 聚合各仓库 `getRepositoryRoom` + `getUnreadCounts`（现有 `fetchRoom` 单房间；补「全部仓库」聚合或后端 `listRooms`）。
+`stores/chat.ts`：`fetchChatRooms()` = 后端 `GET /api/v1/rooms`（`RoomService.list_rooms` 既有服务端实现补暴露 REST，2 例测试通过）+ `fetchUnread` 按 `repository_id` 映射 `unreadByRepo`；另补 `typingByRoom`/`onlineUsers`（presence 全套）、`toggleReaction`/`pickReaction`/`deleteMessage`、`reset()`（切服务器清态）；修复 `fetchMessages` 倒序返回未反转问题。
 
-- [ ] **Step 3: 注册为 Portal 独立视图**
+- [x] **Step 3: 注册为 Portal 独立视图**
 
-`navigation.ts` `PortalView` 增 `'chat'`；`PortalShell.tsx` switch 增 case + CRUMB_KEYS。
+`navigation.ts` `PortalView` 增 `'chat'`；`PortalShell.tsx` switch 增 case（无服务器时空态）+ CRUMB_KEYS；入口：Welcome 新增「团队聊天」动作卡；切服务器时 `resetChat`。
 
-- [ ] **Step 4: IDE 活动栏 chat 面板真接线**
+- [x] **Step 4: IDE 活动栏 chat 面板真接线**
 
-`IdeShell.tsx:225-230` 占位改为 `ChatView` 精简版（或 ActivityChatPanel），连接同一 `useChatStore`/`chatSocket`；socket 常驻不随切 Tab 销毁（对齐终端语义）。
+`IdeShell.tsx` 占位改为 `ActivityChatPanel`（房间下拉 + 精简消息流 + composer），clone 工作区按 `remote_url` 尾段自动匹配来源仓库房间；socket 常驻不随切 Tab 销毁（对齐终端语义）。
 
-- [ ] **Step 5: build 验证 + Commit**
+- [x] **Step 5: build 验证 + Commit**
+
+`npm run build` 通过（新增 `react-markdown`+`remark-gfm`，pnpm）后提交 commit `842315b`。
 
 ---
 

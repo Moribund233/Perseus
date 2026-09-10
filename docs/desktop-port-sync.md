@@ -13,7 +13,7 @@
 | 仓库浏览 | ✅ 列表/详情/树/blob | ✅ 移植（2A, proxy 化） | 2A | 文件内容 `<pre>` 只读, web 为编辑器 |
 | Issues | ✅ 列表/详情/创建/评论/关闭 | ✅ 移植（2B） | 2B | |
 | Pull Requests | ✅ 列表/详情/merge/close/review | 🟡 列表/详情/评论/merge/close；**创建 PR 仅按钮无 Modal** | 2B+ | 补创建 Modal |
-| 聊天 | ✅ 会话/频道/附件/reactions/presence | ⬜ | 2C（D4 推后） | 体量大: 会话流+附件+reactions |
+| 聊天 | ✅ 会话/频道/附件/reactions/presence | ✅ 移植（T4：门户三栏全屏页 + IDE 活动栏面板；后端补 `GET /api/v1/rooms`） | T4 | 频道=仓库房间语义与 web 一致；DM 私聊两端均未实现 |
 | 通知 | ✅ 面板/未读/跳转 | ⬜ | 2C（D4 推后） | |
 | **协作编辑（F-204）** | ✅ **Yjs 底座**（Hocuspocus 网关 + y-codemirror.next，2026-09-08 迁移） | ⬜ | **y-monaco 接入**（D1） | CRDT 底座已就绪, desktop 仅需 y-monaco 绑定 + provider 接线, 无协议适配 |
 | 全局搜索 | ✅ 代码/issue 聚合搜索 | ✅ 门户聚合搜索（仓库/Issue/PR，T3；后端 `GET /api/v1/search/global` 两端可共用） | T3 | web 端 `GlobalSearch.tsx` 仍为纯代码搜索，可后续复用该端点增强 |
