@@ -400,7 +400,9 @@
         "clone": "Clone 仓库",
         "cloneDesc": "通过 URL 克隆，凭据自动进系统密钥库",
         "chat": "团队聊天",
-        "chatDesc": "按仓库频道的团队沟通，实时同步"
+        "chatDesc": "按仓库频道的团队沟通，实时同步",
+        "myWork": "我的工作",
+        "myWorkDesc": "跨仓库聚合我发起的 PR 与 Issue"
       },
       "hints": {
         "commandPalette": "命令面板",
@@ -429,6 +431,7 @@
         "repositories": "仓库",
         "servers": "服务器",
         "chat": "团队聊天",
+        "myWork": "我的工作",
         "settings": "设置"
       },
       "manageServers": "管理服务器…",
@@ -495,6 +498,27 @@
       "markAllRead": "全部已读",
       "empty": "暂无通知",
       "delete": "删除"
+    },
+    "myWork": {
+      "title": "我的工作",
+      "sub": "跨仓库聚合你发起的 Pull Request 与分配给你的 Issue",
+      "myPRs": "我发起的 PR",
+      "myIssues": "我的 Issue",
+      "statusOpen": "开启",
+      "statusClosed": "已关闭",
+      "statusAll": "全部",
+      "emptyPRs": "暂无符合条件的 PR",
+      "emptyIssues": "暂无符合条件的 Issue",
+      "prStatus": {
+        "open": "开启",
+        "closed": "已关闭",
+        "merged": "已合并",
+        "draft": "草稿"
+      },
+      "issueStatus": {
+        "open": "开启",
+        "closed": "已关闭"
+      }
     },
     "repos": {
       "sub": "{{name}} · {{count}} 个仓库",

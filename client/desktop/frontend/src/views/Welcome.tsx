@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { App as AntApp, Input, Modal, Tooltip } from 'antd';
 import { useTranslation } from 'react-i18next';
 import {
+  CheckSquareOutlined,
   CloudServerOutlined,
   DownloadOutlined,
   FolderOpenOutlined,
@@ -96,6 +97,7 @@ export default function Welcome() {
     folder: <FolderOpenOutlined />,
     clone: <DownloadOutlined />,
     chat: <MessageOutlined />,
+    myWork: <CheckSquareOutlined />,
   };
 
   return (
@@ -135,6 +137,11 @@ export default function Welcome() {
               {icons.chat}
               <b>{t('desktop.welcome.actions.chat')}</b>
               <span>{t('desktop.welcome.actions.chatDesc')}</span>
+            </button>
+            <button className="wb-action" onClick={() => navigate('myWork')}>
+              {icons.myWork}
+              <b>{t('desktop.welcome.actions.myWork')}</b>
+              <span>{t('desktop.welcome.actions.myWorkDesc')}</span>
             </button>
           </div>
           <div className="wb-hint">

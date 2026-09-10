@@ -24,6 +24,7 @@ import ServerManager from '../views/servers/ServerManager';
 import RepositoriesView from '../views/repositories/RepositoriesView';
 import GlobalSearchView from '../views/GlobalSearchView';
 import ChatView from '../views/chat/ChatView';
+import MyWorkView from '../views/MyWorkView';
 import NotificationsPanel from '../views/notifications/NotificationsPanel';
 import Settings from '../views/Settings';
 
@@ -34,6 +35,7 @@ const CRUMB_KEYS: Record<string, string> = {
   repositories: 'desktop.portal.crumb.repositories',
   servers: 'desktop.portal.crumb.servers',
   chat: 'desktop.portal.crumb.chat',
+  myWork: 'desktop.portal.crumb.myWork',
   settings: 'desktop.portal.crumb.settings',
 };
 
@@ -154,6 +156,19 @@ export default function PortalShell() {
     case 'chat':
       content = current ? (
         <ChatView key={currentServerId} />
+      ) : (
+        <div className="portal-empty">
+          <CloudServerOutlined />
+          <span>{t('desktop.serverShell.noServerSelected')}</span>
+          <Button type="primary" onClick={() => navigate('servers')}>
+            {t('desktop.serverShell.manageServers')}
+          </Button>
+        </div>
+      );
+      break;
+    case 'myWork':
+      content = current ? (
+        <MyWorkView key={currentServerId} />
       ) : (
         <div className="portal-empty">
           <CloudServerOutlined />

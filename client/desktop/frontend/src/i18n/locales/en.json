@@ -400,7 +400,9 @@
         "clone": "Clone Repository",
         "cloneDesc": "Clone by URL; credentials go to the OS keychain",
         "chat": "Team Chat",
-        "chatDesc": "Repository-scoped channels with realtime messaging"
+        "chatDesc": "Repository-scoped channels with realtime messaging",
+        "myWork": "My Work",
+        "myWorkDesc": "Aggregated pull requests and issues across repositories"
       },
       "hints": {
         "commandPalette": "Command Palette",
@@ -429,6 +431,7 @@
         "repositories": "Repositories",
         "servers": "Servers",
         "chat": "Team Chat",
+        "myWork": "My Work",
         "settings": "Settings"
       },
       "manageServers": "Manage servers…",
@@ -495,6 +498,27 @@
       "markAllRead": "Mark all as read",
       "empty": "No notifications",
       "delete": "Delete"
+    },
+    "myWork": {
+      "title": "My Work",
+      "sub": "Your pull requests and assigned issues across repositories",
+      "myPRs": "My Pull Requests",
+      "myIssues": "My Issues",
+      "statusOpen": "Open",
+      "statusClosed": "Closed",
+      "statusAll": "All",
+      "emptyPRs": "No matching pull requests",
+      "emptyIssues": "No matching issues",
+      "prStatus": {
+        "open": "Open",
+        "closed": "Closed",
+        "merged": "Merged",
+        "draft": "Draft"
+      },
+      "issueStatus": {
+        "open": "Open",
+        "closed": "Closed"
+      }
     },
     "repos": {
       "sub": "{{name}} · {{count}} repositories",
