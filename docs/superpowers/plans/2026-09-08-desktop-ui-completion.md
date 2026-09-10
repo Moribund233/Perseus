@@ -166,15 +166,17 @@
 - Consumes: `notificationsApi`（`list`/`markAsRead`/`markAllAsRead`/`delete`/`preferences`）+ `stores/notifications.ts`.
 - Produces: 标题栏通知铃铛点击打开面板（列表/未读状态/全部已读/跳转到对应仓库或 issue/PR）。
 
-- [ ] **Step 1: 写面板组件**
+- [x] **Step 1: 写面板组件**
 
-下拉或抽屉；`notifications store` 拉取列表；每项展开跳转（经导航到对应目标）。
+`NotificationsPanel.tsx`：标题栏铃铛 Popover 下拉面板；未读徽标计数、全部已读、单条删除（hover）、点击跳转（语义对齐 web `AppLayout.handleNotificationClick`：target_type 含 pr/pull → PR Tab、issue → Issues Tab、其余 → 仓库，经 `repositoriesApi.get` 解析 path 后复用 `pendingOpen` 深链）。
 
-- [ ] **Step 2: 接线 PortalShell**
+- [x] **Step 2: 接线 PortalShell**
 
-`PortalShell.tsx:199` `onClick={phase2}` → 打开 `NotificationsPanel`。
+`PortalShell.tsx` 铃铛 `onClick={phase2}` 占位移除 → `Popover(trigger=click)` 包裹；`phase2` 死占位在 PortalShell 中全部清零。
 
-- [ ] **Step 3: build + Commit**
+- [x] **Step 3: build + Commit**
+
+`npm run build` 通过后提交 commit `a4d00e6`。
 
 ---
 
