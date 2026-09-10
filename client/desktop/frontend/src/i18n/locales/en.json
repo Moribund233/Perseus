@@ -520,6 +520,13 @@
         "closed": "Closed"
       }
     },
+    "aux": {
+      "toggle": "Collab sidebar (PRs / Issues / members)",
+      "title": "Collaboration",
+      "pendingPRs": "Open Pull Requests",
+      "relatedIssues": "Related Issues",
+      "empty": "No open records"
+    },
     "repos": {
       "sub": "{{name}} · {{count}} repositories",
       "filterPlaceholder": "Filter repositories…",

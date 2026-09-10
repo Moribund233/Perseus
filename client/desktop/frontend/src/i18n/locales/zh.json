@@ -520,6 +520,13 @@
         "closed": "已关闭"
       }
     },
+    "aux": {
+      "toggle": "协作辅助栏（PR / Issue / 成员）",
+      "title": "协作",
+      "pendingPRs": "待处理 PR",
+      "relatedIssues": "相关 Issue",
+      "empty": "暂无开放记录"
+    },
     "repos": {
       "sub": "{{name}} · {{count}} 个仓库",
       "filterPlaceholder": "筛选仓库…",

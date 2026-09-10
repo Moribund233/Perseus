@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
 import { Select } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useChatStore } from '../../stores/chat';
 import type { Workspace } from '../../api/workspaces';
+import { useWorkspaceChatRoom } from '../../hooks/useWorkspaceChatRoom';
 import ChatMessages from './ChatMessages';
 import ChatComposer from './ChatComposer';
 
@@ -13,38 +13,8 @@ const green = '#3fb950';
 // IDE 活动栏聊天精简面板：与门户 ChatView 共用同一 store/socket（socket 常驻）。
 export default function ActivityChatPanel({ workspace }: { workspace: Workspace }) {
   const { t } = useTranslation();
-  const rooms = useChatStore((s) => s.rooms);
-  const activeRoomId = useChatStore((s) => s.activeRoomId);
-  const status = useChatStore((s) => s.status);
+  const { rooms, activeRoomId, activeRoom, status } = useWorkspaceChatRoom(workspace);
   const setActiveRoom = useChatStore((s) => s.setActiveRoom);
-  const start = useChatStore((s) => s.start);
-
-  useEffect(() => {
-    start();
-  }, [start]);
-
-  useEffect(() => {
-    void useChatStore.getState().fetchChatRooms();
-  }, [workspace.server_id]);
-
-  // 优先匹配工作区来源仓库的房间（clone 工作区 remote_url = <base>/<owner>/<repo>.git）。
-  const preferredRoomId = useMemo(() => {
-    if (rooms.length === 0) return null;
-    const repoName = workspace.remote_url ? (workspace.remote_url.split('/').pop() ?? '').replace(/\.git$/, '') : '';
-    if (repoName) {
-      const hit = rooms.find((r) => r.name === repoName);
-      if (hit) return hit.id;
-    }
-    return null;
-  }, [rooms, workspace.remote_url]);
-
-  useEffect(() => {
-    if (preferredRoomId && preferredRoomId !== activeRoomId) {
-      setActiveRoom(preferredRoomId);
-      void useChatStore.getState().fetchMessages(preferredRoomId);
-      void useChatStore.getState().fetchMembers(preferredRoomId);
-    }
-  }, [preferredRoomId, activeRoomId, setActiveRoom]);
 
   const roomOptions = rooms.map((r) => ({ value: r.id, label: `# ${r.name}` }));
 
@@ -53,8 +23,6 @@ export default function ActivityChatPanel({ workspace }: { workspace: Workspace 
     void useChatStore.getState().fetchMessages(roomId);
     void useChatStore.getState().fetchMembers(roomId);
   };
-
-  const activeRoom = rooms.find((r) => r.id === activeRoomId) ?? null;
 
   return (
     <div className="sb-pane on" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

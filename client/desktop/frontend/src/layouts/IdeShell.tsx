@@ -10,6 +10,7 @@ import {
   MessageOutlined,
   DatabaseOutlined,
   SettingOutlined,
+  TeamOutlined,
 } from '@ant-design/icons';
 import type { Workspace } from '../api/workspaces';
 import { useWorkspaceStore } from '../stores/workspace';
@@ -27,6 +28,7 @@ import DiffView from '../views/workspace/DiffView';
 import ProblemsPanel from '../views/workspace/ProblemsPanel';
 import OutputPanel from '../views/workspace/OutputPanel';
 import TerminalPanel from '../views/workspace/TerminalPanel';
+import CollabAuxPanel from '../views/workspace/CollabAuxPanel';
 import ActivityChatPanel from '../views/chat/ActivityChatPanel';
 import StatusBar, { type BottomTab } from '../views/workspace/StatusBar';
 import CommandPalette, { type PaneId } from '../views/workspace/CommandPalette';
@@ -66,6 +68,7 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
   const [diffPath, setDiffPath] = useState<string | null>(null);
   const [bottom, setBottom] = useState<BottomTab>('problems');
   const [collapsed, setCollapsed] = useState(false);
+  const [auxOpen, setAuxOpen] = useState(false);
   const [palette, setPalette] = useState(false);
   const [file, setFile] = useState<string | null>(null);
   const [lang, setLang] = useState<string | null>(null);
@@ -185,6 +188,9 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
           <span className="faint" title={workspace.path}>{workspace.name}/{workspace.path.split(/[\\/]/).pop()}</span>
         </div>
         <div className="tb-right">
+          <button className={`tb-icon${auxOpen ? ' on' : ''}`} title={t('desktop.aux.toggle')} style={auxOpen ? { color: 'var(--blue-light, #58a6ff)' } : undefined} onClick={() => setAuxOpen((v) => !v)}>
+            <TeamOutlined />
+          </button>
           <button className="tb-search" onClick={() => setPalette(true)}>
             <SearchOutlined />
             <span>{t('desktop.ide.searchWorkspace')}</span>
@@ -261,6 +267,12 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
             <TerminalPanel workspaceId={workspace.id} active={bottom === 'terminal'} />
           </div>
         </main>
+
+        {auxOpen && (
+          <aside style={{ width: 264, flexShrink: 0 }}>
+            <CollabAuxPanel workspace={workspace} />
+          </aside>
+        )}
       </div>
 
       <StatusBar workspace={workspace} file={file} lang={lang} onOpenBottom={(b) => { setBottom(b); setCollapsed(false); }} />
