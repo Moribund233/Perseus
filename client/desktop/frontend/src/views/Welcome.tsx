@@ -7,6 +7,7 @@ import {
   FolderOpenOutlined,
   FolderOutlined,
   KeyOutlined,
+  MessageOutlined,
   NodeIndexOutlined,
 } from '@ant-design/icons';
 import { createWorkspace, listWorkspaces, Workspace } from '../api/workspaces';
@@ -94,6 +95,7 @@ export default function Welcome() {
     servers: <CloudServerOutlined />,
     folder: <FolderOpenOutlined />,
     clone: <DownloadOutlined />,
+    chat: <MessageOutlined />,
   };
 
   return (
@@ -128,6 +130,11 @@ export default function Welcome() {
               {icons.clone}
               <b>{t('desktop.welcome.actions.clone')}</b>
               <span>{t('desktop.welcome.actions.cloneDesc')}</span>
+            </button>
+            <button className="wb-action" onClick={() => navigate('chat')}>
+              {icons.chat}
+              <b>{t('desktop.welcome.actions.chat')}</b>
+              <span>{t('desktop.welcome.actions.chatDesc')}</span>
             </button>
           </div>
           <div className="wb-hint">

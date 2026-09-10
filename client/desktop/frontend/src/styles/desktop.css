@@ -563,3 +563,9 @@ kbd { font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; font-si
 .palette .p-foot { display: flex; gap: 16px; padding: 8px 14px; border-top: 1px solid var(--line); font-size: 11px; color: var(--t3); }
 .palette .p-foot span { display: inline-flex; gap: 5px; align-items: center; }
 .palette .p-empty { padding: 20px; text-align: center; color: var(--t3); font-size: 12.5px; }
+
+/* ---- Chat ---- */
+.chat-msg .chat-delete-btn,
+.chat-msg .chat-add-reaction { opacity: 0 !important; }
+.chat-msg:hover .chat-delete-btn,
+.chat-msg:hover .chat-add-reaction { opacity: 1 !important; }

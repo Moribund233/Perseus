@@ -398,7 +398,9 @@
         "openLocal": "Open Local Directory",
         "openLocalDesc": "Add an existing directory as a workspace, fully usable offline",
         "clone": "Clone Repository",
-        "cloneDesc": "Clone by URL; credentials go to the OS keychain"
+        "cloneDesc": "Clone by URL; credentials go to the OS keychain",
+        "chat": "Team Chat",
+        "chatDesc": "Repository-scoped channels with realtime messaging"
       },
       "hints": {
         "commandPalette": "Command Palette",
@@ -423,9 +425,10 @@
     },
     "portal": {
       "crumb": {
-        "welcome": "Launcher",
+        "welcome": "Launchpad",
         "repositories": "Repositories",
         "servers": "Servers",
+        "chat": "Team Chat",
         "settings": "Settings"
       },
       "manageServers": "Manage servers…",
@@ -449,6 +452,42 @@
           "merged": "Merged"
         }
       }
+    },
+    "chat": {
+      "title": "Perseus Team",
+      "repoCount": "repo channels",
+      "channels": "Channels",
+      "searchChannels": "Search channels…",
+      "noChannels": "No channels available",
+      "noChannelsHint": "No channels joined yet — open any repository to enter its channel",
+      "selectChannel": "Pick a channel to start chatting",
+      "noServer": "Connect to a server first",
+      "connected": "Realtime connected",
+      "status": {
+        "idle": "Offline",
+        "connecting": "Connecting…",
+        "connected": "Connected",
+        "disconnected": "Disconnected",
+        "error": "Connection error"
+      },
+      "onlineCount": "online",
+      "online": "Online",
+      "offline": "Offline",
+      "roleAdmin": "Admin",
+      "members": "Members",
+      "today": "Today",
+      "typing": "is typing…",
+      "noMessages": "No messages yet. Start the conversation!",
+      "delete": "Delete message",
+      "attach": "Upload attachment",
+      "bold": "Bold **text**",
+      "boldText": "bold",
+      "italic": "Italic *text*",
+      "italicText": "italic",
+      "code": "Inline code `code`",
+      "link": "Link [text](URL)",
+      "sendHint": "Enter to send · Shift+Enter for newline",
+      "placeholder": "Message #{{channel}}… Markdown supported"
     },
     "repos": {
       "sub": "{{name}} · {{count}} repositories",

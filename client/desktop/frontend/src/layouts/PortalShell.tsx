@@ -14,6 +14,7 @@ import { useServersStore } from '../stores/servers';
 import { useIdentityStore } from '../stores/identity';
 import { useNotificationsStore } from '../stores/notifications';
 import { useRepositoriesStore } from '../stores/repositories';
+import { useChatStore } from '../stores/chat';
 import { useGatewayStore } from '../stores/gateway';
 import { getAvatarColor, getInitials } from '../utils/avatar';
 import Brand from '../components/Brand';
@@ -22,6 +23,7 @@ import Welcome from '../views/Welcome';
 import ServerManager from '../views/servers/ServerManager';
 import RepositoriesView from '../views/repositories/RepositoriesView';
 import GlobalSearchView from '../views/GlobalSearchView';
+import ChatView from '../views/chat/ChatView';
 import Settings from '../views/Settings';
 
 const healthTag: Record<string, 'success' | 'error' | 'default'> = { online: 'success', offline: 'error', unknown: 'default' };
@@ -30,6 +32,7 @@ const CRUMB_KEYS: Record<string, string> = {
   welcome: 'desktop.portal.crumb.welcome',
   repositories: 'desktop.portal.crumb.repositories',
   servers: 'desktop.portal.crumb.servers',
+  chat: 'desktop.portal.crumb.chat',
   settings: 'desktop.portal.crumb.settings',
 };
 
@@ -48,6 +51,7 @@ export default function PortalShell() {
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const fetchUnreadCount = useNotificationsStore((s) => s.fetchUnreadCount);
   const clearCurrentRepo = useRepositoriesStore((s) => s.clearCurrent);
+  const resetChat = useChatStore((s) => s.reset);
 
   const current = servers.find((s) => s.id === currentServerId) ?? null;
 
@@ -65,10 +69,11 @@ export default function PortalShell() {
     }
   }, [view, currentServerId, fetchUnreadCount]);
 
-  // 切换服务器后清空仓库详情状态，避免串库。
+  // 切换服务器后清空仓库详情与聊天状态，避免串库。
   useEffect(() => {
     clearCurrentRepo();
-  }, [currentServerId, clearCurrentRepo]);
+    resetChat();
+  }, [currentServerId, clearCurrentRepo, resetChat]);
 
   const identityName = me?.full_name || me?.username;
   const identityInitials = identityName ? getInitials(identityName) : '?';
@@ -145,6 +150,19 @@ export default function PortalShell() {
       break;
     case 'servers':
       content = <ServerManager />;
+      break;
+    case 'chat':
+      content = current ? (
+        <ChatView key={currentServerId} />
+      ) : (
+        <div className="portal-empty">
+          <CloudServerOutlined />
+          <span>{t('desktop.serverShell.noServerSelected')}</span>
+          <Button type="primary" onClick={() => navigate('servers')}>
+            {t('desktop.serverShell.manageServers')}
+          </Button>
+        </div>
+      );
       break;
     case 'settings':
       content = <Settings />;

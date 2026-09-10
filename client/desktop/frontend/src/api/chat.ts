@@ -80,6 +80,9 @@ export const chatApi = {
   getRepositoryRoom: (serverId: string, repoId: string) =>
     proxyRequest<RealtimeRoom>(serverId, `/api/v1/repositories/${repoId}/room`),
 
+  listRooms: (serverId: string) =>
+    proxyRequest<RealtimeRoom[]>(serverId, '/api/v1/rooms'),
+
   getUnreadCounts: (serverId: string) =>
     proxyRequest<RoomUnread[]>(serverId, '/api/v1/rooms/unread'),
 

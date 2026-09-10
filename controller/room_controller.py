@@ -46,6 +46,35 @@ async def get_repository_room(
     }
 
 
+@router.get("/api/v1/rooms")
+async def list_rooms(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    列出当前用户已加入的所有活跃房间
+
+    Args:
+        db: 数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        list[dict]: 房间列表（id/repository_id/name/topic/is_active/created_at）
+    """
+    rooms = await RoomService.list_rooms(db, current_user.id)
+    return [
+        {
+            "id": room.id,
+            "repository_id": room.repository_id,
+            "name": room.name,
+            "topic": room.topic,
+            "is_active": room.is_active,
+            "created_at": room.created_at.isoformat() if room.created_at else None,
+        }
+        for room in rooms
+    ]
+
+
 @router.get("/api/v1/rooms/{room_id}/members")
 async def get_room_members(
     room_id: uuid.UUID,

@@ -6,11 +6,17 @@ import {
   type RoomMember,
   type RoomUnread,
 } from '../api/chat';
-import { chatSocket } from '../api/chatSocket';
+import { chatSocket, type PresenceUser } from '../api/chatSocket';
 import { useServersStore } from './servers';
 
 function serverId(): string | null {
   return useServersStore.getState().currentServerId;
+}
+
+export interface TypingUser {
+  user_id: string;
+  username: string;
+  ts: number;
 }
 
 interface ChatState {
@@ -18,20 +24,53 @@ interface ChatState {
   messages: Record<string, ChatMessage[]>;
   members: Record<string, RoomMember[]>;
   unreadByRoom: Record<string, number>;
+  unreadByRepo: Record<string, number>;
   totalUnread: number;
   activeRoomId: string | null;
+  onlineUsers: Record<string, PresenceUser[]>;
+  typingByRoom: Record<string, Record<string, TypingUser>>;
   status: 'idle' | 'connecting' | 'connected' | 'disconnected' | 'error';
   error: string | null;
 
   start: () => void;
   stop: () => void;
+  reset: () => void;
   setActiveRoom: (roomId: string | null) => void;
+  openChannel: (repoId: string) => Promise<void>;
   fetchRoom: (repoId: string) => Promise<RealtimeRoom | null>;
+  fetchChatRooms: () => Promise<void>;
   fetchMessages: (roomId: string) => Promise<void>;
   fetchMembers: (roomId: string) => Promise<void>;
   fetchUnread: () => Promise<void>;
   sendMessage: (roomId: string, content: string, replyTo?: string) => void;
   sendTyping: (roomId: string, isTyping: boolean) => void;
+  toggleReaction: (roomId: string, msgId: string, emoji: string, add: boolean) => void;
+  pickReaction: (roomId: string, msgId: string, emoji: string) => Promise<void>;
+  deleteMessage: (roomId: string, msgId: string) => Promise<void>;
+}
+
+function bumpUnread(
+  s: ChatState,
+  roomId: string,
+): Partial<Pick<ChatState, 'unreadByRoom' | 'unreadByRepo' | 'totalUnread'>> {
+  const byRoom = { ...s.unreadByRoom, [roomId]: (s.unreadByRoom[roomId] ?? 0) + 1 };
+  const repoId = s.rooms.find((r) => r.id === roomId)?.repository_id;
+  const byRepo = repoId
+    ? { ...s.unreadByRepo, [repoId]: (s.unreadByRepo[repoId] ?? 0) + 1 }
+    : s.unreadByRepo;
+  return {
+    unreadByRoom: byRoom,
+    unreadByRepo: byRepo,
+    totalUnread: Object.values(byRoom).reduce((a, b) => a + b, 0),
+  };
+}
+
+function upsertMessage(s: ChatState, msg: ChatMessage): Record<string, ChatMessage[]> {
+  const list = s.messages[msg.room_id] ?? [];
+  if (list.some((m) => m.id === msg.id)) {
+    return { ...s.messages, [msg.room_id]: list.map((m) => (m.id === msg.id ? msg : m)) };
+  }
+  return { ...s.messages, [msg.room_id]: [...list, msg] };
 }
 
 function wireSocket(set: (fn: (s: ChatState) => Partial<ChatState>) => void) {
@@ -40,38 +79,40 @@ function wireSocket(set: (fn: (s: ChatState) => Partial<ChatState>) => void) {
       set(() => ({ status: status as ChatState['status'] })),
     onChatMessage: (msg) =>
       set((s) => ({
-        messages: {
-          ...s.messages,
-          [msg.room_id]: [...(s.messages[msg.room_id] ?? []).filter((m) => m.id !== msg.id), msg],
-        },
-        unreadByRoom:
-          s.activeRoomId === msg.room_id
-            ? s.unreadByRoom
-            : { ...s.unreadByRoom, [msg.room_id]: (s.unreadByRoom[msg.room_id] ?? 0) + 1 },
+        messages: upsertMessage(s, msg),
+        ...(s.activeRoomId === msg.room_id ? {} : bumpUnread(s, msg.room_id)),
       })),
     onAck: (msg) =>
-      set((s) => ({
-        messages: {
-          ...s.messages,
-          [msg.room_id]: [...(s.messages[msg.room_id] ?? []).filter((m) => m.id !== msg.id), msg],
-        },
-      })),
+      set((s) => ({ messages: upsertMessage(s, msg) })),
     onReaction: (msg) =>
-      set((s) => ({
-        messages: {
-          ...s.messages,
-          [msg.room_id]: (s.messages[msg.room_id] ?? []).map((m) =>
-            m.id === msg.id ? msg : m),
-        },
-      })),
+      set((s) => ({ messages: upsertMessage(s, msg) })),
     onReactionAck: (msg) =>
+      set((s) => ({ messages: upsertMessage(s, msg) })),
+    onPresence: (roomId, users) =>
+      set((s) => ({ onlineUsers: { ...s.onlineUsers, [roomId]: users } })),
+    onPresenceJoin: (roomId, user) =>
+      set((s) => {
+        const list = s.onlineUsers[roomId] ?? [];
+        if (list.some((u) => u.user_id === user.user_id)) return {};
+        return { onlineUsers: { ...s.onlineUsers, [roomId]: [...list, user] } };
+      }),
+    onPresenceLeave: (roomId, user) =>
       set((s) => ({
-        messages: {
-          ...s.messages,
-          [msg.room_id]: (s.messages[msg.room_id] ?? []).map((m) =>
-            m.id === msg.id ? msg : m),
+        onlineUsers: {
+          ...s.onlineUsers,
+          [roomId]: (s.onlineUsers[roomId] ?? []).filter((u) => u.user_id !== user.user_id),
         },
       })),
+    onTyping: (evt) =>
+      set((s) => {
+        const roomTyping = { ...(s.typingByRoom[evt.room_id] ?? {}) };
+        if (evt.is_typing) {
+          roomTyping[evt.user_id] = { user_id: evt.user_id, username: evt.username, ts: Date.now() };
+        } else {
+          delete roomTyping[evt.user_id];
+        }
+        return { typingByRoom: { ...s.typingByRoom, [evt.room_id]: roomTyping } };
+      }),
   });
 }
 
@@ -80,8 +121,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messages: {},
   members: {},
   unreadByRoom: {},
+  unreadByRepo: {},
   totalUnread: 0,
   activeRoomId: null,
+  onlineUsers: {},
+  typingByRoom: {},
   status: 'idle',
   error: null,
 
@@ -95,6 +139,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ status: 'idle' });
   },
 
+  // 切换服务器时重置：断开旧连接并清空状态。
+  reset: () => {
+    chatSocket.stop();
+    set({
+      rooms: [],
+      messages: {},
+      members: {},
+      unreadByRoom: {},
+      unreadByRepo: {},
+      totalUnread: 0,
+      activeRoomId: null,
+      onlineUsers: {},
+      typingByRoom: {},
+      status: 'idle',
+      error: null,
+    });
+  },
+
   setActiveRoom: (roomId) => {
     set({ activeRoomId: roomId });
     if (roomId) {
@@ -105,11 +167,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
         void chatApi.markRead(sid, roomId);
         set((s) => {
           const cleared = { ...s.unreadByRoom, [roomId]: 0 };
+          const repoId = s.rooms.find((r) => r.id === roomId)?.repository_id;
+          const byRepo = repoId ? { ...s.unreadByRepo, [repoId]: 0 } : s.unreadByRepo;
           const total = Object.values(cleared).reduce((a, b) => a + b, 0);
-          return { unreadByRoom: cleared, totalUnread: total };
+          return { unreadByRoom: cleared, unreadByRepo: byRepo, totalUnread: total };
         });
       }
     }
+  },
+
+  // 门户频道 = 仓库房间：进入即自动入房（服务端按仓库访问权限 auto-join）。
+  openChannel: async (repoId) => {
+    const room = await get().fetchRoom(repoId);
+    if (!room) return;
+    get().setActiveRoom(room.id);
+    await Promise.all([get().fetchMessages(room.id), get().fetchMembers(room.id)]);
   },
 
   fetchRoom: async (repoId) => {
@@ -129,12 +201,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
+  // 聚合房间列表：后端 listRooms（已加入）+ 未读映射（按 repository_id）。
+  fetchChatRooms: async () => {
+    const sid = serverId();
+    if (!sid) return;
+    try {
+      const joined = await chatApi.listRooms(sid);
+      set((s) => {
+        const known = new Map(s.rooms.map((r) => [r.id, r]));
+        for (const r of joined) known.set(r.id, { ...known.get(r.id), ...r });
+        return { rooms: Array.from(known.values()) };
+      });
+    } catch {
+      /* 离线时保留已有房间 */
+    }
+    await get().fetchUnread();
+  },
+
   fetchMessages: async (roomId) => {
     const sid = serverId();
     if (!sid) return;
     try {
       const res = await chatApi.getRoomMessages(sid, roomId, { limit: 100 });
-      set((s) => ({ messages: { ...s.messages, [roomId]: res.messages ?? [] } }));
+      // 后端按 created_at 倒序返回，反转为正序展示（对齐 web 端）。
+      set((s) => ({ messages: { ...s.messages, [roomId]: [...(res.messages ?? [])].reverse() } }));
     } catch (e) {
       set({ error: (e as Error).message });
     }
@@ -157,12 +247,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const list = await chatApi.getUnreadCounts(sid);
       const byRoom: Record<string, number> = {};
+      const byRepo: Record<string, number> = {};
       let total = 0;
       for (const u of list ?? []) {
         byRoom[u.room_id] = u.unread_count;
+        byRepo[u.repository_id] = u.unread_count;
         total += u.unread_count;
       }
-      set({ unreadByRoom: byRoom, totalUnread: total });
+      set({ unreadByRoom: byRoom, unreadByRepo: byRepo, totalUnread: total });
     } catch {
       /* 离线时保留上次未读数 */
     }
@@ -175,9 +267,41 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendTyping: (roomId, isTyping) => {
     chatSocket.sendTyping(roomId, isTyping);
   },
+
+  toggleReaction: (roomId, msgId, emoji, add) => {
+    chatSocket.sendReaction(roomId, msgId, emoji, add);
+  },
+
+  // 表情面板追加 reaction：REST 直加（与 web 端一致），ack 后本地更新。
+  pickReaction: async (roomId, msgId, emoji) => {
+    const sid = serverId();
+    if (!sid) return;
+    try {
+      const updated = await chatApi.addReaction(sid, roomId, msgId, emoji);
+      set((s) => ({ messages: upsertMessage(s, updated) }));
+    } catch (e) {
+      set({ error: (e as Error).message });
+    }
+  },
+
+  deleteMessage: async (roomId, msgId) => {
+    const sid = serverId();
+    if (!sid) return;
+    try {
+      await chatApi.deleteMessage(sid, roomId, msgId);
+      set((s) => ({
+        messages: {
+          ...s.messages,
+          [roomId]: (s.messages[roomId] ?? []).filter((m) => m.id !== msgId),
+        },
+      }));
+    } catch (e) {
+      set({ error: (e as Error).message });
+    }
+  },
 }));
 
-// 供 Chat 视图初始化房间列表——留空占位，后续 UI 接入后由仓库/房间聚合填充。
+// 供 Chat 视图读取房间列表。
 export function useChatRoomList(): RealtimeRoom[] {
   return useChatStore((s) => s.rooms);
 }

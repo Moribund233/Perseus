@@ -27,6 +27,7 @@ import DiffView from '../views/workspace/DiffView';
 import ProblemsPanel from '../views/workspace/ProblemsPanel';
 import OutputPanel from '../views/workspace/OutputPanel';
 import TerminalPanel from '../views/workspace/TerminalPanel';
+import ActivityChatPanel from '../views/chat/ActivityChatPanel';
 import StatusBar, { type BottomTab } from '../views/workspace/StatusBar';
 import CommandPalette, { type PaneId } from '../views/workspace/CommandPalette';
 import WindowControls from '../components/WindowControls';
@@ -222,12 +223,7 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
           {pane === 'git' && <GitPanel workspaceId={workspace.id} onOpenDiff={setDiffPath} />}
           {pane === 'prs' && <QuickListPanel kind="prs" workspace={workspace} />}
           {pane === 'issues' && <QuickListPanel kind="issues" workspace={workspace} />}
-          {pane === 'chat' && (
-            <div className="sb-pane on">
-              <div className="sb-head">{t('desktop.menu.chat')}</div>
-              <div className="git-hint">{t('desktop.portal.phase2')}</div>
-            </div>
-          )}
+          {pane === 'chat' && <ActivityChatPanel workspace={workspace} />}
         </aside>
 
         <main className="editor-col">
