@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.routes_config import get_route_prefix
+from api.routes_prefix import get_route_prefix
 from models.async_db import get_async_db
 from models.user import User
 from models.repository import Repository

@@ -73,7 +73,9 @@ async def create_notification(
 
     result_data = build_notification_response(notif)
     try:
-        await notify_user(user_id, type, result_data)
+        # F-205: 推送时随带最新未读数, 客户端免回查
+        unread_count = await get_unread_count(db, user_id)
+        await notify_user(user_id, type, result_data, unread_count=unread_count)
     except Exception as e:
         logger.warning("Failed to push WebSocket notification for user %d: %s", user_id, e)
 

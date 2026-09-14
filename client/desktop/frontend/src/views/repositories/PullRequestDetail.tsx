@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Button, Dropdown, Input, Spin, Avatar, App as AntApp, Alert } from 'antd';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeftOutlined, PullRequestOutlined, MergeOutlined, CloseCircleOutlined, SendOutlined, DownOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PullRequestOutlined, MergeOutlined, CloseCircleOutlined, SendOutlined, DownOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import { usePullRequestsStore } from '../../stores/pullRequests';
+import { useServersStore } from '../../stores/servers';
+import { buildsApi, type Build } from '../../api/builds';
 import type { PR } from '../../api/pullRequests';
 
 const borderColor = '#21262d';
@@ -51,6 +53,62 @@ const statusConfig: Record<string, { icon: React.ReactElement; labelKey: string;
   merged: { icon: <MergeOutlined style={{ color: purple }} />, labelKey: 'app.pullRequests.detail.merged', text: purple },
   closed: { icon: <CloseCircleOutlined style={{ color: red }} />, labelKey: 'app.pullRequests.detail.closed', text: red },
 };
+
+const buildStatusColor: Record<string, string> = {
+  pending: '#8b949e',
+  running: blueLight,
+  success: green,
+  failure: red,
+  error: red,
+  cancelled: '#6e7681',
+};
+
+/** F-047 构建状态展示：拉取 PR 源分支与目标分支的最近构建（后端 branch 过滤） */
+function PrBuilds({ repoId, sourceBranch, targetBranch }: { repoId: string; sourceBranch: string; targetBranch: string }) {
+  const { t } = useTranslation();
+  const serverId = useServersStore((s) => s.currentServerId);
+  const [builds, setBuilds] = useState<Build[] | null>(null);
+
+  useEffect(() => {
+    if (!serverId) { setBuilds([]); return; }
+    let cancelled = false;
+    Promise.all([
+      buildsApi.list(serverId, repoId, { branch: sourceBranch, per_page: 5 }).catch(() => []),
+      buildsApi.list(serverId, repoId, { branch: targetBranch, per_page: 5 }).catch(() => []),
+    ])
+      .then(([src, tgt]) => {
+        if (cancelled) return;
+        const merged = [...(src ?? []), ...(tgt ?? [])]
+          .sort((a, b) => new Date(b.started_at ?? b.finished_at ?? 0).getTime() - new Date(a.started_at ?? a.finished_at ?? 0).getTime())
+          .slice(0, 5);
+        setBuilds(merged);
+      })
+      .catch(() => { if (!cancelled) setBuilds([]); });
+    return () => { cancelled = true; };
+  }, [serverId, repoId, sourceBranch, targetBranch]);
+
+  if (!builds || builds.length === 0) return null;
+
+  return (
+    <div style={{ border: `1px solid ${borderColor}`, borderRadius: 12, background: bgSecondary, overflow: 'hidden', marginBottom: 20 }}>
+      <div style={{ padding: '10px 16px', background: bgTertiary, borderBottom: `1px solid ${borderColor}`, fontSize: 13, fontWeight: 600, color: textPrimary, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <PlayCircleOutlined style={{ color: blueLight }} />
+        {t('app.pullRequests.detail.builds')}
+      </div>
+      {builds.map((b) => (
+        <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', borderBottom: `1px solid ${borderColor}`, fontSize: 13 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: buildStatusColor[b.status] ?? textSecondary, flexShrink: 0 }} />
+          <span style={{ color: buildStatusColor[b.status] ?? textSecondary, fontWeight: 600, fontSize: 12, width: 70, flexShrink: 0 }}>
+            {t(`app.repositories.builds.${b.status}`)}
+          </span>
+          <span style={{ fontFamily: 'monospace', color: textPrimary, flexShrink: 0 }}>{b.commit_sha.slice(0, 7)}</span>
+          <span style={{ color: textSecondary, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.commit_message || b.branch}</span>
+          <span style={{ color: textTertiary, fontSize: 12, flexShrink: 0 }}>{b.branch}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 interface PullRequestDetailProps {
   repoId: string;
@@ -185,6 +243,8 @@ export default function PullRequestDetail({ repoId, prNumber, onBack }: PullRequ
                 )}
               </div>
             </div>
+
+            <PrBuilds repoId={repoId} sourceBranch={currentPR.source_branch} targetBranch={currentPR.target_branch} />
 
             <h3 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 12px', color: textPrimary }}>
               {t('app.pullRequests.detail.comments', { count: comments.length })}

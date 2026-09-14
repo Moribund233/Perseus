@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import * as monaco from 'monaco-editor';
 import { readFile, writeFile, type FileContent, type Workspace } from '../../api/workspaces';
 import { CollabSession, type CollabParticipant, type CollabStatus } from '../../api/collabSocket';
+import { useEditorStatusStore } from '../../stores/editorStatus';
 import { useWorkspaceRepo } from '../../hooks/useWorkspaceRepo';
 import { useProblemsStore } from '../../stores/problems';
 import CollabMonaco from './CollabMonaco';
@@ -50,6 +51,7 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
   const [collabStatus, setCollabStatus] = useState<CollabStatus>('disconnected');
   const [participants, setParticipants] = useState<CollabParticipant[]>([]);
   const [pending, setPending] = useState(false);
+  const [savedCommits, setSavedCommits] = useState<Record<string, string>>({});
   const sessionsRef = useRef<Record<string, CollabSession>>({});
 
   const diagnostics = useProblemsStore((s) => s.diagnostics);
@@ -108,7 +110,28 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
     textRef.current = new Map();
     for (const s of Object.values(sessionsRef.current)) s.detach();
     sessionsRef.current = {};
+    setSavedCommits({});
+    useEditorStatusStore.getState().reset();
   }, [workspaceId]);
+
+  // 卸载时复位状态栏徽标, 避免离开 IDE 后残留
+  useEffect(() => {
+    return () => useEditorStatusStore.getState().reset();
+  }, []);
+
+  // M1 数据安全: 任一 tab 未保存或协作会话未同步时, 关闭窗口前拦截提示
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      const anyDirty = tabsRef.current.some((tb) => tb.content.content !== tb.savedContent);
+      const anyPending = Object.values(sessionsRef.current).some((s) => s.hasPendingChanges());
+      if (anyDirty || anyPending) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, []);
 
   useEffect(() => {
     if (!openPath) return;
@@ -172,7 +195,10 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
       docKey: `${repo.repoId}:${branch}:${path}`,
       onStatus: (s) => { if (activePathRef.current === path) setCollabStatus(s); },
       onParticipants: (peers) => { if (activePathRef.current === path) setParticipants(peers); },
-      onSaved: (msg) => message.success(t('desktop.collab.saved', { commit: (msg.commit_id || '').slice(0, 7) })),
+      onSaved: (msg) => {
+        message.success(t('desktop.collab.saved', { commit: (msg.commit_id || '').slice(0, 7) }));
+        setSavedCommits((prev) => ({ ...prev, [path]: (msg.commit_id || '').slice(0, 7) }));
+      },
       onError: (err) => message.error(`${t('desktop.collab.saveFailed')}: ${err}`),
     });
     sessionsRef.current[path] = session;
@@ -191,6 +217,16 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
     return () => clearInterval(timer);
   }, [active, collabStatus]);
 
+  // 状态栏双态徽标（会话已同步 / Git 已提交）：活动 tab 维度的协作与最近提交状态。
+  useEffect(() => {
+    const enabledPath = !!active && !!collabEnabled[active];
+    useEditorStatusStore.getState().update({
+      collabActive: enabledPath,
+      collabSynced: enabledPath && collabStatus === 'connected' && !pending,
+      lastSavedCommit: active ? savedCommits[active] ?? null : null,
+    });
+  }, [active, collabEnabled, collabStatus, pending, savedCommits]);
+
   const toggleCollab = () => {
     const path = active;
     if (!path) return;
@@ -199,6 +235,12 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
       setCollabStatus('disconnected');
       setParticipants([]);
       setPending(false);
+      setSavedCommits((prev) => {
+        if (!(path in prev)) return prev;
+        const next = { ...prev };
+        delete next[path];
+        return next;
+      });
     }
     setCollabEnabled((prev) => ({ ...prev, [path]: !prev[path] }));
   };
@@ -348,6 +390,15 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
           setTabs((prev) =>
             prev.map((tb) => (tb.path === active ? { ...tb, content: { ...tb.content, content: next } } : tb)),
           );
+          // 内容再次偏离保存基线后, Git 已提交徽标失效
+          if (next !== current.savedContent) {
+            setSavedCommits((prev) => {
+              if (!(current.path in prev)) return prev;
+              const n = { ...prev };
+              delete n[current.path];
+              return n;
+            });
+          }
           lspChange(current.path);
         }}
         options={{

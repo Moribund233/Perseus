@@ -156,7 +156,7 @@ Nginx/OpenResty (反向代理)
 | 业务事件广播 | `services/realtime/event_service.py` | ✅ Phase 2 |
 | 协作文本编辑 | `collab-gateway/`（Hocuspocus 网关）<br>`controller/collab_internal_controller.py` | ✅ F-204 完成（Yjs 底座） |
 | 在线状态 | `services/realtime/room_service.py`<br>`api/websocket/manager.py` | ✅ Phase 2 |
-| 通知系统（实时推送） | `services/realtime/notify.py` | ⏳ Phase 2 |
+| 通知系统（实时推送） | `services/realtime/notify.py` → `api/websocket/handlers/notification.py` | ✅ F-205 完成（user_notification WS 推送，2026-09-14 两端接入） |
 | 文件上传 | ✅ (代码附件) | ✅ |
 | 系统管理/审计 | `middleware/` | ✅ 基础 |
 
@@ -176,5 +176,8 @@ Nginx/OpenResty (反向代理)
     web 端 `y-codemirror.next`；断线本地编辑保留（CRDT 重连收敛）、只读连接服务端强制、
     显式保存落 Git 语义保留。协议详见 `docs/api/websocket/README.md` 第 7 节；
     与 Code with Me 的差距分析与演进规划见 `docs/collab-f204-vs-cwm.md`
-  - **未开始** 🔴：独立实时通知模块（F-205）、国际化（F-048~050）
+  - **已完成** ✅：独立实时通知推送（F-205）— **2026-09-14 落地**：通知落库即经 `/ws/notifications` 推送
+    `user_notification` 消息（含完整通知对象 + `unread_count`）；web（AppLayout 常驻订阅）与 desktop
+    （PortalShell 订阅，经网关 WS 透传）均已接入，REST 轮询降级为对账兜底。协议见 `docs/api/websocket/README.md` 第 4 节
+  - **未开始** 🔴：国际化（F-048~050）
 - **阶段四（生产准备）**：Docker 基础、Nginx 反向代理、基础中间件审计已就绪；监控、压测、安全审计、日志告警 — **待开发** 🔴

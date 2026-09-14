@@ -11,6 +11,7 @@ import {
   EyeOutlined,
   MessageOutlined,
   PullRequestOutlined,
+  MergeOutlined,
   TagOutlined,
   KeyOutlined,
 } from '@ant-design/icons';
@@ -423,10 +424,38 @@ export default function SettingsPage() {
                       border: true,
                     },
                     {
+                      key: 'email_on_issue_comment' as const,
+                      icon: <MessageOutlined style={{ fontSize: 18, color: blueLight }} />,
+                      label: t('app.settings.emailOnIssueComment'),
+                      desc: t('app.settings.emailOnIssueCommentDesc'),
+                      border: true,
+                    },
+                    {
+                      key: 'email_on_pr_merge' as const,
+                      icon: <MergeOutlined style={{ fontSize: 18, color: blueLight }} />,
+                      label: t('app.settings.emailOnPrMerge'),
+                      desc: t('app.settings.emailOnPrMergeDesc'),
+                      border: true,
+                    },
+                    {
+                      key: 'email_on_release' as const,
+                      icon: <TagOutlined style={{ fontSize: 18, color: blueLight }} />,
+                      label: t('app.settings.emailOnRelease'),
+                      desc: t('app.settings.emailOnReleaseDesc'),
+                      border: true,
+                    },
+                    {
                       key: 'in_app_on_mention' as const,
                       icon: <EyeOutlined style={{ fontSize: 18, color: blueLight }} />,
                       label: t('app.settings.inAppOnMention'),
                       desc: t('app.settings.inAppOnMentionDesc'),
+                      border: true,
+                    },
+                    {
+                      key: 'in_app_on_pr_review' as const,
+                      icon: <PullRequestOutlined style={{ fontSize: 18, color: blueLight }} />,
+                      label: t('app.settings.inAppOnPrReview'),
+                      desc: t('app.settings.inAppOnPrReviewDesc'),
                       border: true,
                     },
                     {

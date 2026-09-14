@@ -6,6 +6,7 @@ import { useMyWorkStore } from '../stores/myWork';
 import { useRepositoriesStore } from '../stores/repositories';
 import { useNavigationStore } from '../stores/navigation';
 import { timeAgo } from '../utils/time';
+import type { DashboardActivity } from '../api/myWork';
 
 const borderColor = '#21262d';
 const hoverBg = '#1c2333';
@@ -22,6 +23,45 @@ const statusColor: Record<string, string> = {
 
 type TabKey = 'prs' | 'issues';
 
+/** 近 30 天贡献柱状图（与 web 端 Dashboard ContribGraph 同源同款） */
+function ContribGraph({ contributionsByDay }: { contributionsByDay: Record<string, number> }) {
+  const days = useMemo(() => {
+    const today = new Date();
+    return Array.from({ length: 30 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - (29 - i));
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return { key, count: contributionsByDay[key] ?? 0 };
+    });
+  }, [contributionsByDay]);
+
+  const max = Math.max(1, ...days.map((d) => d.count));
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'end', gap: 2, height: 56, marginTop: 10 }}>
+      {days.map((day) => {
+        const ratio = day.count / max;
+        let bg = '#1c2128';
+        if (day.count > 0) bg = ratio > 0.66 ? '#1f6feb' : ratio > 0.33 ? '#388bfd' : '#0d419d';
+        return (
+          <div
+            key={day.key}
+            title={`${day.key}: ${day.count}`}
+            style={{
+              flex: 1,
+              background: bg,
+              borderRadius: 2,
+              minHeight: 3,
+              height: `${Math.max(6, ratio * 100)}%`,
+              transition: 'all 0.3s',
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export default function MyWorkView() {
   const { t } = useTranslation();
   const navigate = useNavigationStore((s) => s.navigate);
@@ -31,10 +71,12 @@ export default function MyWorkView() {
 
   const pullRequests = useMyWorkStore((s) => s.pullRequests);
   const issues = useMyWorkStore((s) => s.issues);
+  const dashboard = useMyWorkStore((s) => s.dashboard);
   const isLoading = useMyWorkStore((s) => s.isLoading);
   const error = useMyWorkStore((s) => s.error);
   const fetchMyPullRequests = useMyWorkStore((s) => s.fetchMyPullRequests);
   const fetchMyIssues = useMyWorkStore((s) => s.fetchMyIssues);
+  const fetchDashboard = useMyWorkStore((s) => s.fetchDashboard);
 
   const [tab, setTab] = useState<TabKey>('prs');
   const [status, setStatus] = useState<string>('open');
@@ -43,6 +85,10 @@ export default function MyWorkView() {
     void fetchMyPullRequests(status === 'all' ? undefined : status);
     void fetchMyIssues(status === 'all' ? undefined : status);
   }, [status, fetchMyPullRequests, fetchMyIssues]);
+
+  useEffect(() => {
+    void fetchDashboard();
+  }, [fetchDashboard]);
 
   useEffect(() => {
     if (repositories.length === 0) void fetchRepositories();
@@ -66,6 +112,35 @@ export default function MyWorkView() {
     navigate('repositories');
   };
 
+  const contributions = useMemo(
+    () => Object.values(dashboard?.contributions_by_day ?? {}).reduce((s, n) => s + n, 0),
+    [dashboard?.contributions_by_day],
+  );
+
+  // 活动流文案: 动态 i18n 键 {entity_type}_{action}, 无匹配时回退 fallback（与 web 端一致）
+  const activities = useMemo(
+    () => (dashboard?.recent_activities ?? []).map((item: DashboardActivity) => {
+      const entityType = String(item.entity_type ?? '');
+      const action = String(item.action ?? '');
+      const details = String(item.details ?? '');
+      const key = `${entityType}_${action}`;
+      const text = t(`desktop.myWork.activityText.${key}`, {
+        defaultValue: t('desktop.myWork.activityText.fallback', {
+          action,
+          entityType: entityType === 'pull_request' ? 'PR' : entityType,
+        }),
+        details,
+      });
+      return {
+        key: String(item.id ?? `${item.actor_username}-${item.created_at}`),
+        actor: String(item.actor_username ?? 'unknown'),
+        text,
+        time: timeAgo(item.created_at, t),
+      };
+    }),
+    [dashboard?.recent_activities, t],
+  );
+
   const rowStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
     borderBottom: `1px solid ${borderColor}`, cursor: 'pointer', fontSize: 13,
@@ -82,6 +157,39 @@ export default function MyWorkView() {
             <Radio.Button value="closed">{t('desktop.myWork.statusClosed')}</Radio.Button>
             <Radio.Button value="all">{t('desktop.myWork.statusAll')}</Radio.Button>
           </Radio.Group>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+        <div style={{ flex: 1, border: `1px solid ${borderColor}`, borderRadius: 10, background: '#161b22', padding: '12px 16px' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: textSecondary }}>{t('desktop.myWork.contributionActivity')}</div>
+          <div style={{ display: 'flex', gap: 16, marginTop: 8, fontSize: 12, color: textTertiary }}>
+            <span>{t('desktop.myWork.stats.repositories')}: <b style={{ color: blueLight }}>{dashboard?.repo_count ?? 0}</b></span>
+            <span>{t('desktop.myWork.stats.openPRs')}: <b style={{ color: '#3fb950' }}>{dashboard?.open_prs ?? 0}</b></span>
+            <span>{t('desktop.myWork.stats.openIssues')}: <b style={{ color: '#bc8cff' }}>{dashboard?.open_issues ?? 0}</b></span>
+          </div>
+          <ContribGraph contributionsByDay={dashboard?.contributions_by_day ?? {}} />
+          <div style={{ marginTop: 8, fontSize: 12, color: textTertiary }}>
+            {contributions > 0
+              ? t('desktop.myWork.contributionsCount', { count: contributions })
+              : t('desktop.myWork.noContributions')}
+          </div>
+        </div>
+        <div style={{ flex: 1, border: `1px solid ${borderColor}`, borderRadius: 10, background: '#161b22', padding: '12px 16px', overflow: 'auto' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: textSecondary, marginBottom: 4 }}>{t('desktop.myWork.recentActivity')}</div>
+          {activities.length === 0 ? (
+            <div style={{ padding: '18px 0', textAlign: 'center', fontSize: 12, color: textTertiary }}>
+              {t('desktop.myWork.emptyActivity')}
+            </div>
+          ) : (
+            activities.map((a) => (
+              <div key={a.key} style={{ display: 'flex', gap: 8, padding: '6px 0', borderBottom: `1px dashed ${borderColor}`, fontSize: 12 }}>
+                <span style={{ color: blueLight, flexShrink: 0 }}>{a.actor}</span>
+                <span style={{ flex: 1, minWidth: 0, color: textSecondary }}>{a.text}</span>
+                <span style={{ color: textTertiary, flexShrink: 0 }}>{a.time}</span>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

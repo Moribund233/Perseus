@@ -338,6 +338,9 @@ export default function EditorPage() {
   const [onlinePresence, setOnlinePresence] = useState<PresenceUser[]>([]);
   const [collabStatus, setCollabStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
   const [docParticipants, setDocParticipants] = useState<CollabParticipant[]>([]);
+  // 双态徽标: 会话同步状态(轮询 Yjs 未同步变更) + 最近一次保存产生的 Git 提交
+  const [collabPending, setCollabPending] = useState(false);
+  const [lastCommitSha, setLastCommitSha] = useState<string | null>(null);
   const { t } = useTranslation();
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -454,6 +457,28 @@ export default function EditorPage() {
     };
   }, [currentRepo?.id]);
 
+  // 双态徽标「会话已同步」: 轮询 Yjs 未同步变更 (断线缓冲时为 true)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const c = collabRef.current;
+      setCollabPending(!!c && c.isActive ? !!c.hasPendingChanges() : false);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // M1 数据安全: 本地未提交或会话未同步时, 关闭/刷新页面前拦截提示
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      const pending = collabRef.current?.isActive ? collabRef.current.hasPendingChanges() : false;
+      if (isDirty || pending) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
   const handleSelectFile = useCallback(async (key: string) => {
     setSelectedTreeKey(key);
     setPinnedChain([]);
@@ -547,6 +572,7 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
       );
       savedContentRef.current = content;
       setIsDirty(false);
+      setLastCommitSha(result.commit_id.slice(0, 7));
       antdMessage.success(t('app.codeEditor.saved', { defaultValue: `已提交 ${result.commit_id.slice(0, 7)}` }));
       // 后台刷新提交历史等派生数据
       fetchTree(repoId, currentRepo?.default_branch).catch(() => {});
@@ -625,6 +651,7 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
     savedContentRef.current = content === sampleCode ? '\u0000-sample' : content;
     setIsDirty(false);
     setDocParticipants([]);
+    setLastCommitSha(null);
     const lang = activeTab ? getLanguageExtension(activeTab) : undefined;
     const extensions = [
       basicSetup(() => handleSaveRef.current()),
@@ -633,7 +660,10 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
       EditorView.theme({ '&': { height: '100%' }, '.cm-scroller': { overflow: 'auto' } }),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
-          setIsDirty(update.state.doc.toString() !== savedContentRef.current);
+          const dirty = update.state.doc.toString() !== savedContentRef.current;
+          setIsDirty(dirty);
+          // 内容再次偏离保存基线后, Git 已提交徽标失效
+          if (dirty) setLastCommitSha(null);
         }
         if (update.selectionSet || update.docChanged) {
           const head = update.state.selection.main.head;
@@ -670,6 +700,7 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
             setIsDirty(false);
           }
           setSaving(false);
+          setLastCommitSha(msg.commit_id.slice(0, 7));
           antdMessage.success(
             t('app.codeEditor.collabSaved', { defaultValue: '协作编辑已提交' }) +
               ` ${msg.commit_id.slice(0, 7)}`
@@ -1183,6 +1214,18 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 16 }}>
             <span>{t('app.codeEditor.lnCol', { defaultValue: `Ln ${cursor.line}, Col ${cursor.col}` })}</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><TeamOutlined style={{ fontSize: 12 }} /> {onlinePresence.length} online</span>
+            {collabStatus === 'connected' && !collabPending && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: green, display: 'inline-block' }} />
+                {t('app.codeEditor.collabSynced', { defaultValue: '会话已同步' })}
+              </span>
+            )}
+            {collabStatus === 'connected' && collabPending && (
+              <span style={{ color: '#e3b341' }}>{t('app.codeEditor.collabSyncing', { defaultValue: '会话同步中' })}</span>
+            )}
+            {lastCommitSha && (
+              <span>{t('app.codeEditor.gitCommitted', { sha: lastCommitSha, defaultValue: `Git 已提交 ${lastCommitSha}` })}</span>
+            )}
             {isDirty && <span style={{ color: '#e3b341' }}>{t('app.codeEditor.unsavedShort', { defaultValue: '● 未保存' })}</span>}
             <span>{activeNode?.fileType ? activeNode.fileType.toUpperCase() : 'Text'}</span>
             <span>UTF-8</span>

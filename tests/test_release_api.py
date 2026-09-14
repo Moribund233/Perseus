@@ -20,6 +20,15 @@ def create_test_repo(db, name: str = "test-repo") -> Repository:
     return repo
 
 
+@pytest.fixture(autouse=True)
+def _clean_release_asset_dir():
+    """每个用例前清空附件存储目录（data/ 为挂载卷, 跨运行会残留）"""
+    import shutil
+    from services import release_asset_service
+    shutil.rmtree(release_asset_service.RELEASE_ASSET_UPLOAD_DIR, ignore_errors=True)
+    yield
+
+
 # =============================================================================
 # Release CRUD
 # =============================================================================
@@ -273,3 +282,160 @@ def test_delete_release_asset(test_client: TestClient, auth_headers: dict, db):
     )
 
     assert response.status_code == 204
+
+
+# =============================================================================
+# Release Asset 上传/下载（二进制）
+# =============================================================================
+
+def test_upload_release_asset(test_client: TestClient, auth_headers: dict, db):
+    """测试 multipart 上传 Release 附件（二进制落盘 + 元数据注册）"""
+    from services import release_asset_service
+    repo = create_test_repo(db)
+
+    create_resp = test_client.post(
+        f"/api/v1/repositories/{repo.id}/releases",
+        json={"tag_name": "v1.0.0", "name": "Version 1.0.0"},
+        headers=auth_headers
+    )
+    release_number = create_resp.json()["release_number"]
+
+    response = test_client.post(
+        f"/api/v1/repositories/{repo.id}/releases/{release_number}/assets/upload",
+        files={"file": ("build artifact.zip", b"PK\x03\x04fake-zip-bytes", "application/zip")},
+        headers=auth_headers
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["name"] == "build_artifact.zip"
+    assert data["file_size"] == len(b"PK\x03\x04fake-zip-bytes")
+    assert data["content_type"] == "application/zip"
+    # 文件确实落盘（file_path 不对外暴露, 按文件名扫描存储目录）
+    stored = list(release_asset_service.RELEASE_ASSET_UPLOAD_DIR.rglob("*build_artifact*"))
+    assert len(stored) == 1
+    stored[0].unlink()
+
+
+def test_upload_release_asset_too_large(test_client: TestClient, auth_headers: dict, db):
+    """测试上传超限附件被拒绝"""
+    from services import release_asset_service
+    repo = create_test_repo(db)
+
+    create_resp = test_client.post(
+        f"/api/v1/repositories/{repo.id}/releases",
+        json={"tag_name": "v1.0.0", "name": "Version 1.0.0"},
+        headers=auth_headers
+    )
+    release_number = create_resp.json()["release_number"]
+
+    big = b"x" * (release_asset_service.RELEASE_ASSET_MAX_SIZE + 1)
+    response = test_client.post(
+        f"/api/v1/repositories/{repo.id}/releases/{release_number}/assets/upload",
+        files={"file": ("big.bin", big, "application/octet-stream")},
+        headers=auth_headers
+    )
+    assert response.status_code == 400
+
+
+def test_upload_release_asset_empty_rejected(test_client: TestClient, auth_headers: dict, db):
+    """测试上传空附件被拒绝"""
+    repo = create_test_repo(db)
+
+    create_resp = test_client.post(
+        f"/api/v1/repositories/{repo.id}/releases",
+        json={"tag_name": "v1.0.0", "name": "Version 1.0.0"},
+        headers=auth_headers
+    )
+    release_number = create_resp.json()["release_number"]
+
+    response = test_client.post(
+        f"/api/v1/repositories/{repo.id}/releases/{release_number}/assets/upload",
+        files={"file": ("empty.bin", b"", "application/octet-stream")},
+        headers=auth_headers
+    )
+    assert response.status_code == 400
+
+
+def test_download_release_asset(test_client: TestClient, auth_headers: dict, db):
+    """测试下载 Release 附件（内容一致 + 下载计数自增）"""
+    repo = create_test_repo(db)
+
+    create_resp = test_client.post(
+        f"/api/v1/repositories/{repo.id}/releases",
+        json={"tag_name": "v1.0.0", "name": "Version 1.0.0"},
+        headers=auth_headers
+    )
+    release_number = create_resp.json()["release_number"]
+
+    payload = b"PK\x03\x04asset-download-bytes"
+    upload_resp = test_client.post(
+        f"/api/v1/repositories/{repo.id}/releases/{release_number}/assets/upload",
+        files={"file": ("artifact.zip", payload, "application/zip")},
+        headers=auth_headers
+    )
+    asset = upload_resp.json()
+    asset_id = asset["id"]
+
+    response = test_client.get(
+        f"/api/v1/repositories/{repo.id}/releases/{release_number}/assets/{asset_id}/download",
+        headers=auth_headers
+    )
+    assert response.status_code == 200
+    assert response.content == payload
+
+    # 列表中的 download_count 应为 1
+    detail = test_client.get(
+        f"/api/v1/repositories/{repo.id}/releases/{release_number}",
+        headers=auth_headers
+    ).json()
+    target = next(a for a in detail["assets"] if a["id"] == asset_id)
+    assert target["download_count"] == 1
+
+
+def test_download_release_asset_not_found(test_client: TestClient, auth_headers: dict, db):
+    """测试下载不存在的附件返回 404"""
+    import uuid as _uuid
+    repo = create_test_repo(db)
+
+    create_resp = test_client.post(
+        f"/api/v1/repositories/{repo.id}/releases",
+        json={"tag_name": "v1.0.0", "name": "Version 1.0.0"},
+        headers=auth_headers
+    )
+    release_number = create_resp.json()["release_number"]
+
+    response = test_client.get(
+        f"/api/v1/repositories/{repo.id}/releases/{release_number}/assets/{_uuid.uuid4()}/download",
+        headers=auth_headers
+    )
+    assert response.status_code == 404
+
+
+def test_delete_uploaded_release_asset_removes_file(test_client: TestClient, auth_headers: dict, db):
+    """测试删除上传的附件会同时清理磁盘文件"""
+    from services import release_asset_service
+    repo = create_test_repo(db)
+
+    create_resp = test_client.post(
+        f"/api/v1/repositories/{repo.id}/releases",
+        json={"tag_name": "v1.0.0", "name": "Version 1.0.0"},
+        headers=auth_headers
+    )
+    release_number = create_resp.json()["release_number"]
+
+    upload_resp = test_client.post(
+        f"/api/v1/repositories/{repo.id}/releases/{release_number}/assets/upload",
+        files={"file": ("artifact.zip", b"to-be-deleted", "application/zip")},
+        headers=auth_headers
+    )
+    asset = upload_resp.json()
+    stored = list(release_asset_service.RELEASE_ASSET_UPLOAD_DIR.rglob("*artifact.zip"))
+    assert len(stored) == 1
+
+    response = test_client.delete(
+        f"/api/v1/repositories/{repo.id}/releases/{release_number}/assets/{asset['id']}",
+        headers=auth_headers
+    )
+    assert response.status_code == 204
+    assert not stored[0].exists()

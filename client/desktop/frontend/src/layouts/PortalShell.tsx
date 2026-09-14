@@ -16,6 +16,7 @@ import { useNotificationsStore } from '../stores/notifications';
 import { useRepositoriesStore } from '../stores/repositories';
 import { useChatStore } from '../stores/chat';
 import { useGatewayStore } from '../stores/gateway';
+import { notificationSocket } from '../api/notificationSocket';
 import { getAvatarColor, getInitials } from '../utils/avatar';
 import Brand from '../components/Brand';
 import WindowControls from '../components/WindowControls';
@@ -77,6 +78,21 @@ export default function PortalShell() {
     clearCurrentRepo();
     resetChat();
   }, [currentServerId, clearCurrentRepo, resetChat]);
+
+  // F-205: 订阅当前服务器的通知实时推送（经网关 WS 透传），切服即换通道
+  useEffect(() => {
+    if (!currentServerId) {
+      notificationSocket.stop();
+      return;
+    }
+    notificationSocket.setHandlers({
+      onNotification: (payload) => {
+        useNotificationsStore.getState().addLive(payload.data, payload.unread_count);
+      },
+    });
+    notificationSocket.start();
+    return () => notificationSocket.stop();
+  }, [currentServerId]);
 
   const identityName = me?.full_name || me?.username;
   const identityInitials = identityName ? getInitials(identityName) : '?';

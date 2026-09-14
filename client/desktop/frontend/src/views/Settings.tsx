@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { App as AntApp, Select, Tooltip } from 'antd';
+import { useEffect, useState } from 'react';
+import { App as AntApp, Popconfirm, Select, Switch, Tooltip } from 'antd';
 import { useTranslation } from 'react-i18next';
 import {
   CloudServerOutlined,
@@ -9,11 +9,19 @@ import {
   InfoCircleOutlined,
   CopyOutlined,
   ReloadOutlined,
+  BellOutlined,
+  UserOutlined,
+  PlusOutlined,
+  DeleteOutlined,
+  LinkOutlined,
 } from '@ant-design/icons';
 import { useGatewayStore } from '../stores/gateway';
 import { useServersStore } from '../stores/servers';
 import { useWorkspaceStore } from '../stores/workspace';
 import { useNavigationStore } from '../stores/navigation';
+import { useNotificationsStore } from '../stores/notifications';
+import type { NotificationPreference } from '../api/notifications';
+import { accountApi, type SSHKey, type OAuthAccount } from '../api/account';
 import Brand from '../components/Brand';
 
 const LANGUAGES = [
@@ -21,7 +29,7 @@ const LANGUAGES = [
   { value: 'en', label: 'English' },
 ];
 
-type Section = 'gateway' | 'appearance' | 'editor' | 'keys' | 'about';
+type Section = 'gateway' | 'appearance' | 'editor' | 'notifications' | 'account' | 'keys' | 'about';
 
 function gatewayHost(baseURL: string | undefined): string {
   return (baseURL ?? '').replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -49,6 +57,8 @@ export default function Settings() {
     { key: 'gateway', icon: <CloudServerOutlined />, label: t('desktop.settings.gateway.title') },
     { key: 'appearance', icon: <GlobalOutlined />, label: t('desktop.settings.appearance.title') },
     { key: 'editor', icon: <EditOutlined />, label: t('desktop.settings.editor.title') },
+    { key: 'notifications', icon: <BellOutlined />, label: t('desktop.settings.notifications.title') },
+    { key: 'account', icon: <UserOutlined />, label: t('desktop.settings.account.title') },
     { key: 'keys', icon: <KeyOutlined />, label: t('desktop.settings.keys.title') },
     { key: 'about', icon: <InfoCircleOutlined />, label: t('desktop.settings.about.title') },
   ];
@@ -195,6 +205,10 @@ export default function Settings() {
           </section>
         )}
 
+        {sec === 'notifications' && <NotificationsSection />}
+
+        {sec === 'account' && <AccountSection />}
+
         {sec === 'keys' && (
           <section className="set-sec">
             <h3>{t('desktop.settings.keys.title')}</h3>
@@ -243,5 +257,320 @@ export default function Settings() {
 function ButtonGhost({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
     <button className="btn ghost" onClick={onClick}>{children}</button>
+  );
+}
+
+// NotificationsSection：通知偏好设置（与 web 端设置页对齐的八项开关，覆盖后端全部偏好字段）。
+// 偏好按服务器维度存储，未连接服务器时引导去服务器管理页。
+const PREF_ROWS: Array<{ key: keyof NotificationPreference; label: string; desc: string }> = [
+  { key: 'email_on_mention', label: 'emailOnMention', desc: 'emailOnMentionDesc' },
+  { key: 'email_on_pr_review', label: 'emailOnPrReview', desc: 'emailOnPrReviewDesc' },
+  { key: 'email_on_issue_comment', label: 'emailOnIssueComment', desc: 'emailOnIssueCommentDesc' },
+  { key: 'email_on_pr_merge', label: 'emailOnPrMerge', desc: 'emailOnPrMergeDesc' },
+  { key: 'email_on_release', label: 'emailOnRelease', desc: 'emailOnReleaseDesc' },
+  { key: 'in_app_on_mention', label: 'inAppOnMention', desc: 'inAppOnMentionDesc' },
+  { key: 'in_app_on_pr_review', label: 'inAppOnPrReview', desc: 'inAppOnPrReviewDesc' },
+  { key: 'in_app_on_issue_comment', label: 'inAppOnIssueComment', desc: 'inAppOnIssueCommentDesc' },
+];
+
+function NotificationsSection() {
+  const { t } = useTranslation();
+  const { message } = AntApp.useApp();
+  const currentServerId = useServersStore((s) => s.currentServerId);
+  const preferences = useNotificationsStore((s) => s.preferences);
+  const isLoading = useNotificationsStore((s) => s.isLoading);
+  const error = useNotificationsStore((s) => s.error);
+  const fetchPreferences = useNotificationsStore((s) => s.fetchPreferences);
+  const updatePreferences = useNotificationsStore((s) => s.updatePreferences);
+  const navigate = useNavigationStore((s) => s.navigate);
+  const [draft, setDraft] = useState<NotificationPreference | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!currentServerId) return;
+    void fetchPreferences();
+  }, [currentServerId, fetchPreferences]);
+
+  useEffect(() => {
+    setDraft(preferences ? { ...preferences } : null);
+  }, [preferences]);
+
+  if (!currentServerId) {
+    return (
+      <section className="set-sec">
+        <h3>{t('desktop.settings.notifications.title')}</h3>
+        <p className="desc">{t('desktop.settings.notifications.desc')}</p>
+        <div className="card pad">
+          <div className="kv">
+            <span className="k2">{t('desktop.settings.notifications.noServer')}</span>
+            <span className="v2">
+              <button className="link-btn" onClick={() => navigate('servers')}>
+                {t('desktop.settings.notifications.connect')}
+              </button>
+            </span>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (!draft) {
+    return (
+      <section className="set-sec">
+        <h3>{t('desktop.settings.notifications.title')}</h3>
+        <p className="desc">{t('desktop.settings.notifications.desc')}</p>
+        <div className="card pad">
+          {isLoading ? (
+            <span className="sub-hint">{t('desktop.settings.notifications.loading')}</span>
+          ) : (
+            <>
+              <span className="sub-hint">{t('desktop.settings.notifications.unavailable')}</span>
+              <button className="link-btn" style={{ marginLeft: 8 }} onClick={() => void fetchPreferences()}>
+                {t('desktop.settings.notifications.retry')}
+              </button>
+              {error ? <div className="sub-hint">{error}</div> : null}
+            </>
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await updatePreferences(draft);
+      message.success(t('desktop.settings.notifications.saved'));
+    } catch (e) {
+      message.error((e as Error).message || t('desktop.settings.notifications.saveFailed'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="set-sec">
+      <h3>{t('desktop.settings.notifications.title')}</h3>
+      <p className="desc">{t('desktop.settings.notifications.desc')}</p>
+      <div className="card kv-card">
+        {PREF_ROWS.map((row) => (
+          <div className="kv" key={row.key}>
+            <span className="k2">{t(`desktop.settings.notifications.${row.label}`)}</span>
+            <span className="v2">
+              <Switch
+                checked={draft[row.key]}
+                onChange={(v) => setDraft((prev) => (prev ? { ...prev, [row.key]: v } : prev))}
+              />
+              <span className="sub-hint">{t(`desktop.settings.notifications.${row.desc}`)}</span>
+            </span>
+          </div>
+        ))}
+        <div className="kv">
+          <span className="k2" />
+          <span className="v2">
+            <button className="btn ghost" disabled={saving} onClick={() => void save()}>
+              {t('desktop.settings.notifications.save')}
+            </button>
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+// AccountSection：用户中心（SSH Keys 管理 + OAuth 关联），按当前连接服务器操作。
+function AccountSection() {
+  const { t } = useTranslation();
+  const { message } = AntApp.useApp();
+  const currentServerId = useServersStore((s) => s.currentServerId);
+  const navigate = useNavigationStore((s) => s.navigate);
+  const [keys, setKeys] = useState<SSHKey[] | null>(null);
+  const [oauth, setOauth] = useState<OAuthAccount[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [keyName, setKeyName] = useState('');
+  const [publicKey, setPublicKey] = useState('');
+  const [adding, setAdding] = useState(false);
+
+  const load = async () => {
+    if (!currentServerId) return;
+    setFailed(false);
+    try {
+      const [keyList, accList] = await Promise.all([
+        accountApi.listSSHKeys(currentServerId),
+        accountApi.listOAuthAccounts(currentServerId),
+      ]);
+      setKeys(keyList ?? []);
+      setOauth(accList ?? []);
+    } catch (e) {
+      setFailed(true);
+      message.error((e as Error).message || t('desktop.settings.account.loadFailed'));
+    }
+  };
+
+  useEffect(() => {
+    if (currentServerId) void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentServerId]);
+
+  if (!currentServerId) {
+    return (
+      <section className="set-sec">
+        <h3>{t('desktop.settings.account.title')}</h3>
+        <p className="desc">{t('desktop.settings.account.desc')}</p>
+        <div className="card pad">
+          <div className="kv">
+            <span className="k2">{t('desktop.settings.notifications.noServer')}</span>
+            <span className="v2">
+              <button className="link-btn" onClick={() => navigate('servers')}>
+                {t('desktop.settings.notifications.connect')}
+              </button>
+            </span>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const handleAddKey = async () => {
+    const name = keyName.trim();
+    const pk = publicKey.trim();
+    if (!name || !pk) return;
+    setAdding(true);
+    try {
+      const created = await accountApi.addSSHKey(currentServerId, { name, public_key: pk });
+      setKeys((prev) => [...(prev ?? []), created]);
+      setKeyName('');
+      setPublicKey('');
+      message.success(t('desktop.settings.account.keyAdded'));
+    } catch (e) {
+      message.error((e as Error).message || t('desktop.settings.account.keyAddFailed'));
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleDeleteKey = async (keyId: string) => {
+    try {
+      await accountApi.deleteSSHKey(currentServerId, keyId);
+      setKeys((prev) => (prev ?? []).filter((k) => k.id !== keyId));
+      message.success(t('desktop.settings.account.keyDeleted'));
+    } catch (e) {
+      message.error((e as Error).message || t('desktop.settings.account.keyDeleteFailed'));
+    }
+  };
+
+  const handleUnlink = async (provider: string) => {
+    try {
+      await accountApi.unlinkOAuth(currentServerId, provider);
+      setOauth((prev) => (prev ?? []).filter((a) => a.provider !== provider));
+      message.success(t('desktop.settings.account.oauthUnlinked'));
+    } catch (e) {
+      message.error((e as Error).message || t('desktop.settings.account.oauthUnlinkFailed'));
+    }
+  };
+
+  return (
+    <section className="set-sec">
+      <h3>{t('desktop.settings.account.title')}</h3>
+      <p className="desc">{t('desktop.settings.account.desc')}</p>
+
+      <div className="card pad">
+        <div className="sec-label">{t('desktop.settings.account.sshKeys')}</div>
+        <p className="sub-hint">{t('desktop.settings.account.sshKeysDesc')}</p>
+        {failed ? (
+          <div className="kv">
+            <span className="k2">{t('desktop.settings.account.loadFailed')}</span>
+            <span className="v2">
+              <button className="link-btn" onClick={() => void load()}>{t('desktop.settings.notifications.retry')}</button>
+            </span>
+          </div>
+        ) : (
+          <>
+            {(keys ?? []).map((k) => (
+              <div className="kv" key={k.id}>
+                <span className="k2">
+                  <KeyOutlined />
+                  <span className="mono">{k.name}</span>
+                  <span className="sub-hint">{k.fingerprint}</span>
+                </span>
+                <span className="v2">
+                  <span className="sub-hint">{t('desktop.settings.account.keyAddedAt', { date: k.created_at.slice(0, 10) })}</span>
+                  <Popconfirm
+                    title={t('desktop.settings.account.keyDeleteConfirm')}
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => void handleDeleteKey(k.id)}
+                  >
+                    <button className="icon-btn sm danger" aria-label={t('desktop.settings.account.keyDeleteConfirm')}>
+                      <DeleteOutlined />
+                    </button>
+                  </Popconfirm>
+                </span>
+              </div>
+            ))}
+            {(keys ?? []).length === 0 && (
+              <p className="sub-hint">{t('desktop.settings.account.noKeys')}</p>
+            )}
+          </>
+        )}
+        <div className="kv" style={{ marginTop: 10 }}>
+          <span className="k2">{t('desktop.settings.account.keyName')}</span>
+          <span className="v2">
+            <input
+              className="set-input"
+              value={keyName}
+              onChange={(e) => setKeyName(e.target.value)}
+              placeholder={t('desktop.settings.account.keyNamePh')}
+            />
+          </span>
+        </div>
+        <div className="kv">
+          <span className="k2">{t('desktop.settings.account.publicKey')}</span>
+          <span className="v2">
+            <input
+              className="set-input mono"
+              style={{ minWidth: 320 }}
+              value={publicKey}
+              onChange={(e) => setPublicKey(e.target.value)}
+              placeholder={t('desktop.settings.account.publicKeyPh')}
+            />
+          </span>
+        </div>
+        <div className="kv">
+          <span className="k2" />
+          <span className="v2">
+            <button className="btn ghost" disabled={adding || !keyName.trim() || !publicKey.trim()} onClick={() => void handleAddKey()}>
+              <PlusOutlined />
+              {t('desktop.settings.account.addKey')}
+            </button>
+          </span>
+        </div>
+      </div>
+
+      <div className="card pad">
+        <div className="sec-label">{t('desktop.settings.account.oauth')}</div>
+        <p className="sub-hint">{t('desktop.settings.account.oauthDesc')}</p>
+        {(oauth ?? []).map((a) => (
+          <div className="kv" key={a.provider}>
+            <span className="k2">
+              <LinkOutlined />
+              <span className="mono">{a.provider}</span>
+              <span className="sub-hint">{a.provider_username}</span>
+            </span>
+            <span className="v2">
+              <span className="sub-hint">{t('desktop.settings.account.keyAddedAt', { date: a.created_at.slice(0, 10) })}</span>
+              <Popconfirm
+                title={t('desktop.settings.account.oauthUnlinkConfirm')}
+                okButtonProps={{ danger: true }}
+                onConfirm={() => void handleUnlink(a.provider)}
+              >
+                <button className="icon-btn sm danger">{t('desktop.settings.account.oauthUnlink')}</button>
+              </Popconfirm>
+            </span>
+          </div>
+        ))}
+        {(oauth ?? []).length === 0 && (
+          <p className="sub-hint">{t('desktop.settings.account.noOauth')}</p>
+        )}
+      </div>
+    </section>
   );
 }

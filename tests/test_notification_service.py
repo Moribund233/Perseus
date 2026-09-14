@@ -1,4 +1,5 @@
 import pytest
+import json
 import uuid
 from datetime import datetime
 from unittest.mock import AsyncMock, patch
@@ -221,7 +222,7 @@ async def test_create_notification_email_failure(async_db: AsyncSession, async_t
 
 @pytest.mark.asyncio
 async def test_create_notification_sends_ws_push(async_db: AsyncSession, async_test_user):
-    """创建通知后自动推送 WebSocket 通知"""
+    """创建通知后自动推送 WebSocket 通知（携带未读数）"""
     mock_notify = AsyncMock(return_value=1)
 
     with patch("services.notification_service.notify_user", mock_notify):
@@ -240,3 +241,49 @@ async def test_create_notification_sends_ws_push(async_db: AsyncSession, async_t
     assert args[0][1] == "mention"  # notification_type
     assert args[0][2]["id"] == notif["id"]  # data
     assert args[0][2]["title"] == "You were mentioned"
+    assert args.kwargs.get("unread_count") == 1  # unread_count：刚创建 1 条未读
+
+
+@pytest.mark.asyncio
+async def test_notify_user_pushes_message_with_unread_count(async_test_user):
+    """notify_user 经真实 ConnectionManager 将 user_notification 消息推送到用户连接"""
+    from api.websocket.manager import manager
+    from api.websocket.handlers.notification import notify_user
+
+    sent: list[dict] = []
+
+    class StubWebSocket:
+        async def accept(self):
+            pass
+
+        async def send_text(self, text: str):
+            sent.append(json.loads(text))
+
+    connection = await manager.connect(StubWebSocket())
+    await manager.bind_user(connection, async_test_user.id, async_test_user.username)
+
+    count = await notify_user(
+        async_test_user.id, "mention", {"id": "n-1", "title": "hi"}, unread_count=3
+    )
+
+    assert count == 1
+    assert len(sent) == 1
+    msg = sent[0]
+    assert msg["type"] == "user_notification"
+    assert msg["notification_type"] == "mention"
+    assert msg["data"]["id"] == "n-1"
+    assert msg["unread_count"] == 3
+    assert "timestamp" in msg
+
+    await manager.disconnect(connection)
+
+
+@pytest.mark.asyncio
+async def test_notify_user_without_connection_returns_zero(async_test_user):
+    """无活跃连接时推送返回 0 且不抛错"""
+    from api.websocket.handlers.notification import notify_user
+
+    count = await notify_user(
+        async_test_user.id, "mention", {"id": "n-1"}, unread_count=1
+    )
+    assert count == 0

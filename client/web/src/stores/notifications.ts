@@ -15,6 +15,8 @@ interface NotificationsState {
   deleteNotification: (id: string) => Promise<void>;
   fetchPreferences: () => Promise<void>;
   updatePreferences: (data: Partial<NotificationPreference>) => Promise<void>;
+  /** F-205: WS 实时推送到达时插入新通知并对齐未读数 */
+  addLive: (notification: Notification, unreadCount?: number) => void;
 }
 
 export const useNotificationsStore = create<NotificationsState>((set) => ({
@@ -83,5 +85,18 @@ export const useNotificationsStore = create<NotificationsState>((set) => ({
   updatePreferences: async (data) => {
     const preferences = await notificationsApi.updatePreferences(data);
     set({ preferences });
+  },
+
+  addLive: (notification, unreadCount) => {
+    set((state) => {
+      if (state.notifications.some((n) => n.id === notification.id)) {
+        // 已存在（如重连后补推）仅对齐未读数
+        return unreadCount != null ? { unreadCount } : state;
+      }
+      return {
+        notifications: [notification, ...state.notifications],
+        unreadCount: unreadCount ?? state.unreadCount + 1,
+      };
+    });
   },
 }));

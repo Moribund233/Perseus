@@ -230,15 +230,21 @@ async def notify_repository_event(repository_id: uuid.UUID, event_type: str, eve
     return await manager.send_to_repository(repository_id, message)
 
 
-async def notify_user(user_id: uuid.UUID, notification_type: str, data: Dict[str, Any]) -> int:
+async def notify_user(
+    user_id: uuid.UUID,
+    notification_type: str,
+    data: Dict[str, Any],
+    unread_count: int | None = None,
+) -> int:
     """
     向用户发送个人通知
-    
+
     Args:
         user_id: 用户ID
         notification_type: 通知类型
         data: 通知数据
-        
+        unread_count: 推送时刻的未读数（可选，随消息下发省去客户端回查）
+
     Returns:
         int: 通知到的连接数
     """
@@ -248,5 +254,7 @@ async def notify_user(user_id: uuid.UUID, notification_type: str, data: Dict[str
         "data": data,
         "timestamp": datetime.now().isoformat(),
     }
-    
+    if unread_count is not None:
+        message["unread_count"] = unread_count
+
     return await manager.send_to_user(user_id, message)

@@ -17,6 +17,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/auth';
 import { useNotificationsStore } from '../../stores/notifications';
+import { notificationSocket } from '../../api/notificationSocket';
 import { repositoriesApi, type Repository } from '../../api/repositories';
 import type { Notification } from '../../api/notifications';
 import GlobalSearch from './GlobalSearch';
@@ -69,13 +70,25 @@ export default function AppLayout() {
   const markAllAsRead = useNotificationsStore((s) => s.markAllAsRead);
   const [notifOpen, setNotifOpen] = useState(false);
 
-  // 登录后拉取未读数并每 60s 轮询
+  // 登录后拉取未读数并每 60s 轮询（WS 实时推送为主，轮询作对账兜底）
   useEffect(() => {
     if (!user) return;
     fetchUnreadCount();
     const timer = setInterval(() => fetchUnreadCount(), 60_000);
     return () => clearInterval(timer);
   }, [user, fetchUnreadCount]);
+
+  // F-205: 订阅 /ws/notifications 实时推送
+  useEffect(() => {
+    if (!user) return;
+    notificationSocket.setHandlers({
+      onNotification: (payload) => {
+        useNotificationsStore.getState().addLive(payload.data, payload.unread_count);
+      },
+    });
+    notificationSocket.start();
+    return () => notificationSocket.stop();
+  }, [user]);
 
   const openNotificationPanel = (open: boolean) => {
     setNotifOpen(open);

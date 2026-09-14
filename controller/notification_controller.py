@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from api.routes_config import get_route_prefix
+from api.routes_prefix import get_route_prefix
 from api.dependencies import get_current_user
 from models.async_db import get_async_db
 from models.user import User

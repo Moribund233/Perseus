@@ -14,6 +14,8 @@ import {
   SearchOutlined,
   AppstoreOutlined,
   UnorderedListOutlined,
+  PlayCircleOutlined,
+  RocketOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import {
@@ -28,6 +30,8 @@ import IssueDetail from './IssueDetail';
 import PullRequestsView from './PullRequestsView';
 import PullRequestDetail from './PullRequestDetail';
 import RepositorySettings from './RepositorySettings';
+import BuildsPanel from './BuildsPanel';
+import ReleasesPanel from './ReleasesPanel';
 import Markdown from '../../components/Markdown';
 import { fileBadge } from '../workspace/ExplorerPanel';
 import { issuesApi } from '../../api/issues';
@@ -558,6 +562,8 @@ export default function RepositoriesView() {
     { key: 'code', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><FileTextOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.code')}</span> },
     { key: 'pullRequests', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><GitPullRequestIco />{t('app.repositories.tabs.pullRequests')}{tabCount(prCount)}</span> },
     { key: 'issues', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><IssueIco />{t('app.repositories.tabs.issues')}{tabCount(issueCount)}</span> },
+    { key: 'actions', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><PlayCircleOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.actions')}</span> },
+    { key: 'releases', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><RocketOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.releases')}</span> },
     { key: 'settings', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><GearIco />{t('app.repositories.tabs.settings')}</span> },
   ];
 
@@ -653,6 +659,16 @@ export default function RepositoriesView() {
           {activeTab === 'settings' && (
             <div style={{ flex: 1, minHeight: 0, padding: '16px 0 0', display: 'flex' }}>
               <RepositorySettings repoId={currentRepo.id} />
+            </div>
+          )}
+          {activeTab === 'actions' && (
+            <div style={{ flex: 1, minHeight: 0, padding: '16px 0 0', display: 'flex' }}>
+              <BuildsPanel repoId={currentRepo.id} />
+            </div>
+          )}
+          {activeTab === 'releases' && (
+            <div style={{ flex: 1, minHeight: 0, padding: '16px 0 0', display: 'flex' }}>
+              <ReleasesPanel repoId={currentRepo.id} />
             </div>
           )}
         </div>

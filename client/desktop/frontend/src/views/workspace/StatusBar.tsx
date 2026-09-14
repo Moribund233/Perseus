@@ -11,6 +11,7 @@ import { useGitStore } from '../../stores/git';
 import { useProblemsStore } from '../../stores/problems';
 import { useLspStore } from '../../stores/lsp';
 import { useServersStore } from '../../stores/servers';
+import { useEditorStatusStore } from '../../stores/editorStatus';
 
 export type BottomTab = 'problems' | 'output' | 'terminal';
 
@@ -30,6 +31,7 @@ export default function StatusBar({ workspace, file, lang, cursor, onOpenBottom 
   const lsp = useLspStore();
   const servers = useServersStore((s) => s.servers);
   const currentServerId = useServersStore((s) => s.currentServerId);
+  const { collabActive, collabSynced, lastSavedCommit } = useEditorStatusStore();
 
   const server = servers.find((s) => s.id === (currentServerId ?? workspace.server_id));
   const serverName = server?.name ?? (workspace.server_id ? String(workspace.server_id) : 'local');
@@ -68,6 +70,26 @@ export default function StatusBar({ workspace, file, lang, cursor, onOpenBottom 
         <span className={`sb-dot ${lsp.status === 'connected' ? 'on' : 'off'}`} />
         {lspText}
       </span>
+      {collabActive && (
+        <span
+          className="sb-item"
+          title={t('desktop.status.collabTitle', { defaultValue: '协作会话状态' })}
+        >
+          <span className={`sb-dot ${collabSynced ? 'on' : 'off'}`} />
+          {collabSynced
+            ? t('desktop.status.collabSynced', { defaultValue: '会话已同步' })
+            : t('desktop.status.collabSyncing', { defaultValue: '会话同步中' })}
+        </span>
+      )}
+      {lastSavedCommit && (
+        <span
+          className="sb-item"
+          title={t('desktop.status.gitCommittedTitle', { defaultValue: '最近一次协作保存的 Git 提交' })}
+          style={{ fontFamily: 'var(--mono)', fontSize: 10.5 }}
+        >
+          {t('desktop.status.gitCommitted', { sha: lastSavedCommit, defaultValue: 'Git 已提交 {{sha}}' })}
+        </span>
+      )}
       <span className="sb-item" title={t('desktop.status.serverTitle', { defaultValue: '关联服务器' })}>
         <DatabaseOutlined />
         {serverName}

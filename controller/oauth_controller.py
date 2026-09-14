@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.routes_config import get_route_prefix
+from api.routes_prefix import get_route_prefix
 from api.dependencies import get_current_user
 from core.config import get_config
 from core.exception import AuthenticationException, NotFoundException

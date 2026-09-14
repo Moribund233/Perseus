@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.routes_config import get_route_prefix
+from api.routes_prefix import get_route_prefix
 from api.dependencies import get_current_user
 from models.async_db import get_async_db
 from models.repository import Repository
@@ -95,12 +95,15 @@ async def list_builds(
     repo_id: uuid.UUID,
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    branch: Optional[str] = Query(default=None, description="按分支过滤（PR 详情关联构建场景）"),
+    status_filter: Optional[str] = Query(default=None, alias="status", description="按状态过滤"),
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
     await _get_repo(repo_id, db)
     builds = await BuildService.get_builds_for_repository(
-        db=db, repo_id=repo_id, limit=limit, offset=offset
+        db=db, repo_id=repo_id, limit=limit, offset=offset,
+        branch=branch, status=status_filter,
     )
     return [_build_to_response(b) for b in builds]
 

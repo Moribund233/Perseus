@@ -4,10 +4,10 @@ import {
 } from 'antd';
 import {
   SettingOutlined, TeamOutlined, ApiOutlined, UserAddOutlined, DeleteOutlined,
-  ExperimentOutlined, HistoryOutlined,
+  ExperimentOutlined, HistoryOutlined, LockOutlined, BranchesOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
-import { repositoriesApi, type Repository, type RepoMember, type RepoBranch } from '../../api/repositories';
+import { repositoriesApi, type Repository, type RepoMember, type RepoBranch, type BranchProtectionSettings } from '../../api/repositories';
 import { webhooksApi, type Webhook, type WebhookDelivery } from '../../api/webhooks';
 import { useAuthStore } from '../../stores/auth';
 import { useRepositoriesStore } from '../../stores/repositories';
@@ -116,6 +116,35 @@ export default function RepoSettingsTab({ repoId }: { repoId: string }) {
       setMembersLoading(false);
     }
   }, [repoId]);
+
+  // ---- Branch Protection ----
+  const [protectionSettings, setProtectionSettings] = useState<Record<string, BranchProtectionSettings>>({});
+
+  const toggleProtection = async (branchName: string, on: boolean) => {
+    try {
+      if (on) {
+        const settings = protectionSettings[branchName] ?? { require_code_review: false, require_status_checks: false };
+        await repositoriesApi.protectBranch(repoId, branchName, settings);
+        setProtectionSettings((prev) => ({ ...prev, [branchName]: settings }));
+        message.success(t('app.repositories.settings.branchProtection.protected'));
+      } else {
+        await repositoriesApi.unprotectBranch(repoId, branchName);
+        message.success(t('app.repositories.settings.branchProtection.unprotected'));
+      }
+      setBranches(await repositoriesApi.getBranches(repoId));
+    } catch (e) {
+      message.error((e as Error).message || t('app.repositories.settings.branchProtection.failed'));
+    }
+  };
+
+  const updateProtection = async (branchName: string, settings: BranchProtectionSettings) => {
+    setProtectionSettings((prev) => ({ ...prev, [branchName]: settings }));
+    try {
+      await repositoriesApi.protectBranch(repoId, branchName, settings);
+    } catch (e) {
+      message.error((e as Error).message || t('app.repositories.settings.branchProtection.failed'));
+    }
+  };
 
   const loadWebhooks = useCallback(async () => {
     try {
@@ -352,6 +381,59 @@ export default function RepoSettingsTab({ repoId }: { repoId: string }) {
                   </div>
                 ))
               )}
+            </div>
+          </div>
+
+          {/* Branch Protection */}
+          <div style={SECTION_GAP}>
+            <SectionHeader icon={<LockOutlined />} title={t('app.repositories.settings.branchProtection.title')} />
+            <div style={{ padding: 8 }}>
+              {branches.map((b) => (
+                <div
+                  key={b.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <BranchesOutlined style={{ color: textTertiary }} />
+                  <span style={{ fontSize: 13, color: textPrimary, fontWeight: 500, fontFamily: 'monospace' }}>{b.name}</span>
+                  {b.is_default && <Tag style={{ fontSize: 10 }}>{t('app.repositories.settings.general.defaultBranch')}</Tag>}
+                  <span style={{ flex: 1 }} />
+                  {b.is_protected && (
+                    <>
+                      <label style={{ fontSize: 12, color: textSecondary, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={protectionSettings[b.name]?.require_code_review ?? false}
+                          disabled={!isOwnerOrAdmin}
+                          onChange={(e) => updateProtection(b.name, { ...protectionSettings[b.name], require_code_review: e.target.checked })}
+                        />
+                        {t('app.repositories.settings.branchProtection.requireCodeReview')}
+                      </label>
+                      <label style={{ fontSize: 12, color: textSecondary, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={protectionSettings[b.name]?.require_status_checks ?? false}
+                          disabled={!isOwnerOrAdmin}
+                          onChange={(e) => updateProtection(b.name, { ...protectionSettings[b.name], require_status_checks: e.target.checked })}
+                        />
+                        {t('app.repositories.settings.branchProtection.requireStatusChecks')}
+                      </label>
+                    </>
+                  )}
+                  <Switch
+                    size="small"
+                    checked={b.is_protected}
+                    disabled={!isOwnerOrAdmin}
+                    onChange={(on) => toggleProtection(b.name, on)}
+                  />
+                </div>
+              ))}
             </div>
           </div>
 

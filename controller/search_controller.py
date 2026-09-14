@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 
-from api.routes_config import get_route_prefix
+from api.routes_prefix import get_route_prefix
 from models.async_db import get_async_db
 from models import Repository, Issue, PullRequest
 from models.user import User

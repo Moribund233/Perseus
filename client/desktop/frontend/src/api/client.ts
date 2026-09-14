@@ -21,8 +21,10 @@ export async function apiRequest<T>(
   _serverId?: string,
 ): Promise<T> {
   const { config } = useGatewayStore.getState();
+  const isForm = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    // FormData 交给浏览器生成含 boundary 的 Content-Type
+    ...(isForm ? {} : { 'Content-Type': 'application/json' }),
     'X-Gateway-Token': config?.gatewayToken ?? '',
     ...(options.headers as Record<string, string>),
   };
@@ -56,4 +58,23 @@ export async function proxyRequest<T>(
   options: RequestInit = {},
 ): Promise<T> {
   return apiRequest<T>(`/api/local/proxy/${serverId}${path}`, options);
+}
+
+// proxyRequestBlob 经网关代理拉取二进制内容（附件下载等场景）。
+export async function proxyRequestBlob(serverId: string, path: string): Promise<Blob> {
+  const { config } = useGatewayStore.getState();
+  const res = await fetch(`${config?.baseURL ?? ''}/api/local/proxy/${serverId}${path}`, {
+    headers: { 'X-Gateway-Token': config?.gatewayToken ?? '' },
+  });
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const json = await res.json();
+      message = json.error?.message || json.detail || message;
+    } catch {
+      /* keep statusText */
+    }
+    throw new ApiError(res.status, message, { offline: res.status === 503 });
+  }
+  return res.blob();
 }

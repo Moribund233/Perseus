@@ -94,6 +94,43 @@ class TestBuildService:
         )
         assert len(builds) == 2
 
+    async def test_list_builds_filters_by_branch(self, async_db: AsyncSession, async_test_user):
+        repo_id = uuid.uuid4()
+        await BuildService.create_build(
+            db=async_db, repo_id=repo_id, branch="main",
+            commit_sha="abc1", triggered_by=async_test_user.id,
+        )
+        await BuildService.create_build(
+            db=async_db, repo_id=repo_id, branch="feature/x",
+            commit_sha="abc2", triggered_by=async_test_user.id,
+        )
+        await BuildService.create_build(
+            db=async_db, repo_id=repo_id, branch="feature/x",
+            commit_sha="abc3", triggered_by=async_test_user.id,
+        )
+        builds = await BuildService.get_builds_for_repository(
+            db=async_db, repo_id=repo_id, branch="feature/x"
+        )
+        assert len(builds) == 2
+        assert all(b.branch == "feature/x" for b in builds)
+
+    async def test_list_builds_filters_by_status(self, async_db: AsyncSession, async_test_user):
+        repo_id = uuid.uuid4()
+        b1 = await BuildService.create_build(
+            db=async_db, repo_id=repo_id, branch="main",
+            commit_sha="abc1", triggered_by=async_test_user.id,
+        )
+        await BuildService.create_build(
+            db=async_db, repo_id=repo_id, branch="main",
+            commit_sha="abc2", triggered_by=async_test_user.id,
+        )
+        await BuildService.update_build_status(db=async_db, build_id=b1.id, status="success")
+        builds = await BuildService.get_builds_for_repository(
+            db=async_db, repo_id=repo_id, status="success"
+        )
+        assert len(builds) == 1
+        assert builds[0].status == "success"
+
     async def test_update_build_status_to_running(self, async_db: AsyncSession, async_test_user):
         build = await BuildService.create_build(
             db=async_db,
@@ -187,6 +224,28 @@ class TestBuildController:
         )
         assert response.status_code == 200
         assert response.json()["id"] == build_id
+
+    def test_list_builds_filter_by_branch_via_api(self, test_client: TestClient, auth_headers: dict, db):
+        repo = create_test_repo(db)
+        test_client.post(
+            f"/api/v1/repositories/{repo.id}/builds",
+            json={"branch": "main", "commit_sha": "abc1"},
+            headers=auth_headers,
+        )
+        test_client.post(
+            f"/api/v1/repositories/{repo.id}/builds",
+            json={"branch": "feature/x", "commit_sha": "abc2"},
+            headers=auth_headers,
+        )
+        response = test_client.get(
+            f"/api/v1/repositories/{repo.id}/builds",
+            params={"branch": "feature/x"},
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["branch"] == "feature/x"
 
     def test_update_build_status_via_api(self, test_client: TestClient, auth_headers: dict, db):
         repo = create_test_repo(db)

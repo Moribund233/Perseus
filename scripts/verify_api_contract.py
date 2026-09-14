@@ -17,14 +17,18 @@ FRONTEND_API_DIR = PROJECT_ROOT / "client" / "web" / "src" / "api"
 
 
 def collect_backend_routes(app) -> set[tuple[str, str]]:
-    """从 FastAPI 应用中提取所有已注册的 HTTP 路由"""
-    routes = set()
-    for route in app.routes:
-        if hasattr(route, "methods") and hasattr(route, "path"):
-            for method in route.methods:
-                if method == "HEAD":
-                    continue
-                routes.add((method.upper(), route.path))
+    """从 FastAPI 应用中提取所有已注册的 HTTP 路由
+
+    注意：新版 FastAPI 的 include_router 采用懒加载机制（app.routes 中是
+    _IncludedRouter 包装器，不会平铺子路由），因此必须经 openapi() 强制
+    展开后再枚举，直接遍历 app.routes 只能看到默认路由。
+    """
+    routes: set[tuple[str, str]] = set()
+    spec = app.openapi()
+    for path, methods in spec.get("paths", {}).items():
+        for method in methods:
+            if method.upper() in {"GET", "POST", "PUT", "PATCH", "DELETE"}:
+                routes.add((method.upper(), path))
     return routes
 
 

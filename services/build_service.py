@@ -48,14 +48,16 @@ class BuildService:
         repo_id: uuid.UUID,
         limit: int = 50,
         offset: int = 0,
+        branch: Optional[str] = None,
+        status: Optional[str] = None,
     ) -> List[BuildStatus]:
-        result = await db.execute(
-            select(BuildStatus)
-            .filter(BuildStatus.repo_id == repo_id)
-            .order_by(desc(BuildStatus.created_at))
-            .offset(offset)
-            .limit(limit)
-        )
+        stmt = select(BuildStatus).filter(BuildStatus.repo_id == repo_id)
+        if branch:
+            stmt = stmt.filter(BuildStatus.branch == branch)
+        if status:
+            stmt = stmt.filter(BuildStatus.status == status)
+        stmt = stmt.order_by(desc(BuildStatus.created_at)).offset(offset).limit(limit)
+        result = await db.execute(stmt)
         return list(result.scalars().all())
 
     @staticmethod

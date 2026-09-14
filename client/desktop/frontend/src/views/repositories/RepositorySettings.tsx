@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Button, Modal, Form, Input, Select, Switch, Checkbox, App as AntApp, Avatar, Tag, Popconfirm } from 'antd';
-import { UserOutlined, LinkOutlined, PlusOutlined, DeleteOutlined, ThunderboltOutlined, ApartmentOutlined } from '@ant-design/icons';
+import { Button, Modal, Form, Input, Select, Switch, Checkbox, App as AntApp, Avatar, Tag, Popconfirm, Spin } from 'antd';
+import { UserOutlined, LinkOutlined, PlusOutlined, DeleteOutlined, ThunderboltOutlined, ApartmentOutlined, LockOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { repositorySettingsApi, type Webhook, type RepoMember, type RepoUser } from '../../api/repositorySettings';
+import { repositoriesApi, type RepoBranch, type BranchProtectionSettings } from '../../api/repositories';
 import { useServersStore } from '../../stores/servers';
 
 const borderColor = '#21262d';
@@ -70,12 +71,18 @@ export default function RepositorySettings({ repoId }: RepositorySettingsProps) 
   const { message } = AntApp.useApp();
   const serverId = useServersStore((s) => s.servers.find((x) => x.id === s.currentServerId)?.id || '');
 
-  const [activeSub, setActiveSub] = useState<'webhooks' | 'collaborators'>('webhooks');
+  const [activeSub, setActiveSub] = useState<'webhooks' | 'collaborators' | 'branchProtection'>('webhooks');
+
+  const SUB_TABS = [
+    { key: 'webhooks' as const, icon: <LinkOutlined style={{ fontSize: 12 }} />, label: t('app.repositorySettings.webhooks') },
+    { key: 'collaborators' as const, icon: <ApartmentOutlined style={{ fontSize: 12 }} />, label: t('app.repositorySettings.collaborators') },
+    { key: 'branchProtection' as const, icon: <LockOutlined style={{ fontSize: 12 }} />, label: t('app.repositorySettings.branchProtection') },
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ display: 'flex', gap: 4, padding: '8px 0', flexShrink: 0 }}>
-        {(['webhooks', 'collaborators'] as const).map((key) => {
+        {SUB_TABS.map(({ key, icon, label }) => {
           const isActive = activeSub === key;
           return (
             <button
@@ -102,18 +109,22 @@ export default function RepositorySettings({ repoId }: RepositorySettingsProps) 
                 if (!isActive) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = textSecondary; }
               }}
             >
-              {key === 'webhooks' ? <LinkOutlined style={{ fontSize: 12 }} /> : <ApartmentOutlined style={{ fontSize: 12 }} />}
-              {key === 'webhooks' ? t('app.repositorySettings.webhooks') : t('app.repositorySettings.collaborators')}
+              {icon}
+              {label}
             </button>
           );
         })}
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-        {activeSub === 'webhooks' ? (
+        {activeSub === 'webhooks' && (
           <WebhooksPanel repoId={repoId} serverId={serverId} t={t} message={message} />
-        ) : (
+        )}
+        {activeSub === 'collaborators' && (
           <CollaboratorsPanel repoId={repoId} serverId={serverId} t={t} message={message} />
+        )}
+        {activeSub === 'branchProtection' && (
+          <BranchProtectionPanel repoId={repoId} serverId={serverId} t={t} message={message} />
         )}
       </div>
     </div>
@@ -447,6 +458,98 @@ function CollaboratorsPanel({ repoId, serverId, t, message }: {
           </Form.Item>
         </Form>
       </Modal>
+    </div>
+  );
+}
+// BranchProtectionPanel：分支保护开关 + 审查/状态检查要求（与 web 端仓库设置对齐）。
+function BranchProtectionPanel({ repoId, serverId, t, message }: {
+  repoId: string;
+  serverId: string;
+  t: TFunction;
+  message: ReturnType<typeof AntApp.useApp>['message'];
+}) {
+  const [branches, setBranches] = useState<RepoBranch[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [protectionSettings, setProtectionSettings] = useState<Record<string, BranchProtectionSettings>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!serverId) { setLoading(false); return; }
+    repositoriesApi.getBranches(serverId, repoId)
+      .then((list) => { if (!cancelled) setBranches(list ?? []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [serverId, repoId]);
+
+  const refresh = async () => {
+    try {
+      setBranches(await repositoriesApi.getBranches(serverId, repoId));
+    } catch { /* noop */ }
+  };
+
+  const toggleProtection = async (branchName: string, on: boolean) => {
+    try {
+      if (on) {
+        const settings = protectionSettings[branchName] ?? { require_code_review: false, require_status_checks: false };
+        await repositoriesApi.protectBranch(serverId, repoId, branchName, settings);
+        setProtectionSettings((prev) => ({ ...prev, [branchName]: settings }));
+        message.success(t('app.repositorySettings.branchProtected'));
+      } else {
+        await repositoriesApi.unprotectBranch(serverId, repoId, branchName);
+        message.success(t('app.repositorySettings.branchUnprotected'));
+      }
+      await refresh();
+    } catch (e) {
+      message.error((e as Error).message || t('app.repositorySettings.branchProtectionFailed'));
+    }
+  };
+
+  const updateProtection = async (branchName: string, settings: BranchProtectionSettings) => {
+    setProtectionSettings((prev) => ({ ...prev, [branchName]: settings }));
+    try {
+      await repositoriesApi.protectBranch(serverId, repoId, branchName, settings);
+    } catch (e) {
+      message.error((e as Error).message || t('app.repositorySettings.branchProtectionFailed'));
+    }
+  };
+
+  if (loading) {
+    return <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>;
+  }
+
+  return (
+    <div style={{ border: `1px solid ${borderColor}`, borderRadius: 12, background: bgSecondary, margin: '8px 0' }}>
+      {branches.map((b) => (
+        <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: `1px solid ${borderColor}`, flexWrap: 'wrap' }}>
+          <LockOutlined style={{ color: textTertiary }} />
+          <span style={{ fontSize: 13, color: textPrimary, fontWeight: 500, fontFamily: "'JetBrains Mono', monospace" }}>{b.name}</span>
+          {b.is_default && <Tag style={{ fontSize: 10 }}>{t('app.repositorySettings.defaultBranch')}</Tag>}
+          <span style={{ flex: 1 }} />
+          {b.is_protected && (
+            <>
+              <Checkbox
+                checked={protectionSettings[b.name]?.require_code_review ?? false}
+                onChange={(e) => updateProtection(b.name, { ...protectionSettings[b.name], require_code_review: e.target.checked })}
+              >
+                <span style={{ fontSize: 12, color: textSecondary }}>{t('app.repositorySettings.branchRequireCodeReview')}</span>
+              </Checkbox>
+              <Checkbox
+                checked={protectionSettings[b.name]?.require_status_checks ?? false}
+                onChange={(e) => updateProtection(b.name, { ...protectionSettings[b.name], require_status_checks: e.target.checked })}
+              >
+                <span style={{ fontSize: 12, color: textSecondary }}>{t('app.repositorySettings.branchRequireStatusChecks')}</span>
+              </Checkbox>
+            </>
+          )}
+          <Switch size="small" checked={b.is_protected} onChange={(on) => toggleProtection(b.name, on)} />
+        </div>
+      ))}
+      {branches.length === 0 && (
+        <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: textTertiary }}>
+          {t('app.repositorySettings.branchProtectionEmpty')}
+        </div>
+      )}
     </div>
   );
 }

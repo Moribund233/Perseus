@@ -7,7 +7,8 @@
 > **当前阶段**: 实时协作层 — F-202 团队聊天 ✅
 > **当前阶段**: 实时协作层 — F-203 业务事件广播 ✅
 > **当前阶段**: 实时协作层 — F-204 协作文本编辑 ✅
-> **下一阶段**: F-205 独立实时通知模块 🎯
+> **当前阶段**: F-205 实时通知推送 ✅（2026-09-14：user_notification WS 推送 + 双端接入）
+> **下一阶段**: F-048~050 国际化 🎯
 
 ---
 
@@ -61,7 +62,7 @@
 > - LFS、通知系统、WebSocket 实时事件广播/在线状态已完成
 > - 代码搜索仅有单仓库接口，跨仓库搜索与索引自动维护待实现
 > - CI/CD 仅有构建状态存储 API，真实 push/PR 触发闭环待接入
-> - 国际化、独立实时通知模块（F-205）尚未开始；协作文本编辑（F-204）已完成（`/ws/collab`，见 `docs/api/websocket/README.md` 第 7 节）
+> - 国际化尚未开始；独立实时通知推送（F-205）已完成（2026-09-14，`user_notification` WS 推送 + 双端接入，见 `docs/api/websocket/README.md` 第 4 节）；协作文本编辑（F-204）已完成（Yjs 底座，见同文件第 7 节）
 
 ---
 
@@ -370,7 +371,8 @@ pytest -v -m e2e
 | **P0** | F-046 | CI/CD 触发闭环 | ✅ 已实现 | PR merge 后自动创建 `Build` 记录 | 已补充 `test_merge_pr_creates_build_record` |
 | **P1** | F-031 | Webhook 重试机制 | ✅ 已实现 | `_deliver_webhook` 支持最多 3 次指数退避重试 | 已补充重试与最终失败测试 |
 | **P1** | F-204 | 协作文本编辑 | ✅ 已实现 | `/ws/collab` 专用端点 + `services/realtime/collab_service.py`（CM6 collab OT authority，乐观并发 + 光标 presence + 协作保存落 Git；写权限会话内缓存，重连自动 rejoin） | 双连接冒烟通过；`tests/test_collab_ws.py` 29 例覆盖 join/push/reject/pull/cursor/save/权限缓存/GC；与 Code with Me 差距分析与演进规划见 `docs/collab-f204-vs-cwm.md` |
-| **P1** | F-205 | 独立实时通知模块 | ⏳ Phase 2 | `services/realtime/notify.py` 不存在 | 拆分实时通知逻辑，支持 @提及解析、评论/CI 状态实时推送；复用 `notification_service` + `notify_user` |
+| **P1** | F-205 | 实时通知推送 | ✅ 已实现 | 通知落库即经 `notify_user` → `manager.send_to_user` 推送 `user_notification` 消息（含完整通知对象与 `unread_count`）；`/ws/notifications` 专用端点常驻订阅。web（AppLayout）与 desktop（PortalShell，经网关 WS 透传）2026-09-14 接入，REST 轮询降级为对账兜底 | `tests/test_notification_service.py` 推送链路 3 例 |
+| **P2** | F-047 | 构建状态展示 | ✅ 已实现 | Builds 列表/日志 UI（批次 B）+ `GET /builds` 支持 `branch`/`status` 过滤（2026-09-14），PR 详情展示源/目标分支最近构建状态（web+desktop） | `test_list_builds_filters_by_branch` 等 3 例 |
 | **P2** | F-048~050 | 国际化 | 🔴 未开始 | API 错误消息未做多语言 | 后端新增 `locales/` 与错误码映射，`core/exception.py` 支持按 `Accept-Language` 返回多语言消息 |
 | **P2** | F-051~057 | 生产准备 | 🔴 未开始 | Docker 基础已就绪，缺监控/压测/审计 | 按阶段四任务逐项推进，优先完成 Prometheus/Sentry 集成与 Controller 层测试覆盖 |
 

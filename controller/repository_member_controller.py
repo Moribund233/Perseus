@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
 
-from api.routes_config import get_route_prefix
+from api.routes_prefix import get_route_prefix
 from models.async_db import get_async_db
 from models.user import User
 from api.dependencies import get_current_user

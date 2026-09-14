@@ -164,7 +164,14 @@
         "descriptionPlaceholder": "Release notes…",
         "prerelease": "This is a prerelease",
         "createTag": "Create a Git tag",
-        "draft": "Set as draft"
+        "draft": "Set as draft",
+        "assetUpload": "Upload asset",
+        "assetUploaded": "Asset uploaded",
+        "assetUploadFailed": "Failed to upload asset",
+        "assetDeleted": "Asset deleted",
+        "assetDeleteFailed": "Failed to delete asset",
+        "assetDeleteConfirm": "Delete this asset?",
+        "downloads": "{{count}} downloads"
       },
       "builds": {
         "title": "Builds",
@@ -232,6 +239,14 @@
           "testFailed": "Test failed",
           "deliveries": "Deliveries",
           "noDeliveries": "No deliveries yet"
+        },
+        "branchProtection": {
+          "title": "Branch protection",
+          "requireCodeReview": "Require code review",
+          "requireStatusChecks": "Require status checks",
+          "protected": "Branch protected",
+          "unprotected": "Branch protection removed",
+          "failed": "Failed to update branch protection"
         }
       },
       "fileList": {
@@ -367,6 +382,7 @@
         "mergeSquash": "Squash and merge",
         "mergeRebase": "Rebase and merge",
         "noDescription": "No description provided.",
+        "builds": "Builds",
         "comments": "{{count}} comments",
         "leaveComment": "Leave a comment",
         "commentPlaceholder": "Leave a comment",
@@ -413,7 +429,10 @@
       "collabConnecting": "Collab connecting",
       "collabSaved": "Collaborative edit committed",
       "peersInFile": "editing this file",
-      "saveViaCollab": "Changes will be committed from the current collab session to the default branch"
+      "saveViaCollab": "Changes will be committed from the current collab session to the default branch",
+      "collabSynced": "Session synced",
+      "collabSyncing": "Session syncing",
+      "gitCommitted": "Git committed {{sha}}"
     },
     "teamChat": {
       "title": "Team Chat",
@@ -458,8 +477,16 @@
       "emailOnMentionDesc": "Email me when someone mentions me",
       "emailOnPrReview": "Email — PR Reviews",
       "emailOnPrReviewDesc": "Email me when my pull requests get reviewed",
+      "emailOnIssueComment": "Email — Issue Comments",
+      "emailOnIssueCommentDesc": "Email me about new comments on issues I participate in",
+      "emailOnPrMerge": "Email — PR Merged",
+      "emailOnPrMergeDesc": "Email me when a pull request I participated in is merged",
+      "emailOnRelease": "Email — Releases",
+      "emailOnReleaseDesc": "Email me when a new release is published in my repositories",
       "inAppOnMention": "In-app — Mentions",
       "inAppOnMentionDesc": "Notify me in-app when someone mentions me",
+      "inAppOnPrReview": "In-app — PR Reviews",
+      "inAppOnPrReviewDesc": "Notify me in-app when my pull requests get reviewed",
       "inAppOnIssueComment": "In-app — Issue Comments",
       "inAppOnIssueCommentDesc": "Notify me about new comments on issues I participate in",
       "security": "Security",
@@ -492,7 +519,11 @@
       "failed": "Search failed. Please try again.",
       "noResults": "No results for {{query}}",
       "matches": "matches",
-      "initialHint": "Enter a keyword to search code across all repositories"
+      "initialHint": "Enter a keyword to search code across all repositories",
+      "groupRepos": "Repositories",
+      "groupIssues": "Issues",
+      "groupPullRequests": "Pull Requests",
+      "groupCode": "Code"
     }
   },
   "auth": {

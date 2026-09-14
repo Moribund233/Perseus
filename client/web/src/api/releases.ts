@@ -23,6 +23,7 @@ export interface ReleaseAsset {
   file_size: number;
   content_type: string;
   uploader_id: string;
+  download_count?: number;
   created_at: string;
 }
 
@@ -79,4 +80,22 @@ export const releasesApi = {
     apiRequest<void>(`/api/v1/repositories/${repoId}/releases/${releaseNumber}`, {
       method: 'DELETE',
     }),
+
+  uploadAsset: (repoId: string, releaseNumber: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiRequest<ReleaseAsset>(
+      `/api/v1/repositories/${repoId}/releases/${releaseNumber}/assets/upload`,
+      { method: 'POST', body: formData },
+    );
+  },
+
+  deleteAsset: (repoId: string, releaseNumber: number, assetId: string) =>
+    apiRequest<void>(
+      `/api/v1/repositories/${repoId}/releases/${releaseNumber}/assets/${assetId}`,
+      { method: 'DELETE' },
+    ),
+
+  assetDownloadUrl: (repoId: string, releaseNumber: number, assetId: string) =>
+    `/api/v1/repositories/${repoId}/releases/${releaseNumber}/assets/${assetId}/download`,
 };

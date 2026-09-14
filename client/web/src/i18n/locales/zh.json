@@ -164,7 +164,14 @@
         "descriptionPlaceholder": "发布说明…",
         "prerelease": "预发布版本",
         "createTag": "同时创建 Git 标签",
-        "draft": "存为草稿"
+        "draft": "存为草稿",
+        "assetUpload": "上传附件",
+        "assetUploaded": "附件已上传",
+        "assetUploadFailed": "附件上传失败",
+        "assetDeleted": "附件已删除",
+        "assetDeleteFailed": "附件删除失败",
+        "assetDeleteConfirm": "确定删除该附件？",
+        "downloads": "{{count}} 次下载"
       },
       "builds": {
         "title": "构建记录",
@@ -232,6 +239,14 @@
           "testFailed": "测试失败",
           "deliveries": "投递记录",
           "noDeliveries": "暂无投递记录"
+        },
+        "branchProtection": {
+          "title": "分支保护",
+          "requireCodeReview": "要求代码审查",
+          "requireStatusChecks": "要求状态检查",
+          "protected": "分支已保护",
+          "unprotected": "已取消分支保护",
+          "failed": "分支保护更新失败"
         }
       },
       "fileList": {
@@ -367,6 +382,7 @@
         "mergeSquash": "Squash 合并",
         "mergeRebase": "Rebase 合并",
         "noDescription": "未提供描述。",
+        "builds": "构建",
         "comments": "{{count}} 条评论",
         "leaveComment": "发表评论",
         "commentPlaceholder": "发表评论",
@@ -413,7 +429,10 @@
       "collabConnecting": "协作连接中",
       "collabSaved": "协作编辑已提交",
       "peersInFile": "人正在编辑此文件",
-      "saveViaCollab": "更改将以当前协作会话内容提交到默认分支"
+      "saveViaCollab": "更改将以当前协作会话内容提交到默认分支",
+      "collabSynced": "会话已同步",
+      "collabSyncing": "会话同步中",
+      "gitCommitted": "Git 已提交 {{sha}}"
     },
     "teamChat": {
       "title": "团队聊天",
@@ -458,8 +477,16 @@
       "emailOnMentionDesc": "有人 @ 提及你时发送邮件",
       "emailOnPrReview": "邮件通知 — PR 审查",
       "emailOnPrReviewDesc": "你的 PR 收到审查时发送邮件",
+      "emailOnIssueComment": "邮件通知 — Issue 评论",
+      "emailOnIssueCommentDesc": "你参与的 Issue 有新评论时发送邮件",
+      "emailOnPrMerge": "邮件通知 — PR 合并",
+      "emailOnPrMergeDesc": "你参与的 PR 被合并时发送邮件",
+      "emailOnRelease": "邮件通知 — 新版本发布",
+      "emailOnReleaseDesc": "你的仓库发布新版本时发送邮件",
       "inAppOnMention": "站内通知 — 被提及",
       "inAppOnMentionDesc": "有人 @ 提及你时站内提醒",
+      "inAppOnPrReview": "站内通知 — PR 审查",
+      "inAppOnPrReviewDesc": "你的 PR 收到审查时站内提醒",
       "inAppOnIssueComment": "站内通知 — Issue 评论",
       "inAppOnIssueCommentDesc": "你参与的 Issue 有新评论时提醒",
       "security": "安全",
@@ -492,7 +519,11 @@
       "failed": "搜索失败，请重试",
       "noResults": "未找到与 {{query}} 相关的结果",
       "matches": "个匹配",
-      "initialHint": "输入关键词搜索全部仓库的代码"
+      "initialHint": "输入关键词搜索全部仓库的代码",
+      "groupRepos": "仓库",
+      "groupIssues": "Issues",
+      "groupPullRequests": "Pull Requests",
+      "groupCode": "代码"
     }
   },
   "auth": {

@@ -3,6 +3,9 @@
 > **日期**: 2026-09-07；**2026-09-08 更新**: Yjs 统一底座已落地（5.1 方案 B / D1 决策实施完成）——
 > Hocuspocus 哑管道网关 + web `y-codemirror.next` 迁移完成，3.6 方案 B（断线变更保留）随 CRDT 天然解决；
 > desktop 待 `y-monaco` 接入。下文现状描述保留为迁移前记录，供追溯。
+> **2026-09-14 更新**: desktop T9 y-monaco 接入完成，两端同 Yjs 底座；**M1 短期项全部落地**——
+> 3.3 双态徽标（会话已同步/Git 已提交）与 3.2 短期「未保存离开提示」（`beforeunload` × `hasPendingChanges()`）两端实现，
+> 详见 `docs/desktop-port-sync.md` 同步批次记录。M2+（邀请链接/TTL/跟随模式）仍待排期。
 > **状态**: 规划参考文档（非实施承诺）
 > **定位**: 以 JetBrains Code with Me（下称 CwM）为直接参照，梳理 F-204 协作文本编辑的功能差异，按"影响用户体验 → web 端取舍 → desktop 端深化"三层组织，供后续里程碑规划使用。
 > **关联**: [`docs/api/websocket/README.md`](api/websocket/README.md) 第 7 节（协议）、[`docs/roadmap.md`](roadmap.md)（阶段三）、[`docs/superpowers/specs/2026-08-03-desktop-app-design.md`](superpowers/specs/2026-08-03-desktop-app-design.md)（desktop 基线）、[`docs/frontend-placeholders.md`](frontend-placeholders.md)（已知限制）
@@ -65,7 +68,7 @@ F-204 是以**服务端会话 + Git 提交为权威**的**轻协作能力**（�
 - **F-204**：会话纯内存态，最后一人离开（或断连）即销毁；**未 `collab_save` 的变更直接丢失**，无任何提示。
 - **UX 影响**：数据丢失风险 + "我走了别人还在编辑吗"的不确定感。多人协作中最后一人静默离开是常态路径，风险真实存在。
 - **规划建议**（按成本递增）：
-  1. 短期：前端 `beforeunload`/关闭 tab 时若有 `hasPendingChanges()` 提示；会话参与者列表常显"未保存"徽标。
+  1. 短期：前端 `beforeunload`/关闭 tab 时若有 `hasPendingChanges()` 提示；会话参与者列表常显"未保存"徽标。→ **✅ 2026-09-14 beforeunload 拦截已落地（web `routes/editor/index.tsx` / desktop `EditorTabs.tsx`）**；参与者"未保存"徽标未做。
   2. 中期：服务端会话 TTL 延迟销毁（如最后一人离开后保留 10 分钟，期间重 join 恢复现场，`collab_init` 直接续版本号）。
   3. 长期：可选"自动落盘"策略——会话空闲 N 分钟自动 `collab_save` 到草稿分支（`collab/draft-...`），避免污染目标分支。
   - 涉及：`collab_service.py`（TTL/GC）、`collabController.ts`、编辑器 UI。
@@ -77,6 +80,7 @@ F-204 是以**服务端会话 + Git 提交为权威**的**轻协作能力**（�
 - **UX 影响**：当前编辑器仅有 `isDirty` 标记，用户无法得知"当前内容是否已被某人提交过"。CwM 用架构回避了这个问题，F-204 必须用 UI 交代清楚。
 - **规划建议**：编辑器状态区显示双态徽标："会话已同步 ✓（版本 N）" / "Git 已提交（短 SHA）"；`collab_saved` 广播已具备全部所需信息。
   - 涉及：`client/web/src/routes/editor/index.tsx`（状态栏）、`collabController.ts`（版本透出）。
+  → **✅ 2026-09-14 双态徽标已落地（两端）**：web 编辑器状态栏 + desktop StatusBar（`stores/editorStatus.ts`）；"会话已同步"= connected 且无未同步变更（Yjs `hasUnsyncedChanges` 轮询），"Git 已提交"= 最近一次协作保存 short-SHA（内容再编辑即失效）。「版本 N」未透出，与规划略有出入。
 
 ### 3.4 跟随模式（Follow me / Spotlight） — **P1**
 
@@ -187,7 +191,7 @@ F-204 是以**服务端会话 + Git 提交为权威**的**轻协作能力**（�
 
 | 里程碑 | 端 | 内容 | 对应章节 |
 |--------|----|------|----------|
-| **M1（短期）** | web | 未保存离开提示、保存/同步双态徽标、会话 TTL 延迟销毁 | 3.2 / 3.3 |
+| **M1（短期）** | web | ~~未保存离开提示、保存/同步双态徽标~~ **✅ 2026-09-14 两端落地**；会话 TTL 延迟销毁待做 | 3.2 / 3.3 |
 | **M2** | web | 邀请链接 + 会话级临时权限（token 换权限）、跟随模式基础版 | 3.1 / 3.4 / 3.5 |
 | **M3** | web | 断线策略决策落地（锁定 or rebase 保留）、受限视图（token scope） | 3.6 / 3.8 |
 | **M4** | 服务端 | Redis pub/sub 多副本、会话持久化 | 5.6 |

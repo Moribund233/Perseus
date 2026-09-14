@@ -20,8 +20,13 @@ export interface CreateBuildRequest {
 }
 
 export const buildsApi = {
-  list: (repoId: string, params?: { page?: number; per_page?: number; status?: string }) => {
-    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+  list: (repoId: string, params?: { page?: number; per_page?: number; status?: string; branch?: string }) => {
+    const qparams: Record<string, string> = {};
+    if (params?.page) qparams['page'] = String(params.page);
+    if (params?.per_page) qparams['per_page'] = String(params.per_page);
+    if (params?.status) qparams['status'] = params.status;
+    if (params?.branch) qparams['branch'] = params.branch;
+    const qs = Object.keys(qparams).length ? '?' + new URLSearchParams(qparams).toString() : '';
     return apiRequest<Build[]>(`/api/v1/repositories/${repoId}/builds${qs}`);
   },
 

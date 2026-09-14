@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Button, Modal, Form, Input, Switch, Tag, Empty, Spin, Popconfirm, Pagination, message,
+  Button, Modal, Form, Input, Switch, Tag, Empty, Spin, Popconfirm, Pagination, App as AntApp,
 } from 'antd';
 import { RocketOutlined, EditOutlined, DeleteOutlined, PaperClipOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { releasesApi, type Release, type CreateReleaseRequest } from '../../api/releases';
-import Markdown from '../Markdown';
+import { useServersStore } from '../../stores/servers';
+import Markdown from '../../components/Markdown';
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -31,8 +32,11 @@ interface FormValues {
   create_git_tag: boolean;
 }
 
-export default function ReleasesTab({ repoId }: { repoId: string }) {
+// ReleasesPanel：仓库 Release 列表 + 创建/编辑/删除（移植自 web 端 ReleasesTab）。
+export default function ReleasesPanel({ repoId }: { repoId: string }) {
   const { t } = useTranslation();
+  const { message } = AntApp.useApp();
+  const serverId = useServersStore((s) => s.currentServerId);
   const [releases, setReleases] = useState<Release[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -47,22 +51,23 @@ export default function ReleasesTab({ repoId }: { repoId: string }) {
   const [form] = Form.useForm<FormValues>();
 
   const load = useCallback(async (targetPage = page, withDrafts = showDrafts) => {
+    if (!serverId) { setReleases([]); setTotal(0); setLoading(false); return; }
     try {
-      const res = await releasesApi.list(repoId, {
+      const res = await releasesApi.list(serverId, repoId, {
         include_drafts: withDrafts,
         include_prereleases: true,
         page: targetPage,
         limit,
       });
-      setReleases(res.items);
-      setTotal(res.total);
+      setReleases(res.items ?? []);
+      setTotal(res.total ?? 0);
     } catch {
       setReleases([]);
       setTotal(0);
     } finally {
       setLoading(false);
     }
-  }, [repoId, page, showDrafts, limit]);
+  }, [serverId, repoId, page, showDrafts, limit]);
 
   useEffect(() => {
     // 微任务延迟, 避免在 effect 同步体中触发级联渲染
@@ -91,11 +96,12 @@ export default function ReleasesTab({ repoId }: { repoId: string }) {
   };
 
   const handleSubmit = async () => {
+    if (!serverId) return;
     const values = await form.validateFields();
     setSaving(true);
     try {
       if (editing) {
-        await releasesApi.update(repoId, editing.release_number, {
+        await releasesApi.update(serverId, repoId, editing.release_number, {
           name: values.name,
           description: values.description,
           is_draft: values.is_draft,
@@ -111,25 +117,26 @@ export default function ReleasesTab({ repoId }: { repoId: string }) {
           is_prerelease: values.is_prerelease,
           create_git_tag: values.create_git_tag,
         };
-        await releasesApi.create(repoId, payload);
+        await releasesApi.create(serverId, repoId, payload);
       }
       message.success(editing ? t('app.repositories.releases.updated') : t('app.repositories.releases.created'));
       setModalOpen(false);
       load(1, showDrafts);
-    } catch {
-      message.error(t('app.repositories.releases.failed'));
+    } catch (e) {
+      message.error((e as Error).message || t('app.repositories.releases.failed'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (rel: Release) => {
+    if (!serverId) return;
     try {
-      await releasesApi.delete(repoId, rel.release_number);
+      await releasesApi.delete(serverId, repoId, rel.release_number);
       message.success(t('app.repositories.releases.deleted'));
       load(1, showDrafts);
-    } catch {
-      message.error(t('app.repositories.releases.deleteFailed'));
+    } catch (e) {
+      message.error((e as Error).message || t('app.repositories.releases.deleteFailed'));
     }
   };
 
@@ -148,9 +155,9 @@ export default function ReleasesTab({ repoId }: { repoId: string }) {
     const file = e.target.files?.[0];
     const num = uploadingFor;
     e.target.value = '';
-    if (!file || !num) return;
+    if (!file || !num || !serverId) return;
     try {
-      await releasesApi.uploadAsset(repoId, num, file);
+      await releasesApi.uploadAsset(serverId, repoId, num, file);
       message.success(t('app.repositories.releases.assetUploaded'));
       load(page, showDrafts);
     } catch (err) {
@@ -161,8 +168,9 @@ export default function ReleasesTab({ repoId }: { repoId: string }) {
   };
 
   const handleDeleteAsset = async (rel: Release, assetId: string) => {
+    if (!serverId) return;
     try {
-      await releasesApi.deleteAsset(repoId, rel.release_number, assetId);
+      await releasesApi.deleteAsset(serverId, repoId, rel.release_number, assetId);
       message.success(t('app.repositories.releases.assetDeleted'));
       load(page, showDrafts);
     } catch (err) {
@@ -170,8 +178,17 @@ export default function ReleasesTab({ repoId }: { repoId: string }) {
     }
   };
 
+  const handleDownloadAsset = async (rel: Release, assetId: string, filename: string) => {
+    if (!serverId) return;
+    try {
+      await releasesApi.downloadAsset(serverId, repoId, rel.release_number, assetId, filename);
+    } catch (err) {
+      message.error((err as Error).message || t('app.repositories.releases.assetDownloadFailed'));
+    }
+  };
+
   return (
-    <div>
+    <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: textPrimary, display: 'flex', alignItems: 'center', gap: 8 }}>
           <RocketOutlined style={{ color: blue }} />
@@ -257,9 +274,12 @@ export default function ReleasesTab({ repoId }: { repoId: string }) {
                   {rel.assets.map((a) => (
                     <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
                       <PaperClipOutlined style={{ color: textTertiary }} />
-                      <a href={releasesApi.assetDownloadUrl(repoId, rel.release_number, a.id)} style={{ color: blue }} download={a.name}>
+                      <span
+                        style={{ color: blue, cursor: 'pointer' }}
+                        onClick={() => handleDownloadAsset(rel, a.id, a.name)}
+                      >
                         {a.name} <DownloadOutlined style={{ fontSize: 11 }} />
-                      </a>
+                      </span>
                       <span style={{ color: textTertiary, fontSize: 12 }}>
                         {formatBytes(a.file_size)} · {t('app.repositories.releases.downloads', { count: a.download_count ?? 0 })}
                       </span>

@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, Query, Body
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.routes_config import get_route_prefix
+from api.routes_prefix import get_route_prefix
 from core.config import get_config
 from services.app_service import get_app_service
 from services.config_service import get_config_service

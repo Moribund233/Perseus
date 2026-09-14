@@ -4,7 +4,8 @@ Release 控制器层
 处理 Release 和 Git 标签相关的 HTTP 请求
 """
 from typing import Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, UploadFile, File
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -15,6 +16,7 @@ from models.user import User
 from api.dependencies import get_current_user
 from core.exception import NotFoundException
 from services import release_service
+from services import release_asset_service
 import uuid
 
 # 创建路由实例
@@ -286,6 +288,73 @@ async def add_release_asset(
         file_path=data.file_path,
         file_size=data.file_size,
         content_type=data.content_type
+    )
+
+
+@router.post("/{repo_id}/releases/{release_number}/assets/upload", status_code=201)
+async def upload_release_asset(
+    repo_id: uuid.UUID,
+    release_number: int,
+    file: UploadFile = File(..., description="附件文件（最大 50MB）"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    上传 Release 附件（multipart，二进制落盘 + 元数据注册）
+
+    Args:
+        repo_id: 仓库ID
+        release_number: Release 编号
+        file: 上传的文件
+        db: 数据库会话
+        current_user: 当前认证用户
+
+    Returns:
+        dict: 创建的附件元数据
+    """
+    await _get_repo(repo_id, db)
+    file_data, safe_name, content_type = await release_asset_service.read_upload(file)
+    return await release_service.add_release_asset_from_upload(
+        db=db,
+        repository_id=repo_id,
+        release_number=release_number,
+        user_id=current_user.id,
+        filename=safe_name,
+        file_data=file_data,
+        content_type=content_type,
+    )
+
+
+@router.get("/{repo_id}/releases/{release_number}/assets/{asset_id}/download")
+async def download_release_asset(
+    repo_id: uuid.UUID,
+    release_number: int,
+    asset_id: uuid.UUID,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    下载 Release 附件（流式返回文件，自增下载计数）
+
+    Args:
+        repo_id: 仓库ID
+        release_number: Release 编号
+        asset_id: 附件ID
+        db: 数据库会话
+        current_user: 当前认证用户
+    """
+    await _get_repo(repo_id, db)
+    asset = await release_service.get_release_asset_for_download(
+        db=db,
+        repository_id=repo_id,
+        release_number=release_number,
+        asset_id=asset_id,
+    )
+    disk_path = release_asset_service.resolve_asset_path(asset.release_id, asset.file_path)
+    return FileResponse(
+        path=disk_path,
+        filename=asset.name,
+        media_type=release_asset_service.guess_content_type(asset.file_path),
     )
 
 

@@ -295,10 +295,14 @@ async def list_releases(
         stmt = stmt.filter(Release.is_prerelease == False)
 
     stmt = stmt.order_by(Release.created_at.desc())
+    stmt = stmt.options(
+        selectinload(Release.author),
+        selectinload(Release.assets)
+    )
     releases, total = await paginate(db, stmt, page, limit)
 
     return build_pagination_response(
-        items=[build_release_response(r) for r in releases],
+        items=[build_release_response(r, include_assets=True) for r in releases],
         total=total,
         page=page,
         limit=limit
@@ -741,6 +745,103 @@ async def delete_release_asset(
 
     await db.delete(asset)
     await db.commit()
+
+
+async def add_release_asset_from_upload(
+    db: AsyncSession,
+    repository_id: uuid.UUID,
+    release_number: int,
+    user_id: uuid.UUID,
+    filename: str,
+    file_data: bytes,
+    content_type: str,
+) -> dict:
+    """
+    上传并注册 Release 附件（二进制落盘 + 元数据入库）
+
+    Args:
+        db: 异步数据库会话
+        repository_id: 仓库ID
+        release_number: Release 编号
+        user_id: 当前用户ID
+        filename: 消毒后的文件名
+        file_data: 文件字节内容
+        content_type: MIME 类型
+
+    Returns:
+        dict: 创建的附件元数据
+
+    Raises:
+        NotFoundException: Release 不存在
+        AuthorizationException: 无权限添加
+    """
+    from services import release_asset_service
+
+    stmt = select(Release).filter(
+        Release.repository_id == repository_id,
+        Release.release_number == release_number
+    )
+    result = await db.execute(stmt)
+    release = result.scalar_one_or_none()
+    if not release:
+        raise NotFoundException(detail=f"Release #{release_number} not found")
+
+    if release.author_id != user_id:
+        has_permission = await check_repository_permission(
+            db, repository_id, user_id, ["admin"]
+        )
+        if not has_permission:
+            raise AuthorizationException(detail="Not authorized to add assets to this release")
+
+    stored_name = f"{uuid.uuid4().hex[:12]}_{filename}"
+    file_path = release_asset_service.save_asset_file(release.id, stored_name, file_data)
+
+    asset = ReleaseAsset(
+        release_id=release.id,
+        name=filename,
+        file_path=file_path,
+        file_size=len(file_data),
+        content_type=content_type,
+    )
+    db.add(asset)
+    await db.commit()
+    await db.refresh(asset)
+    return build_asset_response(asset)
+
+
+async def get_release_asset_for_download(
+    db: AsyncSession,
+    repository_id: uuid.UUID,
+    release_number: int,
+    asset_id: uuid.UUID,
+) -> ReleaseAsset:
+    """
+    定位待下载的附件并自增下载计数
+
+    Raises:
+        NotFoundException: Release 或附件不存在
+    """
+    stmt = select(Release).filter(
+        Release.repository_id == repository_id,
+        Release.release_number == release_number
+    )
+    result = await db.execute(stmt)
+    release = result.scalar_one_or_none()
+    if not release:
+        raise NotFoundException(detail=f"Release #{release_number} not found")
+
+    stmt = select(ReleaseAsset).filter(
+        ReleaseAsset.id == asset_id,
+        ReleaseAsset.release_id == release.id
+    )
+    result = await db.execute(stmt)
+    asset = result.scalar_one_or_none()
+    if not asset:
+        raise NotFoundException(detail="Asset not found")
+
+    asset.download_count = (asset.download_count or 0) + 1
+    await db.commit()
+    return asset
 
 
 # =============================================================================

@@ -56,6 +56,11 @@ export interface RepoBranch {
   is_protected: boolean;
 }
 
+export interface BranchProtectionSettings {
+  require_code_review: boolean;
+  require_status_checks: boolean;
+}
+
 export interface RepoCommit {
   id: string;
   hash: string;
@@ -194,6 +199,17 @@ export const repositoriesApi = {
 
   getBranches: (serverId: string, repoId: string) =>
     proxyRequest<RepoBranch[]>(serverId, `/api/v1/repositories/${repoId}/branches`),
+
+  protectBranch: (serverId: string, repoId: string, branchName: string, settings: BranchProtectionSettings = { require_code_review: false, require_status_checks: false }) =>
+    proxyRequest<RepoBranch>(serverId, `/api/v1/repositories/${repoId}/branches/${encodeURIComponent(branchName)}/protect`, {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }),
+
+  unprotectBranch: (serverId: string, repoId: string, branchName: string) =>
+    proxyRequest<RepoBranch>(serverId, `/api/v1/repositories/${repoId}/branches/${encodeURIComponent(branchName)}/unprotect`, {
+      method: 'PUT',
+    }),
 
   getDefaultBranch: (serverId: string, repoId: string) =>
     proxyRequest<RepoBranch>(serverId, `/api/v1/repositories/${repoId}/branches/default`),

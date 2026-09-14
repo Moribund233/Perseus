@@ -252,20 +252,39 @@ ws://host:port/ws/repository/42?token=your_jwt_token
 {"type": "pong", "timestamp": "2026-06-10T12:00:00.000Z", "server_time": "..."}
 ```
 
-### 通知示例（未来实现）
+### 通知推送（✅ F-205 已实现，2026-09-14 两端接入）
+
+服务端在 `notification_service.create_notification` 落库后主动推送（`notify_user`，
+经 `manager.send_to_user` 投递到该用户全部连接，离线用户自然跳过）：
 
 ```json
 {
-  "type": "notification",
-  "id": "notif_001",
-  "kind": "issue_mentioned",
-  "title": "你在 Issue #42 中被提到了",
-  "body": "admin 在 Bug: login fails 中提到了你",
-  "link": "/repositories/1/issues/42",
-  "read": false,
-  "created_at": "2026-06-10T10:30:00Z"
+  "type": "user_notification",
+  "notification_type": "mention",
+  "data": {
+    "id": "0193a1b2-...",
+    "type": "mention",
+    "title": "你在 Issue #42 中被提到了",
+    "message": "admin 在 Bug: login fails 中提到了你",
+    "repository_id": "0193a1b2-...",
+    "target_type": "issue",
+    "target_id": "0193a1b2-...",
+    "is_read": false,
+    "created_at": "2026-09-14T10:30:00Z",
+    "read_at": null
+  },
+  "unread_count": 3,
+  "timestamp": "2026-09-14T10:30:00.123456"
 }
 ```
+
+字段说明：
+- `data`：完整通知对象（与 `GET /api/v1/notifications` 列表项同构，可直接插入前端列表）
+- `unread_count`：推送时刻该用户的未读总数（随消息下发，客户端免回查）
+- 客户端仅需心跳保活（建议 30s 间隔）；断线期间产生的通知由客户端重连后经 REST 对账
+
+> **web 接入**: `client/web/src/api/notificationSocket.ts`（AppLayout 挂载，登录态常驻）
+> **desktop 接入**: `client/desktop/frontend/src/api/notificationSocket.ts`（PortalShell 挂载，经本地网关 WS 透传，切服自动换通道）
 
 ---
 
