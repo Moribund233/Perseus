@@ -55,7 +55,7 @@ class ConfigService:
         if not is_debug and not is_admin:
             raise AuthorizationException(
                 detail="该操作需要调试模式或管理员权限"
-            )
+            , error_code="config_debug_or_admin_required")
 
     def get_config(self, section: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -94,7 +94,7 @@ class ConfigService:
 
         is_valid, errors = self._validate_config_data(config_data)
         if not is_valid:
-            raise ValidationException(detail=f"配置验证失败: {'; '.join(errors)}")
+            raise ValidationException(detail=f"配置验证失败: {'; '.join(errors)}", error_code="config_validation_failed")
 
         restart_required, restart_items = self._check_restart_required(config_data)
 

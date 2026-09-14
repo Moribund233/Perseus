@@ -50,7 +50,7 @@ async def get_branch(repo_id: uuid.UUID, branch_name: str, db: AsyncSession):
     branch = result.scalar_one_or_none()
 
     if branch is None:
-        raise NotFoundException(detail=f"Branch '{branch_name}' not found")
+        raise NotFoundException(detail=f"Branch '{branch_name}' not found", error_code="branch_not_found")
 
     return branch
 
@@ -72,7 +72,7 @@ async def get_branch_by_id(branch_id: uuid.UUID, db: AsyncSession):
     result = await db.execute(select(Branch).filter(Branch.id == branch_id))
     branch = result.scalar_one_or_none()
     if branch is None:
-        raise NotFoundException(detail="Branch not found")
+        raise NotFoundException(detail="Branch not found", error_code="branch_not_found")
     return branch
 
 
@@ -94,7 +94,7 @@ async def create_branch(repo_id: uuid.UUID, branch_data: dict, db: AsyncSession)
     """
     # 验证请求参数
     if "name" not in branch_data:
-        raise ValidationException(detail="Branch name is required")
+        raise ValidationException(detail="Branch name is required", error_code="branch_name_required")
 
     # 检查分支名称是否已存在
     result = await db.execute(
@@ -106,7 +106,7 @@ async def create_branch(repo_id: uuid.UUID, branch_data: dict, db: AsyncSession)
     existing_branch = result.scalar_one_or_none()
 
     if existing_branch:
-        raise ConflictException(detail=f"Branch '{branch_data['name']}' already exists")
+        raise ConflictException(detail=f"Branch '{branch_data['name']}' already exists", error_code="branch_already_exists")
 
     # 创建新分支
     db_branch = Branch(
@@ -182,7 +182,7 @@ async def delete_branch(repo_id: uuid.UUID, branch_name: str, db: AsyncSession):
 
     # 检查是否是默认分支
     if db_branch.is_default:
-        raise AuthorizationException(detail="Cannot delete default branch")
+        raise AuthorizationException(detail="Cannot delete default branch", error_code="branch_delete_default_forbidden")
 
     await db.delete(db_branch)
     await db.commit()
@@ -210,7 +210,7 @@ async def set_default_branch(repo_id: uuid.UUID, branch_id: uuid.UUID, db: Async
 
     # 确保分支属于指定仓库
     if branch.repository_id != repo_id:
-        raise NotFoundException(detail="Branch does not belong to this repository")
+        raise NotFoundException(detail="Branch does not belong to this repository", error_code="branch_repo_mismatch")
 
     # 将所有分支的默认状态设置为False
     await db.execute(
@@ -317,7 +317,7 @@ async def get_default_branch(repo_id: uuid.UUID, db: AsyncSession):
     branch = result.scalar_one_or_none()
 
     if branch is None:
-        raise NotFoundException(detail="Default branch not found")
+        raise NotFoundException(detail="Default branch not found", error_code="default_branch_not_found")
 
     return branch
 

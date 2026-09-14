@@ -51,7 +51,7 @@ async def _get_repo(repo_id: uuid.UUID, db: AsyncSession) -> Repository:
     result = await db.execute(select(Repository).filter(Repository.id == repo_id))
     repo = result.scalar_one_or_none()
     if not repo:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
     return repo
 
 
@@ -118,7 +118,7 @@ async def get_build(
     await _get_repo(repo_id, db)
     build = await BuildService.get_build(db=db, build_id=build_id)
     if build.repo_id != repo_id:
-        raise NotFoundException(detail="Build not found")
+        raise NotFoundException(detail="Build not found", error_code="build_not_found")
     return _build_to_response(build)
 
 
@@ -163,5 +163,5 @@ async def get_build_logs(
     await _get_repo(repo_id, db)
     build = await BuildService.get_build(db=db, build_id=build_id)
     if build.repo_id != repo_id:
-        raise NotFoundException(detail="Build not found")
+        raise NotFoundException(detail="Build not found", error_code="build_not_found")
     return {"logs": build.logs or ""}

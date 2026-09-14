@@ -41,9 +41,9 @@ async def read_upload(file: UploadFile) -> tuple[bytes, str, str]:
     """
     file_data = await file.read()
     if not file_data:
-        raise ValidationException(detail="附件内容为空")
+        raise ValidationException(detail="附件内容为空", error_code="attachment_content_empty")
     if len(file_data) > RELEASE_ASSET_MAX_SIZE:
-        raise ValidationException(detail="附件大小不能超过 50MB")
+        raise ValidationException(detail="附件大小不能超过 50MB", error_code="asset_too_large")
     return file_data, _sanitize_filename(file.filename or "file"), file.content_type or "application/octet-stream"
 
 
@@ -71,13 +71,13 @@ def resolve_asset_path(release_id: uuid.UUID, file_path: str) -> Path:
 
     stored_name = Path(file_path or "").name
     if not _STORED_NAME_RE.match(stored_name):
-        raise NotFoundException(detail="Asset not found")
+        raise NotFoundException(detail="Asset not found", error_code="asset_not_found")
     expected_dir = (RELEASE_ASSET_UPLOAD_DIR / str(release_id)).resolve()
     disk_path = (expected_dir / stored_name).resolve()
     if not str(disk_path).startswith(str(expected_dir)):
-        raise NotFoundException(detail="Asset not found")
+        raise NotFoundException(detail="Asset not found", error_code="asset_not_found")
     if not disk_path.is_file():
-        raise NotFoundException(detail="Asset not found")
+        raise NotFoundException(detail="Asset not found", error_code="asset_not_found")
     return disk_path
 
 

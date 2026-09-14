@@ -24,7 +24,7 @@ class RoomService:
     ) -> RealtimeRoom:
         existing = await RoomService.get_repository_room(db, repository_id)
         if existing:
-            raise ValidationException(f"仓库 {repository_id} 已有关联房间")
+            raise ValidationException(f"仓库 {repository_id} 已有关联房间", error_code="room_already_exists")
 
         room = RealtimeRoom(
             repository_id=repository_id,
@@ -144,7 +144,7 @@ class RoomService:
         role: str
     ) -> RoomMember:
         if role not in VALID_ROLES:
-            raise ValidationException(f"无效的角色: {role}，有效值: {', '.join(sorted(VALID_ROLES))}")
+            raise ValidationException(f"无效的角色: {role}，有效值: {', '.join(sorted(VALID_ROLES))}", error_code="room_invalid_role")
 
         result = await db.execute(
             select(RoomMember).filter(
@@ -154,7 +154,7 @@ class RoomService:
         )
         member = result.scalar_one_or_none()
         if not member:
-            raise ValidationException("成员不存在")
+            raise ValidationException("成员不存在", error_code="room_member_not_found")
 
         member.role = role
         await db.commit()

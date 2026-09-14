@@ -77,7 +77,7 @@ async def get_user_by_id(user_id: uuid.UUID, db: AsyncSession):
     result = await db.execute(select(User).filter(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
-        raise NotFoundException(detail="User not found")
+        raise NotFoundException(detail="User not found", error_code="user_not_found")
     return user_to_dict(user)
 
 
@@ -99,13 +99,13 @@ async def create_user(user_data: dict, db: AsyncSession):
     result = await db.execute(select(User).filter(User.username == user_data["username"]))
     existing_user = result.scalar_one_or_none()
     if existing_user:
-        raise ConflictException(detail="Username already exists")
+        raise ConflictException(detail="Username already exists", error_code="username_already_exists")
 
     # 检查邮箱是否已存在
     result = await db.execute(select(User).filter(User.email == user_data["email"]))
     existing_email = result.scalar_one_or_none()
     if existing_email:
-        raise ConflictException(detail="Email already exists")
+        raise ConflictException(detail="Email already exists", error_code="email_already_exists")
 
     # 创建新用户
     db_user = User(
@@ -150,11 +150,11 @@ async def update_user(user_id: uuid.UUID, user_data: dict, db: AsyncSession, cur
     result = await db.execute(select(User).filter(User.id == user_id))
     db_user = result.scalar_one_or_none()
     if db_user is None:
-        raise NotFoundException(detail="User not found")
+        raise NotFoundException(detail="User not found", error_code="user_not_found")
 
     # 权限检查：只能更新自己的信息，或管理员可以更新任何用户
     if current_user and current_user.id != user_id and not current_user.is_admin:
-        raise AuthorizationException(detail="You don't have permission to update this user")
+        raise AuthorizationException(detail="You don't have permission to update this user", error_code="user_update_forbidden")
 
     # 更新用户信息（排除敏感字段）
     for key, value in user_data.items():
@@ -187,7 +187,7 @@ async def delete_user(user_id: uuid.UUID, db: AsyncSession):
     result = await db.execute(select(User).filter(User.id == user_id))
     db_user = result.scalar_one_or_none()
     if db_user is None:
-        raise NotFoundException(detail="User not found")
+        raise NotFoundException(detail="User not found", error_code="user_not_found")
 
     await db.delete(db_user)
     await db.commit()
@@ -215,13 +215,13 @@ async def change_password(user: User, old_password: str, new_password: str, db: 
         ValidationException: 新密码不符合要求时抛出422异常
     """
     if not old_password or not new_password:
-        raise ValidationException(detail="Old password and new password are required")
+        raise ValidationException(detail="Old password and new password are required", error_code="user_passwords_required")
 
     if len(new_password) < 6:
-        raise ValidationException(detail="New password must be at least 6 characters")
+        raise ValidationException(detail="New password must be at least 6 characters", error_code="user_password_too_short")
 
     if not verify_password(old_password, user.password):
-        raise AuthenticationException(detail="Invalid old password")
+        raise AuthenticationException(detail="Invalid old password", error_code="invalid_old_password")
 
     user.password = get_password_hash(new_password)
     await db.commit()
@@ -247,7 +247,7 @@ async def login_user(credentials: dict, db: AsyncSession):
     """
     # 验证请求参数
     if "username" not in credentials or "password" not in credentials:
-        raise ValidationException(detail="Username and password are required")
+        raise ValidationException(detail="Username and password are required", error_code="user_credentials_required")
 
     # 查找用户（异步）
     result = await db.execute(select(User).filter(User.username == credentials["username"]))
@@ -255,7 +255,7 @@ async def login_user(credentials: dict, db: AsyncSession):
 
     # 验证用户是否存在以及密码是否正确
     if not user or not verify_password(credentials["password"], user.password):
-        raise AuthenticationException(detail="Invalid username or password")
+        raise AuthenticationException(detail="Invalid username or password", error_code="invalid_credentials")
 
     # 登录成功，创建令牌对
     tokens = create_token_pair(user)
@@ -342,10 +342,10 @@ async def update_user_avatar(
     if not content_type or content_type not in AVATAR_ALLOWED_CONTENT_TYPES:
         raise ValidationException(
             detail=f"Invalid image format. Allowed: {', '.join(AVATAR_ALLOWED_CONTENT_TYPES.keys())}"
-        )
+        , error_code="avatar_invalid_format")
 
     if len(file_data) > AVATAR_MAX_SIZE:
-        raise ValidationException(detail=f"Avatar file too large. Max size: {AVATAR_MAX_SIZE // 1024 // 1024}MB")
+        raise ValidationException(detail=f"Avatar file too large. Max size: {AVATAR_MAX_SIZE // 1024 // 1024}MB", error_code="avatar_too_large")
 
     ext = AVATAR_ALLOWED_CONTENT_TYPES[content_type]
     file_path = _get_avatar_file_path(user.id, ext)
@@ -389,4 +389,4 @@ async def get_user_avatar(user_id: uuid.UUID) -> tuple[Path, str]:
         if file_path.exists():
             return file_path, _get_avatar_content_type(file_path)
 
-    raise NotFoundException(detail="Avatar not found")
+    raise NotFoundException(detail="Avatar not found", error_code="avatar_not_found")

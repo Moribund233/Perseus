@@ -184,7 +184,7 @@ async def get_pull_request(
     pr = result.unique().scalar_one_or_none()
 
     if not pr:
-        raise NotFoundException(detail="Pull request not found")
+        raise NotFoundException(detail="Pull request not found", error_code="pr_not_found")
 
     return build_pr_response(pr, include_details=include_details)
 
@@ -218,10 +218,10 @@ async def create_pull_request(
     """
     # 验证参数
     if not title or not title.strip():
-        raise ValidationException(detail="Title is required")
+        raise ValidationException(detail="Title is required", error_code="pr_title_required")
 
     if source_branch == target_branch:
-        raise ValidationException(detail="Source and target branches cannot be the same")
+        raise ValidationException(detail="Source and target branches cannot be the same", error_code="pr_branches_same")
 
     # 生成 PR 编号
     pr_number = await get_next_sequence_number(
@@ -276,7 +276,7 @@ async def publish_draft(repo_id: uuid.UUID, pr_number: int, user_id: uuid.UUID, 
 
     pr = await get_pull_request_or_404(db, repo_id, pr_number)
     if not pr.is_draft:
-        raise ValidationException(detail="Pull request is not a draft")
+        raise ValidationException(detail="Pull request is not a draft", error_code="pr_not_draft")
 
     await check_resource_author_or_admin(db, pr.author_id, user_id, repo_id, "publish this draft")
     pr.is_draft = False
@@ -324,7 +324,7 @@ async def update_pull_request(
 
     # 已合并或关闭的 PR 不能修改
     if pr.status != "open":
-        raise ValidationException(detail=f"Cannot update {pr.status} pull request")
+        raise ValidationException(detail=f"Cannot update {pr.status} pull request", error_code="pr_invalid_status_for_update")
 
     if title is not None:
         pr.title = title.strip()
@@ -367,7 +367,7 @@ async def close_pull_request(
     )
 
     if pr.status != "open":
-        raise ValidationException(detail=f"Pull request is already {pr.status}")
+        raise ValidationException(detail=f"Pull request is already {pr.status}", error_code="pr_invalid_status")
 
     pr.status = "closed"
     await db.commit()
@@ -424,26 +424,26 @@ async def merge_pull_request(
     pr = await get_pull_request_or_404(db, repository_id, pr_number)
 
     if pr.status != "open":
-        raise ValidationException(detail=f"Cannot merge {pr.status} pull request")
+        raise ValidationException(detail=f"Cannot merge {pr.status} pull request", error_code="pr_invalid_status_for_merge")
 
     # 获取合并者信息
     result = await db.execute(select(User).filter(User.id == merger_id))
     merger = result.scalar_one_or_none()
     if not merger:
-        raise NotFoundException(detail="Merger not found")
+        raise NotFoundException(detail="Merger not found", error_code="pr_merger_not_found")
 
     # 检查合并权限（需要仓库写权限）
     has_permission = await check_repository_permission(
         db, repository_id, merger_id, ["owner", "admin", "developer"]
     )
     if not has_permission:
-        raise AuthorizationException(detail="You don't have permission to merge this pull request")
+        raise AuthorizationException(detail="You don't have permission to merge this pull request", error_code="pr_merge_forbidden")
 
     # 使用 GitService 进行 Git 操作
     try:
         git_service = await GitService.from_repository_id(db, repository_id)
     except NotFoundException:
-        raise NotFoundException(detail="Repository not found on disk")
+        raise NotFoundException(detail="Repository not found on disk", error_code="repository_not_found_on_disk")
 
     # 检查是否有冲突
     has_conflicts = git_service.check_merge_conflicts(
@@ -454,11 +454,11 @@ async def merge_pull_request(
     if has_conflicts:
         raise ValidationException(
             detail="Merge conflicts detected. Please resolve conflicts before merging."
-        )
+        , error_code="pr_merge_conflict")
 
     # 验证合并方式
     if merge_method not in ["merge", "squash", "rebase"]:
-        raise ValidationException(detail=f"Invalid merge method: {merge_method}")
+        raise ValidationException(detail=f"Invalid merge method: {merge_method}", error_code="pr_invalid_merge_method")
 
     # 构建合并提交信息
     if merge_method == "squash":
@@ -499,7 +499,7 @@ async def merge_pull_request(
     except ValidationException:
         raise
     except Exception as e:
-        raise ValidationException(detail=f"Merge operation failed: {str(e)}")
+        raise ValidationException(detail=f"Merge operation failed: {str(e)}", error_code="pr_merge_failed")
 
     # 更新 PR 状态
     pr.status = "merged"
@@ -583,14 +583,14 @@ async def create_pr_comment(
     pr = await get_pull_request_or_404(db, repository_id, pr_number)
 
     if not content or not content.strip():
-        raise ValidationException(detail="Comment content is required")
+        raise ValidationException(detail="Comment content is required", error_code="pr_comment_required")
 
     # 验证父评论
     if parent_id:
         result = await db.execute(select(PRComment).filter(PRComment.id == parent_id))
         parent = result.scalar_one_or_none()
         if not parent or parent.pull_request_id != pr.id:
-            raise ValidationException(detail="Invalid parent comment")
+            raise ValidationException(detail="Invalid parent comment", error_code="pr_invalid_parent_comment")
 
     comment = PRComment(
         pull_request_id=pr.id,
@@ -648,7 +648,7 @@ async def create_pr_review(
     pr = await get_pull_request_or_404(db, repository_id, pr_number)
 
     if status not in ["approved", "changes_requested"]:
-        raise ValidationException(detail="Invalid review status")
+        raise ValidationException(detail="Invalid review status", error_code="pr_invalid_review_status")
 
     # 检查是否已存在审查记录
     result = await db.execute(
@@ -791,7 +791,7 @@ async def get_pr_diff(
         }
 
     except Exception as e:
-        raise ValidationException(detail=f"Failed to get PR diff: {str(e)}")
+        raise ValidationException(detail=f"Failed to get PR diff: {str(e)}", error_code="pr_diff_failed")
 
 
 async def get_pr_file_diff(
@@ -842,4 +842,4 @@ async def get_pr_file_diff(
         }
 
     except Exception as e:
-        raise ValidationException(detail=f"Failed to get file diff: {str(e)}")
+        raise ValidationException(detail=f"Failed to get file diff: {str(e)}", error_code="pr_file_diff_failed")

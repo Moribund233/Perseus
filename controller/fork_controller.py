@@ -45,7 +45,7 @@ async def _get_repo(repo_id: uuid.UUID, db: AsyncSession) -> Repository:
     result = await db.execute(select(Repository).filter(Repository.id == repo_id))
     repo = result.scalar_one_or_none()
     if not repo:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
     return repo
 
 

@@ -117,7 +117,7 @@ async def get_repository_by_path(
     repository = await service_get_repository_by_path(owner, repo, db)
     has_access = await service_check_repository_access(repository["id"], current_user.id, db)
     if not has_access:
-        raise AuthorizationException(detail="You do not have access to this repository")
+        raise AuthorizationException(detail="You do not have access to this repository", error_code="repository_access_denied")
     return repository
 
 

@@ -295,7 +295,7 @@ async def get_repository_by_id(repo_id: uuid.UUID, db: AsyncSession):
     result = await db.execute(select(Repository).filter(Repository.id == repo_id))
     repo = result.scalar_one_or_none()
     if repo is None:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
     await sync_repository_default_branch(repo, db)
     physical_exists = await _check_physical_repo_exists_async(repo)
     languages = await detect_repo_languages(get_repository_storage_path(repo.path), repo.default_branch or "HEAD") if physical_exists else {}
@@ -323,7 +323,7 @@ async def get_repository_by_path(owner: str, repo_name: str, db: AsyncSession):
     result = await db.execute(select(Repository).filter(Repository.path == path))
     repo = result.scalar_one_or_none()
     if repo is None:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
     await sync_repository_default_branch(repo, db)
     physical_exists = await _check_physical_repo_exists_async(repo)
     languages = await detect_repo_languages(get_repository_storage_path(repo.path), repo.default_branch or "HEAD") if physical_exists else {}
@@ -410,11 +410,11 @@ async def create_repository(repo_data: dict, db: AsyncSession):
     """
     # 验证请求参数
     if "name" not in repo_data or "path" not in repo_data or "owner_id" not in repo_data:
-        raise ValidationException(detail="Name, path and owner_id are required")
+        raise ValidationException(detail="Name, path and owner_id are required", error_code="repository_required_fields")
 
     # 检查路径是否已存在
     if await exists(db, Repository, {"path": repo_data["path"]}):
-        raise ConflictException(detail="Repository path already exists")
+        raise ConflictException(detail="Repository path already exists", error_code="repository_path_already_exists")
 
     # 创建新仓库
     db_repo = Repository(
@@ -492,12 +492,12 @@ async def update_repository(repo_id: uuid.UUID, repo_data: dict, db: AsyncSessio
     result = await db.execute(select(Repository).filter(Repository.id == repo_id))
     db_repo = result.scalar_one_or_none()
     if db_repo is None:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
 
     # 检查路径是否已存在（如果更新了路径）
     if "path" in repo_data and repo_data["path"] != db_repo.path:
         if await exists(db, Repository, {"path": repo_data["path"]}):
-            raise ConflictException(detail="Repository path already exists")
+            raise ConflictException(detail="Repository path already exists", error_code="repository_path_already_exists")
 
     # 更新仓库信息
     for key, value in repo_data.items():
@@ -528,7 +528,7 @@ async def delete_repository(repo_id: uuid.UUID, db: AsyncSession):
     result = await db.execute(select(Repository).filter(Repository.id == repo_id))
     db_repo = result.scalar_one_or_none()
     if db_repo is None:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
 
     # 获取物理仓库路径（get_repository_storage_path 已包含 .git 后缀）
     physical_path = None
@@ -643,7 +643,7 @@ async def archive_repository(repo_id: uuid.UUID, db: AsyncSession) -> dict:
     result = await db.execute(select(Repository).filter(Repository.id == repo_id))
     repo = result.scalar_one_or_none()
     if repo is None:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
     repo.is_archived = True
     await db.commit()
     await db.refresh(repo)
@@ -670,7 +670,7 @@ async def unarchive_repository(repo_id: uuid.UUID, db: AsyncSession) -> dict:
     result = await db.execute(select(Repository).filter(Repository.id == repo_id))
     repo = result.scalar_one_or_none()
     if repo is None:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
     repo.is_archived = False
     await db.commit()
     await db.refresh(repo)

@@ -85,7 +85,7 @@ class OAuthService:
         state: str,
     ) -> dict:
         if not _state_store.consume(state, provider_name):
-            raise AuthenticationException("Invalid or expired OAuth state")
+            raise AuthenticationException("Invalid or expired OAuth state", error_code="oauth_invalid_state")
 
         provider = self._get_provider(provider_name)
         token_resp = await provider.exchange_code(code)
@@ -102,7 +102,7 @@ class OAuthService:
         if account:
             user = await db.get(User, account.user_id)
             if user is None:
-                raise AuthenticationException("Linked OAuth account has no matching user")
+                raise AuthenticationException("Linked OAuth account has no matching user", error_code="oauth_no_matching_user")
             account.access_token = token_resp.access_token
             if token_resp.refresh_token:
                 account.refresh_token = token_resp.refresh_token
@@ -184,6 +184,6 @@ class OAuthService:
         )
         account = result.scalar_one_or_none()
         if account is None:
-            raise NotFoundException(detail=f"Linked {provider} account not found")
+            raise NotFoundException(detail=f"Linked {provider} account not found", error_code="oauth_account_not_found")
         await db.delete(account)
         await db.commit()

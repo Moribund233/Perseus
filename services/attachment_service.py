@@ -44,9 +44,9 @@ async def upload_attachment(room_id: uuid.UUID, file: UploadFile) -> dict:
     """
     file_data = await file.read()
     if not file_data:
-        raise ValidationException(detail="附件内容为空")
+        raise ValidationException(detail="附件内容为空", error_code="attachment_content_empty")
     if len(file_data) > ATTACHMENT_MAX_SIZE:
-        raise ValidationException(detail="附件大小不能超过 20MB")
+        raise ValidationException(detail="附件大小不能超过 20MB", error_code="attachment_too_large")
 
     safe_name = _sanitize_filename(file.filename or "file")
     token = uuid.uuid4().hex[:12]
@@ -75,11 +75,11 @@ async def get_attachment_file(
         NotFoundException: 文件名非法或文件不存在
     """
     if not _STORED_NAME_RE.match(stored_name or ""):
-        raise NotFoundException(detail="Attachment not found")
+        raise NotFoundException(detail="Attachment not found", error_code="attachment_not_found")
 
     file_path = ATTACHMENT_UPLOAD_DIR / str(room_id) / stored_name
     if not file_path.is_file():
-        raise NotFoundException(detail="Attachment not found")
+        raise NotFoundException(detail="Attachment not found", error_code="attachment_not_found")
 
     content_type = _guess_content_type(stored_name)
     return file_path, content_type

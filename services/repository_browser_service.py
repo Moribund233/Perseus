@@ -37,12 +37,12 @@ def _get_repo(repo_path: str) -> pygit2.Repository:
         RepositoryNotFoundException: 仓库不存在或无法打开
     """
     if not repo_exists(repo_path):
-        raise RepositoryNotFoundException(detail=f"Repository not found: {repo_path}")
+        raise RepositoryNotFoundException(detail=f"Repository not found: {repo_path}", error_code="repository_not_found")
 
     try:
         return pygit2.Repository(repo_path)
     except Exception as e:
-        raise RepositoryNotFoundException(detail=f"Failed to open repository: {e}")
+        raise RepositoryNotFoundException(detail=f"Failed to open repository: {e}", error_code="repository_open_failed")
 
 
 def _resolve_ref(repo: pygit2.Repository, ref: str) -> Optional[pygit2.Commit]:
@@ -72,7 +72,7 @@ def _resolve_ref(repo: pygit2.Repository, ref: str) -> Optional[pygit2.Commit]:
             # is_empty 会误报 False, head_is_unborn 才是可靠判据
             if repo.head_is_unborn or repo.is_empty:
                 return None
-            raise PathNotFoundException(detail=f"Ref not found: {ref}")
+            raise PathNotFoundException(detail=f"Ref not found: {ref}", error_code="branch_ref_not_found")
 
 
 def _get_tree(repo: pygit2.Repository, commit: pygit2.Commit, path: str = "") -> pygit2.Tree:
@@ -99,9 +99,9 @@ def _get_tree(repo: pygit2.Repository, commit: pygit2.Commit, path: str = "") ->
         if entry.type == pygit2.GIT_OBJECT_TREE:
             return cast(pygit2.Tree, repo[entry.id])
         else:
-            raise InvalidPathException(detail=f"'{path}' is not a directory")
+            raise InvalidPathException(detail=f"'{path}' is not a directory", error_code="path_not_directory")
     except KeyError:
-        raise PathNotFoundException(detail=f"Path not found: {path}")
+        raise PathNotFoundException(detail=f"Path not found: {path}", error_code="path_not_found")
 
 
 def _get_file_last_commit(repo: pygit2.Repository, commit: pygit2.Commit, path: str) -> Dict[str, Any] | None:
@@ -239,7 +239,7 @@ async def get_blob_content(
         InvalidPathException: 路径是目录或不是有效文件
     """
     if not path:
-        raise InvalidPathException(detail="Path is required")
+        raise InvalidPathException(detail="Path is required", error_code="path_required")
 
     repo = _get_repo(repo_path)
     commit = _resolve_ref(repo, ref)
@@ -262,13 +262,13 @@ async def get_blob_content(
     try:
         entry = commit.tree[path]
     except KeyError:
-        raise PathNotFoundException(detail=f"File not found: {path}")
+        raise PathNotFoundException(detail=f"File not found: {path}", error_code="file_not_found")
 
     if entry.type == pygit2.GIT_OBJECT_TREE:
-        raise InvalidPathException(detail=f"'{path}' is a directory, not a file")
+        raise InvalidPathException(detail=f"'{path}' is a directory, not a file", error_code="path_is_directory")
 
     if entry.type != pygit2.GIT_OBJECT_BLOB:
-        raise InvalidPathException(detail=f"'{path}' is not a valid file")
+        raise InvalidPathException(detail=f"'{path}' is not a valid file", error_code="file_invalid")
     
     blob = cast(pygit2.Blob, repo[entry.id])
     
@@ -403,7 +403,7 @@ async def get_diff(
         InvalidPathException: 无效的提交
     """
     if not head:
-        raise InvalidPathException(detail="Head commit is required")
+        raise InvalidPathException(detail="Head commit is required", error_code="head_commit_required")
 
     repo = _get_repo(repo_path)
 
@@ -412,13 +412,13 @@ async def get_diff(
 
     # 检查空仓库
     if head_commit is None:
-        raise PathNotFoundException(detail=f"Ref not found: {head} (empty repository)")
+        raise PathNotFoundException(detail=f"Ref not found: {head} (empty repository)", error_code="branch_ref_not_found")
 
     if base:
         base_commit = _resolve_ref(repo, base)
         # 检查 base 提交是否存在
         if base_commit is None:
-            raise PathNotFoundException(detail=f"Base ref not found: {base}")
+            raise PathNotFoundException(detail=f"Base ref not found: {base}", error_code="base_ref_not_found")
         # 使用树对象进行比较，避免在裸仓库中使用repo.diff
         diff = base_commit.tree.diff_to_tree(head_commit.tree)
     else:
@@ -814,7 +814,7 @@ async def get_file_symbols(
         InvalidPathException: 路径是目录或无效
     """
     if not path:
-        raise InvalidPathException(detail="Path is required")
+        raise InvalidPathException(detail="Path is required", error_code="path_required")
 
     # 获取文件内容
     blob_info = await get_blob_content(repo_path, ref=ref, path=path)
@@ -902,7 +902,7 @@ async def commit_file(
         ValidationException: 路径或分支名非法
     """
     if not repo_exists(repo_path):
-        raise RepositoryNotFoundException(detail=f"Repository not found: {repo_path}")
+        raise RepositoryNotFoundException(detail=f"Repository not found: {repo_path}", error_code="repository_not_found")
 
     import asyncio
     from utils import git_utils
@@ -931,7 +931,7 @@ async def remove_file(
     在指定分支删除文件并提交
     """
     if not repo_exists(repo_path):
-        raise RepositoryNotFoundException(detail=f"Repository not found: {repo_path}")
+        raise RepositoryNotFoundException(detail=f"Repository not found: {repo_path}", error_code="repository_not_found")
 
     import asyncio
     from utils import git_utils

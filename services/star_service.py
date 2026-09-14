@@ -38,7 +38,7 @@ async def star_repository(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSessi
         )
     )
     if existing.scalar_one_or_none():
-        raise ConflictException(detail="Repository already starred")
+        raise ConflictException(detail="Repository already starred", error_code="repository_already_starred")
 
     stargazer = Stargazer(repository_id=repo_id, user_id=user_id)
     db.add(stargazer)
@@ -75,7 +75,7 @@ async def unstar_repository(repo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSes
     )
     stargazer = result.scalar_one_or_none()
     if not stargazer:
-        raise ValidationException(detail="Repository not starred")
+        raise ValidationException(detail="Repository not starred", error_code="repository_not_starred")
 
     await db.delete(stargazer)
     repo.star_count = max(0, (repo.star_count or 0) - 1)

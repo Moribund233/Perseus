@@ -40,7 +40,7 @@ async def _get_repo_path(repo_id: uuid.UUID, db: AsyncSession) -> str:
     result = await db.execute(select(Repository).filter(Repository.id == repo_id))
     repo = result.scalar_one_or_none()
     if not repo:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
 
     return get_repository_storage_path(repo.path)
 

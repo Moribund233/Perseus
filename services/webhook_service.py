@@ -61,7 +61,7 @@ async def list_webhooks(
         db, repository_id, user_id, ["read"]
     )
     if not has_permission:
-        raise AuthorizationException(detail="Not authorized to view webhooks")
+        raise AuthorizationException(detail="Not authorized to view webhooks", error_code="webhook_view_forbidden")
 
     stmt = select(WebHook).filter(
         WebHook.repository_id == repository_id
@@ -104,7 +104,7 @@ async def get_webhook(
         db, repository_id, user_id, ["read"]
     )
     if not has_permission:
-        raise AuthorizationException(detail="Not authorized to view webhook")
+        raise AuthorizationException(detail="Not authorized to view webhook", error_code="webhook_view_forbidden")
 
     stmt = select(WebHook).filter(
         WebHook.id == webhook_id,
@@ -115,7 +115,7 @@ async def get_webhook(
     webhook = result.scalar_one_or_none()
 
     if not webhook:
-        raise NotFoundException(detail="Webhook not found")
+        raise NotFoundException(detail="Webhook not found", error_code="webhook_not_found")
 
     return build_webhook_response(webhook, include_secret=True)
 
@@ -155,23 +155,23 @@ async def create_webhook(
         db, repository_id, user_id, ["admin"]
     )
     if not has_permission:
-        raise AuthorizationException(detail="Not authorized to create webhook")
+        raise AuthorizationException(detail="Not authorized to create webhook", error_code="webhook_create_forbidden")
 
     # 验证 URL
     if not url or not url.startswith(("http://", "https://")):
-        raise ValidationException(detail="Invalid URL. Must start with http:// or https://")
+        raise ValidationException(detail="Invalid URL. Must start with http:// or https://", error_code="webhook_invalid_url")
 
     # 验证事件
     if not events:
-        raise ValidationException(detail="At least one event must be specified")
+        raise ValidationException(detail="At least one event must be specified", error_code="webhook_events_required")
 
     for event in events:
         if not _is_valid_event(event):
-            raise ValidationException(detail=f"Invalid event: {event}")
+            raise ValidationException(detail=f"Invalid event: {event}", error_code="webhook_invalid_event")
 
     # 验证 content_type
     if content_type not in ["application/json", "application/x-www-form-urlencoded"]:
-        raise ValidationException(detail="Invalid content_type. Must be application/json or application/x-www-form-urlencoded")
+        raise ValidationException(detail="Invalid content_type. Must be application/json or application/x-www-form-urlencoded", error_code="webhook_invalid_content_type")
 
     # 创建 WebHook
     webhook = WebHook(
@@ -228,7 +228,7 @@ async def update_webhook(
         db, repository_id, user_id, ["admin"]
     )
     if not has_permission:
-        raise AuthorizationException(detail="Not authorized to update webhook")
+        raise AuthorizationException(detail="Not authorized to update webhook", error_code="webhook_update_forbidden")
 
     stmt = select(WebHook).filter(
         WebHook.id == webhook_id,
@@ -239,18 +239,18 @@ async def update_webhook(
     webhook = result.scalar_one_or_none()
 
     if not webhook:
-        raise NotFoundException(detail="Webhook not found")
+        raise NotFoundException(detail="Webhook not found", error_code="webhook_not_found")
 
     # 更新字段
     if url is not None:
         if not url.startswith(("http://", "https://")):
-            raise ValidationException(detail="Invalid URL")
+            raise ValidationException(detail="Invalid URL", error_code="webhook_invalid_url")
         webhook.url = url
 
     if events is not None:
         for event in events:
             if not _is_valid_event(event):
-                raise ValidationException(detail=f"Invalid event: {event}")
+                raise ValidationException(detail=f"Invalid event: {event}", error_code="webhook_invalid_event")
         webhook.set_events_list(events)
 
     if secret is not None:
@@ -258,7 +258,7 @@ async def update_webhook(
 
     if content_type is not None:
         if content_type not in ["application/json", "application/x-www-form-urlencoded"]:
-            raise ValidationException(detail="Invalid content_type")
+            raise ValidationException(detail="Invalid content_type", error_code="webhook_invalid_content_type")
         webhook.content_type = content_type
 
     if is_active is not None:
@@ -294,7 +294,7 @@ async def delete_webhook(
         db, repository_id, user_id, ["admin"]
     )
     if not has_permission:
-        raise AuthorizationException(detail="Not authorized to delete webhook")
+        raise AuthorizationException(detail="Not authorized to delete webhook", error_code="webhook_delete_forbidden")
 
     stmt = select(WebHook).filter(
         WebHook.id == webhook_id,
@@ -305,7 +305,7 @@ async def delete_webhook(
     webhook = result.scalar_one_or_none()
 
     if not webhook:
-        raise NotFoundException(detail="Webhook not found")
+        raise NotFoundException(detail="Webhook not found", error_code="webhook_not_found")
 
     await db.delete(webhook)
     await db.commit()
@@ -340,7 +340,7 @@ async def test_webhook(
         db, repository_id, user_id, ["admin"]
     )
     if not has_permission:
-        raise AuthorizationException(detail="Not authorized to test webhook")
+        raise AuthorizationException(detail="Not authorized to test webhook", error_code="webhook_test_forbidden")
 
     stmt = select(WebHook).filter(
         WebHook.id == webhook_id,
@@ -351,7 +351,7 @@ async def test_webhook(
     webhook = result.scalar_one_or_none()
 
     if not webhook:
-        raise NotFoundException(detail="Webhook not found")
+        raise NotFoundException(detail="Webhook not found", error_code="webhook_not_found")
 
     # 构建测试 payload
     test_payload = {
@@ -658,7 +658,7 @@ async def list_webhook_deliveries(
         db, repository_id, user_id, ["admin"]
     )
     if not has_permission:
-        raise AuthorizationException(detail="Not authorized to view deliveries")
+        raise AuthorizationException(detail="Not authorized to view deliveries", error_code="webhook_delivery_view_forbidden")
 
     # 验证 WebHook 存在且属于该仓库
     webhook_stmt = select(WebHook).filter(
@@ -667,7 +667,7 @@ async def list_webhook_deliveries(
     )
     result = await db.execute(webhook_stmt)
     if not result.scalar_one_or_none():
-        raise NotFoundException(detail="Webhook not found")
+        raise NotFoundException(detail="Webhook not found", error_code="webhook_not_found")
 
     stmt = select(WebHookDelivery).filter(
         WebHookDelivery.webhook_id == webhook_id
@@ -712,7 +712,7 @@ async def get_webhook_delivery(
         db, repository_id, user_id, ["admin"]
     )
     if not has_permission:
-        raise AuthorizationException(detail="Not authorized to view delivery")
+        raise AuthorizationException(detail="Not authorized to view delivery", error_code="webhook_delivery_view_forbidden")
 
     # 验证 WebHook 存在且属于该仓库
     webhook_stmt = select(WebHook).filter(
@@ -721,7 +721,7 @@ async def get_webhook_delivery(
     )
     result = await db.execute(webhook_stmt)
     if not result.scalar_one_or_none():
-        raise NotFoundException(detail="Webhook not found")
+        raise NotFoundException(detail="Webhook not found", error_code="webhook_not_found")
 
     stmt = select(WebHookDelivery).filter(
         WebHookDelivery.id == delivery_id,
@@ -732,7 +732,7 @@ async def get_webhook_delivery(
     delivery = result.scalar_one_or_none()
 
     if not delivery:
-        raise NotFoundException(detail="Delivery not found")
+        raise NotFoundException(detail="Delivery not found", error_code="webhook_delivery_not_found")
 
     return build_delivery_response(delivery, include_details=True)
 

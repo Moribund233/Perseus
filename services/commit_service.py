@@ -81,7 +81,7 @@ async def get_commit_by_hash(repo_id: uuid.UUID, commit_hash: str, db: AsyncSess
     commit = result.scalar_one_or_none()
 
     if commit is None:
-        raise NotFoundException(detail=f"Commit '{commit_hash}' not found")
+        raise NotFoundException(detail=f"Commit '{commit_hash}' not found", error_code="commit_not_found")
 
     return commit
 
@@ -103,7 +103,7 @@ async def get_commit_by_id(commit_id: uuid.UUID, db: AsyncSession):
     result = await db.execute(select(Commit).filter(Commit.id == commit_id))
     commit = result.scalar_one_or_none()
     if commit is None:
-        raise NotFoundException(detail="Commit not found")
+        raise NotFoundException(detail="Commit not found", error_code="commit_not_found")
     return commit
 
 
@@ -127,19 +127,19 @@ async def create_commit(commit_data: dict, db: AsyncSession):
     required_fields = ["hash", "repository_id", "branch_id", "author_name", "author_email", "commit_message"]
     for field in required_fields:
         if field not in commit_data:
-            raise ValidationException(detail=f"{field} is required")
+            raise ValidationException(detail=f"{field} is required", error_code="commit_field_required")
 
     # 检查提交哈希是否已存在
     result = await db.execute(select(Commit).filter(Commit.hash == commit_data["hash"]))
     existing_commit = result.scalar_one_or_none()
     if existing_commit:
-        raise ConflictException(detail=f"Commit hash '{commit_data['hash']}' already exists")
+        raise ConflictException(detail=f"Commit hash '{commit_data['hash']}' already exists", error_code="commit_hash_already_exists")
 
     # 检查分支是否存在
     result = await db.execute(select(Branch).filter(Branch.id == commit_data["branch_id"]))
     branch = result.scalar_one_or_none()
     if not branch:
-        raise NotFoundException(detail="Branch not found")
+        raise NotFoundException(detail="Branch not found", error_code="branch_not_found")
 
     # 创建新提交记录
     db_commit = Commit(
@@ -248,7 +248,7 @@ async def get_latest_commit(repo_id: uuid.UUID, db: AsyncSession):
     )
     commit = result.scalars().first()
     if commit is None:
-        raise NotFoundException(detail="No commits found in this repository")
+        raise NotFoundException(detail="No commits found in this repository", error_code="repo_has_no_commits")
     return commit
 
 
@@ -273,7 +273,7 @@ async def get_latest_commit_by_branch(branch_id: uuid.UUID, db: AsyncSession):
     )
     commit = result.scalars().first()
     if commit is None:
-        raise NotFoundException(detail="No commits found in this branch")
+        raise NotFoundException(detail="No commits found in this branch", error_code="branch_has_no_commits")
     return commit
 
 

@@ -131,7 +131,7 @@ def check_app_permission(
     if not is_debug and not is_admin:
         raise AuthorizationException(
             detail="该操作需要管理员权限或调试模式"
-        )
+        , error_code="app_admin_or_debug_required")
 
     return is_debug, is_admin
 

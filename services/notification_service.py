@@ -127,7 +127,7 @@ async def mark_as_read(db: AsyncSession, notification_id: uuid.UUID, user_id: uu
     result = await db.execute(stmt)
     notif = result.scalar_one_or_none()
     if not notif:
-        raise NotFoundException(detail="Notification not found")
+        raise NotFoundException(detail="Notification not found", error_code="notification_not_found")
 
     notif.is_read = True
     notif.read_at = datetime.now(timezone.utc)
@@ -160,7 +160,7 @@ async def delete_notification(db: AsyncSession, notification_id: uuid.UUID, user
     result = await db.execute(stmt)
     notif = result.scalar_one_or_none()
     if not notif:
-        raise NotFoundException(detail="Notification not found")
+        raise NotFoundException(detail="Notification not found", error_code="notification_not_found")
 
     await db.delete(notif)
     await db.commit()

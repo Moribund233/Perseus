@@ -39,19 +39,21 @@ class ValidationException(BaseException):
 
 
 class AuthenticationException(BaseException):
-    def __init__(self, detail: str = "Authentication Failed"):
+    def __init__(self, detail: str = "Authentication Failed", error_code: str | None = None):
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=detail,
             headers={"WWW-Authenticate": "Bearer"},
+            error_code=error_code,
         )
 
 
 class AuthorizationException(BaseException):
-    def __init__(self, detail: str = "Permission Denied"):
+    def __init__(self, detail: str = "Permission Denied", error_code: str | None = None):
         super().__init__(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=detail,
+            error_code=error_code,
         )
 
 
@@ -65,10 +67,11 @@ class NotFoundException(BaseException):
 
 
 class ConflictException(BaseException):
-    def __init__(self, detail: str = "Resource Conflict"):
+    def __init__(self, detail: str = "Resource Conflict", error_code: str | None = None):
         super().__init__(
             status_code=status.HTTP_409_CONFLICT,
             detail=detail,
+            error_code=error_code,
         )
 
 
@@ -78,7 +81,7 @@ class DatabaseException(BaseException):
 
     用于处理数据库操作失败的情况
     """
-    def __init__(self, detail: str = "Database Operation Failed"):
+    def __init__(self, detail: str = "Database Operation Failed", error_code: str | None = None):
         """
         初始化数据库异常
 
@@ -87,7 +90,8 @@ class DatabaseException(BaseException):
         """
         super().__init__(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=detail
+            detail=detail,
+            error_code=error_code,
         )
 
 
@@ -97,7 +101,7 @@ class FileException(BaseException):
     
     用于处理文件操作失败的情况
     """
-    def __init__(self, detail: str = "File Operation Failed"):
+    def __init__(self, detail: str = "File Operation Failed", error_code: str | None = None):
         """
         初始化文件操作异常
         
@@ -106,7 +110,8 @@ class FileException(BaseException):
         """
         super().__init__(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=detail
+            detail=detail,
+            error_code=error_code,
         )
 
 
@@ -116,7 +121,7 @@ class RepositoryBrowserException(BaseException):
     
     用于处理仓库浏览相关操作的异常情况
     """
-    def __init__(self, detail: str = "Repository Browser Error"):
+    def __init__(self, detail: str = "Repository Browser Error", error_code: str | None = None):
         """
         初始化仓库浏览异常
         
@@ -125,7 +130,8 @@ class RepositoryBrowserException(BaseException):
         """
         super().__init__(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=detail
+            detail=detail,
+            error_code=error_code,
         )
 
 
@@ -135,7 +141,7 @@ class RepositoryNotFoundException(RepositoryBrowserException):
 
     用于处理请求的仓库不存在的情况
     """
-    def __init__(self, detail: str = "Repository Not Found"):
+    def __init__(self, detail: str = "Repository Not Found", error_code: str | None = None):
         """
         初始化仓库不存在异常
 
@@ -146,7 +152,8 @@ class RepositoryNotFoundException(RepositoryBrowserException):
         BaseException.__init__(
             self,
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=detail
+            detail=detail,
+            error_code=error_code,
         )
 
 class PathNotFoundException(RepositoryBrowserException):
@@ -155,7 +162,7 @@ class PathNotFoundException(RepositoryBrowserException):
 
     用于处理请求的路径不存在的情况
     """
-    def __init__(self, detail: str = "Path Not Found"):
+    def __init__(self, detail: str = "Path Not Found", error_code: str | None = None):
         """
         初始化路径不存在异常
 
@@ -166,7 +173,8 @@ class PathNotFoundException(RepositoryBrowserException):
         BaseException.__init__(
             self,
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=detail
+            detail=detail,
+            error_code=error_code,
         )
 
 class InvalidPathException(RepositoryBrowserException):
@@ -175,7 +183,7 @@ class InvalidPathException(RepositoryBrowserException):
 
     用于处理路径格式无效的情况
     """
-    def __init__(self, detail: str = "Invalid Path"):
+    def __init__(self, detail: str = "Invalid Path", error_code: str | None = None):
         """
         初始化无效路径异常
 
@@ -186,7 +194,8 @@ class InvalidPathException(RepositoryBrowserException):
         BaseException.__init__(
             self,
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=detail
+            detail=detail,
+            error_code=error_code,
         )
 
 class AppServiceException(BaseException):

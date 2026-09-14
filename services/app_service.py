@@ -86,7 +86,7 @@ class AppService:
         if not is_debug and not is_admin:
             raise AuthorizationException(
                 detail="该操作需要本地认证或调试模式"
-            )
+            , error_code="app_local_auth_required")
 
     def shutdown(self, is_debug: bool = False, is_admin: bool = False, force: bool = False) -> bool:
         """
@@ -183,7 +183,7 @@ class AppService:
 
             except Exception as e:
                 logger.error(f"重启失败: {e}")
-                raise AppServiceException(f"重启失败: {e}")
+                raise AppServiceException(f"重启失败: {e}", error_code="app_restart_failed")
 
         import threading
         restart_thread = threading.Thread(target=_restart)
@@ -346,7 +346,7 @@ class AppService:
         try:
             datetime.strptime(date, "%Y-%m-%d")
         except ValueError:
-            raise ValidationException(detail="日期格式无效，应为 YYYY-MM-DD")
+            raise ValidationException(detail="日期格式无效，应为 YYYY-MM-DD", error_code="app_invalid_date_format")
 
         log_dir = Path(LogManager.DEFAULT_LOG_DIR) / date
         log_file = log_dir / f"{log_name}.log"
@@ -368,7 +368,7 @@ class AppService:
             with open(log_file, "r", encoding="utf-8") as f:
                 all_lines = f.readlines()
         except Exception as e:
-            raise AppServiceException(f"读取日志文件失败: {e}")
+            raise AppServiceException(f"读取日志文件失败: {e}", error_code="app_log_read_failed")
 
         if level:
             level_upper = level.upper()
@@ -404,7 +404,7 @@ class AppService:
         from utils.logging import cleanup_old_logs, LogManager
 
         if keep_days < 1:
-            raise ValidationException(detail="保留天数必须大于等于1")
+            raise ValidationException(detail="保留天数必须大于等于1", error_code="app_invalid_retention_days")
 
         deleted_count = cleanup_old_logs(
             keep_days=keep_days,

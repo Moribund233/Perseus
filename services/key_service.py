@@ -34,7 +34,7 @@ def _calculate_fingerprint(public_key: str) -> str:
     # 提取 key 部分（去掉前缀和注释）
     parts = public_key.strip().split()
     if len(parts) < 2:
-        raise ValidationException(detail="Invalid SSH key format")
+        raise ValidationException(detail="Invalid SSH key format", error_code="ssh_key_invalid_format")
 
     # parts[0] 是类型 (ssh-rsa, ssh-ed25519 等)
     # parts[1] 是 base64 编码的 key
@@ -46,7 +46,7 @@ def _calculate_fingerprint(public_key: str) -> str:
         # 格式化为 xx:xx:xx:... 格式
         return ':'.join(fingerprint[i:i+2] for i in range(0, len(fingerprint), 2))
     except Exception:
-        raise ValidationException(detail="Invalid SSH key format")
+        raise ValidationException(detail="Invalid SSH key format", error_code="ssh_key_invalid_format")
 
 
 def _validate_ssh_key(public_key: str) -> bool:
@@ -109,7 +109,7 @@ async def add_ssh_key(
     """
     # 验证 key 格式
     if not _validate_ssh_key(public_key):
-        raise ValidationException(detail="Invalid SSH key format")
+        raise ValidationException(detail="Invalid SSH key format", error_code="ssh_key_invalid_format")
 
     # 计算 fingerprint
     fingerprint = _calculate_fingerprint(public_key)
@@ -119,7 +119,7 @@ async def add_ssh_key(
         select(SSHKey).filter(SSHKey.fingerprint == fingerprint)
     )
     if result.scalar_one_or_none():
-        raise ValidationException(detail="SSH key already exists")
+        raise ValidationException(detail="SSH key already exists", error_code="ssh_key_already_exists")
 
     # 创建 key
     ssh_key = SSHKey(
@@ -183,10 +183,10 @@ async def delete_ssh_key(
     key = result.scalar_one_or_none()
 
     if not key:
-        raise NotFoundException(detail="SSH key not found")
+        raise NotFoundException(detail="SSH key not found", error_code="ssh_key_not_found")
 
     if key.user_id != user_id:
-        raise AuthorizationException(detail="You don't have permission to delete this key")
+        raise AuthorizationException(detail="You don't have permission to delete this key", error_code="ssh_key_delete_forbidden")
 
     await db.delete(key)
     await db.commit()
@@ -221,7 +221,7 @@ async def get_ssh_key_by_fingerprint(
     key = result.scalar_one_or_none()
 
     if not key:
-        raise NotFoundException(detail="SSH key not found")
+        raise NotFoundException(detail="SSH key not found", error_code="ssh_key_not_found")
 
     return key
 

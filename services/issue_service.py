@@ -186,7 +186,7 @@ async def get_issue(
     issue = result.scalar_one_or_none()
 
     if not issue:
-        raise NotFoundException(detail="Issue not found")
+        raise NotFoundException(detail="Issue not found", error_code="issue_not_found")
 
     return build_issue_response(issue, include_details=include_details)
 
@@ -218,10 +218,10 @@ async def create_issue(
         dict: 创建的 Issue 数据
     """
     if not title or not title.strip():
-        raise ValidationException(detail="Title is required")
+        raise ValidationException(detail="Title is required", error_code="issue_title_required")
 
     if priority not in ["low", "medium", "high", "critical"]:
-        raise ValidationException(detail="Invalid priority")
+        raise ValidationException(detail="Invalid priority", error_code="issue_invalid_priority")
 
     # 生成 Issue 编号
     issue_number = await get_next_sequence_number(
@@ -443,7 +443,7 @@ async def batch_update_issues(
 
             if "priority" in updates:
                 if updates["priority"] not in ["low", "medium", "high", "critical"]:
-                    raise ValidationException(detail=f"Invalid priority: {updates['priority']}")
+                    raise ValidationException(detail=f"Invalid priority: {updates['priority']}", error_code="issue_invalid_priority")
                 issue.priority = updates["priority"]
 
             if "assignee_id" in updates:
@@ -728,7 +728,7 @@ async def update_issue(
 
     if priority is not None:
         if priority not in ["low", "medium", "high", "critical"]:
-            raise ValidationException(detail="Invalid priority")
+            raise ValidationException(detail="Invalid priority", error_code="issue_invalid_priority")
         issue.priority = priority
 
     if assignee_id is not None:
@@ -772,7 +772,7 @@ async def close_issue(
     )
 
     if issue.status != "open":
-        raise ValidationException(detail="Issue is already closed")
+        raise ValidationException(detail="Issue is already closed", error_code="issue_already_closed")
 
     issue.status = "closed"
     issue.closed_by = user_id
@@ -829,7 +829,7 @@ async def reopen_issue(
     )
 
     if issue.status != "closed":
-        raise ValidationException(detail="Issue is already open")
+        raise ValidationException(detail="Issue is already open", error_code="issue_already_open")
 
     issue.status = "open"
     issue.closed_by = None
@@ -876,7 +876,7 @@ async def create_issue_comment(
     issue = await get_issue_or_404(db, repository_id, issue_number)
 
     if not content or not content.strip():
-        raise ValidationException(detail="Comment content is required")
+        raise ValidationException(detail="Comment content is required", error_code="issue_comment_required")
 
     comment = IssueComment(
         issue_id=issue.id,
@@ -964,10 +964,10 @@ async def create_label(
         dict: 创建的标签数据
     """
     if not name or not name.strip():
-        raise ValidationException(detail="Label name is required")
+        raise ValidationException(detail="Label name is required", error_code="label_name_required")
 
     if not color or not color.startswith("#"):
-        raise ValidationException(detail="Invalid color format")
+        raise ValidationException(detail="Invalid color format", error_code="label_invalid_color")
 
     # 检查是否已存在
     result = await db.execute(
@@ -979,7 +979,7 @@ async def create_label(
     existing = result.scalar_one_or_none()
 
     if existing:
-        raise ValidationException(detail="Label already exists")
+        raise ValidationException(detail="Label already exists", error_code="label_already_exists")
 
     label = Label(
         repository_id=repository_id,
@@ -1026,7 +1026,7 @@ async def update_label(
     label = result.scalar_one_or_none()
 
     if not label:
-        raise NotFoundException(detail="Label not found")
+        raise NotFoundException(detail="Label not found", error_code="label_not_found")
 
     if name is not None:
         label.name = name.strip()
@@ -1065,7 +1065,7 @@ async def delete_label(
     label = result.scalar_one_or_none()
 
     if not label:
-        raise NotFoundException(detail="Label not found")
+        raise NotFoundException(detail="Label not found", error_code="label_not_found")
 
     await db.delete(label)
     await db.commit()
@@ -1116,11 +1116,11 @@ async def add_label_to_issue(
     label = result.scalar_one_or_none()
 
     if not label:
-        raise NotFoundException(detail="Label not found")
+        raise NotFoundException(detail="Label not found", error_code="label_not_found")
 
     # 检查标签是否已存在
     if label in issue.labels:
-        raise ValidationException(detail="Label already added to this issue")
+        raise ValidationException(detail="Label already added to this issue", error_code="label_already_added")
 
     # 添加标签
     issue.labels.append(label)
@@ -1187,11 +1187,11 @@ async def remove_label_from_issue(
     label = result.scalar_one_or_none()
 
     if not label:
-        raise NotFoundException(detail="Label not found")
+        raise NotFoundException(detail="Label not found", error_code="label_not_found")
 
     # 检查标签是否存在于 Issue
     if label not in issue.labels:
-        raise ValidationException(detail="Label not found in this issue")
+        raise ValidationException(detail="Label not found in this issue", error_code="label_not_in_issue")
 
     # 移除标签
     issue.labels.remove(label)

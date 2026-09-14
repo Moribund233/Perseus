@@ -189,7 +189,7 @@ async def update_member_role(
     await require_repository_owner_or_admin(db, repo_id, current_user.id, "update member role")
     role = role_data.get("role")
     if not isinstance(role, str) or not role:
-        raise ValidationException(detail="role 字段缺失或无效")
+        raise ValidationException(detail="role 字段缺失或无效", error_code="member_invalid_role")
     return await service_update_member_role(repo_id, user_id, role, db, operator_id=current_user.id)
 
 

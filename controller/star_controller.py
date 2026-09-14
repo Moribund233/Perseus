@@ -100,7 +100,7 @@ async def get_stargazers(
     result = await db.execute(select(Repository).filter(Repository.id == repo_id))
     repo = result.scalar_one_or_none()
     if not repo:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
     if not repo.is_public:
         await require_repository_permission(
             db, repo_id, current_user.id,

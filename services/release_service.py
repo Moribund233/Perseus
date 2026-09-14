@@ -69,7 +69,7 @@ def _create_git_tag(
             )
 
         if result.returncode != 0:
-            raise ValidationException(detail=f"Failed to create tag: {result.stderr}")
+            raise ValidationException(detail=f"Failed to create tag: {result.stderr}", error_code="release_tag_create_failed")
 
         # 获取标签哈希
         result = subprocess.run(
@@ -81,12 +81,12 @@ def _create_git_tag(
         )
 
         if result.returncode != 0:
-            raise ValidationException(detail=f"Failed to get tag hash: {result.stderr}")
+            raise ValidationException(detail=f"Failed to get tag hash: {result.stderr}", error_code="release_tag_hash_failed")
 
         return result.stdout.strip()
 
     except subprocess.SubprocessError as e:
-        raise ValidationException(detail=f"Failed to create tag: {str(e)}")
+        raise ValidationException(detail=f"Failed to create tag: {str(e)}", error_code="release_tag_create_failed")
 
 
 def _delete_git_tag(repo_path: str, tag_name: str) -> None:
@@ -112,10 +112,10 @@ def _delete_git_tag(repo_path: str, tag_name: str) -> None:
         )
 
         if result.returncode != 0:
-            raise ValidationException(detail=f"Failed to delete tag: {result.stderr}")
+            raise ValidationException(detail=f"Failed to delete tag: {result.stderr}", error_code="release_tag_delete_failed")
 
     except subprocess.SubprocessError as e:
-        raise ValidationException(detail=f"Failed to delete tag: {str(e)}")
+        raise ValidationException(detail=f"Failed to delete tag: {str(e)}", error_code="release_tag_delete_failed")
 
 
 def list_git_tags(repo_path: str, pattern: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -148,7 +148,7 @@ def list_git_tags(repo_path: str, pattern: Optional[str] = None) -> List[Dict[st
         )
 
         if result.returncode != 0:
-            raise ValidationException(detail=f"Failed to list tags: {result.stderr}")
+            raise ValidationException(detail=f"Failed to list tags: {result.stderr}", error_code="release_tag_list_failed")
 
         tags = []
         for line in result.stdout.strip().split("\n"):
@@ -192,7 +192,7 @@ def list_git_tags(repo_path: str, pattern: Optional[str] = None) -> List[Dict[st
         return tags
 
     except subprocess.SubprocessError as e:
-        raise ValidationException(detail=f"Failed to list tags: {str(e)}")
+        raise ValidationException(detail=f"Failed to list tags: {str(e)}", error_code="release_tag_list_failed")
 
 
 def get_git_tag(repo_path: str, tag_name: str) -> Optional[Dict[str, Any]]:
@@ -257,7 +257,7 @@ def get_git_tag(repo_path: str, tag_name: str) -> Optional[Dict[str, Any]]:
         }
 
     except subprocess.SubprocessError as e:
-        raise ValidationException(detail=f"Failed to get tag: {str(e)}")
+        raise ValidationException(detail=f"Failed to get tag: {str(e)}", error_code="release_tag_get_failed")
 
 
 # =============================================================================
@@ -340,7 +340,7 @@ async def get_release(
     release = result.scalar_one_or_none()
 
     if not release:
-        raise NotFoundException(detail=f"Release #{release_number} not found")
+        raise NotFoundException(detail=f"Release #{release_number} not found", error_code="release_not_found")
 
     return build_release_response(release, include_assets=True)
 
@@ -376,7 +376,7 @@ async def get_release_by_tag(
     release = result.scalar_one_or_none()
 
     if not release:
-        raise NotFoundException(detail=f"Release with tag '{tag_name}' not found")
+        raise NotFoundException(detail=f"Release with tag '{tag_name}' not found", error_code="release_tag_not_found")
 
     return build_release_response(release, include_assets=True)
 
@@ -425,7 +425,7 @@ async def create_release(
     )
     repo = result.scalar_one_or_none()
     if not repo:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
 
     # 检查标签是否已存在
     result = await db.execute(
@@ -435,7 +435,7 @@ async def create_release(
         )
     )
     if result.scalar_one_or_none():
-        raise ValidationException(detail=f"Release with tag '{tag_name}' already exists")
+        raise ValidationException(detail=f"Release with tag '{tag_name}' already exists", error_code="release_tag_already_exists")
 
     # 获取仓库路径（如果未提供）
     if repo_path is None:
@@ -452,7 +452,7 @@ async def create_release(
             encoding="utf-8"
         )
         if rev_parse_result.returncode != 0:
-            raise ValidationException(detail="Failed to get HEAD commit hash")
+            raise ValidationException(detail="Failed to get HEAD commit hash", error_code="release_head_commit_failed")
         commit_hash = rev_parse_result.stdout.strip()
 
     # 创建 Git 标签
@@ -528,7 +528,7 @@ async def update_release(
     release = result.scalar_one_or_none()
 
     if not release:
-        raise NotFoundException(detail=f"Release #{release_number} not found")
+        raise NotFoundException(detail=f"Release #{release_number} not found", error_code="release_not_found")
 
     # 检查权限（只有作者或管理员可以修改）
     if release.author_id != user_id:
@@ -537,7 +537,7 @@ async def update_release(
             db, repository_id, user_id, ["admin"]
         )
         if not has_permission:
-            raise AuthorizationException(detail="Not authorized to update this release")
+            raise AuthorizationException(detail="Not authorized to update this release", error_code="release_update_forbidden")
 
     # 更新字段
     if name is not None:
@@ -592,7 +592,7 @@ async def delete_release(
     release = result.scalar_one_or_none()
 
     if not release:
-        raise NotFoundException(detail=f"Release #{release_number} not found")
+        raise NotFoundException(detail=f"Release #{release_number} not found", error_code="release_not_found")
 
     # 检查权限
     if release.author_id != user_id:
@@ -600,7 +600,7 @@ async def delete_release(
             db, repository_id, user_id, ["admin"]
         )
         if not has_permission:
-            raise AuthorizationException(detail="Not authorized to delete this release")
+            raise AuthorizationException(detail="Not authorized to delete this release", error_code="release_delete_forbidden")
 
     # 删除 Git 标签
     if delete_git_tag:
@@ -660,7 +660,7 @@ async def add_release_asset(
     release = result.scalar_one_or_none()
 
     if not release:
-        raise NotFoundException(detail=f"Release #{release_number} not found")
+        raise NotFoundException(detail=f"Release #{release_number} not found", error_code="release_not_found")
 
     # 检查权限
     if release.author_id != user_id:
@@ -668,7 +668,7 @@ async def add_release_asset(
             db, repository_id, user_id, ["admin"]
         )
         if not has_permission:
-            raise AuthorizationException(detail="Not authorized to add assets to this release")
+            raise AuthorizationException(detail="Not authorized to add assets to this release", error_code="release_asset_add_forbidden")
 
     # 创建附件
     asset = ReleaseAsset(
@@ -717,7 +717,7 @@ async def delete_release_asset(
     release = result.scalar_one_or_none()
 
     if not release:
-        raise NotFoundException(detail=f"Release #{release_number} not found")
+        raise NotFoundException(detail=f"Release #{release_number} not found", error_code="release_not_found")
 
     # 获取附件
     stmt = select(ReleaseAsset).filter(
@@ -729,7 +729,7 @@ async def delete_release_asset(
     asset = result.scalar_one_or_none()
 
     if not asset:
-        raise NotFoundException(detail="Asset not found")
+        raise NotFoundException(detail="Asset not found", error_code="asset_not_found")
 
     # 检查权限
     if release.author_id != user_id:
@@ -737,7 +737,7 @@ async def delete_release_asset(
             db, repository_id, user_id, ["admin"]
         )
         if not has_permission:
-            raise AuthorizationException(detail="Not authorized to delete assets from this release")
+            raise AuthorizationException(detail="Not authorized to delete assets from this release", error_code="release_asset_delete_forbidden")
 
     # 删除物理文件
     if os.path.exists(asset.file_path):
@@ -784,14 +784,14 @@ async def add_release_asset_from_upload(
     result = await db.execute(stmt)
     release = result.scalar_one_or_none()
     if not release:
-        raise NotFoundException(detail=f"Release #{release_number} not found")
+        raise NotFoundException(detail=f"Release #{release_number} not found", error_code="release_not_found")
 
     if release.author_id != user_id:
         has_permission = await check_repository_permission(
             db, repository_id, user_id, ["admin"]
         )
         if not has_permission:
-            raise AuthorizationException(detail="Not authorized to add assets to this release")
+            raise AuthorizationException(detail="Not authorized to add assets to this release", error_code="release_asset_add_forbidden")
 
     stored_name = f"{uuid.uuid4().hex[:12]}_{filename}"
     file_path = release_asset_service.save_asset_file(release.id, stored_name, file_data)
@@ -828,7 +828,7 @@ async def get_release_asset_for_download(
     result = await db.execute(stmt)
     release = result.scalar_one_or_none()
     if not release:
-        raise NotFoundException(detail=f"Release #{release_number} not found")
+        raise NotFoundException(detail=f"Release #{release_number} not found", error_code="release_not_found")
 
     stmt = select(ReleaseAsset).filter(
         ReleaseAsset.id == asset_id,
@@ -837,7 +837,7 @@ async def get_release_asset_for_download(
     result = await db.execute(stmt)
     asset = result.scalar_one_or_none()
     if not asset:
-        raise NotFoundException(detail="Asset not found")
+        raise NotFoundException(detail="Asset not found", error_code="asset_not_found")
 
     asset.download_count = (asset.download_count or 0) + 1
     await db.commit()

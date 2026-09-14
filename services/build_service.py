@@ -39,7 +39,7 @@ class BuildService:
         )
         build = result.scalar_one_or_none()
         if not build:
-            raise NotFoundException(detail="Build not found")
+            raise NotFoundException(detail="Build not found", error_code="build_not_found")
         return build
 
     @staticmethod

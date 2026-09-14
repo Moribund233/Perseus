@@ -33,7 +33,7 @@ async def _get_pr_with_labels_or_404(
     )
     pr = result.scalar_one_or_none()
     if not pr:
-        raise NotFoundException(detail=f"Pull Request #{pr_number} not found")
+        raise NotFoundException(detail=f"Pull Request #{pr_number} not found", error_code="pr_not_found")
     return pr
 
 
@@ -48,7 +48,7 @@ async def create_label(repo_id: uuid.UUID, data: dict, db: AsyncSession) -> dict
         )
     )
     if existing.scalar_one_or_none():
-        raise ConflictException(detail=f"Label '{data['name']}' already exists")
+        raise ConflictException(detail=f"Label '{data['name']}' already exists", error_code="label_already_exists")
 
     label = PRLabel(
         repository_id=repo_id,
@@ -91,7 +91,7 @@ async def update_label(repo_id: uuid.UUID, label_id: uuid.UUID, data: dict, db: 
             )
         )
         if existing.scalar_one_or_none():
-            raise ConflictException(detail=f"Label '{data['name']}' already exists")
+            raise ConflictException(detail=f"Label '{data['name']}' already exists", error_code="label_already_exists")
         label.name = data["name"]
 
     if "color" in data:
@@ -201,5 +201,5 @@ async def get_prs_by_label(label_id: uuid.UUID, db: AsyncSession) -> list[dict]:
     )
     label = result.scalar_one_or_none()
     if not label:
-        raise NotFoundException(detail="Label not found")
+        raise NotFoundException(detail="Label not found", error_code="label_not_found")
     return [build_pr_response(pr) for pr in label.labeled_prs]

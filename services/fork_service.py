@@ -59,7 +59,7 @@ async def fork_repository(
     source_repo = result.scalar_one_or_none()
 
     if not source_repo:
-        raise NotFoundException(detail="Source repository not found")
+        raise NotFoundException(detail="Source repository not found", error_code="source_repository_not_found")
 
     # 检查权限（只能 Fork 公开仓库或有权限的私有仓库）
     if not source_repo.is_public:
@@ -67,7 +67,7 @@ async def fork_repository(
             db, source_repository_id, user_id, ["read"]
         )
         if not has_permission:
-            raise AuthorizationException(detail="Not authorized to fork this repository")
+            raise AuthorizationException(detail="Not authorized to fork this repository", error_code="fork_not_authorized")
 
     # 获取 Fork 者信息
     user_stmt = select(User).filter(User.id == user_id)
@@ -75,14 +75,14 @@ async def fork_repository(
     user = user_result.scalar_one_or_none()
 
     if not user:
-        raise NotFoundException(detail="User not found")
+        raise NotFoundException(detail="User not found", error_code="user_not_found")
 
     # 检查是否已 Fork 过
     existing_fork = await _get_user_fork(db, source_repository_id, user_id)
     if existing_fork:
         raise ValidationException(
             detail=f"You have already forked this repository to {existing_fork.path}"
-        )
+        , error_code="fork_already_exists")
 
     # 确定新仓库名称
     new_name = name or source_repo.name
@@ -95,7 +95,7 @@ async def fork_repository(
     if path_check.scalar_one_or_none():
         raise ValidationException(
             detail=f"Repository with path '{new_path}' already exists"
-        )
+        , error_code="repository_path_already_exists")
 
     # 确定可见性
     new_is_public = is_public if is_public is not None else source_repo.is_public
@@ -140,7 +140,7 @@ async def fork_repository(
         )
 
         if clone_result.returncode != 0:
-            raise ValidationException(detail=f"Failed to fork repository: {clone_result.stderr}")
+            raise ValidationException(detail=f"Failed to fork repository: {clone_result.stderr}", error_code="fork_failed")
 
         # 更新源仓库的 Fork 计数
         source_repo.fork_count += 1
@@ -203,7 +203,7 @@ async def get_repository_forks(
     repo_stmt = select(Repository).filter(Repository.id == repository_id)
     result = await db.execute(repo_stmt)
     if not result.scalar_one_or_none():
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
 
     # 获取 Fork 列表
     stmt = select(Repository).filter(
@@ -279,7 +279,7 @@ async def get_fork_source(
     repo = result.scalar_one_or_none()
 
     if not repo:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
 
     if not repo.is_fork():
         return None
@@ -336,15 +336,15 @@ async def sync_fork(
     fork_repo = result.scalar_one_or_none()
 
     if not fork_repo:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
 
     # 检查是否为 Fork
     if not fork_repo.is_fork():
-        raise ValidationException(detail="This repository is not a fork")
+        raise ValidationException(detail="This repository is not a fork", error_code="repo_not_a_fork")
 
     # 检查权限
     if fork_repo.owner_id != user_id:
-        raise AuthorizationException(detail="Not authorized to sync this repository")
+        raise AuthorizationException(detail="Not authorized to sync this repository", error_code="fork_sync_not_authorized")
 
     # 获取源仓库
     source_stmt = select(Repository).filter(Repository.id == fork_repo.forked_from_id)
@@ -352,7 +352,7 @@ async def sync_fork(
     source_repo = source_result.scalar_one_or_none()
 
     if not source_repo:
-        raise NotFoundException(detail="Source repository not found")
+        raise NotFoundException(detail="Source repository not found", error_code="source_repository_not_found")
 
     # 获取仓库路径
     if repo_root is None:
@@ -373,7 +373,7 @@ async def sync_fork(
     )
 
     if fetch_result.returncode != 0:
-        raise ValidationException(detail=f"Failed to sync repository: {fetch_result.stderr}")
+        raise ValidationException(detail=f"Failed to sync repository: {fetch_result.stderr}", error_code="fork_sync_failed")
 
     return {
         "success": True,

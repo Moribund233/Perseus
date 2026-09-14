@@ -21,7 +21,7 @@ async def create_label(repo_id: uuid.UUID, label_data: dict, db: AsyncSession) -
         )
     )
     if existing.scalar_one_or_none():
-        raise ConflictException(detail=f"Label '{label_data['name']}' already exists")
+        raise ConflictException(detail=f"Label '{label_data['name']}' already exists", error_code="label_already_exists")
 
     label = RepoLabel(
         repository_id=repo_id,
@@ -62,7 +62,7 @@ async def update_label(repo_id: uuid.UUID, label_id: uuid.UUID, label_data: dict
             )
         )
         if existing.scalar_one_or_none():
-            raise ConflictException(detail=f"Label '{label_data['name']}' already exists")
+            raise ConflictException(detail=f"Label '{label_data['name']}' already exists", error_code="label_already_exists")
         label.name = label_data["name"]
 
     if "color" in label_data:
@@ -94,7 +94,7 @@ async def add_label_to_repository(repo_id: uuid.UUID, label_id: uuid.UUID, db: A
     )
     repo = result.scalar_one_or_none()
     if not repo:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
 
     label = await get_or_404(db, RepoLabel, {"id": label_id}, "Label not found")
 
@@ -113,7 +113,7 @@ async def remove_label_from_repository(repo_id: uuid.UUID, label_id: uuid.UUID, 
     )
     repo = result.scalar_one_or_none()
     if not repo:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
 
     label = await get_or_404(db, RepoLabel, {"id": label_id}, "Label not found")
 
@@ -132,5 +132,5 @@ async def get_repositories_by_label(label_id: uuid.UUID, db: AsyncSession) -> li
     )
     label = result.scalar_one_or_none()
     if not label:
-        raise NotFoundException(detail="Label not found")
+        raise NotFoundException(detail="Label not found", error_code="label_not_found")
     return [build_repo_response(repo) for repo in label.labeled_repos]

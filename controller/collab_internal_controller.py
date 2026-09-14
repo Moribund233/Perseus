@@ -74,15 +74,15 @@ def parse_doc_key(doc_key: str) -> Tuple[UUID, str, str]:
     """
     parts = str(doc_key or "").split(":")
     if len(parts) < 3 or not parts[0].strip() or not parts[1].strip():
-        raise ValidationException(detail="docKey 格式非法, 应为 repository_id:branch:path")
+        raise ValidationException(detail="docKey 格式非法, 应为 repository_id:branch:path", error_code="collab_invalid_dockey")
     try:
         repository_id = UUID(parts[0].strip())
     except (ValueError, AttributeError, TypeError):
-        raise ValidationException(detail="docKey 中 repository_id 非法")
+        raise ValidationException(detail="docKey 中 repository_id 非法", error_code="collab_invalid_repository_id")
     branch = parts[1].strip()
     path = ":".join(parts[2:]).strip().lstrip("/")
     if not branch or not path:
-        raise ValidationException(detail="docKey 中 branch/path 不能为空")
+        raise ValidationException(detail="docKey 中 branch/path 不能为空", error_code="collab_dockey_missing_parts")
     return repository_id, branch, path
 
 
@@ -93,7 +93,7 @@ def _require_internal_secret(request: Request) -> None:
         raise HTTPException(status_code=503, detail="协作内部 API 未启用")
     provided = request.headers.get(INTERNAL_SECRET_HEADER, "")
     if provided != expected:
-        raise AuthorizationException(detail="内部密钥校验失败")
+        raise AuthorizationException(detail="内部密钥校验失败", error_code="collab_invalid_internal_secret")
 
 
 async def _load_user_by_token(db: AsyncSession, token: str) -> User:
@@ -111,7 +111,7 @@ async def _get_repo_or_404(db: AsyncSession, repository_id: UUID) -> Repository:
     result = await db.execute(select(Repository).filter(Repository.id == repository_id))
     repo = result.scalar_one_or_none()
     if not repo:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
     return repo
 
 
@@ -138,7 +138,7 @@ async def collab_auth(
     repo = await _get_repo_or_404(db, repository_id)
 
     if not await _has_role(db, repository_id, user.id, READ_ROLES):
-        raise AuthorizationException(detail="没有该仓库的访问权限")
+        raise AuthorizationException(detail="没有该仓库的访问权限", error_code="collab_repository_access_denied")
 
     can_write = await _has_role(db, repository_id, user.id, WRITE_ROLES)
 
@@ -198,7 +198,7 @@ async def collab_save(
     repo = await _get_repo_or_404(db, repository_id)
 
     if not await _has_role(db, repository_id, user.id, WRITE_ROLES):
-        raise AuthorizationException(detail="没有该仓库的写入权限")
+        raise AuthorizationException(detail="没有该仓库的写入权限", error_code="collab_repository_write_denied")
 
     from services.repository_browser_service import commit_file
     from utils.git_utils import get_repository_storage_path

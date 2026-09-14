@@ -99,7 +99,7 @@ async def refresh_token(
     # 验证刷新令牌
     token_data = token_service.verify_token(request.refresh_token, token_type="refresh")
     if not token_data:
-        raise AuthenticationException(detail="Invalid or expired refresh token")
+        raise AuthenticationException(detail="Invalid or expired refresh token", error_code="invalid_refresh_token")
 
     # 获取用户信息
     from sqlalchemy import select
@@ -108,7 +108,7 @@ async def refresh_token(
     user = result.scalar_one_or_none()
 
     if not user or not user.is_active:
-        raise AuthenticationException(detail="User not found or inactive")
+        raise AuthenticationException(detail="User not found or inactive", error_code="user_not_found_inactive")
 
     # 创建新的令牌对
     tokens = token_service.create_token_pair(user)

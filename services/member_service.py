@@ -52,7 +52,7 @@ async def get_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, db: Asyn
     member = result.scalar_one_or_none()
 
     if member is None:
-        raise NotFoundException(detail="Member not found in this repository")
+        raise NotFoundException(detail="Member not found in this repository", error_code="member_not_found")
 
     return member
 
@@ -77,14 +77,14 @@ async def add_repository_member(repo_id: uuid.UUID, member_data: dict, db: Async
     """
     # 验证请求参数
     if "user_id" not in member_data:
-        raise ValidationException(detail="User ID is required")
+        raise ValidationException(detail="User ID is required", error_code="member_user_id_required")
 
     # 检查用户是否存在
     from models.user import User
     result = await db.execute(select(User).filter(User.id == member_data["user_id"]))
     user = result.scalar_one_or_none()
     if not user:
-        raise NotFoundException(detail="User not found")
+        raise NotFoundException(detail="User not found", error_code="user_not_found")
 
     # 检查成员是否已存在
     result = await db.execute(
@@ -96,7 +96,7 @@ async def add_repository_member(repo_id: uuid.UUID, member_data: dict, db: Async
     existing_member = result.scalar_one_or_none()
 
     if existing_member:
-        raise ConflictException(detail="User is already a member of this repository")
+        raise ConflictException(detail="User is already a member of this repository", error_code="member_already_exists")
 
     # 创建新成员
     db_member = RepositoryMember(
@@ -164,7 +164,7 @@ async def remove_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, db: A
 
     # 检查是否是仓库所有者
     if db_member.role == "owner":
-        raise AuthorizationException(detail="Cannot remove repository owner")
+        raise AuthorizationException(detail="Cannot remove repository owner", error_code="member_remove_owner_forbidden")
 
     await db.delete(db_member)
     await db.commit()
@@ -192,7 +192,7 @@ async def update_member_role(repo_id: uuid.UUID, user_id: uuid.UUID, role: str, 
     """
     # 验证角色是否有效
     if role not in VALID_ROLES:
-        raise ValidationException(detail=f"Invalid role. Valid roles are: {', '.join(VALID_ROLES)}")
+        raise ValidationException(detail=f"Invalid role. Valid roles are: {', '.join(VALID_ROLES)}", error_code="member_invalid_role")
 
     return await update_repository_member(repo_id, user_id, {"role": role}, db, operator_id=operator_id)
 
@@ -241,7 +241,7 @@ async def check_member_permission(repo_id: uuid.UUID, user_id: uuid.UUID, requir
     result = await db.execute(select(Repository).filter(Repository.id == repo_id))
     repo = result.scalar_one_or_none()
     if not repo:
-        raise NotFoundException(detail="Repository not found")
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
 
     # 检查用户是否是仓库所有者
     if repo.owner_id == user_id:
@@ -307,6 +307,6 @@ async def deactivate_repository_member(repo_id: uuid.UUID, user_id: uuid.UUID, d
 
     # 检查是否是仓库所有者
     if db_member.role == "owner":
-        raise AuthorizationException(detail="Cannot deactivate repository owner")
+        raise AuthorizationException(detail="Cannot deactivate repository owner", error_code="member_deactivate_owner_forbidden")
 
     return await update_repository_member(repo_id, user_id, {"is_active": False}, db, operator_id=operator_id)
