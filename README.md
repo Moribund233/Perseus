@@ -325,7 +325,8 @@ perseus/
 │   ├── email_utils.py            # SMTP 邮件发送
 │   ├── db_utils.py               # 数据库辅助（exists, paginate）
 │   ├── db_validation.py          # 数据库配置验证
-│   ├── init_database.py          # 数据库初始化 + 管理员引导
+│   ├── init_database.py          # 数据库初始化（迁移 + 管理员引导）
+│   ├── db_migrate.py             # 程序化 Alembic 迁移入口与 schema 版本查询
 │   ├── config_utils.py           # 配置文件工具
 │   ├── webhook_trigger.py        # WebHook HTTP 投递
 │   └── lfs_utils.py              # LFS 工具
@@ -405,9 +406,16 @@ cd scripts && bash dev-start.sh
 export DATABASE_URL="postgresql://user:pass@host:5432/perseus"
 export PERSEUS_SECURITY_SECRET_KEY="<strong-secret>"
 
-# 2. 启动生产栈
+# 2. 首次执行数据库初始化任务（迁移 + 管理员引导，幂等）
+docker compose --profile init run --rm init
+
+# 3. 启动生产栈
 docker compose up -d --build
 ```
+
+> 生产多容器下 schema 迁移由一次性 `init` 任务完成（`--profile init`），
+> `app` 启动时仅做只读就绪校验（`PERSEUS_INIT_DATABASE=false`）。
+> 开发模式默认 `PERSEUS_INIT_DATABASE=true`，启动时自动迁移，无感。
 
 生产部署需要外部维护：
 - **PostgreSQL** 数据库

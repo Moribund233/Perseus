@@ -206,7 +206,9 @@ Request Body:
 | full_name | string | ❌ | 最多 100 字符 |
 | is_active | bool | ❌ | 默认 true |
 
-> `is_admin` 不能通过注册接口设置；管理员账号由 `PERSEUS_ADMIN_*` 环境变量在应用初始化时引导创建。
+> `is_admin` 不能通过注册接口设置；管理员角色通过两种方式获得：
+> 1. `PERSEUS_ADMIN_*` 环境变量在初始化任务时引导创建；
+> 2. 现有管理员通过 `PUT /api/v1/users/{user_id}` 的 `is_admin` 字段授予/回收。
 
 ### 获取当前用户
 
@@ -1645,7 +1647,7 @@ Response:
 POST /api/v1/debug/initdb?force=false
 ```
 
-删除所有表并重新创建。
+删除所有表并重新创建（内部通过 Alembic 迁移）。
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|

@@ -101,6 +101,12 @@ DATABASE_ENV_VARS = [
         example="sqlite:///./perseus.db 或 postgresql://user:pass@localhost/dbname"
     ),
     EnvVarConfig(
+        name="PERSEUS_INIT_DATABASE",
+        description="数据库初始化模式，'true'启动时执行迁移+管理员引导，'false'仅做就绪校验（生产多容器推荐）",
+        example="false",
+        required=False,
+    ),
+    EnvVarConfig(
         name="PERSEUS_STRESS_TEST",
         description="压力测试模式标志，'true'启用压力测试优化",
         example="false",
@@ -348,14 +354,41 @@ class AppInitializer:
             return False
 
     def _init_database(self) -> bool:
-        """初始化数据库（创建表 + 自动引导管理员）"""
-        from utils.init_database import init_database
+        """初始化数据库。
 
-        if init_database():
+        模式由环境变量 ``PERSEUS_INIT_DATABASE`` 控制：
+          - true/1/yes/on（默认，开发便捷）→ 启动时执行迁移 + 管理员引导
+          - false/0/no/off（生产多容器）   → 仅做只读就绪校验，
+             schema 需已由独立的 init 任务（scripts/init_db.py）迁移到位
+        """
+        init_db_mode = os.environ.get("PERSEUS_INIT_DATABASE", "true").strip().lower()
+        auto_init = init_db_mode in ("1", "true", "yes", "on")
+
+        from utils.db_migrate import get_head_revision
+
+        if auto_init:
+            from utils.init_database import init_database
+
+            if not init_database():
+                self._logger.error("数据库初始化失败")
+                return False
+            self._logger.info(f"数据库迁移/初始化完成 (schema head={get_head_revision()})")
             return True
-        else:
-            self._logger.error("数据库初始化失败")
+
+        from utils.init_database import verify_database_ready
+
+        ready, state = verify_database_ready()
+        if not ready:
+            self._logger.critical(
+                "数据库 schema 未就绪，拒绝启动。"
+                "请先运行一次初始化任务: python scripts/init_db.py\n"
+                f"  applied={state.get('applied')}  head={state.get('head')}"
+            )
             return False
+        self._logger.info(
+            f"数据库就绪校验通过 (schema applied={state.get('applied')} head={state.get('head')})"
+        )
+        return True
 
     def _init_repository_root(self) -> bool:
         """初始化仓库根目录"""
@@ -401,7 +434,7 @@ class AppInitializer:
         4. 配置文件初始化
         5. 日志系统初始化
         6. 安全密钥检查
-        7. 数据库初始化（创建表 + 自动引导管理员；测试进程跳过）
+        7. 数据库初始化（迁移 + 自动引导管理员；由 PERSEUS_INIT_DATABASE 控制自动或就绪校验；测试进程跳过）
         8. 仓库目录初始化
 
         Args:

@@ -21,6 +21,7 @@ from services.user_service import (
     update_user as service_update_user,
     delete_user as service_delete_user,
     change_password as service_change_password,
+    admin_reset_password as service_admin_reset_password,
     update_user_avatar as service_update_user_avatar,
     get_user_avatar as service_get_user_avatar,
 )
@@ -40,7 +41,8 @@ class UserCreateRequest(BaseModel):
     password: str = Field(..., min_length=6, max_length=128, description="密码")
     full_name: Optional[str] = Field(None, max_length=100, description="全名")
     is_active: bool = Field(default=True, description="是否激活")
-    # is_admin 不由注册接口设置；管理员只能通过环境变量 PERSEUS_ADMIN_* 引导创建
+    # is_admin 不由注册接口设置；管理员角色通过 PERSEUS_ADMIN_* 环境变量引导，
+    # 或由现有管理员通过 PUT /users/{user_id} 的 is_admin 字段授予
 
 
 class UserUpdateRequest(BaseModel):
@@ -49,6 +51,12 @@ class UserUpdateRequest(BaseModel):
     email: Optional[EmailStr] = Field(None, description="邮箱地址")
     full_name: Optional[str] = Field(None, max_length=100, description="全名")
     is_active: Optional[bool] = Field(None, description="是否激活")
+    is_admin: Optional[bool] = Field(None, description="是否管理员（仅管理员可设置）")
+
+
+class AdminResetPasswordRequest(BaseModel):
+    """管理员重置用户密码请求体"""
+    new_password: str = Field(..., min_length=6, max_length=128, description="新密码")
 
 
 class ChangePasswordRequest(BaseModel):
@@ -276,6 +284,32 @@ async def create_user(
         ValidationException: 请求参数无效时抛出422异常
     """
     return await service_create_user(user_data.model_dump(), db)
+
+
+@router.post("/{user_id}/password", summary="管理员重置用户密码")
+async def admin_reset_user_password(
+    user_id: uuid.UUID,
+    data: AdminResetPasswordRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """
+    管理员重置指定用户的密码（不需要旧密码）
+
+    Args:
+        user_id: 用户ID
+        data: 新密码
+        db: 数据库会话
+        current_user: 当前认证管理员用户
+
+    Returns:
+        dict: 重置成功消息
+
+    Raises:
+        AuthorizationException: 非管理员时抛出403异常
+        NotFoundException: 用户不存在时抛出404异常
+    """
+    return await service_admin_reset_password(user_id, data.new_password, db, current_user)
 
 
 @router.put("/{user_id}")

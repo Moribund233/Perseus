@@ -54,6 +54,8 @@ services:
       # 调试模式
       PERSEUS_APP_DEBUG: "true"
       PERSEUS_STRESS_TEST: "false"
+      # 开发模式：启动时自动执行迁移 + 管理员引导（幂等）
+      PERSEUS_INIT_DATABASE: "true"
       # 日志级别
       LOG_LEVEL: debug
       # 时区

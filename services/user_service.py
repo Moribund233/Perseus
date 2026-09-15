@@ -156,11 +156,37 @@ async def update_user(user_id: uuid.UUID, user_data: dict, db: AsyncSession, cur
     if current_user and current_user.id != user_id and not current_user.is_admin:
         raise AuthorizationException(detail="You don't have permission to update this user", error_code="user_update_forbidden")
 
+    # 管理员角色守卫（仅管理员可修改 is_admin）
+    new_admin_flag = user_data.get("is_admin")
+    if "is_admin" in user_data and new_admin_flag is not None:
+        if not current_user or not current_user.is_admin:
+            raise AuthorizationException(
+                detail="Only administrators can change admin role",
+                error_code="admin_role_forbidden",
+            )
+        # 禁止自降级
+        if current_user.id == user_id and not new_admin_flag and db_user.is_admin:
+            raise AuthorizationException(
+                detail="Administrators cannot demote themselves",
+                error_code="admin_self_demote_forbidden",
+            )
+        # 禁止移除最后一个管理员
+        if db_user.is_admin and not new_admin_flag:
+            admin_count = await _count_admins(db)
+            if admin_count <= 1:
+                raise ValidationException(
+                    detail="Cannot remove the last administrator",
+                    error_code="admin_remove_last_forbidden",
+                )
+
     # 更新用户信息（排除敏感字段）
     for key, value in user_data.items():
         if key == "password":
             # 如果更新密码，需要哈希处理
             value = get_password_hash(value)
+        if key == "is_admin" and value is None:
+            # 显式传 null 视为不修改管理员状态
+            continue
         if hasattr(db_user, key):
             setattr(db_user, key, value)
 
@@ -168,6 +194,57 @@ async def update_user(user_id: uuid.UUID, user_data: dict, db: AsyncSession, cur
     await db.refresh(db_user)
 
     return user_to_dict(db_user)
+
+
+async def _count_admins(db: AsyncSession) -> int:
+    """统计当前管理员数量"""
+    from sqlalchemy import func
+
+    result = await db.execute(
+        select(func.count()).select_from(User).where(User.is_admin.is_(True))
+    )
+    return int(result.scalar_one())
+
+
+async def admin_reset_password(user_id: uuid.UUID, new_password: str, db: AsyncSession, current_user: User | None = None):
+    """
+    管理员重置指定用户密码（不需要旧密码）
+
+    用于管理员账号生命周期管理，例如初始密码引导、员工离职/遗忘密码重置。
+
+    Args:
+        user_id: 目标用户ID
+        new_password: 新密码
+        db: 异步数据库会话
+        current_user: 当前认证管理员用户
+
+    Returns:
+        dict: 重置成功消息
+
+    Raises:
+        AuthorizationException: 非管理员时抛出403异常
+        NotFoundException: 用户不存在时抛出404异常
+        ValidationException: 新密码不符合要求时抛出422异常
+    """
+    from core.exception import AuthorizationException
+
+    if not current_user or not current_user.is_admin:
+        raise AuthorizationException(detail="Admin permission required", error_code="admin_required")
+
+    if not new_password or len(new_password) < 6:
+        raise ValidationException(detail="New password must be at least 6 characters", error_code="user_password_too_short")
+
+    result = await db.execute(select(User).filter(User.id == user_id))
+    db_user = result.scalar_one_or_none()
+    if db_user is None:
+        raise NotFoundException(detail="User not found", error_code="user_not_found")
+
+    db_user.password = get_password_hash(new_password)
+    await db.commit()
+    await db.refresh(db_user)
+
+    logger.info(f"管理员 {current_user.username} 重置了用户 {db_user.username} 的密码")
+    return {"message": "Password reset successfully"}
 
 
 async def delete_user(user_id: uuid.UUID, db: AsyncSession):
@@ -188,6 +265,15 @@ async def delete_user(user_id: uuid.UUID, db: AsyncSession):
     db_user = result.scalar_one_or_none()
     if db_user is None:
         raise NotFoundException(detail="User not found", error_code="user_not_found")
+
+    # 禁止删除最后一个管理员
+    if db_user.is_admin:
+        admin_count = await _count_admins(db)
+        if admin_count <= 1:
+            raise ValidationException(
+                detail="Cannot delete the last administrator",
+                error_code="admin_delete_last_forbidden",
+            )
 
     await db.delete(db_user)
     await db.commit()

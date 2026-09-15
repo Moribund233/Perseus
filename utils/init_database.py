@@ -1,7 +1,8 @@
 """
 数据库初始化工具模块
 
-提供数据库表创建和首次运行管理员引导功能。
+提供数据库迁移、首次运行管理员引导等功能。
+schema 演进统一走 Alembic 迁移（utils/db_migrate），不再使用 create_all。
 管理员凭据通过环境变量注入，不在代码中硬编码。
 """
 import os
@@ -23,7 +24,7 @@ ENV_ADMIN_EMAIL = "PERSEUS_ADMIN_EMAIL"
 
 
 def _to_sync_db_url(url: str) -> str:
-    """将异步驱动 URL 转为同步 URL（用于表创建和命令行工具）"""
+    """将异步驱动 URL 转为同步 URL（用于迁移和命令行工具）"""
     return url.replace("+aiosqlite", "", 1).replace("+asyncpg", "", 1)
 
 
@@ -31,7 +32,7 @@ class DatabaseInitializer:
     """
     数据库初始化器
 
-    负责初始化数据库表结构，以及首次运行时自动创建管理员用户。
+    负责数据库 schema 迁移（Alembic），以及首次运行时自动创建管理员用户。
     """
 
     def __init__(self, db_url: Optional[str] = None):
@@ -40,7 +41,7 @@ class DatabaseInitializer:
         self._SessionLocal: sessionmaker | None = None
 
     def _get_sync_engine(self):
-        """获取同步引擎（create_tables 需要同步连接）"""
+        """获取同步引擎（bootstrap 等操作需要同步连接）"""
         if self._engine is None:
             if self.db_url:
                 sync_url = _to_sync_db_url(self.db_url)
@@ -54,20 +55,37 @@ class DatabaseInitializer:
             self._engine = create_engine(sync_url, connect_args=connect_args)
         return self._engine
 
+    def run_migrations(self, db_url: Optional[str] = None) -> dict:
+        """
+        将数据库 schema 升级到最新（Alembic，幂等）。
+
+        Returns:
+            dict: 含 ``success`` / ``applied`` / ``head``
+        """
+        from utils.db_migrate import run_migrations
+        return run_migrations(db_url or self.db_url)
+
     def create_tables(self) -> bool:
         """
-        创建数据库表结构
+        创建数据库表结构（兼容入口）。
+
+        等价于执行 Alembic 迁移（含历史库 stamp 认领），
+        返回是否成功。
 
         Returns:
             bool: 创建是否成功
         """
-        try:
-            engine = self._get_sync_engine()
-            Base.metadata.create_all(bind=engine)
-            return True
-        except Exception as e:
-            logger.error(f"数据库表创建失败: {e}")
-            return False
+        return self.run_migrations()["success"]
+
+    def is_schema_ready(self, db_url: Optional[str] = None) -> tuple:
+        """
+        只读就绪校验：schema 是否已迁移到位（不执行 DDL）。
+
+        Returns:
+            tuple: ``(ready: bool, state: dict)``
+        """
+        from utils.db_migrate import is_schema_ready
+        return is_schema_ready(db_url or self.db_url)
 
     def autobootstrap_admin(self) -> bool:
         """
@@ -144,7 +162,7 @@ def init_database(db_url: Optional[str] = None) -> bool:
     初始化数据库的便捷函数
 
     执行:
-    1. 创建表结构
+    1. Alembic 迁移到最新 schema（幂等）
     2. 首次运行自动创建管理员用户（由 autobootstrap_admin 控制）
 
     Args:
@@ -155,10 +173,25 @@ def init_database(db_url: Optional[str] = None) -> bool:
     """
     initializer = DatabaseInitializer(db_url)
 
-    if not initializer.create_tables():
+    migrated = initializer.run_migrations()
+    if not migrated["success"]:
+        logger.error("数据库迁移失败，初始化中止")
         return False
 
     if not initializer.autobootstrap_admin():
         return False
 
     return True
+
+
+def verify_database_ready(db_url: Optional[str] = None) -> tuple[bool, dict]:
+    """
+    运行容器启动时的只读就绪校验（不执行任何 DDL / 写入）。
+
+    多容器部署中业务容器应设置 ``PERSEUS_INIT_DATABASE=false``，
+    由独立的 init 任务先完成迁移与管理员引导。
+
+    Returns:
+        tuple: ``(ready: bool, state: dict)``，state 含 applied/head
+    """
+    return DatabaseInitializer(db_url).is_schema_ready(db_url)

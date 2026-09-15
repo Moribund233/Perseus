@@ -105,13 +105,29 @@ docker compose up -d --build
 | git-cgi | 127.0.0.1:9000 | Git HTTP Smart Protocol |
 | gateway | 8000 | OpenResty 统一入口 |
 | sshd | 127.0.0.1:2222 | Git over SSH（可选） |
+| init | 一次性 | 数据库初始化任务（Alembic 迁移 + 管理员引导，profile: init） |
+
+> **初始化与运行解耦**：schema 迁移/管理员引导由一次性 `init` 任务负责，
+> `app` 启动时仅做只读就绪校验（`PERSEUS_INIT_DATABASE=false`）。
 
 ### 4.3 首次初始化
 
-1. 等待网关健康：`docker compose ps` 全部 healthy。
-2. 访问 http://localhost:8000/docs 验证 API 与 Swagger。
-3. 应用启动时自动创建数据库表与初始管理员账号
+1. 先执行一次数据库初始化任务（幂等、可重复运行）：
+   ```bash
+   docker compose --profile init run --rm init
+   ```
+2. 再启动全部服务（跳过 `init` profile）：
+   ```bash
+   docker compose up -d --build
+   ```
+3. 等待网关健康：`docker compose ps` 全部 healthy。
+4. 访问 http://localhost:8000/docs 验证 API 与 Swagger。
+5. 初始化任务自动创建数据库 schema 与初始管理员账号
    （`PERSEUS_ADMIN_USERNAME` / `PERSEUS_ADMIN_PASSWORD`）。
+
+> `init` 任务执行 Alembic 迁移：已有 `alembic_version` 则增量升级；
+> 历史库（create_all 时代、无版本表但有业务表）自动 `stamp` 认领；
+> 全新库全量建表。schema 版本可在 `GET /api/app/status` 的 `schema_state` 字段查看。
 
 ### 4.4 监控与告警（F-053 / F-057）
 
@@ -152,6 +168,10 @@ docker compose -f docker-compose.monitoring.yml up -d
 docker compose logs -f app
 # 进入容器
 docker compose exec app bash
+# 数据库迁移/管理员引导（升级/重建镜像后执行，幂等）
+docker compose --profile init run --rm init
+# 只读校验 schema 是否就绪（不改动任何数据）
+docker compose --profile init run --rm init --check-only
 # 数据库备份（PostgreSQL）
 docker compose exec postgres pg_dump -U perseus perseus > backup.sql
 # 更新并重建

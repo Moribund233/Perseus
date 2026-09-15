@@ -148,18 +148,18 @@ class DatabaseResetManager:
             temp_engine.dispose()
 
     def _create_tables(self) -> None:
-        """重新创建数据库表"""
+        """重新创建数据库表（通过 Alembic 迁移）"""
         # 重新初始化引擎
         init_engine()
 
-        # 创建表
+        # 创建表（DatabaseInitializer.create_tables 内部走 alembic 迁移）
         initializer = DatabaseInitializer()
         success = initializer.create_tables()
 
         if not success:
             raise RuntimeError("创建表失败")
 
-        logger.info("数据库表已重新创建")
+        logger.info("数据库表已通过 Alembic 迁移重建")
 
     def _bootstrap_admin(self) -> bool:
         """重置后自动引导管理员用户"""

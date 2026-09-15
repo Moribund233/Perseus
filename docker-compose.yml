@@ -70,6 +70,8 @@ services:
       PERSEUS_APP_DEBUG: "${PERSEUS_APP_DEBUG:-false}"
       PERSEUS_STRESS_TEST: "false"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
+      # 生产多容器：schema 迁移由 init 服务完成，app 启动仅做只读就绪校验
+      PERSEUS_INIT_DATABASE: "false"
       PERSEUS_STORAGE_REPO_ROOT: /data/repositories
       TZ: Asia/Shanghai
       PERSEUS_ADMIN_USERNAME: admin
@@ -211,6 +213,41 @@ services:
         limits:
           cpus: '0.5'
           memory: 64M
+
+  # 一次性数据库初始化任务（Alembic 迁移 + 管理员引导）
+  # 运行: docker compose --profile init run --rm init
+  init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: perseus-init
+    command: ["python", "scripts/init_db.py"]
+    profiles: ["init"]
+    environment:
+      DATABASE_URL: postgresql://perseus:${POSTGRES_PASSWORD:?必需设置数据库密码}@postgres:5432/perseus
+      PERSEUS_SECURITY_SECRET_KEY: ${PERSEUS_SECURITY_SECRET_KEY:?必需设置 JWT 密钥}
+      PERSEUS_APP_DEBUG: "${PERSEUS_APP_DEBUG:-false}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      TZ: Asia/Shanghai
+      PERSEUS_ADMIN_USERNAME: admin
+      PERSEUS_ADMIN_PASSWORD: ${PERSEUS_ADMIN_PASSWORD:-perseus_admin_2024}
+      PERSEUS_ADMIN_EMAIL: admin@perseus.local
+    volumes:
+      - ./config.toml:/app/config.toml:ro
+      - app-logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.2'
+          memory: 128M
 
   # 测试容器（专用 profile: docker compose --profile test run --rm test [pytest 参数]）
   test:

@@ -98,6 +98,7 @@ class StatusResponse(BaseModel):
     process: Dict[str, Any]
     requests: Dict[str, Any]
     git_operations: Dict[str, Any]
+    schema_state: Dict[str, Any] = Field(default_factory=dict, description="数据库 schema 版本（applied/head）")
 
 
 class ActionResponse(BaseModel):

@@ -222,7 +222,28 @@ class AppService:
             "process": process_info,
             "requests": requests_info or self._get_default_requests_info(),
             "git_operations": git_info,
+            "schema_state": self._get_schema_info(),
         }
+
+    @staticmethod
+    def _get_schema_info() -> Dict[str, Any]:
+        """
+        获取数据库 schema 版本信息（Alembic applied/head）。
+
+        Returns:
+            Dict[str, Any]: schema 信息；查询失败时返回空字典（不影响状态接口可用性）
+        """
+        try:
+            from core.config import get_config
+            from utils.db_migrate import get_applied_revision, get_head_revision
+
+            db_url = get_config().database.url
+            return {
+                "applied": get_applied_revision(db_url),
+                "head": get_head_revision(db_url),
+            }
+        except Exception:
+            return {}
 
     def _get_process_info(self) -> Dict[str, Any]:
         """

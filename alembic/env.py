@@ -40,9 +40,12 @@ def _to_sync_database_url(db_url: str) -> str:
         return f'sqlite:///{path.lstrip("/")}'
     return db_url
 
-# 从环境变量读取 DATABASE_URL（与应用保持一致）
+# 从环境变量读取 DATABASE_URL（与应用保持一致）。
+# 程序化调用（utils/db_migrate）已在 Config 中预置 sqlalchemy.url，
+# 此时以显式传入的 URL 为准（避免被环境变量覆盖成别的库）。
+configured_url = config.get_main_option("sqlalchemy.url")
 db_url = os.environ.get("DATABASE_URL")
-if db_url:
+if db_url and not configured_url:
     # Alembic 需要同步驱动，将异步驱动转换为同步驱动
     # sqlite+aiosqlite -> sqlite
     # postgresql+asyncpg -> postgresql
@@ -50,7 +53,12 @@ if db_url:
     config.set_main_option("sqlalchemy.url", sync_url)
 
 # 日志配置
-if config.config_file_name is not None:
+# 程序化调用（utils/db_migrate.run_migrations）通过 Config.attributes 关闭日志重配置，
+# 避免 fileConfig 覆盖应用已有的 root logger 处理器；CLI 调用（alembic xxx）不受影响。
+if (
+    config.config_file_name is not None
+    and not config.attributes.get("perseus_skip_logging_config", False)
+):
     fileConfig(config.config_file_name)
 
 
