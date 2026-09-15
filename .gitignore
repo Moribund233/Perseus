@@ -169,7 +169,14 @@ CLAUDE.md
 # node_modules
 node_modules/
 
-# lock files
+# Lock files
 yarn.lock
 package-lock.json
 temp/
+
+# 本地运维产物
+.backup.*
+backups/
+
+# scripts lib (override lib/ above)
+!scripts/lib/

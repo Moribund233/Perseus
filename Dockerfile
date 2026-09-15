@@ -84,8 +84,8 @@ COPY . /app/
 
 # 创建非 root 用户
 RUN groupadd -g 1000 perseus && useradd -u 1000 -g perseus perseus \
-    && mkdir -p /data/repositories /app/logs \
-    && chown -R perseus:perseus /app /data/repositories /app/logs
+    && mkdir -p /data/repositories /data/lfs /app/logs \
+    && chown -R perseus:perseus /data /app /data/repositories /app/logs
 
 # 切换到非 root 用户
 USER perseus

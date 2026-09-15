@@ -1,0 +1,17 @@
+# =============================================================================
+# 换行符策略
+#
+# 本项目在 Windows 上编辑、在 Linux/WSL/Docker 中运行。Shell 脚本、Dockerfile
+# 与编排文件若被检出为 CRLF，会导致 "bad interpreter" / 解析错误，因此强制 LF。
+# =============================================================================
+*.sh          text eol=lf
+*.bash        text eol=lf
+Dockerfile    text eol=lf
+Dockerfile.*  text eol=lf
+*.dockerfile  text eol=lf
+*.yml         text eol=lf
+*.yaml        text eol=lf
+*.toml        text eol=lf
+
+# 其余文本文件交由 Git 自动识别
+* text=auto

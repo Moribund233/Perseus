@@ -149,6 +149,40 @@ class DatabaseInitializer:
         finally:
             session.close()
 
+    def reset_admin_password(self, new_password: str) -> bool:
+        """
+        重设管理员密码（运维用，由 scripts/reset_admin.py 调用）。
+
+        管理员按 ``PERSEUS_ADMIN_USERNAME``（默认 admin）定位。
+
+        Returns:
+            bool: 操作是否成功
+        """
+        if not new_password:
+            logger.error("未提供新密码，拒绝重设")
+            return False
+
+        from models.user import User
+        from utils.password_utils import get_password_hash
+
+        session = self._get_session()
+        try:
+            username = os.environ.get(ENV_ADMIN_USERNAME, "admin")
+            admin = session.query(User).filter(User.username == username).first()
+            if admin is None:
+                logger.error(f"管理员用户不存在: {username}")
+                return False
+            admin.password = get_password_hash(new_password)
+            session.commit()
+            logger.info(f"管理员密码已重置: {username}")
+            return True
+        except Exception as e:
+            session.rollback()
+            logger.error(f"管理员密码重设失败: {e}")
+            return False
+        finally:
+            session.close()
+
     def _get_session(self) -> Session:
         """获取数据库会话"""
         if self._SessionLocal is None:

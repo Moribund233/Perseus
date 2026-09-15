@@ -3,7 +3,9 @@ FROM alpine:3.20
 RUN apk add --no-cache openssh git py3-pip py3-psycopg2
 
 # 用 UID 1000 创建 git 用户（对齐 app 容器的 perseus 用户）
+# 仓库目录属主对齐 uid=1000，避免共享卷 repos 首次初始化时属主为 root 导致不可写
 RUN mkdir -p /data/repositories && \
+    chown -R 1000:1000 /data/repositories && \
     adduser -D -u 1000 -h /home/git -s /usr/local/bin/git-shell-wrapper git && \
     passwd -u git && \
     ssh-keygen -A

@@ -1,64 +1,31 @@
+# =============================================================================
+# Perseus 业务层编排（基础设施见 docker-compose.base.yml，通过 include 合并）
+#
+# 部署 & 运维（推荐）:
+#   bash scripts/install.sh                 # 一键安装（含初始化）
+#   bash scripts/mgt.sh start|stop|status   # 生命周期
+#   bash scripts/mgt.sh upgrade             # 升级（自动备份+迁移）
+#   bash scripts/mgt.sh backup / restore    # 备份 / 恢复
+#   bash scripts/mgt.sh reset-admin         # 重设管理员密码
+#
+# 手工流程（与 install.sh 等价）:
+#   docker compose up -d postgres redis
+#   docker compose --profile init run --rm init
+#   docker compose up -d
+#
+# 镜像版本控制:
+#   PERSEUS_IMAGE_TAG    镜像标签（默认 latest；固定版本如 v0.1.0）
+#   PERSEUS_IMAGE_PREFIX 镜像前缀（默认 perseus；推送私有仓库时设置为
+#                        registry.example.com/perseus，并配合 docker compose pull）
+# =============================================================================
+
+include:
+  - docker-compose.base.yml
+
 services:
-  # PostgreSQL 数据库
-  postgres:
-    image: postgres:16-alpine
-    container_name: perseus-postgres
-    environment:
-      POSTGRES_USER: perseus
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?必需设置数据库密码}
-      POSTGRES_DB: perseus
-      TZ: Asia/Shanghai
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U perseus -d perseus"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"
-        max-file: "3"
-    restart: unless-stopped
-    networks:
-      - default
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 256M
-
-  # Redis（可选缓存，为空则应用不使用）
-  redis:
-    image: redis:7-alpine
-    container_name: perseus-redis
-    command: ["redis-server", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"
-        max-file: "3"
-    restart: unless-stopped
-    networks:
-      - default
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 320M
-
   # FastAPI 后端
   app:
+    image: ${PERSEUS_IMAGE_PREFIX:-perseus}-app:${PERSEUS_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -74,13 +41,14 @@ services:
       PERSEUS_INIT_DATABASE: "false"
       PERSEUS_STORAGE_REPO_ROOT: /data/repositories
       TZ: Asia/Shanghai
-      PERSEUS_ADMIN_USERNAME: admin
-      PERSEUS_ADMIN_PASSWORD: ${PERSEUS_ADMIN_PASSWORD:-perseus_admin_2024}
-      PERSEUS_ADMIN_EMAIL: admin@perseus.local
+      PERSEUS_ADMIN_USERNAME: ${PERSEUS_ADMIN_USERNAME:-admin}
+      PERSEUS_ADMIN_PASSWORD: ${PERSEUS_ADMIN_PASSWORD:?必需设置管理员初始密码}
+      PERSEUS_ADMIN_EMAIL: ${PERSEUS_ADMIN_EMAIL:-admin@perseus.local}
       PERSEUS_COLLAB_INTERNAL_SECRET: ${PERSEUS_COLLAB_INTERNAL_SECRET:?必需设置协作网关内部密钥 (scripts/generate_env.py)}
     volumes:
       - ./config.toml:/app/config.toml:ro
       - repos:/data/repositories
+      - lfs:/data/lfs
       - app-logs:/app/logs
     logging:
       driver: json-file
@@ -114,6 +82,7 @@ services:
 
   # 协作编辑 Yjs 网关 (Hocuspocus 哑管道: CRDT 同步 + app 回调)
   collab:
+    image: ${PERSEUS_IMAGE_PREFIX:-perseus}-collab:${PERSEUS_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: docker/collab/Dockerfile
@@ -144,6 +113,7 @@ services:
 
   # git-http-backend CGI
   git-cgi:
+    image: ${PERSEUS_IMAGE_PREFIX:-perseus}-git-cgi:${PERSEUS_IMAGE_TAG:-latest}
     build:
       context: ./docker/git-cgi
     container_name: perseus-git-cgi
@@ -156,6 +126,8 @@ services:
     ports:
       - "127.0.0.1:9000:9000"
     restart: unless-stopped
+    networks:
+      - default
     deploy:
       resources:
         limits:
@@ -170,7 +142,7 @@ services:
     image: openresty/openresty:1.31.1.1-0-bookworm-fat
     container_name: perseus-gateway
     ports:
-      - "8000:8000"
+      - "${PERSEUS_GATEWAY_PORT:-8000}:8000"
     volumes:
       - ./docker/gateway/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
       - /var/www/perseus-web:/var/www/perseus-web:ro
@@ -178,6 +150,12 @@ services:
     networks:
       - default
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     depends_on:
       app:
         condition: service_healthy
@@ -193,6 +171,7 @@ services:
 
   # SSH 服务器 — Git over SSH
   sshd:
+    image: ${PERSEUS_IMAGE_PREFIX:-perseus}-sshd:${PERSEUS_IMAGE_TAG:-latest}
     build:
       context: ./docker/ssh
     container_name: perseus-sshd
@@ -217,6 +196,7 @@ services:
   # 一次性数据库初始化任务（Alembic 迁移 + 管理员引导）
   # 运行: docker compose --profile init run --rm init
   init:
+    image: ${PERSEUS_IMAGE_PREFIX:-perseus}-app:${PERSEUS_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -229,9 +209,9 @@ services:
       PERSEUS_APP_DEBUG: "${PERSEUS_APP_DEBUG:-false}"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       TZ: Asia/Shanghai
-      PERSEUS_ADMIN_USERNAME: admin
-      PERSEUS_ADMIN_PASSWORD: ${PERSEUS_ADMIN_PASSWORD:-perseus_admin_2024}
-      PERSEUS_ADMIN_EMAIL: admin@perseus.local
+      PERSEUS_ADMIN_USERNAME: ${PERSEUS_ADMIN_USERNAME:-admin}
+      PERSEUS_ADMIN_PASSWORD: ${PERSEUS_ADMIN_PASSWORD:?必需设置管理员初始密码}
+      PERSEUS_ADMIN_EMAIL: ${PERSEUS_ADMIN_EMAIL:-admin@perseus.local}
     volumes:
       - ./config.toml:/app/config.toml:ro
       - app-logs:/app/logs
@@ -287,12 +267,7 @@ services:
 volumes:
   repos:
     driver: local
+  lfs:
+    driver: local
   app-logs:
     driver: local
-  postgres-data:
-    driver: local
-
-networks:
-  default:
-    name: perseus-network
-    driver: bridge

@@ -61,8 +61,9 @@ ENV GIT_PROJECT_ROOT=/data/repositories
 # 不设置此选项会导致 "dubious ownership" 错误
 RUN git config --system safe.directory "*"
 
-# 创建仓库目录
-RUN mkdir -p /data/repositories && chmod 755 /data/repositories
+# 创建仓库目录（属主对齐 app 容器的 perseus 用户 uid=1000，
+# 避免共享卷 repos 首次初始化时属主为 root 导致 app 不可写）
+RUN mkdir -p /data/repositories && chown -R 1000:1000 /data/repositories && chmod 755 /data/repositories
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

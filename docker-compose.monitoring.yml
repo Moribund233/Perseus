@@ -1,9 +1,11 @@
 # =============================================================================
 # Perseus 监控栈（可选）：Prometheus + Grafana
 #
-# 前置条件：已启动开发/生产 compose（app 服务在 perseus-dev-network 或
-# perseus-network 网络中），随后：
+# 前置条件：已启动开发/生产 compose，随后：
 #   docker compose -f docker-compose.monitoring.yml up -d
+#
+# 共享网络：默认加入生产网络 perseus-network；
+# 若面向开发 compose，请在 .env 中设置 PERSEUS_NETWORK_NAME=perseus-dev-network。
 #
 # 访问：
 #   - Prometheus: http://127.0.0.1:9090 (Targets → perseus)
@@ -65,6 +67,6 @@ volumes:
 
 networks:
   default:
-    # 复用开发 compose 的共享网络（app 服务以此解析），确保 Prometheus 可达 app:8000
-    name: perseus-dev-network
+    # 复用业务 compose 的共享网络（app 服务以此解析），确保 Prometheus 可达 app:8000
+    name: ${PERSEUS_NETWORK_NAME:-perseus-network}
     driver: bridge
