@@ -80,7 +80,18 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
 
     # 添加请求统计中间件
     from middleware.request_stats import RequestStatsMiddleware
-    app.add_middleware(RequestStatsMiddleware, exclude_paths=["/health", "/docs", "/openapi.json"])
+    app.add_middleware(
+        RequestStatsMiddleware,
+        exclude_paths=["/health", "/docs", "/openapi.json", "/metrics"],
+    )
+
+    # 添加 Prometheus 指标中间件与 /metrics 导出端点
+    from middleware.prometheus_metrics import (
+        PrometheusMetricsMiddleware,
+        metrics_response,
+    )
+    app.add_middleware(PrometheusMetricsMiddleware, exclude_paths=["/metrics"])
+    app.add_route("/metrics", metrics_response, include_in_schema=False)
 
     # 注意：CORS 由 Nginx 反向代理统一处理
     # 开发环境: docker-compose.dev.yml 中的 Nginx 处理

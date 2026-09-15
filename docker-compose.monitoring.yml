@@ -1,0 +1,70 @@
+# =============================================================================
+# Perseus 监控栈（可选）：Prometheus + Grafana
+#
+# 前置条件：已启动开发/生产 compose（app 服务在 perseus-dev-network 或
+# perseus-network 网络中），随后：
+#   docker compose -f docker-compose.monitoring.yml up -d
+#
+# 访问：
+#   - Prometheus: http://127.0.0.1:9090 (Targets → perseus)
+#   - Grafana:    http://127.0.0.1:3000 (默认 admin/admin，首次登录请修改)
+#
+# 告警规则: docker/prometheus/alerts.yml
+#   - PerseusErrorRateHigh: 错误率 > 1% 持续 5 分钟（F-057）
+#   - PerseusRequestLatencyHigh: P95 > 2s 持续 10 分钟
+# =============================================================================
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    container_name: perseus-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - default
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: perseus-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - default
+
+volumes:
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+networks:
+  default:
+    # 复用开发 compose 的共享网络（app 服务以此解析），确保 Prometheus 可达 app:8000
+    name: perseus-dev-network
+    driver: bridge

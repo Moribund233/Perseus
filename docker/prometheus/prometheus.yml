@@ -1,0 +1,19 @@
+# Prometheus 抓取配置（Perseus 监控栈）
+# 由 docker-compose.monitoring.yml 挂载 /etc/prometheus/prometheus.yml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: perseus
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: perseus
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - app:8000
+        labels:
+          service: perseus-app

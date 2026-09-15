@@ -1,6 +1,6 @@
 # Perseus 开发规划
 
-> **更新日期**: 2026-07-12
+> **更新日期**: 2026-09-15
 > **开发方针**: 所有新功能必须采用 **TDD（测试驱动开发）**
 > **开发环境**: wsl docker-compose / command: `wsl docker-compose -f docker-compose-dev.yml up -d`
 > **当前阶段**: 实时协作层 — F-201 房间/频道管理 ✅
@@ -8,7 +8,8 @@
 > **当前阶段**: 实时协作层 — F-203 业务事件广播 ✅
 > **当前阶段**: 实时协作层 — F-204 协作文本编辑 ✅
 > **当前阶段**: F-205 实时通知推送 ✅（2026-09-14：user_notification WS 推送 + 双端接入）
-> **下一阶段**: F-048~050 国际化 🎯
+> **当前阶段**: F-055 Controller 覆盖率 81% ✅（2026-09-15，目标 >80%）
+> **下一阶段**: F-056 安全审计 / F-054 文档完善 🎯
 
 ---
 
@@ -63,6 +64,7 @@
 > - 代码搜索仅有单仓库接口，跨仓库搜索与索引自动维护待实现
 > - CI/CD 仅有构建状态存储 API，真实 push/PR 触发闭环待接入
 > - 国际化尚未开始；独立实时通知推送（F-205）已完成（2026-09-14，`user_notification` WS 推送 + 双端接入，见 `docs/api/websocket/README.md` 第 4 节）；协作文本编辑（F-204）已完成（Yjs 底座，见同文件第 7 节）
+> - Controller 层覆盖率已达 **81%**（2026-09-15，目标 >80%，见 F-055）
 
 ---
 
@@ -348,11 +350,11 @@ pytest -v -m e2e
 |----|------|------|
 | F-051 | Docker Compose 完善 | PostgreSQL + Nginx + git-cgi + Redis 一键部署 |
 | F-052 | 性能压测 | 使用 `tests/stress_test.py` + locust/wrk |
-| F-053 | 监控集成 | Prometheus metrics + Sentry 错误追踪 |
+| F-053 | 监控集成 | Prometheus metrics + Sentry 错误追踪 | 🟡 Prometheus 部分完成（2026-09-15）：`middleware/prometheus_metrics.py` + `/metrics` 端点 + `docker-compose.monitoring.yml`（Prometheus v3 + Grafana 11）+ `docker/prometheus/{prometheus,alerts}.yml`；`tests/test_prometheus_metrics.py` 11 用例全绿；Sentry 未集成 |
 | F-054 | 文档完善 | Swagger/Redoc + 部署文档 + 用户手册 |
-| F-055 | 单元测试覆盖率 | Controller 层测试，目标 >80% |
+| F-055 | 单元测试覆盖率 | Controller 层测试，目标 >80% | ✅ 2026-09-15 达成 **81%**：`tests/test_controller_coverage.py` 138 用例全绿；全量套件 1020 passed / 3 skipped；git_auth 65%→96% |
 | F-056 | 安全审计 | 依赖扫描 + CORS/CSRF/SSRF 防护检查 |
-| F-057 | 日志告警 | 错误日志告警规则（Error Rate > 1%）|
+| F-057 | 日志告警 | 错误日志告警规则（Error Rate > 1%）| ✅ 2026-09-15：`docker/prometheus/alerts.yml` 已实现 `PerseusErrorRateHigh`（>1% 持续 5min）+ `PerseusRequestLatencyHigh`（P95>2s 持续 10min），规则引用 `perseus_http_*` 指标 |
 
 ---
 
@@ -374,7 +376,7 @@ pytest -v -m e2e
 | **P1** | F-205 | 实时通知推送 | ✅ 已实现 | 通知落库即经 `notify_user` → `manager.send_to_user` 推送 `user_notification` 消息（含完整通知对象与 `unread_count`）；`/ws/notifications` 专用端点常驻订阅。web（AppLayout）与 desktop（PortalShell，经网关 WS 透传）2026-09-14 接入，REST 轮询降级为对账兜底 | `tests/test_notification_service.py` 推送链路 3 例 |
 | **P2** | F-047 | 构建状态展示 | ✅ 已实现 | Builds 列表/日志 UI（批次 B）+ `GET /builds` 支持 `branch`/`status` 过滤（2026-09-14），PR 详情展示源/目标分支最近构建状态（web+desktop） | `test_list_builds_filters_by_branch` 等 3 例 |
 | **P2** | F-048~050 | 国际化 | 🔴 未开始 | API 错误消息未做多语言 | 后端新增 `locales/` 与错误码映射，`core/exception.py` 支持按 `Accept-Language` 返回多语言消息 |
-| **P2** | F-051~057 | 生产准备 | 🔴 未开始 | Docker 基础已就绪，缺监控/压测/审计 | 按阶段四任务逐项推进，优先完成 Prometheus/Sentry 集成与 Controller 层测试覆盖 |
+| **P2** | F-051~057 | 生产准备 | 🟡 部分完成 | Docker 基础已就绪；**F-055（覆盖率 81%）✅、F-057（告警规则）✅、F-053 Prometheus 部分 ✅（Sentry 待集成）、F-052 压测脚本已有**，缺安全审计/文档/压测报告 | 按阶段四任务逐项推进，优先补 Sentry 集成与安全审计；Controller 层测试已达标 |
 
 ### 7.3 建议迭代节奏
 
