@@ -97,6 +97,18 @@ audit_log_backup_count = 5
 # 是否启用审计日志
 audit_log_enabled = true
 
+[sentry]
+# Sentry 错误监控：DSN 为空（默认）不启用；生产环境建议设置
+# 也可通过环境变量覆盖:
+#   PERSEUS_SENTRY_DSN            DSN 地址
+#   PERSEUS_SENTRY_TRACES_SAMPLE_RATE  事务采样率 (0~1)
+#   PERSEUS_SENTRY_ENVIRONMENT    环境名（为空自动按 debug 推导）
+#   PERSEUS_SENTRY_RELEASE        构建版本号
+# dsn = ""
+# traces_sample_rate = 1.0
+# environment = ""
+# release = ""
+
 [database]
 # 数据库 URL 由环境变量 DATABASE_URL 注入，不写入配置文件
 # 连接池大小

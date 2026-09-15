@@ -319,6 +319,18 @@ class SearchSettings(BaseSettings):
     max_file_size: int = Field(default=10 * 1024 * 1024, ge=0, description="最大文件大小（字节，默认 10MB）")
 
 
+class SentrySettings(BaseSettings):
+    """Sentry 错误监控配置"""
+    model_config = SettingsConfigDict(env_prefix="PERSEUS_SENTRY_")
+
+    dsn: str = Field(default="", description="Sentry DSN，为空时不启用 Sentry")
+    traces_sample_rate: float = Field(
+        default=1.0, ge=0.0, le=1.0, description="事务采样率"
+    )
+    environment: str = Field(default="", description="环境名，为空时按 debug 推导")
+    release: str = Field(default="", description="发布版本号")
+
+
 class OAuthSettings(BaseSettings):
     """OAuth2 认证配置"""
     model_config = SettingsConfigDict(env_prefix="PERSEUS_OAUTH_")
@@ -342,6 +354,7 @@ class Config(BaseSettings):
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     redis: RedisSettings = Field(default_factory=RedisSettings)
+    sentry: SentrySettings = Field(default_factory=SentrySettings)
     lfs: LFSSettings = Field(default_factory=LFSSettings)
     search: SearchSettings = Field(default_factory=SearchSettings)
     oauth: OAuthSettings = Field(default_factory=OAuthSettings)

@@ -40,6 +40,10 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     # 获取配置
     config = get_config(config_path)
 
+    # Sentry 错误监控初始化（未配置 DSN 时零开销跳过）
+    from core.sentry import init_sentry
+    init_sentry(config)
+
     # 创建FastAPI应用实例，使用lifespan管理生命周期
     app = FastAPI(
         title=config.app.title,
@@ -108,6 +112,10 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     # 设置全局异常处理器（必须在路由注册之后设置，确保能捕获所有异常）
     from utils.exception_handler import setup_exception_handlers
     setup_exception_handlers(app)
+
+    # Sentry ASGI 中间件（包装在最外层，捕获所有请求异常）
+    from core.sentry import sentry_middleware
+    app = sentry_middleware(app)
 
     return app
 

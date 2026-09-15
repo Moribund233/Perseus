@@ -25,6 +25,7 @@ from core.exception import NotFoundException, ValidationException, Authorization
 from utils.permission_utils import check_repository_permission
 from utils.db_utils import paginate
 from utils.response_builder import build_pagination_response
+from utils.url_validation import validate_outbound_url
 
 logger = logging.getLogger(__name__)
 
@@ -157,9 +158,14 @@ async def create_webhook(
     if not has_permission:
         raise AuthorizationException(detail="Not authorized to create webhook", error_code="webhook_create_forbidden")
 
-    # 验证 URL
-    if not url or not url.startswith(("http://", "https://")):
+    # 验证 URL（协议 + SSRF 防护，禁止内网/回环/保留地址）
+    if not url or not url.strip():
         raise ValidationException(detail="Invalid URL. Must start with http:// or https://", error_code="webhook_invalid_url")
+
+    try:
+        url = validate_outbound_url(url)
+    except ValidationException:
+        raise ValidationException(detail="Invalid URL. SSRF 防护：禁止访问内网或保留地址", error_code="webhook_invalid_url")
 
     # 验证事件
     if not events:
@@ -243,8 +249,12 @@ async def update_webhook(
 
     # 更新字段
     if url is not None:
-        if not url.startswith(("http://", "https://")):
+        if not url.strip():
             raise ValidationException(detail="Invalid URL", error_code="webhook_invalid_url")
+        try:
+            url = validate_outbound_url(url)
+        except ValidationException:
+            raise ValidationException(detail="Invalid URL. SSRF 防护：禁止访问内网或保留地址", error_code="webhook_invalid_url")
         webhook.url = url
 
     if events is not None:

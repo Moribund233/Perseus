@@ -179,5 +179,5 @@ Nginx/OpenResty (反向代理)
   - **已完成** ✅：独立实时通知推送（F-205）— **2026-09-14 落地**：通知落库即经 `/ws/notifications` 推送
     `user_notification` 消息（含完整通知对象 + `unread_count`）；web（AppLayout 常驻订阅）与 desktop
     （PortalShell 订阅，经网关 WS 透传）均已接入，REST 轮询降级为对账兜底。协议见 `docs/api/websocket/README.md` 第 4 节
-  - **未开始** 🔴：国际化（F-048~050）
-- **阶段四（生产准备）**：Docker 基础、Nginx 反向代理、基础中间件审计已就绪；监控、压测、安全审计、日志告警 — **待开发** 🔴
+  - **已完成** ✅：国际化（F-048~050）— **2026-09-15**：后端 `error_code` + `Accept-Language` 双语错误消息（150 码，`core/i18n.py`），前端 web（462 词条）与 desktop（731 词条）i18next 双语词库及语言切换 UI 全部就绪
+- **阶段四（生产准备）**：Docker 基础、Nginx 反向代理、基础中间件审计已就绪；Prometheus 监控 + **Sentry 错误追踪（F-053 完成 2026-09-15）**、Controller 覆盖率 81%（F-055）、告警规则（F-057）已完成；压测、安全审计、文档收尾 — **部分完成** 🔴

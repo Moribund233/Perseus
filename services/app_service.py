@@ -240,7 +240,7 @@ class AppService:
             return {
                 "pid": process.pid,
                 "memory_mb": round(memory_info.rss / (1024 * 1024), 2),
-                "cpu_percent": process.cpu_percent(interval=0.1),
+                "cpu_percent": round(process.cpu_percent(interval=None) or 0.0, 2),
                 "threads": process.num_threads(),
                 "connections": len(process.connections()),
             }

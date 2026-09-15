@@ -128,6 +128,7 @@ class StressTest:
         timeout = httpx.Timeout(30.0)
         
         async with httpx.AsyncClient(limits=limits, timeout=timeout) as client:
+            wall_start = time.time()
             tasks = []
             for i in range(total):
                 task = self._make_request(client, endpoint, method, data)
@@ -143,10 +144,11 @@ class StressTest:
             if tasks:
                 results = await asyncio.gather(*tasks)
                 self.results.extend(results)
+            wall_end = time.time()
         
-        return self._calculate_stats(endpoint)
+        return self._calculate_stats(endpoint, wall_end - wall_start)
     
-    def _calculate_stats(self, endpoint: str) -> Dict[str, Any]:
+    def _calculate_stats(self, endpoint: str, wall_time_s: float = 0.0) -> Dict[str, Any]:
         """
         计算统计信息
         
@@ -193,6 +195,11 @@ class StressTest:
             "requests_per_second": len(endpoint_results) / total_time if total_time > 0 else 0
         }
         
+        # 真实墙钟时间吞吐量（并发完成时间）
+        if wall_time_s > 0:
+            stats["wall_time_s"] = wall_time_s
+            stats["real_qps"] = len(endpoint_results) / wall_time_s
+        
         return stats
     
     def print_stats(self, stats: Dict[str, Any]):
@@ -214,6 +221,9 @@ class StressTest:
         print(f"\n吞吐量:")
         print(f"  总耗时: {stats['total_time_s']:.2f}s")
         print(f"  QPS: {stats['requests_per_second']:.2f}")
+        if stats.get("real_qps"):
+            print(f"  墙钟耗时: {stats['wall_time_s']:.2f}s")
+            print(f"  真实QPS: {stats['real_qps']:.2f}")
         print(f"{'='*60}\n")
 
 
