@@ -368,7 +368,6 @@
       "openedBy": "#{{id}} opened by {{author}} {{time}}",
       "comments": "{{count}} comments",
       "reviews": "{{count}} reviews",
-      "filter": "Filter",
       "newPullRequest": "New Pull Request",
       "detail": {
         "backToPullRequests": "Back to pull requests",
@@ -441,6 +440,7 @@
       "members": "Members",
       "placeholder": "Message #{{channel}}...",
       "today": "Today",
+      "yesterday": "Yesterday",
       "noChannels": "No channels available. Create a repository to start chatting.",
       "disconnected": "Realtime connection lost. Sending is temporarily unavailable.",
       "deleteMessage": "Delete message",

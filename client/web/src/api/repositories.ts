@@ -170,8 +170,8 @@ export const repositoriesApi = {
     const params = new URLSearchParams();
     if (ref) params.set('ref', ref);
     if (path) params.set('path', path);
-    // 仅根目录附加 last_commit，避免每次展开子目录都遍历提交历史
-    if (!path) params.set('last_commit', 'true');
+    // 逐文件附带最近提交, 保证任意层级文件树 last-commit 列均有数据
+    params.set('last_commit', 'true');
     const qs = params.toString() ? `?${params.toString()}` : '';
     const data = await apiRequest<{ entries: Array<{ name: string; path: string; type: 'tree' | 'blob' | 'symlink'; size?: number; sha?: string; last_commit?: RepoFile['last_commit'] }> }>(
       `/api/v1/repositories/${repoId}/tree${qs}`

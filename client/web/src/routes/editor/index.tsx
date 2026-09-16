@@ -514,6 +514,20 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
     });
   }, []);
 
+  // 面包屑点击: 根段回到根文件树, 目录段加载该目录并钉出浮动面板
+  const handleBreadcrumbRoot = useCallback(() => {
+    setSelectedTreeKey('');
+    setPinnedChain([]);
+  }, []);
+
+  const handleBreadcrumbDir = useCallback((level: number, path: string, el: HTMLElement) => {
+    setSelectedTreeKey(path);
+    const repoId = currentRepo?.id;
+    const ref = currentRepo?.default_branch;
+    if (repoId && ref) fetchTree(repoId, ref, path).catch(() => {});
+    handlePanelPin(level, path, el);
+  }, [currentRepo, fetchTree, handlePanelPin]);
+
   useEffect(() => {
     if (!pinnedChain.length) return;
     const handle = (e: MouseEvent) => {
@@ -972,13 +986,36 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
             flexShrink: 0,
           }}
         >
-          <span style={{ cursor: 'pointer' }}>{currentRepo?.name || repo}</span>
-          {breadcrumb.map((part, idx) => (
-            <span key={idx} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span>/</span>
-              <span style={idx === breadcrumb.length - 1 ? { color: textPrimary } : { cursor: 'pointer' }}>{part}</span>
-            </span>
-          ))}
+          <span
+            style={{ cursor: 'pointer' }}
+            onClick={handleBreadcrumbRoot}
+            title={currentRepo?.name || repo}
+          >
+            {currentRepo?.name || repo}
+          </span>
+          {breadcrumb.map((part, idx) => {
+            const isFileSegment = idx === breadcrumb.length - 1;
+            const partialKey = breadcrumb.slice(0, idx + 1).join('/');
+            return (
+              <span key={idx} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span>/</span>
+                <span
+                  style={
+                    isFileSegment
+                      ? { color: textPrimary, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+                      : { cursor: 'pointer' }
+                  }
+                  onClick={
+                    isFileSegment
+                      ? undefined
+                      : (e) => handleBreadcrumbDir(idx, partialKey, e.currentTarget)
+                  }
+                >
+                  {part}
+                </span>
+              </span>
+            );
+          })}
           {activeNode?.fileType === 'md' && (
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
               <Button

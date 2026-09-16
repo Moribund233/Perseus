@@ -1,6 +1,6 @@
 # 前端占位实现清单与开发规划
 
-> **更新日期**: 2026-09-08
+> **更新日期**: 2026-09-16
 > **背景**: 前端多处 UI 为占位/装饰实现（无 onClick 的按钮、硬编码 mock 数据、假状态）。
 > 本文档梳理**尚未真实化**的占位点，作为后续迭代规划依据。
 >
@@ -17,6 +17,9 @@
 >   Dashboard「我的 PR / Issues」跨仓库聚合、顶栏全局搜索（防抖下拉 + /search 结果页 + Editor 行号跳转）
 > - 2026-08-31 批次 D（实时增强）：聊天/Editor 在线状态接 WS presence（list/join/leave）、
 >   聊天频道未读数徽标（后端 `GET /rooms/unread` + `POST /rooms/{id}/read`，RoomMember.last_read_at 水位）
+> - 2026-09-16 批次 E（体验完善）：消息 reactions UI 接线确认（前端已实现：emoji picker + WS 即时增减 + REST 兜底）、
+>   聊天消息按日期分组（Today/Yesterday/日期头）、编辑器面包屑点击跳转（目录段钉出浮动面板 + 根段回根文件树）、
+>   文件树 last-commit 列全层级接线（任意层级请求 `last_commit=true`）、PR Filter 装饰按钮移除 + unused i18n key 清理
 
 ---
 
@@ -79,7 +82,7 @@
 | Watch 按钮 | 无 onClick | 后端无 watch API（只有 star/fork）。需新表/字段 + 端点，或先移除该按钮 | P3 |
 | Actions tab | ✅ 已接 Builds 列表 + 日志（批次 B） | — | P1 |
 | Settings tab | ✅ 已实现仓库设置子内容：描述/可见性/默认分支、协作者管理、Webhooks（批次 B） | — | P1~P2 |
-| 文件列表"最近提交/时间"两列 | 写死 `-` 和空白 | 需后端按目录聚合每文件最近提交（`get_commits` 逐文件请求开销大），建议后端新增 tree+last-commit 聚合端点 | P3 |
+| 文件列表"最近提交/时间"两列 | 写死 `-` 和空白 | ✅ 已接线：任意层级文件树请求 `last_commit=true`，root 顶层曾只对根目录附加（批次 E） | ✅ P1 完成 |
 
 ### 3.3 团队聊天（chat/index.tsx）
 
@@ -90,8 +93,8 @@
 | DM 私聊列表 | 成员伪装成 DM，点击无效 | 后端无私聊模型（仅 repo room），需私信会话设计 | P3 |
 | 成员在线状态 | ✅ 已接 WS presence：进入房间 `presence_list` + join/leave 实时增删（批次 D） | — | P1 |
 | 频道未读数 | ✅ 已接后端 `GET /rooms/unread`（按 repository_id 映射频道）+ 进频道 `POST /rooms/{id}/read`（批次 D） | — | P1 |
-| 表情回应 reactions | UI 死代码（渲染逻辑存在，数据恒空） | 后端消息 reactions 存储 + WS 广播 | P3 |
-| 消息按日期分组 | 所有消息归入 "Today" | 纯前端按 created_at 分组渲染 | P2 |
+| 表情回应 reactions | UI 死代码（渲染逻辑存在，数据恒空） | ✅ 已接线（2026-09-16 确认前端早已实现）：emoji picker + WS `send_reaction` 增减 + REST `chatApi.addReaction` 兜底；后端 `chat_controller.py:62-83`、`chat_service.py:228` add_reaction 已就绪 | ✅ P1 完成 |
+| 消息按日期分组 | 所有消息归入 "Today" | ✅ 按 created_at 分组渲染：Today/Yesterday（新增 i18n）/本地化日期头，静态 Today 块移除（批次 E） | ✅ P2 完成 |
 | 侧边栏搜索框 | 无 value/onChange | 同顶栏搜索，依赖消息检索 | P3 |
 
 ### 3.4 Editor（editor/index.tsx）
@@ -102,7 +105,7 @@
 | Discussions 面板 | 空状态占位（mock 已移除） | 行内评论需后端锚定文件+行号存储，可复用 PR 评论模型扩展 | P3 |
 | 协作者 "viewing" 状态 | ✅ 已接 WS presence：在线协作者列表即 Editors tab 内容（批次 D）；本文件会话参与者经 `collab_init`/peer 事件展示（F-204） | — | P3 |
 | "Online" 绿点 | ✅ 已接房间 presence（在线人数 > 0 亮绿）（批次 D） | — | P2 |
-| 面包屑点击 | cursor:pointer 无跳转 | 点击目录段切回该目录/根文件树，纯前端 | P2 |
+| 面包屑点击 | cursor:pointer 无跳转 | ✅ 已接线（批次 E）：目录段点击加载该目录并钉出浮动面板（对齐文件树点位），根段点击回根文件树（清选中与面板链） | ✅ P2 完成 |
 | 文件删除入口 | ✅ 已加文件树 hover 删除按钮 + 确认弹窗，调用 `deleteFileContent`，删除后刷新树并关闭对应标签 | — | P1 |
 | 文件重命名/移动 | 无 | 后端需 move 端点（或 copy+delete 组合提交） | P3 |
 
@@ -110,7 +113,7 @@
 
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
-| Filter 按钮 | 无 onClick | 筛选实际由状态按钮组完成；建议直接移除该装饰按钮 | P4 |
+| Filter 按钮 | 无 onClick | ✅ 已移除装饰按钮（批次 E），筛选由状态按钮组完成，unused i18n key 一并清理 | ✅ P4 完成 |
 | 审阅者头像堆叠 | 恒只显示作者 | PR 详情已加 Review 提交区（Approve/Request changes/Comment） | P2 |
 | PR 编辑 | ✅ 已加标题/描述编辑入口 | — | P2 |
 | PR 标签 UI | ✅ 已加标签管理下拉（拉取/添加/移除） | — | P1 |
@@ -141,7 +144,8 @@
 | **批次 B（仓库能力页）** ✅ | Releases tab（2.1）+ Actions/Builds tab（2.3）+ 仓库 Settings tab（含 Webhooks 2.2、协作者、默认分支）— **已完成** | — |
 | **批次 C（用户中心）** ✅ | SSH Keys、OAuth 账号管理、`/me/*` 聚合展示（2.4）；全局搜索（3.1）— **已完成** | — |
 | **批次 D（实时增强）** ✅ | Editor 在线状态（3.4）、聊天 presence/未读数（3.3）— **已完成**（presence 复用原 WS 基础设施，未读数新增 REST 端点） | — |
-| **批次 E（体验完善）** | 消息 reactions、DM 私聊、文件树 last-commit 聚合、行内评论、亮色主题 | 按需评估，均涉及新后端能力 |
+| **批次 E（体验完善）** ✅ | 消息 reactions UI（确认已实现，仅回填）、文件树 last-commit 列全层级接线、聊天按日期分组、编辑器面包屑点击跳转、PR Filter 装饰按钮移除 — **已完成（2026-09-16）** | 后端早已就绪，纯前端 + 文档 |
+| 待排期 | DM 私聊、行内评论、亮色主题 | 涉及新后端能力 |
 
 ---
 

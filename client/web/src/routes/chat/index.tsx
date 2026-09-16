@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'react';
 import { Layout, Input, Button, Avatar, Tooltip, Popover, message as antdMessage } from 'antd';
 import {
   NumberOutlined,
@@ -70,6 +70,7 @@ interface Message {
   initials: string;
   color: string;
   time: string;
+  createdAt?: string;
   text: string;
   reactions?: { emoji: string; count: number; active: boolean }[];
 }
@@ -102,6 +103,16 @@ function formatMessageTime(dateStr: string | null): string {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function dayDiffFromToday(dateStr: string): number {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return NaN;
+  const day = new Date(d);
+  day.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((day.getTime() - today.getTime()) / 86400000);
+}
+
 function statusColor(status: string) {
   if (status === 'online') return green;
   if (status === 'away') return yellow;
@@ -118,6 +129,7 @@ function mapChatMessage(msg: ChatMessage): Message {
     initials,
     color: getAvatarColor(initials),
     time: formatMessageTime(msg.created_at),
+    createdAt: msg.created_at ?? undefined,
     text: msg.content,
     reactions: msg.reactions,
   };
@@ -461,6 +473,15 @@ export default function ChatPage() {
     [channels, activeChannel, room]
   );
 
+  const dayLabel = (dateStr: string | null): string => {
+    if (!dateStr) return '';
+    const diff = dayDiffFromToday(dateStr);
+    if (Number.isNaN(diff)) return '';
+    if (diff === 0) return t('app.teamChat.today');
+    if (diff === -1) return t('app.teamChat.yesterday', { defaultValue: 'Yesterday' });
+    return new Date(dateStr).toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -674,39 +695,46 @@ export default function ChatPage() {
         </div>
 
         <Content style={{ overflowY: 'auto', padding: '16px 20px' }}>
-          <div style={{ textAlign: 'center', margin: '16px 0', position: 'relative' }}>
-            <div
-              style={{
-                position: 'absolute',
-                left: 0,
-                right: 0,
-                top: '50%',
-                height: 1,
-                background: borderColor,
-              }}
-            />
-            <span
-              style={{
-                background: bgPrimary,
-                padding: '0 12px',
-                fontSize: 11,
-                color: textTertiary,
-                position: 'relative',
-                fontWeight: 500,
-              }}
-            >
-              {t('app.teamChat.today')}
-            </span>
-          </div>
           {messages.length === 0 && !loading && (
             <div style={{ textAlign: 'center', color: textTertiary, fontSize: 13, marginTop: 32 }}>
               No messages yet. Start the conversation!
             </div>
           )}
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              style={{
+          {messages.map((msg, idx) => {
+            const curLabel = msg.createdAt ? dayLabel(msg.createdAt) : '';
+            const prev = messages[idx - 1];
+            const prevLabel = prev?.createdAt ? dayLabel(prev.createdAt) : '';
+            const showHeader = curLabel !== '' && curLabel !== prevLabel;
+            return (
+              <Fragment key={msg.id}>
+                {showHeader && (
+                  <div style={{ textAlign: 'center', margin: '20px 0', position: 'relative' }}>
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: '50%',
+                        height: 1,
+                        background: borderColor,
+                      }}
+                    />
+                    <span
+                      style={{
+                        background: bgPrimary,
+                        padding: '0 12px',
+                        fontSize: 11,
+                        color: textTertiary,
+                        position: 'relative',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {curLabel}
+                    </span>
+                  </div>
+                )}
+                <div
+                  style={{
                 display: 'flex',
                 gap: 12,
                 padding: '6px 0',
@@ -841,7 +869,9 @@ export default function ChatPage() {
                   </div>
                 </div>
             </div>
-          ))}
+              </Fragment>
+            );
+          })}
           <div ref={messagesEndRef} />
         </Content>
 

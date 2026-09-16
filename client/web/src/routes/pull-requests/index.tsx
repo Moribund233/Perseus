@@ -7,7 +7,6 @@ import {
   CloseCircleOutlined,
   MessageOutlined,
   EyeOutlined,
-  FilterOutlined,
   PlusOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
@@ -288,24 +287,6 @@ export default function PullRequestsPage() {
             })}
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            <Button
-              icon={<FilterOutlined style={{ fontSize: 14 }} />}
-              style={{
-                background: bgSecondary,
-                color: textSecondary,
-                border: `1px solid ${borderColor}`,
-                borderRadius: 8,
-                fontSize: 13,
-                height: 32,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = textTertiary; e.currentTarget.style.color = textPrimary; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = borderColor; e.currentTarget.style.color = textSecondary; }}
-            >
-              {t('app.pullRequests.filter')}
-            </Button>
             <Button
               type="primary"
               icon={<PlusOutlined style={{ fontSize: 14 }} />}

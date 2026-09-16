@@ -1,6 +1,6 @@
 # Perseus 产品路线图
 
-> **更新日期**: 2026-07-11
+> **更新日期**: 2026-09-16
 > **定位**: 代码托管 + 在线协作（一体化平台）
 > **架构**: 单服务 Python/FastAPI，内置认证授权、实时引擎、Git 托管
 
@@ -14,7 +14,7 @@ Perseus 是一个基于 Git 的本地化协作开发平台，提供完整的代�
 
 | 系统 | 技术栈 | 职责 |
 |------|--------|------|
-| **Perseus** | Python/FastAPI + Vue 3 + SQLite/PostgreSQL | 全部：代码托管 + 认证授权 + 实时引擎 + 团队聊天 |
+| **Perseus** | Python/FastAPI + React 19 + SQLite/PostgreSQL | 全部：代码托管 + 认证授权 + 实时引擎 + 团队聊天 |
 
 ### 核心设计原则
 
@@ -28,7 +28,7 @@ Perseus 是一个基于 Git 的本地化协作开发平台，提供完整的代�
 ## 架构总览
 
 ```
-浏览器 (Vue 3)
+浏览器 (React 19)
     │
     ├── /api/v1/*     ─── REST API（仓库/PR/Issue/用户）
     ├── /ws           ─── WebSocket（聊天/通知/协作/在线状态）

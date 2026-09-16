@@ -368,7 +368,6 @@
       "openedBy": "#{{id}} 由 {{author}} 于 {{time}} 打开",
       "comments": "{{count}} 条评论",
       "reviews": "{{count}} 条审查",
-      "filter": "筛选",
       "newPullRequest": "新建 Pull Request",
       "detail": {
         "backToPullRequests": "返回 Pull Requests",
@@ -441,6 +440,7 @@
       "members": "成员",
       "placeholder": "给 #{{channel}} 发送消息...",
       "today": "今天",
+      "yesterday": "昨天",
       "noChannels": "暂无可用频道，创建仓库后即可开始聊天",
       "disconnected": "实时连接已断开，暂时无法发送消息",
       "deleteMessage": "删除消息",

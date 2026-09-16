@@ -2,6 +2,7 @@
 
 > **创建日期**: 2026-09-15
 > **用途**: 汇总 2026-09-15 文档盘点发现的待迭代任务与文档滞后项，作为后续排期与迭代输入。
+> **最近更新**: 2026-09-16（批次 0/1 完成；前端轻量批次完成并回填）
 > **关联**: `docs/api/roadmap.md`、`docs/frontend-placeholders.md`、`docs/collab-f204-vs-cwm.md`、`docs/desktop-port-sync.md`
 > **开发方针**: 所有新功能必须采用 TDD（测试驱动开发）；新文案同步补 `{zh,en}.json`；禁止硬编码兜底假数据。
 
@@ -25,8 +26,8 @@
 
 | 占位点 | 原标记 | 实际现状 | 待办 |
 |--------|--------|----------|------|
-| 消息 reactions（chat 3.3） | P3「无后端存储」 | ✅ API 已实现：`chat_controller.py:62-83` POST/DELETE + `chat_service.py:228 add_reaction`；`get_messages` 已透出 reactions | 回填 `docs/frontend-placeholders.md`；前端反应 UI 接线（P2） |
-| 文件树 last-commit 列（repo 3.2） | P3「需后端聚合端点」 | ✅ `repository_browser_service.py` 支持 `last_commit=True` 逐文件附带最近提交 | 回填 `docs/frontend-placeholders.md`；前端 `--/空白` 列接线（P2） |
+| 消息 reactions（chat 3.3） | P3「无后端存储」 | ✅ API 已实现：`chat_controller.py:62-83` POST/DELETE + `chat_service.py:228 add_reaction`；`get_messages` 已透出 reactions | ✅ 已回填 `frontend-placeholders.md`；前端接线确认已实现（批次 E） |
+| 文件树 last-commit 列（repo 3.2） | P3「需后端聚合端点」 | ✅ `repository_browser_service.py` 支持 `last_commit=True` 逐文件附带最近提交 | ✅ 已回填 `frontend-placeholders.md`；前端全层级接线完成（批次 E） |
 
 ---
 
@@ -86,10 +87,10 @@
 
 | 任务 | 级别 | 现状 | 待办 |
 |------|------|------|------|
-| 消息按日期分组 | P2 | 所有消息归入 "Today" | 前端按 created_at 分组渲染 |
-| 编辑器面包屑点击跳转 | P2 | cursor:pointer 无跳转 | 点击目录段切回该目录/根文件树 |
-| 顶栏全局搜索三类分组 | P2 | web 为纯代码搜索 | 复用后端 `GET /api/v1/search/global` 增强为仓库/Issue/PR 分组 |
-| PR Filter 装饰按钮 | P4 | 无 onClick，云遮雾绕 | 移除按钮或改说明 |
+| 消息按日期分组 | P2 | ~~所有消息归入 "Today"~~ | ✅ 已完成（批次 E）：按 created_at 分组渲染 Today/Yesterday/本地化日期头（`chat/index.tsx`） |
+| 编辑器面包屑点击跳转 | P2 | ~~cursor:pointer 无跳转~~ | ✅ 已完成（批次 E）：目录段钉出浮动面板 + 根段回根文件树（`editor/index.tsx`） |
+| 顶栏全局搜索三类分组 | P2 | ~~web 为纯代码搜索~~ | ✅ 已完成（批次 C + 2026-09-14）：`GlobalSearch.tsx` 与 `/search` 页均接 `GET /api/v1/search/global` 仓库/Issue/PR/代码分组（`search/index.tsx:50`） |
+| PR Filter 装饰按钮 | P4 | ~~无 onClick，云遮雾绕~~ | ✅ 已完成（批次 E）：移除按钮及 unused i18n key（`pull-requests/index.tsx`） |
 | 聊天侧边栏搜索框 | P3 | 无 value/onChange | 依赖消息检索端点（后端待做） |
 | 主题切换 | P3 | 应用固定 dark | 全站 CSS 变量化，工程量大，可暂缓 |
 
@@ -175,10 +176,10 @@
 
 | 批次 | 内容 | 预估 | 前置依赖 |
 |------|------|------|----------|
-| **批次 0（文档回填）** | 修正 `frontend-placeholders.md`（reactions / last-commit 已就绪） | 0.5 天 | — |
-| **批次 1（搜索保鲜）** | 增量索引接入、push 异步化、collab save 进索引 | 2~3 天 | 无决策依赖，最快收益 |
+| **批次 0（文档回填）** ✅ | 修正 `frontend-placeholders.md`（reactions / last-commit 已就绪） + `roadmap.md`/`README.md` 控制器计数 — **已完成** | 0.5 天 | — |
+| **批次 1（搜索保鲜）** ✅ | 增量索引接入、push 异步化、collab save 进索引、索引生命周期清理 — **已完成（pytest 1082 passed, 3 skipped, 无回归）** | 2~3 天 | 无决策依赖，最快收益 |
 | **批次 2（协作 P0）** | 邀请链接 + 会话级临时权限（M2）、会话 TTL 延迟销毁 | 1~2 周 | 邀请链接默认存在决策 |
-| **批次 3（前端轻量）** | reactions 前端、last-commit 列、日期分组、面包屑、`/search/global` 分组 | 3~5 天 | 批次 0 回填 |
+| **批次 3（前端轻量）** ✅ | reactions 前端（确认已实现）、last-commit 列全层级、日期分组、面包屑、`/search/global` 分组（确认已实现）、PR Filter 移除 — **已完成（web tsc+eslint+build 通过）** | 3~5 天 | 批次 0 回填 |
 | **批次 4（协作 P1）** | 跟随模式、断线策略（含决策）、受限视图 | 1 周 | 批次 2 |
 | **批次 5（CI/CD 闭环）** | push 触发 build + runner/配置校验（先等执行器形态决策） | 1~2 周 | CI 执行器形态决策 |
 | **批次 6（服务端演进）** | Redis pub/sub 多副本、会话持久化、索引生命周期 | 1~2 周 | — |
