@@ -33,6 +33,39 @@ class BuildService:
         return build
 
     @staticmethod
+    async def ensure_build_for_commit(
+        db: AsyncSession,
+        repo_id: uuid.UUID,
+        branch: str,
+        commit_sha: str,
+        triggered_by: uuid.UUID,
+        commit_message: Optional[str] = None,
+    ) -> Optional[BuildStatus]:
+        """
+        按 (repo, branch, commit_sha) 去重建 build。
+
+        已存在同 key 的 build（如 PR merge 已创建）时返回 None，避免重复触发。
+        """
+        result = await db.execute(
+            select(BuildStatus).where(
+                BuildStatus.repo_id == repo_id,
+                BuildStatus.branch == branch,
+                BuildStatus.commit_sha == commit_sha,
+            )
+        )
+        existing = result.scalar_one_or_none()
+        if existing:
+            return None
+        return await BuildService.create_build(
+            db=db,
+            repo_id=repo_id,
+            branch=branch,
+            commit_sha=commit_sha,
+            triggered_by=triggered_by,
+            commit_message=commit_message,
+        )
+
+    @staticmethod
     async def get_build(db: AsyncSession, build_id: uuid.UUID) -> BuildStatus:
         result = await db.execute(
             select(BuildStatus).filter(BuildStatus.id == build_id)

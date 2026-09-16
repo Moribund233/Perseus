@@ -150,8 +150,11 @@ async def broadcast_push(
     pusher_id: uuid.UUID,
     pusher_username: str,
     repo_path: Optional[str] = None,
+    db=None,
+    commit_sha: Optional[str] = None,
+    commit_message: Optional[str] = None,
 ) -> int:
-    """Broadcast push event — also triggers search index rebuild"""
+    """Broadcast push event — also triggers search index rebuild and pending build creation"""
     result = await broadcast_event(room_id, "push", {
         "branch": branch,
         "commit_count": commit_count,
@@ -165,4 +168,50 @@ async def broadcast_push(
         except Exception as e:
             logger.warning("Search index rebuild failed: %s", e)
 
+    # push 触发生成 pending build (F-046): 按 (repo, branch, commit) 去重, 避免与 PR merge 重复
+    if db is not None and commit_sha:
+        build = await _create_build_for_push(
+            db=db,
+            room_id=room_id,
+            branch=branch,
+            commit_sha=commit_sha,
+            commit_message=commit_message,
+            pusher_id=pusher_id,
+        )
+        if build is not None:
+            result += await broadcast_event(room_id, "build", {
+                "build_id": str(build.id),
+                "repo_id": str(build.repo_id),
+                "branch": build.branch,
+                "commit_sha": build.commit_sha,
+                "status": build.status,
+            }, exclude_user_id=pusher_id)
+
     return result
+
+
+async def _create_build_for_push(
+    db,
+    room_id: uuid.UUID,
+    branch: str,
+    commit_sha: str,
+    commit_message: Optional[str],
+    pusher_id: uuid.UUID,
+):
+    """将 push 解析到仓库并去重建 build; room 不存在时静默跳过"""
+    from services.realtime.room_service import RoomService
+    from services.build_service import BuildService
+
+    room = await RoomService.get_room(db, room_id)
+    if not room:
+        logger.warning("Push build skipped: room %s not found", room_id)
+        return None
+
+    return await BuildService.ensure_build_for_commit(
+        db=db,
+        repo_id=room.repository_id,
+        branch=branch,
+        commit_sha=commit_sha,
+        triggered_by=pusher_id,
+        commit_message=commit_message,
+    )

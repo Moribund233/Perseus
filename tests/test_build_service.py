@@ -173,6 +173,53 @@ class TestBuildService:
                 db=async_db, build_id=build.id, status="invalid_status"
             )
 
+    async def test_ensure_build_for_commit_creates_pending(self, async_db: AsyncSession, async_test_repo, async_test_user):
+        """push 触发 build: 无历史 build 时应创建 pending build (F-046)"""
+        build = await BuildService.ensure_build_for_commit(
+            db=async_db,
+            repo_id=async_test_repo.id,
+            branch="main",
+            commit_sha="abc123def456",
+            triggered_by=async_test_user.id,
+            commit_message="Push commit",
+        )
+        assert build is not None
+        assert build.repo_id == async_test_repo.id
+        assert build.branch == "main"
+        assert build.commit_sha == "abc123def456"
+        assert build.commit_message == "Push commit"
+        assert build.status == "pending"
+        assert build.triggered_by == async_test_user.id
+
+    async def test_ensure_build_for_commit_dedup(self, async_db: AsyncSession, async_test_repo, async_test_user):
+        """同 (repo, branch, commit) 重复触发应去重, 避免与 PR merge 重复建 build"""
+        first = await BuildService.ensure_build_for_commit(
+            db=async_db, repo_id=async_test_repo.id, branch="main",
+            commit_sha="abc123", triggered_by=async_test_user.id,
+        )
+        assert first is not None
+        second = await BuildService.ensure_build_for_commit(
+            db=async_db, repo_id=async_test_repo.id, branch="main",
+            commit_sha="abc123", triggered_by=async_test_user.id,
+        )
+        assert second is None
+        builds = await BuildService.get_builds_for_repository(db=async_db, repo_id=async_test_repo.id)
+        assert len(builds) == 1
+
+    async def test_ensure_build_for_commit_allows_distinct_commits(self, async_db: AsyncSession, async_test_repo, async_test_user):
+        """同分支不同 commit 应各自建 build"""
+        await BuildService.ensure_build_for_commit(
+            db=async_db, repo_id=async_test_repo.id, branch="main",
+            commit_sha="abc1", triggered_by=async_test_user.id,
+        )
+        second = await BuildService.ensure_build_for_commit(
+            db=async_db, repo_id=async_test_repo.id, branch="main",
+            commit_sha="abc2", triggered_by=async_test_user.id,
+        )
+        assert second is not None
+        builds = await BuildService.get_builds_for_repository(db=async_db, repo_id=async_test_repo.id)
+        assert len(builds) == 2
+
 
 class TestBuildController:
 
@@ -283,3 +330,86 @@ class TestBuildController:
             headers=auth_headers,
         )
         assert response.status_code == 404
+
+    def test_update_build_via_signature(self, test_client: TestClient, auth_headers: dict, db):
+        """外部 CI runner 可用 X-Perseus-Signature (HMAC-SHA256) 回调, 无需用户 token"""
+        from services.webhook_service import generate_signature
+        repo = create_test_repo(db)
+        repo.ci_secret = "test-ci-secret"
+        db.commit()
+        create_resp = test_client.post(
+            f"/api/v1/repositories/{repo.id}/builds",
+            json={"branch": "main", "commit_sha": "abc"},
+            headers=auth_headers,
+        )
+        build_id = create_resp.json()["id"]
+        body = '{"status": "running"}'
+        response = test_client.patch(
+            f"/api/v1/repositories/{repo.id}/builds/{build_id}",
+            content=body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Perseus-Signature": generate_signature(body, "test-ci-secret"),
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "running"
+
+    def test_update_build_signature_rejected_when_wrong(self, test_client: TestClient, auth_headers: dict, db):
+        """签名错误时外部回调应被拒绝"""
+        from services.webhook_service import generate_signature
+        repo = create_test_repo(db)
+        repo.ci_secret = "test-ci-secret"
+        db.commit()
+        create_resp = test_client.post(
+            f"/api/v1/repositories/{repo.id}/builds",
+            json={"branch": "main", "commit_sha": "abc"},
+            headers=auth_headers,
+        )
+        build_id = create_resp.json()["id"]
+        body = '{"status": "running"}'
+        response = test_client.patch(
+            f"/api/v1/repositories/{repo.id}/builds/{build_id}",
+            content=body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Perseus-Signature": generate_signature(body, "wrong-secret"),
+            },
+        )
+        assert response.status_code == 403
+
+    def test_update_build_signature_rejected_when_no_secret(self, test_client: TestClient, auth_headers: dict, db):
+        """仓库未配置 ci_secret 时, 即使带签名头也应拒绝外部回调"""
+        from services.webhook_service import generate_signature
+        repo = create_test_repo(db)
+        create_resp = test_client.post(
+            f"/api/v1/repositories/{repo.id}/builds",
+            json={"branch": "main", "commit_sha": "abc"},
+            headers=auth_headers,
+        )
+        build_id = create_resp.json()["id"]
+        body = '{"status": "running"}'
+        response = test_client.patch(
+            f"/api/v1/repositories/{repo.id}/builds/{build_id}",
+            content=body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Perseus-Signature": generate_signature(body, "test-ci-secret"),
+            },
+        )
+        assert response.status_code == 403
+
+    def test_update_build_requires_auth_or_signature(self, test_client: TestClient, auth_headers: dict, db):
+        """无签名头也无用户 token 时回调应被拒绝"""
+        repo = create_test_repo(db)
+        create_resp = test_client.post(
+            f"/api/v1/repositories/{repo.id}/builds",
+            json={"branch": "main", "commit_sha": "abc"},
+            headers=auth_headers,
+        )
+        build_id = create_resp.json()["id"]
+        response = test_client.patch(
+            f"/api/v1/repositories/{repo.id}/builds/{build_id}",
+            json={"status": "running"},
+        )
+        assert response.status_code == 401

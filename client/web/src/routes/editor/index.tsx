@@ -12,6 +12,7 @@ import {
   EyeOutlined,
   EditOutlined,
   DeleteOutlined,
+  ShareAltOutlined,
 } from '@ant-design/icons';
 import { EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, rectangularSelection, crosshairCursor, highlightActiveLine } from '@codemirror/view';
 import { EditorState, Compartment } from '@codemirror/state';
@@ -33,9 +34,10 @@ import EditorSkeleton from '../../components/skeleton/EditorSkeleton';
 import Markdown from '../../components/Markdown';
 import { CollabController, type CollabParticipant } from '../../components/editor/collabController';
 import { useRepositoriesStore } from '../../stores/repositories';
+import { useAuthStore } from '../../stores/auth';
 import { chatApi } from '../../api/chat';
 import { chatSocket, type PresenceUser } from '../../api/chatSocket';
-import type { RepoFile } from '../../api/repositories';
+import { repositoriesApi, type RepoFile } from '../../api/repositories';
 import { FloatingTreePanel } from '../../components/FloatingTreePanel';
 
 const { Sider, Content } = Layout;
@@ -357,6 +359,7 @@ export default function EditorPage() {
     currentRepo,
     files,
     currentBlob,
+    members,
     fetchRepositoryByPath,
     fetchTree,
     fetchBlob,
@@ -365,6 +368,17 @@ export default function EditorPage() {
     deleteFileContent,
     clearCurrent,
   } = useRepositoriesStore();
+
+  const currentUserId = useAuthStore((s) => s.user?.id);
+  // 邀请链接访客: ?invite=<token> 随连接透传给协作网关
+  const inviteToken = useMemo(
+    () => new URLSearchParams(window.location.search).get('invite') || undefined,
+    [],
+  );
+  const isRepoMember =
+    !!currentUserId &&
+    !!currentRepo &&
+    (currentRepo.owner_id === currentUserId || members.some((m) => m.user_id === currentUserId));
 
   const fileTree = useMemo(() => buildTree(files), [files]);
 
@@ -704,6 +718,7 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
         repositoryId: repoId,
         branch,
         path: activeTab,
+        inviteToken,
         onStatus: setCollabStatus,
         onParticipants: setDocParticipants,
         onSaved: (msg) => {
@@ -744,7 +759,24 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
       viewRef.current?.destroy();
       viewRef.current = null;
     };
-  }, [loading, activeTab, currentBlob, currentRepo, t]);
+  }, [loading, activeTab, currentBlob, currentRepo, inviteToken, t]);
+
+  const handleShareCollab = useCallback(async () => {
+    const repoId = currentRepo?.id;
+    if (!repoId || !activeTab) return;
+    const branch = currentRepo?.default_branch || 'main';
+    try {
+      const res = await repositoriesApi.createCollabInvite(repoId, {
+        doc_key: `${repoId}:${branch}:${activeTab}`,
+        scope: 'write',
+      });
+      const link = `${window.location.origin}/editor/${currentRepo?.path}?file=${encodeURIComponent(activeTab)}&invite=${encodeURIComponent(res.token)}`;
+      await navigator.clipboard.writeText(link);
+      antdMessage.success(t('app.codeEditor.shareCollabCopied'));
+    } catch {
+      antdMessage.error(t('app.codeEditor.shareCollabFailed'));
+    }
+  }, [currentRepo, activeTab, t]);
 
   const collaborators = useMemo(() => {
     return (onlinePresence as PresenceUser[]).map((u) => {
@@ -1117,6 +1149,17 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
               </span>
             )}
           </div>
+          {isRepoMember && activeTab && (
+            <Button
+              size="small"
+              type="text"
+              icon={<ShareAltOutlined style={{ fontSize: 12 }} />}
+              onClick={handleShareCollab}
+              style={{ color: textSecondary, fontSize: 11, marginLeft: 8, height: 22, padding: '0 6px' }}
+            >
+              {t('app.codeEditor.shareCollab')}
+            </Button>
+          )}
         </div>
 
         {/* Code Editor */}

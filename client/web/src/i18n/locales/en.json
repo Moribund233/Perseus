@@ -121,9 +121,11 @@
       },
       "actions": {
         "watch": "Watch",
+        "unwatch": "Unwatch",
         "star": "Star",
         "fork": "Fork"
       },
+      "watchFailed": "Failed to update watch",
       "forkSuccess": "Repository {{name}} forked",
       "forkFailed": "Failed to fork repository",
       "visibility": {
@@ -431,7 +433,10 @@
       "saveViaCollab": "Changes will be committed from the current collab session to the default branch",
       "collabSynced": "Session synced",
       "collabSyncing": "Session syncing",
-      "gitCommitted": "Git committed {{sha}}"
+      "gitCommitted": "Git committed {{sha}}",
+      "shareCollab": "Share",
+      "shareCollabCopied": "Collaboration link copied",
+      "shareCollabFailed": "Failed to create collaboration link"
     },
     "teamChat": {
       "title": "Team Chat",

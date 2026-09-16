@@ -121,9 +121,11 @@
       },
       "actions": {
         "watch": "关注",
+        "unwatch": "取消关注",
         "star": "星标",
         "fork": "派生"
       },
+      "watchFailed": "更新关注状态失败",
       "forkSuccess": "已派生仓库 {{name}}",
       "forkFailed": "派生仓库失败",
       "visibility": {
@@ -431,7 +433,10 @@
       "saveViaCollab": "更改将以当前协作会话内容提交到默认分支",
       "collabSynced": "会话已同步",
       "collabSyncing": "会话同步中",
-      "gitCommitted": "Git 已提交 {{sha}}"
+      "gitCommitted": "Git 已提交 {{sha}}",
+      "shareCollab": "分享协作",
+      "shareCollabCopied": "协作链接已复制",
+      "shareCollabFailed": "生成协作链接失败"
     },
     "teamChat": {
       "title": "团队聊天",

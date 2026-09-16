@@ -227,7 +227,7 @@ perseus/
 │   └── build_status.py           # 构建状态
 │
 ├── api/                          # API 路由层
-│   ├── routes_config.py          # 中心路由注册器（29 个控制器）
+│   ├── routes_config.py          # 中心路由注册器（31 个控制器）
 │   ├── dependencies.py           # FastAPI 依赖注入（用户认证）
 │   ├── error.py                  # 错误信息 API
 │   └── websocket/                # WebSocket 子系统
@@ -238,7 +238,7 @@ perseus/
 │           ├── chat.py / room.py / notification.py
 │           ├── sync.py / progress.py / log_handler.py
 │
-├── controller/                   # HTTP 路由处理器（29 个控制器）
+├── controller/                   # HTTP 路由处理器（31 个控制器）
 │   ├── app_controller.py         # 应用管理（状态/重启/日志）
 │   ├── auth_controller.py        # 登录/刷新
 │   ├── git_auth_controller.py    # Git HTTP Smart Protocol 认证
@@ -267,6 +267,8 @@ perseus/
 │   ├── room_controller.py        # 实时聊天室
 │   ├── chat_controller.py        # 聊天消息
 │   ├── collab_internal_controller.py # 协作编辑内部回调（Yjs 网关）
+│   ├── collab_invite_controller.py # 协作邀请链接签发（仅成员）
+│   ├── watch_controller.py       # Watch/Unwatch
 │   └── debug_controller.py       # 调试端点
 │
 ├── services/                     # 业务逻辑层

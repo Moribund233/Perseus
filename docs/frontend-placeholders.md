@@ -79,7 +79,7 @@
 
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
-| Watch 按钮 | 无 onClick | 后端无 watch API（只有 star/fork）。需新表/字段 + 端点，或先移除该按钮 | P3 |
+| Watch 按钮 | ✅ 已接线（2026-09-16）：`handleWatchToggle` + `getWatchStatus`，后端 `POST/DELETE/GET /{repo_id}/watch` + `watch_count` | — | ✅ P3 完成 |
 | Actions tab | ✅ 已接 Builds 列表 + 日志（批次 B） | — | P1 |
 | Settings tab | ✅ 已实现仓库设置子内容：描述/可见性/默认分支、协作者管理、Webhooks（批次 B） | — | P1~P2 |
 | 文件列表"最近提交/时间"两列 | 写死 `-` 和空白 | ✅ 已接线：任意层级文件树请求 `last_commit=true`，root 顶层曾只对根目录附加（批次 E） | ✅ P1 完成 |
@@ -101,13 +101,13 @@
 
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
-| 协同编辑 | ✅ 已实现并迁移 **Yjs 底座**（2026-09-08，D1）：`components/editor/collabController.ts` 接入 `collab-gateway`（Hocuspocus）+ `y-codemirror.next`；远端光标/选区（awareness 标签）+ 协作保存（stateless → 网关 → Git commit 全员广播）+ **断线本地编辑保留**（CRDT 重连收敛，3.6 方案 B 天然解决） | 会话 TTL/空闲卸载未做（Y.Doc 驻留内存至网关重启）；"会话已同步/Git 已提交"双态徽标待接 `hasUnsyncedChanges`/`collab-saved`（原 3.3 项）；不支持离线合并（页面关闭即丢，与旧版一致） | P2 |
+| 协同编辑 | ✅ 已实现并迁移 **Yjs 底座**（2026-09-08，D1）：`components/editor/collabController.ts` 接入 `collab-gateway`（Hocuspocus）+ `y-codemirror.next`；远端光标/选区（awareness 标签）+ 协作保存（stateless → 网关 → Git commit 全员广播）+ **断线本地编辑保留**（CRDT 重连收敛，3.6 方案 B 天然解决）；**邀请链接（2026-09-16，M2）**：工具栏「分享协作」生成会话级临时权限链接（仅成员），`?invite=` 经 JSON token 透传网关 | 会话 TTL/空闲卸载未做（Y.Doc 驻留内存至网关重启）；"会话已同步/Git 已提交"双态徽标待接 `hasUnsyncedChanges`/`collab-saved`（原 3.3 项）；不支持离线合并（页面关闭即丢，与旧版一致） | P2 |
 | Discussions 面板 | 空状态占位（mock 已移除） | 行内评论需后端锚定文件+行号存储，可复用 PR 评论模型扩展 | P3 |
 | 协作者 "viewing" 状态 | ✅ 已接 WS presence：在线协作者列表即 Editors tab 内容（批次 D）；本文件会话参与者经 `collab_init`/peer 事件展示（F-204） | — | P3 |
 | "Online" 绿点 | ✅ 已接房间 presence（在线人数 > 0 亮绿）（批次 D） | — | P2 |
 | 面包屑点击 | cursor:pointer 无跳转 | ✅ 已接线（批次 E）：目录段点击加载该目录并钉出浮动面板（对齐文件树点位），根段点击回根文件树（清选中与面板链） | ✅ P2 完成 |
 | 文件删除入口 | ✅ 已加文件树 hover 删除按钮 + 确认弹窗，调用 `deleteFileContent`，删除后刷新树并关闭对应标签 | — | P1 |
-| 文件重命名/移动 | 无 | 后端需 move 端点（或 copy+delete 组合提交） | P3 |
+| 文件重命名/移动 | 无 | ✅ 后端 move 端点已就绪（2026-09-16，`POST /{repo_id}/contents/move` 单次提交 copy+delete）；前端重命名/移动 UI 待接 | P3 |
 
 ### 3.5 Pull Requests
 

@@ -31,6 +31,7 @@ from core.exception import AuthorizationException, NotFoundException, Validation
 from models import Repository, User
 from models.async_db import get_async_db
 from services.search_service import SearchService
+from services.collab_invite_service import verify_invite_token
 from services.token_service import verify_token
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ MAX_CONTENT_CHARS = 2_000_000
 class CollabAuthRequest(BaseModel):
     token: str
     docKey: str
+    invite_token: Optional[str] = None
 
 
 class CollabSaveRequest(BaseModel):
@@ -60,6 +62,7 @@ class CollabSaveRequest(BaseModel):
     docKey: str
     content: str
     message: Optional[str] = None
+    invite_token: Optional[str] = None
 
 
 def make_doc_key(repository_id: str, branch: str, path: str) -> str:
@@ -139,15 +142,23 @@ async def collab_auth(
 
     repo = await _get_repo_or_404(db, repository_id)
 
-    if not await _has_role(db, repository_id, user.id, READ_ROLES):
-        raise AuthorizationException(detail="没有该仓库的访问权限", error_code="collab_repository_access_denied")
-
-    can_write = await _has_role(db, repository_id, user.id, WRITE_ROLES)
+    has_read = await _has_role(db, repository_id, user.id, READ_ROLES)
+    via_invite = False
+    if has_read:
+        can_write = await _has_role(db, repository_id, user.id, WRITE_ROLES)
+    else:
+        # 无仓库角色者: 凭邀请 token 获得会话级临时权限 (绑定 docKey + scope)
+        invite = verify_invite_token(body.invite_token, doc_key=body.docKey)
+        if invite is None:
+            raise AuthorizationException(detail="没有该仓库的访问权限", error_code="collab_repository_access_denied")
+        can_write = invite["scope"] == "write"
+        via_invite = True
 
     return {
         "user_id": str(user.id),
         "username": user.username,
         "can_write": can_write,
+        "via_invite": via_invite,
         "repository_id": str(repository_id),
         "branch": branch,
         "path": path,
@@ -199,8 +210,12 @@ async def collab_save(
     repository_id, branch, path = parse_doc_key(body.docKey)
     repo = await _get_repo_or_404(db, repository_id)
 
-    if not await _has_role(db, repository_id, user.id, WRITE_ROLES):
-        raise AuthorizationException(detail="没有该仓库的写入权限", error_code="collab_repository_write_denied")
+    can_write = await _has_role(db, repository_id, user.id, WRITE_ROLES)
+    if not can_write:
+        # 无写角色者: 需持 write 档位的邀请 token (绑定同一 docKey)
+        invite = verify_invite_token(body.invite_token, doc_key=body.docKey)
+        if invite is None or invite["scope"] != "write":
+            raise AuthorizationException(detail="没有该仓库的写入权限", error_code="collab_repository_write_denied")
 
     from services.repository_browser_service import commit_file
     from utils.git_utils import get_repository_storage_path

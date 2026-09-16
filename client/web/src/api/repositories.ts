@@ -10,6 +10,7 @@ export interface Repository {
   default_branch: string;
   fork_count: number;
   star_count: number;
+  watch_count: number;
   is_archived: boolean;
   created_at: string;
   updated_at: string;
@@ -204,6 +205,27 @@ export const repositoriesApi = {
     });
   },
 
+  moveFile: (repoId: string, data: { from_path: string; to_path: string; message?: string; branch?: string }) =>
+    apiRequest<{ commit_id: string; branch: string; from: string; to: string }>(
+      `/api/v1/repositories/${repoId}/contents/move`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    ),
+
+  createCollabInvite: (
+    repoId: string,
+    data: { doc_key: string; scope?: 'read' | 'write'; ttl_minutes?: number },
+  ) =>
+    apiRequest<{ token: string; url: string; doc_key: string; scope: string; expires_at: string }>(
+      `/api/v1/repositories/${repoId}/collab/invites`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    ),
+
   getReadme: (repoId: string, ref?: string) => {
     const qs = ref ? `?ref=${encodeURIComponent(ref)}` : '';
     return apiRequest<{ content: string; encoding: string }>(`/api/v1/repositories/${repoId}/readme${qs}`);
@@ -251,6 +273,18 @@ export const repositoriesApi = {
 
   getStargazers: (repoId: string) =>
     apiRequest<{ id: string; username: string }[]>(`/api/v1/repositories/${repoId}/stargazers`),
+
+  watch: (repoId: string) =>
+    apiRequest<void>(`/api/v1/repositories/${repoId}/watch`, { method: 'POST' }),
+
+  unwatch: (repoId: string) =>
+    apiRequest<void>(`/api/v1/repositories/${repoId}/watch`, { method: 'DELETE' }),
+
+  getWatchStatus: (repoId: string) =>
+    apiRequest<{ watching: boolean; watch_count: number }>(`/api/v1/repositories/${repoId}/watch`),
+
+  getWatchers: (repoId: string) =>
+    apiRequest<{ id: string; user_id: string; created_at: string | null }[]>(`/api/v1/repositories/${repoId}/watchers`),
 
   fork: (repoId: string, data?: { name?: string; description?: string; is_public?: boolean }) =>
     apiRequest<Repository>(`/api/v1/repositories/${repoId}/forks`, {

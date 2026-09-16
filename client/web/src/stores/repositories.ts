@@ -32,6 +32,8 @@ interface RepositoriesState {
   fetchCommits: (repoId: string, params?: { page?: number; per_page?: number; branch?: string }) => Promise<void>;
   starRepository: (repoId: string) => Promise<void>;
   unstarRepository: (repoId: string) => Promise<void>;
+  watchRepository: (repoId: string) => Promise<void>;
+  unwatchRepository: (repoId: string) => Promise<void>;
   forkRepository: (repoId: string, data?: { name?: string; description?: string; is_public?: boolean }) => Promise<Repository>;
   fetchMembers: (repoId: string) => Promise<void>;
   clearCurrent: () => void;
@@ -221,6 +223,22 @@ export const useRepositoriesStore = create<RepositoriesState>((set, get) => ({
     const { currentRepo } = get();
     if (currentRepo && currentRepo.id === repoId) {
       set({ currentRepo: { ...currentRepo, star_count: Math.max(0, currentRepo.star_count - 1) } });
+    }
+  },
+
+  watchRepository: async (repoId) => {
+    await repositoriesApi.watch(repoId);
+    const { currentRepo } = get();
+    if (currentRepo && currentRepo.id === repoId) {
+      set({ currentRepo: { ...currentRepo, watch_count: (currentRepo.watch_count ?? 0) + 1 } });
+    }
+  },
+
+  unwatchRepository: async (repoId) => {
+    await repositoriesApi.unwatch(repoId);
+    const { currentRepo } = get();
+    if (currentRepo && currentRepo.id === repoId) {
+      set({ currentRepo: { ...currentRepo, watch_count: Math.max(0, (currentRepo.watch_count ?? 1) - 1) } });
     }
   },
 

@@ -78,6 +78,14 @@ def create_api_router() -> APIRouter:
     from controller.star_controller import router as star_router
     api_v1_router.include_router(star_router)
 
+    # 6c-bis. Watch 管理路由
+    from controller.watch_controller import router as watch_router
+    api_v1_router.include_router(watch_router)
+
+    # 6c-ter. 协作邀请链接路由
+    from controller.collab_invite_controller import router as collab_invite_router
+    api_v1_router.include_router(collab_invite_router)
+
     # 6d. Repo Label 管理路由
     from controller.label_controller import router as label_router
     api_v1_router.include_router(label_router)

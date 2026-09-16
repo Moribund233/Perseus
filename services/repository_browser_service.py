@@ -945,3 +945,39 @@ async def remove_file(
         author_email,
         message,
     )
+
+
+async def move_file(
+    repo_path: str,
+    branch: str,
+    source_path: str,
+    dest_path: str,
+    author_name: str,
+    author_email: str,
+    message: str,
+) -> Dict[str, Any]:
+    """
+    在指定分支重命名/移动文件并提交 (单次提交内 copy+delete)
+
+    Raises:
+        RepositoryNotFoundException: 仓库不存在
+        NotFoundException: 分支或源文件不存在
+        ValidationException: 路径非法、源为目录或源/目标相同
+        ConflictException: 目标路径已存在
+    """
+    if not repo_exists(repo_path):
+        raise RepositoryNotFoundException(detail=f"Repository not found: {repo_path}", error_code="repository_not_found")
+
+    import asyncio
+    from utils import git_utils
+
+    return await asyncio.to_thread(
+        git_utils.move_file_changes,
+        repo_path,
+        branch,
+        source_path,
+        dest_path,
+        author_name,
+        author_email,
+        message,
+    )

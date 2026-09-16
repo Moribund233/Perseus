@@ -29,6 +29,8 @@ export interface CollabControllerOptions {
   repositoryId: string;
   branch: string;
   path: string;
+  /** 邀请链接访客 token (可选): 无仓库角色者凭此获得会话级临时权限 */
+  inviteToken?: string;
   onStatus?: (status: CollabSocketStatus) => void;
   onParticipants?: (peers: CollabParticipant[]) => void;
   onSaved?: (msg: CollabSavedMsg) => void;
@@ -81,11 +83,15 @@ export class CollabController {
     const token = useAuthStore.getState().accessToken ?? '';
     const username = useAuthStore.getState().user?.username ?? 'guest';
     const userId = useAuthStore.getState().user?.id ?? '';
+    // 邀请链接访客: 以 JSON 承载 access + invite 双凭证, 网关解析后转发给 app
+    const connectionToken = this.opts.inviteToken
+      ? JSON.stringify({ access_token: token, invite_token: this.opts.inviteToken })
+      : token;
 
     const provider = new HocuspocusProvider({
       url: this.resolveWsUrl(),
       name: this.opts.docKey,
-      token,
+      token: connectionToken,
       onStatus: ({ status }) => {
         this.lastStatus = status === 'connected' ? 'connected' : status === 'connecting' ? 'connecting' : 'disconnected';
         if (this.lastStatus === 'disconnected') this.opts.onParticipants?.([]);

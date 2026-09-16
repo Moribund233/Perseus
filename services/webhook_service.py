@@ -515,7 +515,7 @@ async def _deliver_webhook(
 
     # 如果有密钥，生成签名
     if webhook.secret:
-        signature = _generate_signature(payload_json, webhook.secret)
+        signature = generate_signature(payload_json, webhook.secret)
         headers["X-Hub-Signature-256"] = signature
         headers["X-Webhook-Signature"] = signature
 
@@ -597,7 +597,7 @@ async def _deliver_webhook(
     return delivery
 
 
-def _generate_signature(payload: str, secret: str) -> str:
+def generate_signature(payload: str, secret: str) -> str:
     """
     生成 HMAC-SHA256 签名
 

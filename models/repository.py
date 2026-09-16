@@ -39,9 +39,15 @@ class Repository(BaseModel):
     star_count = mapped_column(Integer, default=0)
     """Star 数量"""
 
+    watch_count = mapped_column(Integer, default=0)
+    """Watch(关注) 数量"""
+
     is_archived = mapped_column(Boolean, default=False)
     """是否已归档"""
-    
+
+    ci_secret = mapped_column(String(128), nullable=True)
+    """CI 回调签名密钥 (外部 runner PATCH build 状态用, 为空则仅允许用户 token 鉴权)"""
+
     # 关系定义
     branches = relationship("Branch", back_populates="repository", cascade="all, delete-orphan")
     """仓库关联的分支列表"""

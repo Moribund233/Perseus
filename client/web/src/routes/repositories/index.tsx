@@ -298,6 +298,8 @@ export default function RepositoriesPage() {
     fetchCommits,
     starRepository,
     unstarRepository,
+    watchRepository,
+    unwatchRepository,
     forkRepository,
     clearCurrent,
   } = useRepositoriesStore();
@@ -308,6 +310,7 @@ export default function RepositoriesPage() {
   const [fileLoading, setFileLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [isStarred, setIsStarred] = useState(false);
+  const [isWatching, setIsWatching] = useState(false);
   const [repoFilter, setRepoFilter] = useState<'mine' | 'all'>('mine');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const { issues, fetchIssues } = useIssuesStore();
@@ -366,6 +369,9 @@ export default function RepositoriesPage() {
       repositoriesApi.getStarStatus(currentRepo.id).then((res) => {
         setIsStarred(res.starred);
       }).catch(() => {});
+      repositoriesApi.getWatchStatus(currentRepo.id).then((res) => {
+        setIsWatching(res.watching);
+      }).catch(() => {});
     }
   }, [currentRepo, fetchTree, fetchReadme, fetchBranches, fetchCommits, fetchIssues, fetchPullRequests]);
 
@@ -405,6 +411,21 @@ export default function RepositoriesPage() {
       message.error('Failed to update star');
     }
   }, [currentRepo, isStarred, starRepository, unstarRepository]);
+
+  const handleWatchToggle = useCallback(async () => {
+    if (!currentRepo) return;
+    try {
+      if (isWatching) {
+        await unwatchRepository(currentRepo.id);
+        setIsWatching(false);
+      } else {
+        await watchRepository(currentRepo.id);
+        setIsWatching(true);
+      }
+    } catch {
+      message.error(t('app.repositories.watchFailed'));
+    }
+  }, [currentRepo, isWatching, watchRepository, unwatchRepository, t]);
 
   const handleFork = useCallback(async () => {
     if (!currentRepo) return;
@@ -789,7 +810,9 @@ export default function RepositoriesPage() {
               {currentRepo.is_public ? t('app.repositories.visibility.public') : t('app.repositories.visibility.private')}
             </span>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-              <ActionButton icon={<EyeOutlined />}>{t('app.repositories.actions.watch')}</ActionButton>
+              <ActionButton icon={<EyeOutlined style={{ color: isWatching ? blueLight : undefined }} />} onClick={handleWatchToggle}>
+                {isWatching ? t('app.repositories.actions.unwatch') : t('app.repositories.actions.watch')} {currentRepo.watch_count ?? 0}
+              </ActionButton>
               <ActionButton icon={<StarOutlined style={{ color: isStarred ? '#e3b341' : undefined }} />} onClick={handleStarToggle}>
                 {isStarred ? t('app.repositories.actions.unstar') : t('app.repositories.actions.star')} {currentRepo.star_count}
               </ActionButton>

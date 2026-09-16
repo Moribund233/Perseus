@@ -287,7 +287,7 @@ pytest -v -m e2e
 | ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
 |----|------|---------|----------|------|
 | F-031 | Webhook 触发与重试投递 | `test_webhook_delivery_with_retry()` | `webhook_service.py` | ✅ 已实现 3 次指数退避重试 |
-| F-032 | HMAC-SHA256 签名验证 | `test_webhook_hmac_signature()` | `webhook_service.py` | ✅ 已实现 `_generate_signature()` |
+| F-032 | HMAC-SHA256 签名验证 | `test_webhook_hmac_signature()` | `webhook_service.py` | ✅ 已实现 `generate_signature()`（公开，供 webhook 投递与 CI 回调复用） |
 | F-033 | 事件负载标准格式 | `test_push_event_payload_format()` | `webhook_service.py` | ✅ 已实现标准 Payload 格式 |
 
 ---
@@ -332,7 +332,7 @@ pytest -v -m e2e
 
 | ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
 |----|------|---------|----------|------|
-| F-046 | PR Merge → CI Build 触发闭环 | `test_merge_pr_creates_build_record()` | `services/pull_request_service.py`<br>`services/build_service.py` | ✅ PR merge 后自动创建 Build 记录 |
+| F-046 | PR Merge → CI Build 触发闭环 | `test_merge_pr_creates_build_record()` | `services/pull_request_service.py`<br>`services/build_service.py` | ✅ PR merge 后自动创建 Build 记录；**2026-09-16**：push 触发 build（`broadcast_push` + `ensure_build_for_commit` 去重）+ 外部回调签名鉴权（`X-Perseus-Signature` + `Repository.ci_secret`） |
 | F-047 | 构建状态展示 | — | 前端新组件 | ❌ 待实现 |
 
 ### P2 — 国际化 ✅

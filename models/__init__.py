@@ -235,6 +235,7 @@ from models.release import Release, ReleaseAsset
 from models.webhook import WebHook, WebHookDelivery
 from models.ssh_key import SSHKey
 from models.stargazer import Stargazer
+from models.watcher import Watcher
 from models.repo_label import RepoLabel, repo_label_association
 from models.pr_label import PRLabel, pr_label_association
 from models.pr_activity import PRActivity
@@ -255,6 +256,7 @@ __all__ = [
     "WebHook", "WebHookDelivery",
     "SSHKey",
     "Stargazer",
+    "Watcher",
     "RepoLabel", "repo_label_association",
     "PRLabel", "pr_label_association",
     "PRActivity",

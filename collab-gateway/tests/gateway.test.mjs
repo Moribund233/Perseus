@@ -192,4 +192,30 @@ describe("collab-gateway", () => {
     expect(reason).toContain("token");
     p.destroy();
   });
+
+  it("邀请链接访客: JSON token 中的 invite_token 透传给 auth 与 save", async () => {
+    const a = makeProvider(
+      gw.port,
+      DOC,
+      JSON.stringify({ access_token: "writer-token", invite_token: "invite-abc" }),
+      { name: "guest" }
+    );
+    await waitFor(() => a.document?.getText("content").toString() === "hello", "synced");
+
+    const authCall = appMock.calls.find((c) => c.path === "/api/v1/collab/auth");
+    expect(authCall.body.token).toBe("writer-token");
+    expect(authCall.body.invite_token).toBe("invite-abc");
+
+    const savedPromise = new Promise((resolve) => a.on("stateless", ({ payload }) => {
+      const msg = JSON.parse(payload);
+      if (msg.type === "collab-saved") resolve(msg);
+    }));
+    a.sendStateless(JSON.stringify({ type: "collab-save", message: "guest save" }));
+    await savedPromise;
+
+    const saveCall = appMock.calls.find((c) => c.path === "/api/v1/collab/save");
+    expect(saveCall.body.token).toBe("writer-token");
+    expect(saveCall.body.invite_token).toBe("invite-abc");
+    a.destroy();
+  });
 });

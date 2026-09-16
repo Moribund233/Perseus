@@ -247,6 +247,7 @@ def build_repo_response(
         "is_archived": repo.is_archived,
         "star_count": repo.star_count,
         "fork_count": repo.fork_count,
+        "watch_count": repo.watch_count,
         "physical_exists": physical_exists,
         "status": {
             "initialized": physical_exists

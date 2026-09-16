@@ -2,7 +2,7 @@
 
 > **创建日期**: 2026-09-15
 > **用途**: 汇总 2026-09-15 文档盘点发现的待迭代任务与文档滞后项，作为后续排期与迭代输入。
-> **最近更新**: 2026-09-16（批次 0/1 完成；前端轻量批次完成并回填）
+> **最近更新**: 2026-09-16（批次 0/1/3/5/7 完成；批次 2 邀请链接后端+网关+web 完成）
 > **关联**: `docs/api/roadmap.md`、`docs/frontend-placeholders.md`、`docs/collab-f204-vs-cwm.md`、`docs/desktop-port-sync.md`
 > **开发方针**: 所有新功能必须采用 TDD（测试驱动开发）；新文案同步补 `{zh,en}.json`；禁止硬编码兜底假数据。
 
@@ -35,10 +35,12 @@
 
 ### P0 — 会话邀请链接 + 会话级临时权限（M2）
 
+> **决策（2026-09-16）**：邀请链接**仅仓库成员可生成**（非任意文档可分享）；被邀请人凭 token 获得会话级临时权限。
+
 | 任务 | 说明 | TDD 要点 | 涉及文件 |
 |------|------|----------|----------|
-| 邀请链接生成 | `/collab/:sessionToken`，短时 JWT（绑定 docKey + 只读/可写两档 + 过期时间），无仓库角色者凭 token 获得会话级临时权限 | `test_issue_invite_token()`、`test_invite_token_expired()`、`test_invite_token_grants_read_only()` | 新邀请 token service、`api/websocket/handlers/collab.py`（join 权限判定） |
-| web 入口 | 编辑器工具栏「分享协作」按钮 → 生成/复制链接 | — | `client/web/src/routes/editor/index.tsx` |
+| 邀请链接生成 ✅ | `/collab/:sessionToken`，短时 JWT（绑定 docKey + 只读/可写两档 + 过期时间），仅仓库成员可签发；无仓库角色者凭 token 获得会话级临时权限 — **已完成**：`services/collab_invite_service.py` + `controller/collab_invite_controller.py`（`POST /{repo_id}/collab/invites`）；`/collab/auth`/`/collab/save` 接受 `invite_token` | `test_issue_invite_token()`、`test_invite_token_expired()`、`test_invite_token_grants_read_only()`、`test_invite_token_rejected_for_non_member()` ✅ | `services/collab_invite_service.py`、`controller/collab_invite_controller.py`、`controller/collab_internal_controller.py` |
+| web 入口 ✅ | 编辑器工具栏「分享协作」按钮 → 生成/复制链接（仅成员可见） — **已完成**：`editor/index.tsx`（`handleShareCollab` + `isRepoMember`）；`?invite=` 经 `collabController.ts` JSON token 透传，网关 `parseConnectionToken` 解析转发 | — | `client/web/src/routes/editor/index.tsx`、`components/editor/collabController.ts`、`collab-gateway/server.mjs` |
 
 ### P0 — 会话生命周期数据安全（3.2）
 
@@ -55,11 +57,11 @@
 
 ### P1 — 断线策略决策落地（M3）
 
-> **需产品决策**：方案 A（断线即编辑锁定，对齐 CwM，简单）vs 方案 B（rejoin 保留本地未确认变更 rebase，超越 CwM，复杂）。当前 Yjs CRDT 底座已天然支持离线合并，建议验证后选 B。
+> **决策（2026-09-16）**：选 **方案 B（rebase 保留）**——断线后本地继续编辑，本地未确认变更缓冲保留，重连后利用 Yjs CRDT 收敛合并。截止前未确认的普通提交不做全本地支持（B 的复现面为 P1 范围）。
 
 | 任务 | 说明 | 涉及文件 |
 |------|------|----------|
-| 决策并落地 | 决策后实现锁定或本地缓冲重放 | `collabController.ts`、`client/web/src/components/editor/` |
+| 按方案 B 落地 | 断线本地缓冲 + 重连 rebase 重放（验证 CRDT 收敛语义后实现） | `collabController.ts`、`client/web/src/components/editor/` |
 
 ### P1 — 受限视图（M3，依赖邀请 token scope）
 
@@ -100,9 +102,9 @@
 
 | 任务 | 说明 | TDD 要点 | 涉及文件 |
 |------|------|----------|----------|
-| Watch 仓库 API | 新表/字段 + 端点（当前只有 star/fork） | `test_watch_repository()`、`test_unwatch_repository()` | 新模型字段 + `repository_controller.py` |
+| Watch 仓库 API ✅ | 新表/字段 + 端点（当前只有 star/fork） — **已完成**：`Watcher` 表 + `Repository.watch_count`，`watch_service.py` + `watch_controller.py`（POST/DELETE/GET `/{repo_id}/watch`、GET `/watchers`）；web 仓库页 Watch 按钮已接线 | `test_watch_repository()`、`test_unwatch_repository()` ✅ | `models/watcher.py`、`services/watch_service.py`、`controller/watch_controller.py` |
 | DM 私聊模型 | 当前仅 repo room，无私信 | `test_dm_room_creation()` | 新模型 + `room_service.py` |
-| 文件重命名/移动端点 | move 端点（或 copy+delete 组合提交） | `test_move_file_in_repo()` | `repository_browser_service.py` + controller |
+| 文件重命名/移动端点 ✅ | move 端点（或 copy+delete 组合提交） — **已完成**：`git_utils.move_file_changes` 单次提交内 copy+delete，`POST /{repo_id}/contents/move` | `test_move_file_in_repo()` ✅ | `utils/git_utils.py`、`services/repository_browser_service.py`、`controller/repository_browser_controller.py` |
 | 行内评论锚定 | 文件+行号存储，可复用 PR 评论模型扩展 | `test_inline_comment_on_file()` | 新模型 + 评论服务 |
 | 自动落盘草稿分支 | 会话空闲 N 分钟自动 `collab_save` 到 `collab/draft-...` | `test_autosave_to_draft_branch()` | `collab_service.py` 集成 |
 
@@ -143,11 +145,11 @@
 
 | 优先级 | 任务 | 缺口说明 | TDD 要点 | 涉及文件 |
 |--------|------|----------|----------|----------|
-| P0 | CI 执行器形态决策 | 内置本地 runner（轮询 pending → clone/checkout → 执行脚本 → 回写日志/状态）vs 仅保留外部回调（GHA 式）；**决定后才能排后续任务** | 决策（需产品） | `docs/deployment-guide.md` |
-| P0 | push 触发 build | `broadcast_push`（`event_service.py:145`）只建索引+推事件，**不建 build** → CI 仅对 PR merge 生效，feature 分支状态不落库 | `test_push_creates_build()`：非 PR 分支推送建 pending 记录 | `event_service.py`/`pull_request_service.py` |
-| P1 | 本地 runner（若选内置） | 执行配置（`.perseus-ci.yml` 或命令约定）→ sandbox 隔离 + 超时 + 日志流式写回 + 并发上限 | `test_runner_executes_build()`、`test_runner_timeout()`、`test_runner_logs()` | 新 `worker/ci_runner.py`、`build_service.py` |
-| P1 | 构建配置校验 | `.perseus-ci.yml` 解析/校验/缓存；禁止任意 shell（白名单命令，防 RCE） | `test_ci_config_valid()`、`test_ci_config_rejects_dangerous()` | 新 `services/ci_config_service.py` |
-| P2 | 构建日志流式 | 当前 `logs` 为整串字段（`build_controller.py:145`），无分步/时间戳 | `test_build_log_stream()` | 模型字段 + runner 集成 |
+| ~~P0~~ | ~~CI 执行器形态决策~~ | ✅ **已决策（2026-09-16）：仅外部回调（GHA 式）**——系统只存 build 记录 + 状态机，执行由外部 CI 完成后 `PATCH` 回写 | — | — |
+| ~~P0~~ | ~~push 触发 build~~ ✅ | `broadcast_push`（`event_service.py`）已扩展：携带 `db`/`commit_sha` 时经 room 解析仓库并 `ensure_build_for_commit` 去重建 pending build（避免与 PR merge 重复） | `test_push_creates_build()`、`test_broadcast_push_creates_build_for_commit()` ✅ | `event_service.py`/`build_service.py` |
+| ~~P1~~ | ~~本地 runner~~ | ❌ **取消**（决策为仅外部回调，无需内置轮询/clone/执行器） | — | — |
+| ~~P1~~ | ~~外部回调接入增强~~ ✅ | 外部 CI 回调签名鉴权（`X-Perseus-Signature`，HMAC-SHA256 复用 `generate_signature`）+ `Repository.ci_secret`（alembic 迁移）；`PATCH /builds/{id}` 支持签名或用户 token 双通道 | `test_external_callback_signed()`（`test_update_build_via_signature` 等）✅ | `build_controller.py`、`webhook_service.py`、`models/repository.py` |
+| P2 | 构建日志流式 | 当前 `logs` 为整串字段（`build_controller.py:145`），无分步/时间戳 | `test_build_log_stream()` | 模型字段 + 外部回调写入 |
 
 ### 6.3 实时协作增强 —— 底座齐，缺会话能力
 
@@ -155,7 +157,7 @@
 
 | 优先级 | 任务 | 缺口说明 | 涉及文件 |
 |--------|------|----------|----------|
-| P0 | 邀请链接 + 会话级临时权限 | docKey 无 token 化，join 必须仓库角色（`collab_internal_controller.py:140,200`） | 第二节 P0 表 |
+| P0 | 邀请链接 + 会话级临时权限 ✅ | 已落地：docKey 绑定短时 JWT（`collab_invite_service.py`），`/collab/auth`/`/collab/save` 接受 `invite_token`（无仓库角色者可读写受控） | 第二节 P0 表 |
 | P1 | 会话 TTL 延迟销毁 | 最后一人离开即销毁，重 join 现场不恢复 | 第二节 P0 表 |
 | P2 | Redis pub/sub 多副本 | `workers=1` 单副本约束仍在 | 第二节 P2 表 |
 
@@ -163,12 +165,14 @@
 
 ## 七、需产品决策项
 
+> 2026-09-16 已批量决策：F-204 断线策略 → 方案 B（rebase 保留）；邀请链接 → 仅成员可分享；CI 执行器 → 仅外部回调（GHA 式）。
+
 | 项 | 决策点 | 出处 |
 |----|--------|------|
-| F-204 断线策略 | 方案 A 锁定 vs 方案 B rebase 保留（CRDT 底座已支持 B） | `docs/collab-f204-vs-cwm.md` 3.6 |
-| 双态徽标「版本 N」 | 是否透出协作版本号（当前仅短 SHA） | 同上 3.3 |
-| 邀请链接默认存在 | 是否存在「任意文档可分享」vs 仅成员可分享 | M2 设计时明确 |
-| **CI 执行器形态** | 内置本地 runner vs 仅外部回调（GHA 式）——阻塞 6.2 P0 之后全部任务 | 6.2 分析（2026-09-15） |
+| F-204 断线策略 | ✅ **已决策（2026-09-16）：方案 B rebase 保留**（保留未确认变更，重连 CRDT 收敛） | `docs/collab-f204-vs-cwm.md` 3.6 |
+| 双态徽标「版本 N」 | ⏳ 待定：是否透出协作版本号（当前仅短 SHA）——不阻塞排期 | 同上 3.3 |
+| 邀请链接默认存在 | ✅ **已决策（2026-09-16）：仅成员可分享**（非任意文档可分享），被邀请人凭 token 获会话级临时权限 | M2 设计时明确 |
+| **CI 执行器形态** | ✅ **已决策（2026-09-16）：仅外部回调（GHA 式）**，push 触发 build 即可排期 | 6.2 分析（2026-09-15） |
 
 ---
 
@@ -178,9 +182,9 @@
 |------|------|------|----------|
 | **批次 0（文档回填）** ✅ | 修正 `frontend-placeholders.md`（reactions / last-commit 已就绪） + `roadmap.md`/`README.md` 控制器计数 — **已完成** | 0.5 天 | — |
 | **批次 1（搜索保鲜）** ✅ | 增量索引接入、push 异步化、collab save 进索引、索引生命周期清理 — **已完成（pytest 1082 passed, 3 skipped, 无回归）** | 2~3 天 | 无决策依赖，最快收益 |
-| **批次 2（协作 P0）** | 邀请链接 + 会话级临时权限（M2）、会话 TTL 延迟销毁 | 1~2 周 | 邀请链接默认存在决策 |
+| **批次 2（协作 P0）** ✅ | 邀请链接 + 会话级临时权限（M2）**已完成**（后端 + 网关透传 + web 分享按钮）；会话 TTL 延迟销毁仍待做 | 1~2 周 | ✅ 邀请链接决策已定（仅成员可分享，2026-09-16） |
 | **批次 3（前端轻量）** ✅ | reactions 前端（确认已实现）、last-commit 列全层级、日期分组、面包屑、`/search/global` 分组（确认已实现）、PR Filter 移除 — **已完成（web tsc+eslint+build 通过）** | 3~5 天 | 批次 0 回填 |
-| **批次 4（协作 P1）** | 跟随模式、断线策略（含决策）、受限视图 | 1 周 | 批次 2 |
-| **批次 5（CI/CD 闭环）** | push 触发 build + runner/配置校验（先等执行器形态决策） | 1~2 周 | CI 执行器形态决策 |
+| **批次 4（协作 P1）** | 跟随模式、断线策略（方案 B rebase 保留，✅ 已决策）、受限视图 | 1 周 | 批次 2 |
+| **批次 5（CI/CD 闭环）** ✅ | push 触发 build + 外部回调签名（GHA 式）**已完成**；仅剩余双态徽标「版本 N」非阻塞项 | 1~2 周 | 仅剩余双态徽标「版本 N」非阻塞项 |
 | **批次 6（服务端演进）** | Redis pub/sub 多副本、会话持久化、索引生命周期 | 1~2 周 | — |
-| **批次 7（后端 P3）** | Watch、DM、move、行内评论、自动落盘 | 2 周+ | — |
+| **批次 7（后端 P3）** 🚧 | Watch ✅、文件 move ✅；DM、行内评论、自动落盘 待做 | 2 周+ | — |

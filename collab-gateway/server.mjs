@@ -64,15 +64,36 @@ export function deny(status, detail) {
   return err;
 }
 
+/**
+ * 解析连接 token:
+ * - 纯字符串 = 用户 access token (旧行为)
+ * - JSON 字符串 {access_token, invite_token} = 邀请链接访客 (会话级临时权限)
+ */
+export function parseConnectionToken(raw) {
+  if (typeof raw !== "string") return { token: raw ?? "", invite_token: undefined };
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("{")) return { token: raw, invite_token: undefined };
+  try {
+    const parsed = JSON.parse(trimmed);
+    return {
+      token: parsed.access_token || parsed.token || "",
+      invite_token: parsed.invite_token || undefined,
+    };
+  } catch {
+    return { token: raw, invite_token: undefined };
+  }
+}
+
 /** 构建协作网关 (未监听, 供测试复用) */
 export function buildGateway() {
   return new Server({
     name: "perseus-collab-gateway",
 
     async onAuthenticate({ token, documentName, connectionConfig }) {
+      const creds = parseConnectionToken(token);
       const { status, data } = await callApp("/api/v1/collab/auth", {
         method: "POST",
-        body: { token, docKey: documentName },
+        body: { token: creds.token, docKey: documentName, invite_token: creds.invite_token },
       });
       if (status === 401) throw deny(401, data?.detail || "无效或过期的 token");
       if (status === 404) throw deny(404, data?.detail || "仓库不存在");
@@ -80,13 +101,14 @@ export function buildGateway() {
       if (status !== 200) throw deny(status, data?.detail || "协作服务暂不可用");
 
       connectionConfig.readOnly = !data.can_write;
-      log(`auth doc=${documentName} user=${data.username} can_write=${data.can_write}`);
+      log(`auth doc=${documentName} user=${data.username} can_write=${data.can_write} via_invite=${!!data.via_invite}`);
       // token 存入连接上下文, 供显式保存时实时鉴权
       return {
         user_id: data.user_id,
         username: data.username,
         can_write: data.can_write,
-        token,
+        token: creds.token,
+        invite_token: creds.invite_token,
       };
     },
 
@@ -128,7 +150,7 @@ export function buildGateway() {
       const content = document.getText("content").toString();
       const { status, data } = await callApp("/api/v1/collab/save", {
         method: "POST",
-        body: { token: context.token, docKey: documentName, content, message: msg.message },
+        body: { token: context.token, docKey: documentName, content, message: msg.message, invite_token: context.invite_token },
       });
 
       if (status !== 200) {

@@ -166,6 +166,112 @@ class TestEventService:
         assert index.exists()
         assert len(index.search("pushed_func")) > 0
 
+    @pytest.mark.asyncio
+    async def test_broadcast_push_creates_build_for_commit(
+        self, async_db, async_test_repo, async_test_user,
+    ):
+        """push 携带 commit 信息时应按 (repo, branch, commit) 去重建 pending build (F-046)"""
+        from services.realtime.room_service import RoomService
+        from services.build_service import BuildService
+        from services.realtime.event_service import broadcast_push
+        room = await RoomService.create_room(
+            async_db, async_test_repo.id, "dev-room", async_test_user.id,
+        )
+        manager = ConnectionManager()
+        manager.send_to_room = AsyncMock(return_value=1)
+        with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
+            count = await broadcast_push(
+                room_id=room.id, branch="main", commit_count=1,
+                pusher_id=async_test_user.id, pusher_username="alice",
+                db=async_db, commit_sha="abc123def456", commit_message="Push commit",
+            )
+        assert count == 2
+        payloads = [call.args[1] for call in manager.send_to_room.call_args_list]
+        assert payloads[0]["event"] == "push"
+        assert payloads[1]["event"] == "build"
+        assert payloads[1]["data"]["status"] == "pending"
+        assert payloads[1]["data"]["commit_sha"] == "abc123def456"
+
+        builds = await BuildService.get_builds_for_repository(
+            db=async_db, repo_id=async_test_repo.id,
+        )
+        assert len(builds) == 1
+        assert builds[0].branch == "main"
+        assert builds[0].commit_sha == "abc123def456"
+        assert builds[0].status == "pending"
+
+    @pytest.mark.asyncio
+    async def test_broadcast_push_build_dedup_by_commit(
+        self, async_db, async_test_repo, async_test_user,
+    ):
+        """同 commit 已存在 build (如 PR merge 已创建) 时, push 不应重复建 build"""
+        from services.realtime.room_service import RoomService
+        from services.build_service import BuildService
+        from services.realtime.event_service import broadcast_push
+        room = await RoomService.create_room(
+            async_db, async_test_repo.id, "dev-room", async_test_user.id,
+        )
+        await BuildService.ensure_build_for_commit(
+            db=async_db, repo_id=async_test_repo.id, branch="main",
+            commit_sha="abc123", triggered_by=async_test_user.id,
+        )
+        manager = ConnectionManager()
+        manager.send_to_room = AsyncMock(return_value=1)
+        with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
+            count = await broadcast_push(
+                room_id=room.id, branch="main", commit_count=1,
+                pusher_id=async_test_user.id, pusher_username="alice",
+                db=async_db, commit_sha="abc123",
+            )
+        assert count == 1
+        manager.send_to_room.assert_called_once()
+        payload = manager.send_to_room.call_args[0][1]
+        assert payload["event"] == "push"
+
+        builds = await BuildService.get_builds_for_repository(
+            db=async_db, repo_id=async_test_repo.id,
+        )
+        assert len(builds) == 1
+
+    @pytest.mark.asyncio
+    async def test_broadcast_push_no_build_event_without_db(
+        self, async_db, async_test_repo, async_test_user,
+    ):
+        """未传 db/commit_sha 时保持原行为: 仅广播 push, 不建 build (向后兼容)"""
+        from services.realtime.event_service import broadcast_push
+        from services.build_service import BuildService
+        manager = ConnectionManager()
+        manager.send_to_room = AsyncMock(return_value=3)
+        with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
+            count = await broadcast_push(
+                room_id=uuid.uuid4(), branch="main", commit_count=3,
+                pusher_id=async_test_user.id, pusher_username="alice",
+            )
+        assert count == 3
+        manager.send_to_room.assert_called_once()
+        payload = manager.send_to_room.call_args[0][1]
+        assert payload["event"] == "push"
+        builds = await BuildService.get_builds_for_repository(
+            db=async_db, repo_id=async_test_repo.id,
+        )
+        assert builds == []
+
+    @pytest.mark.asyncio
+    async def test_broadcast_push_skips_build_when_room_missing(
+        self, async_db, async_test_user,
+    ):
+        """room 不存在时建 build 应静默跳过, 不抛异常"""
+        from services.realtime.event_service import broadcast_push
+        manager = ConnectionManager()
+        manager.send_to_room = AsyncMock(return_value=0)
+        with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
+            count = await broadcast_push(
+                room_id=uuid.uuid4(), branch="main", commit_count=1,
+                pusher_id=async_test_user.id, pusher_username="alice",
+                db=async_db, commit_sha="abc123",
+            )
+        assert count == 0
+
 
 class TestPREvents:
 

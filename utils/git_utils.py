@@ -13,7 +13,7 @@ import pygit2
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from core.exception import NotFoundException, ValidationException
+from core.exception import NotFoundException, ValidationException, ConflictException
 from models import Repository
 import uuid
 
@@ -1068,3 +1068,138 @@ def delete_file_changes(
         ref_name, author, author, message, tree_id, [parent_commit.id]
     )
     return {"commit_id": str(commit_id), "branch": branch, "path": file_path}
+
+
+def move_file_changes(
+    repo_path: str,
+    branch: str,
+    source_path: str,
+    dest_path: str,
+    author_name: str,
+    author_email: str,
+    message: str,
+) -> Dict[str, Any]:
+    """
+    在指定分支重命名/移动单个文件并提交 (单次提交内 copy+delete)
+
+    Args:
+        repo_path: 仓库物理路径
+        branch: 目标分支名 (必须已存在)
+        source_path: 源文件路径 (如 "src/main.py")
+        dest_path: 目标路径 (父目录不存在时自动创建)
+        author_name / author_email: 提交作者
+        message: 提交信息
+
+    Returns:
+        dict: {commit_id, branch, from, to}
+
+    Raises:
+        NotFoundException: 分支或源文件不存在
+        ValidationException: 路径非法、源为目录或源/目标相同
+        ConflictException: 目标路径已存在
+    """
+    repo = pygit2.Repository(repo_path)
+
+    source_path = source_path.strip("/")
+    dest_path = dest_path.strip("/")
+    if not source_path or ".." in source_path.split("/"):
+        raise ValidationException(detail="Invalid source path")
+    if not dest_path or ".." in dest_path.split("/"):
+        raise ValidationException(detail="Invalid destination path")
+    if source_path == dest_path:
+        raise ValidationException(detail="Source and destination are the same")
+    if not branch or ".." in branch or branch.startswith("/"):
+        raise ValidationException(detail="Invalid branch name")
+
+    ref_name = f"refs/heads/{branch}"
+    if repo.branches.local.get(branch) is None:
+        raise NotFoundException(detail=f"Branch not found: {branch}")
+
+    parent_commit = repo.lookup_reference(ref_name).peel(pygit2.Commit)
+    base_tree = parent_commit.tree
+
+    def _lookup(tree, segments):
+        node = tree
+        entry = None
+        for seg in segments:
+            if not isinstance(node, pygit2.Tree):
+                return None
+            try:
+                entry = node[seg]
+            except KeyError:
+                return None
+            node = repo[entry.id]
+        return entry
+
+    source_entry = _lookup(base_tree, source_path.split("/"))
+    if source_entry is None:
+        raise NotFoundException(detail=f"File not found: {source_path}")
+    if source_entry.type != pygit2.GIT_OBJECT_BLOB:
+        raise ValidationException(detail="Only files can be moved")
+    blob_id = source_entry.id
+
+    if _lookup(base_tree, dest_path.split("/")) is not None:
+        raise ConflictException(detail=f"Destination already exists: {dest_path}", error_code="destination_exists")
+
+    def _remove(tree: pygit2.Tree, segments) -> pygit2.Oid:
+        tb = repo.TreeBuilder(tree)
+        name = segments[0]
+        if len(segments) == 1:
+            try:
+                tree[name]
+            except KeyError:
+                raise NotFoundException(detail=f"File not found: {source_path}")
+            tb.remove(name)
+        else:
+            try:
+                entry = tree[name]
+            except KeyError:
+                raise NotFoundException(detail=f"File not found: {source_path}")
+            child = repo[entry.id]
+            if not isinstance(child, pygit2.Tree):
+                raise NotFoundException(detail=f"File not found: {source_path}")
+            child_id = _remove(child, segments[1:])
+            child_tree = repo[child_id]
+            if not isinstance(child_tree, pygit2.Tree):
+                raise NotFoundException(detail=f"File not found: {source_path}")
+            # 子树删空后一并移除该目录项 (git 不会保留空目录)
+            if len(child_tree) == 0:
+                tb.remove(name)
+            else:
+                tb.insert(name, child_id, pygit2.GIT_FILEMODE_TREE)
+        return tb.write()
+
+    def _insert_blob(tree: Optional[pygit2.Tree], segments, blob) -> pygit2.Oid:
+        tb = repo.TreeBuilder(tree) if tree is not None else repo.TreeBuilder()
+        name = segments[0]
+        if len(segments) == 1:
+            tb.insert(name, blob, pygit2.GIT_FILEMODE_BLOB)
+        else:
+            subtree: Optional[pygit2.Tree] = None
+            if tree is not None:
+                try:
+                    entry = tree[name]
+                    if entry.type == pygit2.GIT_OBJECT_TREE:
+                        subtree = cast(pygit2.Tree, repo[entry.id])
+                except KeyError:
+                    subtree = None
+            child_id = _insert_blob(subtree, segments[1:], blob)
+            tb.insert(name, child_id, pygit2.GIT_FILEMODE_TREE)
+        return tb.write()
+
+    tree_after_remove = _remove(base_tree, source_path.split("/"))
+    new_base = repo[tree_after_remove]
+    if not isinstance(new_base, pygit2.Tree):
+        raise NotFoundException(detail=f"File not found: {source_path}")
+    tree_id = _insert_blob(new_base, dest_path.split("/"), blob_id)
+
+    author = create_signature(author_name, author_email)
+    commit_id = repo.create_commit(
+        ref_name, author, author, message, tree_id, [parent_commit.id]
+    )
+    return {
+        "commit_id": str(commit_id),
+        "branch": branch,
+        "from": source_path,
+        "to": dest_path,
+    }

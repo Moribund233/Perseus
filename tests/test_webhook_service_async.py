@@ -237,7 +237,7 @@ def test_generate_signature():
     payload = '{"event": "push", "ref": "main"}'
     secret = "my-secret"
 
-    signature = webhook_service._generate_signature(payload, secret)
+    signature = webhook_service.generate_signature(payload, secret)
 
     # 验证签名格式
     assert signature.startswith("sha256=")

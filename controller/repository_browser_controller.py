@@ -27,7 +27,8 @@ from services.repository_browser_service import (
     get_file_symbols,
     detect_file_language,
     commit_file,
-    remove_file
+    remove_file,
+    move_file
 )
 from utils.git_utils import get_repository_storage_path
 from core.exception import NotFoundException
@@ -177,6 +178,46 @@ async def delete_repository_file(
         current_user.full_name or current_user.username,
         current_user.email,
         f"Delete {file_path}",
+    )
+
+
+class FileMoveRequest(BaseModel):
+    """文件重命名/移动请求体"""
+    from_path: str = Field(..., min_length=1, description="源文件路径")
+    to_path: str = Field(..., min_length=1, description="目标路径")
+    message: Optional[str] = Field(None, description="提交信息, 默认 Move <from> -> <to>")
+    branch: Optional[str] = Field(None, description="目标分支, 默认仓库默认分支")
+
+
+@router.post("/{repo_id}/contents/move")
+async def move_repository_file(
+    repo_id: uuid.UUID,
+    data: FileMoveRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    在指定分支重命名/移动文件并提交 (单次提交内 copy+delete)
+
+    目标父目录不存在时自动创建; 目标已存在则返回 409。
+    """
+    result = await db.execute(select(Repository).filter(Repository.id == repo_id))
+    repo = result.scalar_one_or_none()
+    if not repo:
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
+
+    repo_path = await _get_repo_path(repo_id, db)
+    branch = data.branch or repo.default_branch or "main"
+    message = data.message or f"Move {data.from_path} -> {data.to_path}"
+
+    return await move_file(
+        repo_path,
+        branch,
+        data.from_path,
+        data.to_path,
+        current_user.full_name or current_user.username,
+        current_user.email,
+        message,
     )
 
 

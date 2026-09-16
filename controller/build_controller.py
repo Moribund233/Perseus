@@ -1,16 +1,19 @@
 from typing import List, Optional
 import uuid
-from fastapi import APIRouter, Depends, Query, status
+import hmac
+from fastapi import APIRouter, Depends, Query, Request, status, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routes_prefix import get_route_prefix
-from api.dependencies import get_current_user
+from api.dependencies import get_current_user, security
 from models.async_db import get_async_db
 from models.repository import Repository
 from models.user import User
 from core.exception import NotFoundException
 from services.build_service import BuildService
+from services.webhook_service import generate_signature
 from models.build_status import VALID_STATUSES
 import uuid
 
@@ -127,10 +130,36 @@ async def update_build(
     repo_id: uuid.UUID,
     build_id: uuid.UUID,
     data: UpdateBuildRequest,
+    request: Request,
     db: AsyncSession = Depends(get_async_db),
-    current_user: User = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    await _get_repo(repo_id, db)
+    """
+    更新构建状态。
+
+    外部 CI runner 无需用户 token: 通过 X-Perseus-Signature 头携带
+    HMAC-SHA256 签名 (https://docs.github.com/webhooks/using-webhooks/validating-webhook-deliveries)
+    回调; 否则回落到用户 token 鉴权 (F-046)。
+    """
+    repo = await _get_repo(repo_id, db)
+    signature_header = request.headers.get("X-Perseus-Signature")
+    if signature_header:
+        if not repo.ci_secret:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="CI callback signature not configured for repository",
+            )
+        raw_body = await request.body()
+        expected = generate_signature(raw_body.decode("utf-8"), repo.ci_secret)
+        if not hmac.compare_digest(signature_header, expected):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid CI callback signature",
+            )
+    else:
+        # 无签名头: 回落到用户 token 鉴权 (原行为)
+        await get_current_user(credentials, db)
+
     build = await BuildService.update_build_status(
         db=db,
         build_id=build_id,
