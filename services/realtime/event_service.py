@@ -1,4 +1,5 @@
 """F-203 Business Events Push — broadcast business events to room subscribers"""
+import asyncio
 import uuid
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
@@ -159,7 +160,8 @@ async def broadcast_push(
 
     if repo_path:
         try:
-            SearchService.rebuild_index(repo_path)
+            # 索引重建为 CPU/IO 密集操作, 放线程池避免阻塞事件循环 (F-039)
+            await asyncio.to_thread(SearchService.rebuild_index, repo_path)
         except Exception as e:
             logger.warning("Search index rebuild failed: %s", e)
 

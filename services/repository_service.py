@@ -499,6 +499,11 @@ async def update_repository(repo_id: uuid.UUID, repo_data: dict, db: AsyncSessio
         if await exists(db, Repository, {"path": repo_data["path"]}):
             raise ConflictException(detail="Repository path already exists", error_code="repository_path_already_exists")
 
+    # 记录旧物理路径, 供路径变更后清理残留的搜索索引 (F-039 生命周期)
+    old_physical_path = None
+    if "path" in repo_data and repo_data["path"] != db_repo.path:
+        old_physical_path = get_repository_storage_path(db_repo.path)
+
     # 更新仓库信息
     for key, value in repo_data.items():
         if hasattr(db_repo, key):
@@ -506,6 +511,14 @@ async def update_repository(repo_id: uuid.UUID, repo_data: dict, db: AsyncSessio
 
     await db.commit()
     await db.refresh(db_repo)
+
+    # 路径变更后清理旧路径的残留搜索索引 (索引随新路径重建)
+    if old_physical_path:
+        try:
+            from services.search_service import SearchService
+            await asyncio.to_thread(SearchService.cleanup_index, old_physical_path)
+        except Exception as e:
+            logger.warning(f"Failed to clean legacy search index at {old_physical_path}: {e}")
 
     physical_exists = await _check_physical_repo_exists_async(db_repo)
     return build_repo_response(db_repo, physical_exists)
@@ -541,6 +554,13 @@ async def delete_repository(repo_id: uuid.UUID, db: AsyncSession):
         # 物理仓库删除失败，记录错误但不阻止数据库删除
         path_info = physical_path if physical_path else "unknown"
         logger.warning(f"Failed to delete physical repository at {path_info}: {e}")
+        # rmtree 删除失败时仍尽力清理搜索索引残留 (F-039 生命周期)
+        if physical_path:
+            try:
+                from services.search_service import SearchService
+                await asyncio.to_thread(SearchService.cleanup_index, physical_path)
+            except Exception:
+                pass
 
     from models.realtime_room import RealtimeRoom, RoomMember
     room_result = await db.execute(

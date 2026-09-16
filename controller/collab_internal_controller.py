@@ -16,6 +16,7 @@ docKey 格式 (与旧 F-204 兼容): "{repository_id}:{branch}:{path}"
 - git 引用名不允许含 ':', 因此 branch 为第二个 ':' 之前的字段
 - path 允许含 ':' (极少见), 取第二个 ':' 之后的全部内容
 """
+import asyncio
 import logging
 import os
 from typing import Optional, Tuple
@@ -29,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.exception import AuthorizationException, NotFoundException, ValidationException
 from models import Repository, User
 from models.async_db import get_async_db
+from services.search_service import SearchService
 from services.token_service import verify_token
 
 logger = logging.getLogger(__name__)
@@ -214,6 +216,12 @@ async def collab_save(
         user.email,
         commit_message,
     )
+
+    # F-039: 协作保存后增量更新搜索索引 (单文件, 放线程池避免阻塞事件循环)
+    try:
+        await asyncio.to_thread(SearchService.update_files, repo_path, [path])
+    except Exception as index_err:
+        logger.warning("Search index update failed after collab save: %s", index_err)
 
     return {
         "commit_id": str(commit.get("commit_id", "")),

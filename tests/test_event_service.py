@@ -132,6 +132,40 @@ class TestEventService:
         assert payload["data"]["branch"] == "main"
         assert payload["data"]["commit_count"] == 3
 
+    @pytest.mark.asyncio
+    async def test_broadcast_push_rebuilds_index_asynchronously(self, tmp_path, monkeypatch):
+        """push 后索引重建应经 asyncio.to_thread 离开事件循环 (F-039)"""
+        from services.realtime import event_service
+        from services.search_service import SearchService, SearchIndex
+        manager = ConnectionManager()
+        manager.send_to_room = AsyncMock(return_value=1)
+
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        (repo_dir / "main.py").write_text("def pushed_func():\n    return 1\n")
+
+        to_thread_targets = []
+
+        async def fake_to_thread(fn, *args, **kwargs):
+            to_thread_targets.append(fn)
+            return fn(*args, **kwargs)
+
+        monkeypatch.setattr(event_service.asyncio, "to_thread", fake_to_thread)
+
+        with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
+            count = await event_service.broadcast_push(
+                room_id=uuid.uuid4(), branch="main", commit_count=1,
+                pusher_id=uuid.uuid4(), pusher_username="alice",
+                repo_path=str(repo_dir),
+            )
+
+        assert count == 1
+        assert SearchService.rebuild_index in to_thread_targets, \
+            "索引重建应经 to_thread 调用, 避免大仓阻塞事件循环"
+        index = SearchIndex(str(repo_dir))
+        assert index.exists()
+        assert len(index.search("pushed_func")) > 0
+
 
 class TestPREvents:
 

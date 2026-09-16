@@ -456,6 +456,14 @@ async def merge_pull_request(
             detail="Merge conflicts detected. Please resolve conflicts before merging."
         , error_code="pr_merge_conflict")
 
+    # 记录合并前 target 分支 tip, 供合并后增量更新搜索索引使用 (F-039)
+    pre_merge_target_sha: Optional[str] = None
+    try:
+        pre_merge_commit = git_service.get_branch_commit(pr.target_branch)
+        pre_merge_target_sha = str(pre_merge_commit.id) if pre_merge_commit else None
+    except Exception:
+        pre_merge_target_sha = None
+
     # 验证合并方式
     if merge_method not in ["merge", "squash", "rebase"]:
         raise ValidationException(detail=f"Invalid merge method: {merge_method}", error_code="pr_invalid_merge_method")
@@ -528,7 +536,7 @@ async def merge_pull_request(
     except Exception as build_err:
         logger.warning(f"Failed to create CI build after PR merge: {build_err}")
 
-    # F-039: PR 合并后重建搜索索引
+    # F-039: PR 合并后增量更新搜索索引 (无法计算变更文件时回退全量重建)
     try:
         from models import Repository
         repo_result = await db.execute(
@@ -537,9 +545,18 @@ async def merge_pull_request(
         repo = repo_result.scalar_one_or_none()
         if repo:
             repo_path = get_repository_storage_path(repo.path)
-            await asyncio.to_thread(SearchService.rebuild_index, repo_path)
+            changed = await asyncio.to_thread(
+                SearchService.diff_changed_files,
+                repo_path,
+                pre_merge_target_sha,
+                merged_commit_hash,
+            )
+            if changed:
+                await asyncio.to_thread(SearchService.update_files, repo_path, changed)
+            else:
+                await asyncio.to_thread(SearchService.rebuild_index, repo_path)
     except Exception as index_err:
-        logger.warning(f"Failed to rebuild search index after PR merge: {index_err}")
+        logger.warning(f"Failed to update search index after PR merge: {index_err}")
 
     # Dashboard 活动流埋点
     await try_record_activity(

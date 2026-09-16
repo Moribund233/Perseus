@@ -1,5 +1,6 @@
 """搜索业务逻辑层"""
 import hashlib
+import shutil
 import sqlite3
 import os
 from dataclasses import dataclass, field
@@ -243,3 +244,58 @@ class SearchService:
         index = SearchIndex(repo_path)
         index.build()
         return len(index._iter_files())
+
+    @staticmethod
+    def diff_changed_files(
+        repo_path: str,
+        old_ref: Optional[str],
+        new_ref: Optional[str],
+    ) -> Optional[List[str]]:
+        """
+        计算两个引用间变更的文件路径列表 (用于索引增量更新, F-039)
+
+        Args:
+            repo_path: 仓库物理路径
+            old_ref / new_ref: 提交 SHA 或可解析引用
+
+        Returns:
+            变更文件路径列表; None 表示无法计算 (调用方应回退全量重建)
+        """
+        if not old_ref or not new_ref:
+            return None
+        try:
+            import pygit2
+            repo = pygit2.Repository(repo_path)
+            old_commit = repo.revparse_single(old_ref).peel(pygit2.Commit)
+            new_commit = repo.revparse_single(new_ref).peel(pygit2.Commit)
+        except Exception:
+            return None
+        try:
+            diff = repo.diff(old_commit, new_commit)
+            changed: List[str] = []
+            for patch in diff:
+                delta = patch.delta
+                if delta.old_file.path:
+                    changed.append(delta.old_file.path)
+                if delta.new_file.path and delta.new_file.path != delta.old_file.path:
+                    changed.append(delta.new_file.path)
+            return list(dict.fromkeys(changed))
+        except Exception:
+            return None
+
+    @staticmethod
+    def update_files(repo_path: str, changed_files: List[str]) -> None:
+        """Incrementally update search index for a repository (仅重索引变更文件)"""
+        if not changed_files:
+            return
+        SearchIndex(repo_path).update(changed_files)
+
+    @staticmethod
+    def cleanup_index(repo_path: str) -> None:
+        """删除仓库的搜索索引目录 (仓库删除/改名后的生命周期清理)"""
+        index_dir = os.path.join(repo_path, SearchIndex.INDEX_DIR)
+        try:
+            if os.path.isdir(index_dir):
+                shutil.rmtree(index_dir, ignore_errors=True)
+        except Exception:
+            pass

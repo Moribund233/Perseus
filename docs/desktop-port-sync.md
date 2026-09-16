@@ -46,3 +46,4 @@
 ## 4. 后端共享增强（web/desktop 均可复用）
 
 - **仓库语言聚合**（2026-09-10，F3 决策落地）：`Repository.languages`（`{语言标识: 文件数}` 降序）由新 `services/language_service.py` 提供——网格卡片主语言色块直接取 Top1。web 仓库列表/详情可复用该字段补齐 GitHub 式语言条。旧版仅单文件 `detect_file_language`，无聚合数据。
+- **代码搜索保鲜闭环**（2026-09-16，搜索保鲜批次）：`services/search_service.py` 新增 `diff_changed_files`/`update_files`/`cleanup_index` 静态方法——push 重建异步化（`asyncio.to_thread`）、collab save 与 PR merge 走增量索引（非全量 rebuild）、仓库删除/改名清理索引残留。索引仍存于仓库内 `.perseus_search_index/`（bare 仓库下 FTS5 自然为空，搜索回退 ripgrep，未改变该设计）。

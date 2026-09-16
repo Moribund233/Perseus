@@ -234,6 +234,77 @@ async def test_delete_repository(async_db: AsyncSession, test_user):
 
 
 @pytest.mark.asyncio
+async def test_delete_repository_removes_search_index(async_db: AsyncSession, test_user, tmp_path, monkeypatch):
+    """
+    F-039: 删除仓库时物理目录 (含 .perseus_search_index) 一并移除
+    """
+    import os
+    from core.config import get_config
+    from utils.git_utils import get_repository_storage_path
+    from services.search_service import SearchService
+
+    config = get_config()
+    original_repo_root = config.storage.repo_root
+    config.storage.repo_root = str(tmp_path)
+    try:
+        created = await repository_service.create_repository(
+            {"name": "index-cleanup-repo", "path": "index-cleanup-repo", "owner_id": test_user["id"]},
+            async_db,
+        )
+        repo_id = created["id"]
+        physical_path = get_repository_storage_path(created["path"])
+        assert os.path.exists(physical_path), "创建后应有物理仓库"
+
+        # 在物理仓库内构建搜索索引
+        SearchService.rebuild_index(physical_path)
+        index_dir = os.path.join(physical_path, ".perseus_search_index")
+        assert os.path.isdir(index_dir), "索引目录应存在"
+
+        await repository_service.delete_repository(repo_id, async_db)
+
+        assert not os.path.exists(physical_path), "删除后物理仓库目录应不存在 (含索引)"
+        print("✓ test_delete_repository_removes_search_index 通过")
+    finally:
+        config.storage.repo_root = original_repo_root
+
+
+@pytest.mark.asyncio
+async def test_update_repository_cleans_legacy_index_on_path_change(
+    async_db: AsyncSession, test_user, tmp_path, monkeypatch
+):
+    """
+    F-039: 仓库路径变更后旧路径的搜索索引残留应被清理
+    """
+    import os
+    from core.config import get_config
+    from utils.git_utils import get_repository_storage_path
+    from services.search_service import SearchService
+
+    config = get_config()
+    original_repo_root = config.storage.repo_root
+    config.storage.repo_root = str(tmp_path)
+    try:
+        created = await repository_service.create_repository(
+            {"name": "rename-index-repo", "path": "old/rename-index-repo", "owner_id": test_user["id"]},
+            async_db,
+        )
+        repo_id = created["id"]
+        old_physical = get_repository_storage_path(created["path"])
+        SearchService.rebuild_index(old_physical)
+        old_index = os.path.join(old_physical, ".perseus_search_index")
+        assert os.path.isdir(old_index), "旧路径索引目录应存在"
+
+        updated = await repository_service.update_repository(
+            repo_id, {"path": "new/rename-index-repo"}, async_db
+        )
+        assert updated["path"] == "new/rename-index-repo"
+        assert not os.path.exists(old_index), "路径变更后旧路径索引应被清理"
+        print("✓ test_update_repository_cleans_legacy_index_on_path_change 通过")
+    finally:
+        config.storage.repo_root = original_repo_root
+
+
+@pytest.mark.asyncio
 async def test_delete_repository_not_found(async_db: AsyncSession):
     """测试删除不存在的仓库"""
     with pytest.raises(NotFoundException) as exc_info:

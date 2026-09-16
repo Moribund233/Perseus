@@ -725,3 +725,57 @@ async def test_merge_pr_rebuilds_search_index(async_db: AsyncSession, test_repo_
     assert os.path.exists(index_db_path), "搜索索引数据库文件应存在"
 
     print("✓ test_merge_pr_rebuilds_search_index 通过")
+
+
+@pytest.mark.asyncio
+async def test_merge_pr_uses_incremental_index_update(
+    async_db: AsyncSession, test_repo_with_git, async_test_user, monkeypatch
+):
+    """
+    F-039: PR 合并后应使用 diff 计算变更文件做增量索引更新
+
+    验证点:
+    1. SearchService.diff_changed_files 被执行 (用于计算变更文件)
+    2. SearchService.update_files 被调用 (增量更新替代全量重建)
+    """
+    import asyncio
+    from services import pull_request_service
+    from services.search_service import SearchService
+    from utils.git_utils import get_repository_storage_path
+
+    diff_calls = []
+    update_calls = []
+    original_to_thread = asyncio.to_thread
+
+    async def fake_to_thread(fn, *args, **kwargs):
+        result = await original_to_thread(fn, *args, **kwargs)
+        if fn is SearchService.diff_changed_files:
+            diff_calls.append(args)
+        elif fn is SearchService.update_files:
+            update_calls.append(args)
+        return result
+
+    monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
+
+    repo = test_repo_with_git
+    pr = await pull_request_service.create_pull_request(
+        async_db, repo.id, async_test_user.id,
+        title="Incremental Index PR",
+        description="This PR should incrementally update search index",
+        source_branch="feature",
+        target_branch="main"
+    )
+
+    await pull_request_service.merge_pull_request(
+        async_db, repo.id, pr["pr_number"], async_test_user.id, merge_method="merge"
+    )
+
+    assert diff_calls, "PR 合并应使用 diff_changed_files 计算变更文件"
+    repo_path, old_sha, new_sha = diff_calls[0]
+    assert repo_path == get_repository_storage_path(repo.path)
+    assert old_sha, "应携带合并前的 target 分支 tip"
+    assert new_sha, "应携带合并后的 commit sha"
+    assert update_calls, "PR 合并应触发增量索引更新"
+    assert len(update_calls[0][1]) > 0, "变更文件列表不应为空"
+
+    print("✓ test_merge_pr_uses_incremental_index_update 通过")
