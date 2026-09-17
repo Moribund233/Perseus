@@ -31,7 +31,7 @@ from core.exception import AuthorizationException, NotFoundException, Validation
 from models import Repository, User
 from models.async_db import get_async_db
 from services.search_service import SearchService
-from services.collab_invite_service import verify_invite_token
+from services.collab_invite_service import verify_invite_token_active
 from services.collab_session_service import get_override
 from services.token_service import verify_token
 
@@ -160,7 +160,7 @@ async def collab_auth(
         can_write = await _has_role(db, repository_id, user.id, WRITE_ROLES)
     else:
         # 无仓库角色者: 凭邀请 token 获得会话级临时权限 (绑定 docKey + scope)
-        invite = verify_invite_token(body.invite_token, doc_key=body.docKey)
+        invite = await verify_invite_token_active(db, body.invite_token, doc_key=body.docKey)
         if invite is None:
             raise AuthorizationException(detail="没有该仓库的访问权限", error_code="collab_repository_access_denied")
         can_write = invite["scope"] == "write"
@@ -230,13 +230,12 @@ async def collab_save(
 
     if override is not None and override.scope:
         can_write = override.scope == "write"
+    elif await _has_role(db, repository_id, user.id, WRITE_ROLES):
+        can_write = True
     else:
-        can_write = await _has_role(db, repository_id, user.id, WRITE_ROLES)
-        if not can_write:
-            # 无写角色者: 需持 write 档位的邀请 token (绑定同一 docKey)
-            invite = verify_invite_token(body.invite_token, doc_key=body.docKey)
-            if invite is None or invite["scope"] != "write":
-                raise AuthorizationException(detail="没有该仓库的写入权限", error_code="collab_repository_write_denied")
+        # 无写角色者: 需持 write 档位的邀请 token (绑定同一 docKey, 且未被撤销)
+        invite = await verify_invite_token_active(db, body.invite_token, doc_key=body.docKey)
+        can_write = invite is not None and invite["scope"] == "write"
     if not can_write:
         raise AuthorizationException(detail="没有该仓库的写入权限", error_code="collab_repository_write_denied")
 

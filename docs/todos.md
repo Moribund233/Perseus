@@ -2,7 +2,7 @@
 
 > **创建日期**: 2026-09-15
 > **用途**: 汇总 2026-09-15 文档盘点发现的待迭代任务与文档滞后项，作为后续排期与迭代输入。
-> **最近更新**: 2026-09-17（批次 0/1/3/5/7 完成；会话 TTL 延迟销毁 + Redis 多副本/会话持久化落地；collab 网关多副本收紧：广播私密性/容量上限/403 即时吊销；构建日志流式、自动落盘草稿分支、协作会话级角色覆盖层落地；test 服务补挂载 alembic）；
+> **最近更新**: 2026-09-17（批次 0/1/3/5/7 完成；会话 TTL 延迟销毁 + Redis 多副本/会话持久化落地；collab 网关多副本收紧：广播私密性/容量上限/403 即时吊销；构建日志流式、自动落盘草稿分支、协作会话级角色覆盖层落地；后端闭环补齐：邀请 token 撤销体系 + push 路径增量索引；test 服务补挂载 alembic）；
 > 2026-09-16（批次 2 邀请链接后端+网关+web 完成）
 > **关联**: `docs/api/roadmap.md`、`docs/frontend-placeholders.md`、`docs/collab-f204-vs-cwm.md`、`docs/desktop-port-sync.md`
 > **开发方针**: 所有新功能必须采用 TDD（测试驱动开发）；新文案同步补 `{zh,en}.json`；禁止硬编码兜底假数据。
@@ -83,7 +83,7 @@
 | Redis pub/sub 多副本 ✅ | `@hocuspocus/extension-redis` 经 Redis pub/sub 跨副本广播 CRDT 变更与感知，同一文档落在不同副本也收敛 — **已完成（2026-09-17）**；compose 已接线 `REDIS_URL`、可 `--scale collab=N`（nginx 动态解析留待扩容） | `redisIntegration.test.mjs`：副本间同步 / 快照恢复不回源 Git（需 `TEST_REDIS_URL`）✅ | `collab-gateway/server.mjs`、`collab-gateway/redisPersistence.mjs`、`docker-compose.yml` |
 | 会话持久化 ✅ | `@hocuspocus/extension-database` + Redis Y.Doc 快照：周期落盘、冷加载优先恢复未提交编辑；多副本冷启动播种用 Redis 锁串行化防重复（`hellohello`） — **已完成（2026-09-17）** | 同上 | `collab-gateway/redisPersistence.mjs`、`docker-compose.yml` |
 | 多副本收紧（bugfix） ✅ | 广播私密性（`collab-saved` 仅回 `commit_id`+`docKey`，不再泄漏 `saved_by/branch/path/message`）；单文档内容上限（`PERSEUS_COLLAB_MAX_CONTENT_CHARS`，超限拒加载 413/拒保存）；每文档并发连接上限（`PERSEUS_COLLAB_MAX_CONNECTIONS_PER_DOC`，超限拒新连接）；保存被 app 回 403 即断连强制重认证（多副本即时吊销） — **已完成（2026-09-17）** | `gatewayHardening.test.mjs`：5 用例 ✅ | `collab-gateway/server.mjs`、`client/web/src/components/editor/collabController.ts`、`client/desktop/frontend/src/api/collabSocket.ts` |
-| 邀请 token 体系 | 签发/校验/撤销服务（与 P0 邀请链接联动） | 新 service |
+| 邀请 token 体系 ✅ | 签发/校验/**撤销**服务（与 P0 邀请链接联动）— **已完成（2026-09-17）**：新增 `collab_invite_revocations` 黑名单表（按 jti）+ `POST /{repo_id}/collab/invites/revoke`（仅 owner/admin）；`/collab/auth` 与 `/collab/save` 改用 `verify_invite_token_active` 叠加撤销校验，已撤销 token 即时 403 | `test_collab_invite_revocation.py`：8 用例 ✅ | `services/collab_invite_service.py`、`controller/collab_invite_controller.py`、`models/collab_invite_revocation.py` |
 
 ---
 
@@ -134,10 +134,10 @@
 
 | 优先级 | 任务 | 缺口说明 | TDD 要点 | 涉及文件 |
 |--------|------|----------|----------|----------|
-| P1 | 增量索引接入（PR merge/collab save 已接线，push 仍全量） | `SearchIndex.update()` 已在 PR merge（`pull_request_service.py:549-557` 用 `update_files`）与 collab save（`collab_internal_controller.py:237`）接线；**push 路径仍是全量 rebuild（`event_service.py:167`），大仓 push 代价高** | `test_index_incremental_update()`：改 1 文件只更新该文件，mtime 不变项跳过 | `search_service.py`、push 触发点 |
+| P1 | 增量索引接入（push 已增量） ✅ | PR merge / collab save 已 `update_files`；**push 路径（`event_service.py:broadcast_push`）已改为增量**：携带 `old_sha` 时经 `diff_changed_files` 只重索引变更文件，diff 不可用才回退全量 `rebuild_index`；均经 `asyncio.to_thread` 不阻塞事件循环 — **已完成（2026-09-17）** | `test_broadcast_push_incremental_index_when_old_sha_given`、`test_broadcast_push_falls_back_to_rebuild_when_diff_unavailable` ✅ | `services/realtime/event_service.py`、`services/search_service.py` |
 | P1 | push 后索引重建异步化 ✅ | `event_service.py:167` 已用 `asyncio.to_thread(SearchService.rebuild_index, ...)`，不再阻塞事件循环（与 PR merge 一致）— **已在批次 1 落地** | `test_push_index_rebuild_not_blocking()`（批次1 用例 ✅） | `services/realtime/event_service.py` |
 | P1 | collab save 进索引 ✅ | `collab_internal_controller.py:237` save → `SearchService.update_files()` 增量更新，搜索立即可检索 — **已在批次 1 落地** | `test_collab_save_index_updated()`（批次1 用例 ✅） | `controller/collab_internal_controller.py`、`SearchService.update_files` |
-| P2 | 索引生命周期管理 | 仓库删除/改名后 `.perseus_search_index/` 残留；构建失败无重试/状态上报 | `test_index_cleanup_on_repo_delete()` | `repository_service.py` 删除/重命名路径 |
+| P2 | 索引生命周期管理 ✅ | 仓库删除/改名后索引残留已清理（`repository_service.py` 改名调 `cleanup_index`、删除随物理目录 `rmtree`）；构建失败状态由 `build_service.py:116` 落 `finished_at`，重试按「仅外部回调」决策归外部 CI — **已在批次 1 落地并测试（2026-09-17 复核）** | `test_delete_repository_removes_search_index`、`test_update_repository_cleans_legacy_index_on_path_change`、`test_cleanup_index_removes_directory` ✅ | `repository_service.py`、`services/search_service.py` |
 
 > 前端侧：Web 搜索页接 `/search/global` 三类分组已列于批次 3（见第七节），后端已就绪。
 
@@ -184,9 +184,9 @@
 |------|------|------|----------|
 | **批次 0（文档回填）** ✅ | 修正 `frontend-placeholders.md`（reactions / last-commit 已就绪） + `roadmap.md`/`README.md` 控制器计数 — **已完成** | 0.5 天 | — |
 | **批次 1（搜索保鲜）** ✅ | 增量索引接入、push 异步化、collab save 进索引、索引生命周期清理 — **已完成（pytest 1082 passed, 3 skipped, 无回归）** | 2~3 天 | 无决策依赖，最快收益 |
-| **批次 2（协作 P0）** ✅ | 邀请链接 + 会话级临时权限（M2）**已完成**（后端 + 网关透传 + web 分享按钮）；会话 TTL 延迟销毁仍待做 | 1~2 周 | ✅ 邀请链接决策已定（仅成员可分享，2026-09-16） |
+| **批次 2（协作 P0）** ✅ | 邀请链接 + 会话级临时权限（M2）+ 会话 TTL 延迟销毁 **均已完成**（后端 + 网关透传 + web 分享按钮） | 1~2 周 | ✅ 邀请链接决策已定（仅成员可分享，2026-09-16） |
 | **批次 3（前端轻量）** ✅ | reactions 前端（确认已实现）、last-commit 列全层级、日期分组、面包屑、`/search/global` 分组（确认已实现）、PR Filter 移除 — **已完成（web tsc+eslint+build 通过）** | 3~5 天 | 批次 0 回填 |
 | **批次 4（协作 P1）** | 跟随模式、断线策略（方案 B rebase 保留，✅ 已决策）、受限视图 | 1 周 | 批次 2 |
 | **批次 5（CI/CD 闭环）** ✅ | push 触发 build + 外部回调签名（GHA 式）**已完成**；仅剩余双态徽标「版本 N」非阻塞项 | 1~2 周 | 仅剩余双态徽标「版本 N」非阻塞项 |
-| **批次 6（服务端演进）** | Redis pub/sub 多副本、会话持久化、索引生命周期 | 1~2 周 | — |
-| **批次 7（后端 P3）** 🚧 | Watch ✅、文件 move ✅、DM ✅、行内评论 ✅、消息检索 ✅；自动落盘草稿分支 待做 — **已完成部分（pytest 1168 passed, 3 skipped, 无回归）** | 2 周+ | — |
+| **批次 6（服务端演进）** ✅ | Redis pub/sub 多副本、会话持久化、索引生命周期 — **均已完成** | 1~2 周 | — |
+| **批次 7（后端 P3）** ✅ | Watch ✅、文件 move ✅、DM ✅、行内评论 ✅、消息检索 ✅、自动落盘草稿分支（后端 `draft→collab/draft-{branch}`）✅；仅剩「会话空闲 N 分钟自动触发」前端计时 — **后端已完成（2026-09-17）** | 2 周+ | — |

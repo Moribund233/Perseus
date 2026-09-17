@@ -153,8 +153,9 @@ async def broadcast_push(
     db=None,
     commit_sha: Optional[str] = None,
     commit_message: Optional[str] = None,
+    old_sha: Optional[str] = None,
 ) -> int:
-    """Broadcast push event — also triggers search index rebuild and pending build creation"""
+    """Broadcast push event — also triggers search index update and pending build creation"""
     result = await broadcast_event(room_id, "push", {
         "branch": branch,
         "commit_count": commit_count,
@@ -163,10 +164,17 @@ async def broadcast_push(
 
     if repo_path:
         try:
-            # 索引重建为 CPU/IO 密集操作, 放线程池避免阻塞事件循环 (F-039)
-            await asyncio.to_thread(SearchService.rebuild_index, repo_path)
+            # 有 old_sha 时按 diff 只增量重索引变更文件; 无法计算 diff 时回退全量重建。
+            # 索引为 CPU/IO 密集操作, 一律放线程池避免阻塞事件循环 (F-039)。
+            changed = None
+            if old_sha and commit_sha:
+                changed = SearchService.diff_changed_files(repo_path, old_sha, commit_sha)
+            if changed is not None:
+                await asyncio.to_thread(SearchService.update_files, repo_path, changed)
+            else:
+                await asyncio.to_thread(SearchService.rebuild_index, repo_path)
         except Exception as e:
-            logger.warning("Search index rebuild failed: %s", e)
+            logger.warning("Search index update failed: %s", e)
 
     # push 触发生成 pending build (F-046): 按 (repo, branch, commit) 去重, 避免与 PR merge 重复
     if db is not None and commit_sha:

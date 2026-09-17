@@ -9,8 +9,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 from jose import JWTError, jwt
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import get_config
+from models.collab_invite_revocation import CollabInviteRevocation
 
 INVITE_TOKEN_TYPE = "collab_invite"
 VALID_SCOPES = {"read", "write"}
@@ -107,4 +110,79 @@ def verify_invite_token(token: Optional[str], doc_key: Optional[str] = None) -> 
         "doc_key": payload.get("doc_key"),
         "scope": payload.get("scope"),
         "jti": payload.get("jti"),
+        "exp": payload.get("exp"),
+    }
+
+
+async def is_invite_token_revoked(db: AsyncSession, jti: Optional[str]) -> bool:
+    """该 jti 是否已被撤销 (命中黑名单)。"""
+    if not jti:
+        return False
+    result = await db.execute(
+        select(CollabInviteRevocation.id).filter(CollabInviteRevocation.jti == jti)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def verify_invite_token_active(
+    db: AsyncSession, token: Optional[str], doc_key: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    校验邀请 token 且未被撤销。
+
+    在纯签名/时效校验 (verify_invite_token) 基础上叠加撤销黑名单检查；
+    被撤销的 token 一律视为失效 (返回 None)。
+    """
+    info = verify_invite_token(token, doc_key=doc_key)
+    if info is None:
+        return None
+    if await is_invite_token_revoked(db, info.get("jti")):
+        return None
+    return info
+
+
+async def revoke_invite_token(
+    db: AsyncSession, token: Optional[str], revoked_by: Optional[uuid.UUID] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    撤销邀请 token (按 jti 记入黑名单, 幂等)。
+
+    Args:
+        token: 待撤销的邀请 token
+        revoked_by: 执行撤销的用户ID
+
+    Returns:
+        dict: {jti, doc_key, scope, expires_at}; token 非法/过期返回 None
+    """
+    info = verify_invite_token(token)
+    if info is None:
+        return None
+
+    existing = await db.execute(
+        select(CollabInviteRevocation).filter(
+            CollabInviteRevocation.jti == info["jti"]
+        )
+    )
+    if existing.scalar_one_or_none() is None:
+        exp = info.get("exp")
+        expires_at = (
+            datetime.fromtimestamp(exp, tz=timezone.utc)
+            if isinstance(exp, (int, float))
+            else None
+        )
+        db.add(
+            CollabInviteRevocation(
+                jti=info["jti"],
+                doc_key=info["doc_key"],
+                revoked_by=revoked_by,
+                expires_at=expires_at,
+            )
+        )
+        await db.commit()
+
+    return {
+        "jti": info["jti"],
+        "doc_key": info["doc_key"],
+        "scope": info["scope"],
+        "expires_at": info.get("exp"),
     }

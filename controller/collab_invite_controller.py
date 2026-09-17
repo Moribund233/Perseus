@@ -20,8 +20,10 @@ from controller.collab_internal_controller import READ_ROLES, parse_doc_key
 from services.collab_invite_service import (
     MAX_TTL_MINUTES,
     create_invite_token,
+    revoke_invite_token,
+    verify_invite_token,
 )
-from utils.permission_utils import check_repository_permission
+from utils.permission_utils import check_repository_permission, check_repository_owner_or_admin
 
 router = APIRouter(prefix=get_route_prefix("repositories"), tags=["collab-invites"])
 
@@ -31,6 +33,11 @@ class IssueInviteRequest(BaseModel):
     doc_key: str = Field(..., min_length=1, description="文档标识 repository_id:branch:path")
     scope: str = Field("read", pattern="read|write", description="权限档位")
     ttl_minutes: Optional[int] = Field(None, ge=1, le=MAX_TTL_MINUTES, description="有效期(分钟)")
+
+
+class RevokeInviteRequest(BaseModel):
+    """邀请链接撤销请求体"""
+    token: str = Field(..., min_length=1, description="待撤销的邀请 token")
 
 
 @router.post("/{repo_id}/collab/invites", status_code=201)
@@ -72,3 +79,44 @@ async def issue_collab_invite(
     )
     issued["url"] = f"/collab/{issued['token']}"
     return issued
+
+
+@router.post("/{repo_id}/collab/invites/revoke")
+async def revoke_collab_invite(
+    repo_id: uuid.UUID,
+    data: RevokeInviteRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    撤销协作邀请链接 (仅仓库所有者/管理员)
+
+    被撤销的 token 立即失效: `/collab/auth` 与 `/collab/save` 将拒绝其换取权限。
+    """
+    result = await db.execute(select(Repository).filter(Repository.id == repo_id))
+    repo = result.scalar_one_or_none()
+    if not repo:
+        raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
+
+    if not await check_repository_owner_or_admin(db, repo_id, current_user.id):
+        raise AuthorizationException(
+            detail="仅仓库所有者/管理员可撤销协作邀请链接",
+            error_code="collab_invite_revoke_forbidden",
+        )
+
+    info = verify_invite_token(data.token)
+    if info is None:
+        raise ValidationException(
+            detail="邀请 token 无效或已过期",
+            error_code="collab_invite_invalid",
+        )
+
+    parsed_repo_id, _branch, _path = parse_doc_key(info["doc_key"])
+    if parsed_repo_id != repo_id:
+        raise ValidationException(
+            detail="邀请 token 不属于该仓库",
+            error_code="collab_invite_dockey_mismatch",
+        )
+
+    revoked = await revoke_invite_token(db, data.token, current_user.id)
+    return {"jti": revoked["jti"], "doc_key": revoked["doc_key"], "revoked": True}

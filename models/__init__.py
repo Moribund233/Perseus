@@ -249,6 +249,7 @@ from models.file_comment import FileComment
 from models.build_status import BuildStatus
 from models.build_log_entry import BuildLogEntry
 from models.collab_session_override import CollabSessionOverride
+from models.collab_invite_revocation import CollabInviteRevocation
 
 __all__ = [
     "Base", "SessionLocal", "BaseModel",
@@ -275,4 +276,5 @@ __all__ = [
     "BuildStatus",
     "BuildLogEntry",
     "CollabSessionOverride",
+    "CollabInviteRevocation",
 ]

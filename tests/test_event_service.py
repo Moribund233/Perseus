@@ -167,6 +167,77 @@ class TestEventService:
         assert len(index.search("pushed_func")) > 0
 
     @pytest.mark.asyncio
+    async def test_broadcast_push_incremental_index_when_old_sha_given(self, tmp_path, monkeypatch):
+        """push 携带 old_sha 时只增量重索引变更文件 (不做全量 rebuild)"""
+        from services.realtime import event_service
+        from services.search_service import SearchService
+        manager = ConnectionManager()
+        manager.send_to_room = AsyncMock(return_value=1)
+
+        to_thread_targets = []
+
+        async def fake_to_thread(fn, *args, **kwargs):
+            to_thread_targets.append((fn, args))
+            return fn(*args, **kwargs)
+
+        monkeypatch.setattr(event_service.asyncio, "to_thread", fake_to_thread)
+        monkeypatch.setattr(
+            SearchService, "diff_changed_files",
+            staticmethod(lambda repo_path, old, new: ["src/changed.py"]),
+        )
+        monkeypatch.setattr(
+            SearchService, "update_files",
+            staticmethod(lambda repo_path, files: None),
+        )
+        rebuild_calls = []
+        monkeypatch.setattr(
+            SearchService, "rebuild_index",
+            staticmethod(lambda repo_path: rebuild_calls.append(repo_path)),
+        )
+
+        with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
+            await event_service.broadcast_push(
+                room_id=uuid.uuid4(), branch="main", commit_count=1,
+                pusher_id=uuid.uuid4(), pusher_username="alice",
+                repo_path=str(tmp_path), commit_sha="newsha", old_sha="oldsha",
+            )
+
+        assert (SearchService.update_files, (str(tmp_path), ["src/changed.py"])) in to_thread_targets, \
+            "有 old_sha 时应经 to_thread 只增量重索引变更文件"
+        assert rebuild_calls == [], "有 old_sha 时不应全量 rebuild"
+
+    @pytest.mark.asyncio
+    async def test_broadcast_push_falls_back_to_rebuild_when_diff_unavailable(self, tmp_path, monkeypatch):
+        """无法计算变更文件 (diff 返回 None) 时回退全量 rebuild"""
+        from services.realtime import event_service
+        from services.search_service import SearchService
+        manager = ConnectionManager()
+        manager.send_to_room = AsyncMock(return_value=1)
+
+        async def fake_to_thread(fn, *args, **kwargs):
+            return fn(*args, **kwargs)
+
+        monkeypatch.setattr(event_service.asyncio, "to_thread", fake_to_thread)
+        monkeypatch.setattr(
+            SearchService, "diff_changed_files",
+            staticmethod(lambda repo_path, old, new: None),
+        )
+        rebuild_calls = []
+        monkeypatch.setattr(
+            SearchService, "rebuild_index",
+            staticmethod(lambda repo_path: rebuild_calls.append(repo_path)),
+        )
+
+        with patch("services.realtime.event_service.ConnectionManager", return_value=manager):
+            await event_service.broadcast_push(
+                room_id=uuid.uuid4(), branch="main", commit_count=1,
+                pusher_id=uuid.uuid4(), pusher_username="alice",
+                repo_path=str(tmp_path), commit_sha="newsha", old_sha="oldsha",
+            )
+
+        assert rebuild_calls == [str(tmp_path)], "diff 不可用时应回退全量 rebuild"
+
+    @pytest.mark.asyncio
     async def test_broadcast_push_creates_build_for_commit(
         self, async_db, async_test_repo, async_test_user,
     ):
