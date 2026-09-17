@@ -86,9 +86,18 @@ def create_api_router() -> APIRouter:
     from controller.collab_invite_controller import router as collab_invite_router
     api_v1_router.include_router(collab_invite_router)
 
+    # 6c-quater. 协作会话级权限覆盖路由（改权限/踢人）
+    from controller.collab_session_controller import router as collab_session_router
+    api_v1_router.include_router(collab_session_router)
+
     # 6d. Repo Label 管理路由
     from controller.label_controller import router as label_router
     api_v1_router.include_router(label_router)
+
+    # 6d-bis. 行内评论（Discussions）路由
+    # 需在 repository_controller 的 /{owner}/{repo} 通配路由之前注册
+    from controller.file_comment_controller import router as file_comment_router
+    api_v1_router.include_router(file_comment_router)
 
     # 6e. LFS 管理路由
     from controller.lfs_controller import router as lfs_router
@@ -141,6 +150,10 @@ def create_api_router() -> APIRouter:
     # 11g. Room 路由
     from controller.room_controller import router as room_router
     api_v1_router.include_router(room_router)
+
+    # 11g-bis. DM 私聊路由
+    from controller.dm_controller import router as dm_router
+    api_v1_router.include_router(dm_router)
 
     # 11h. Chat 路由
     from controller.chat_controller import router as chat_router

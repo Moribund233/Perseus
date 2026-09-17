@@ -81,15 +81,22 @@ services:
           memory: 512M
 
   # 协作编辑 Yjs 网关 (Hocuspocus 哑管道: CRDT 同步 + app 回调)
+  # 多副本就绪: 移除 container_name 以允许 --scale collab=N;
+  # 同一文档落在不同副本时经 Redis pub/sub 收敛 (m4)。默认仍单副本,
+  # nginx 动态解析与负载均衡留待真正扩容时处理 (见 docs/collab-f204-vs-cwm.md 5.6)。
   collab:
     image: ${PERSEUS_IMAGE_PREFIX:-perseus}-collab:${PERSEUS_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: docker/collab/Dockerfile
-    container_name: perseus-collab
     environment:
       PERSEUS_APP_URL: http://app:8000
       PERSEUS_COLLAB_INTERNAL_SECRET: ${PERSEUS_COLLAB_INTERNAL_SECRET:?必需设置协作网关内部密钥 (scripts/generate_env.py)}
+      # 配置后启用: 跨副本即时同步 (pub/sub) + 会话快照持久化
+      REDIS_URL: redis://redis:6379/0
+      PERSEUS_COLLAB_SESSION_TTL_MS: "${PERSEUS_COLLAB_TTL_MS:-600000}"
+      PERSEUS_COLLAB_MAX_CONTENT_CHARS: "${PERSEUS_COLLAB_MAX_CONTENT_CHARS:-2000000}"
+      PERSEUS_COLLAB_MAX_CONNECTIONS_PER_DOC: "${PERSEUS_COLLAB_MAX_CONNECTIONS_PER_DOC:-50}"
       TZ: Asia/Shanghai
     logging:
       driver: json-file
@@ -99,6 +106,8 @@ services:
     restart: unless-stopped
     depends_on:
       app:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - default
@@ -252,6 +261,7 @@ services:
       - ./utils:/app/utils
       - ./middleware:/app/middleware
       - ./controller:/app/controller
+      - ./alembic:/app/alembic
       - ./app.py:/app/app.py
     depends_on:
       postgres:

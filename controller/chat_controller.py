@@ -37,13 +37,25 @@ async def get_room_messages(
     room_id: uuid.UUID,
     before: Optional[uuid.UUID] = Query(None),
     limit: int = Query(50, ge=1, le=100),
+    q: Optional[str] = Query(None, description="按内容关键词筛选消息"),
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
     room = await RoomService.get_room(db, room_id)
     if not room:
         raise NotFoundException("Room not found", error_code="room_not_found")
-    return await ChatService.get_messages(db, room_id, current_user.id, before=before, limit=limit)
+    return await ChatService.get_messages(db, room_id, current_user.id, before=before, limit=limit, q=q)
+
+
+@router.get("/api/v1/messages/search")
+async def search_messages(
+    q: str = Query(..., description="搜索关键词"),
+    limit: int = Query(50, ge=1, le=100),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user),
+):
+    """跨当前用户加入的全部会话检索消息（聊天侧边栏搜索框）"""
+    return await ChatService.search_messages(db, current_user.id, q=q, limit=limit)
 
 
 @router.delete("/api/v1/rooms/{room_id}/messages/{msg_id}")

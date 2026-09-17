@@ -14,13 +14,10 @@ export interface CollabParticipant {
   color: string;
 }
 
+/** 网关广播的协作保存结果; 私密性收紧后仅含提交标识 */
 export interface CollabSavedMsg {
   docKey: string;
   commit_id: string;
-  path: string;
-  branch: string;
-  saved_by: string;
-  message: string;
 }
 
 export interface CollabSessionOptions {

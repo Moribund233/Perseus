@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 import uuid
 import hmac
 from fastapi import APIRouter, Depends, Query, Request, status, HTTPException
@@ -26,10 +26,16 @@ class CreateBuildRequest(BaseModel):
     commit_message: Optional[str] = Field(None, max_length=1000)
 
 
+class LogEntryIn(BaseModel):
+    stream: Literal["stdout", "stderr"] = "stdout"
+    line: str = Field(..., min_length=1, max_length=8000)
+
+
 class UpdateBuildRequest(BaseModel):
     status: str = Field(..., pattern="|".join(VALID_STATUSES))
     details_url: Optional[str] = Field(None, max_length=512)
     logs: Optional[str] = Field(None)
+    log_entries: Optional[List[LogEntryIn]] = Field(None, description="增量日志行，seq 按 build 自增")
 
 
 class BuildResponse(BaseModel):
@@ -166,6 +172,7 @@ async def update_build(
         status=data.status,
         details_url=data.details_url,
         logs=data.logs,
+        log_entries=data.log_entries,
     )
     return _build_to_response(build)
 
@@ -174,23 +181,39 @@ async def update_build(
 async def get_build_logs(
     repo_id: uuid.UUID,
     build_id: uuid.UUID,
+    after_seq: int = Query(default=0, ge=0, description="增量边界: 只返回 seq>after_seq 的日志行"),
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     获取构建日志
 
+    - 兼容: 不带 after_seq 时返回整串 `logs`（旧行为），并附增量契约字段；
+    - 增量: 带 `after_seq` 时按 build_log_entries 子表只回 `seq>after_seq` 的
+      entries（逐条 seq/stream/line/logged_at），next_seq 为增量光标。
+
     Args:
         repo_id: 仓库ID
         build_id: 构建ID
+        after_seq: 增量边界（只回大于该 seq 的条目，默认 0=全部）
         db: 数据库会话
         current_user: 当前认证用户
 
     Returns:
-        dict: 构建日志文本
+        dict: {"logs": 整串兼容, "entries": [逐条], "next_seq": 增量光标}
     """
     await _get_repo(repo_id, db)
     build = await BuildService.get_build(db=db, build_id=build_id)
     if build.repo_id != repo_id:
         raise NotFoundException(detail="Build not found", error_code="build_not_found")
-    return {"logs": build.logs or ""}
+
+    # 增量契约: 从 build_log_entries 子表拉 seq>after_seq 的行（一次性或增量）
+    entries, next_seq = await BuildService.get_build_log_entries_after_seq(
+        db=db, build_id=build_id, after_seq=after_seq
+    )
+    # 兼容整串: 既有 build.logs 仍是权威整串快照（签名回调可能整串更新）
+    return {
+        "logs": build.logs or "",
+        "entries": entries,
+        "next_seq": next_seq,
+    }

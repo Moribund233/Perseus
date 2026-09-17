@@ -411,8 +411,9 @@ compose 由 `scripts/generate_env.py` 生成并注入 app 与 collab 两容器�
 | `collab-saved` | S→C 广播 | `{docKey, commit_id, saved_by, message, branch, path}` 全员广播（含提交者），驱动"Git 已提交"徽标 |
 | `collab-save-error` | S→C（点对点） | `{error}` 保存失败原因 |
 
-`onStoreDocument`（debounce/断开自动触发）为 no-op：**仅显式保存落 Git**，防止高频自动 commit。
-自动落盘（TTL/草稿分支）见 `docs/collab-f204-vs-cwm.md` 3.2 长期方案，暂未启用。
+- `onStoreDocument`（debounce/断开自动触发）：**Git 提交仅由显式 `collab-save` 触发**，防止高频自动 commit。
+  配置 `REDIS_URL` 时，另将 Y.Doc 全量状态快照写入 Redis（会话持久化，非 Git commit）。
+- 自动保存到 Git（草稿分支）仍是待办，见 `docs/collab-f204-vs-cwm.md` 3.2 长期方案。
 
 ### 权限与只读
 
@@ -425,7 +426,11 @@ compose 由 `scripts/generate_env.py` 生成并注入 app 与 collab 两容器�
 
 - 断线期间本地编辑保留在客户端内存文档中，重连后由 provider 自动同步收敛
   （解决旧 F-204 "重连整篇覆盖丢输入" 问题，即 3.6 方案 B）
-- 服务端 `Y.Doc` 驻留内存直至进程重启；会话 TTL/空闲卸载为待办（3.2 中期方案）
+- 服务端 `Y.Doc` 在最后一人离开后保留 `PERSEUS_COLLAB_SESSION_TTL_MS`（默认 10 分钟，`collab-gateway/sessionTtl.mjs`），
+  TTL 到期卸载；窗口内重 join 复用内存现场（无需重新播种）
+- 多副本：配置 `REDIS_URL` 后，`@hocuspocus/extension-redis` 经 Redis pub/sub 跨副本同步，
+  `@hocuspocus/extension-database` 将快照持久化至 Redis，支撑副本重启/故障后恢复未提交编辑
+  （`collab-gateway/redisPersistence.mjs`，多副本冷启动播种经 Redis 锁串行化）
 
 ### 部署与验证
 

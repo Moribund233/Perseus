@@ -32,6 +32,7 @@ from models import Repository, User
 from models.async_db import get_async_db
 from services.search_service import SearchService
 from services.collab_invite_service import verify_invite_token
+from services.collab_session_service import get_override
 from services.token_service import verify_token
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,8 @@ INTERNAL_SECRET_HEADER = "X-Collab-Internal-Secret"
 INTERNAL_SECRET_ENV = "PERSEUS_COLLAB_INTERNAL_SECRET"
 
 # 读权限角色 (加入会话/加载文档), 与旧 F-204 保持一致
-READ_ROLES = ["owner", "admin", "developer", "viewer"]
+# 注: 规范角色名为 "readonly" (core/constants.py); 历史 "viewer" 一并保留兼容
+READ_ROLES = ["owner", "admin", "developer", "viewer", "readonly"]
 # 写权限角色 (保存提交)
 WRITE_ROLES = ["owner", "admin", "developer"]
 
@@ -63,6 +65,7 @@ class CollabSaveRequest(BaseModel):
     content: str
     message: Optional[str] = None
     invite_token: Optional[str] = None
+    draft: bool = False
 
 
 def make_doc_key(repository_id: str, branch: str, path: str) -> str:
@@ -142,9 +145,18 @@ async def collab_auth(
 
     repo = await _get_repo_or_404(db, repository_id)
 
+    # 会话级覆盖层: 踢出即时拒绝; 权限覆盖优先于仓库角色与邀请 token
+    override = await get_override(db, body.docKey, user.id)
+    if override is not None and override.is_kicked:
+        raise AuthorizationException(detail="已被移出协作会话", error_code="collab_session_kicked")
+
     has_read = await _has_role(db, repository_id, user.id, READ_ROLES)
     via_invite = False
-    if has_read:
+    via_override = False
+    if override is not None and override.scope:
+        can_write = override.scope == "write"
+        via_override = True
+    elif has_read:
         can_write = await _has_role(db, repository_id, user.id, WRITE_ROLES)
     else:
         # 无仓库角色者: 凭邀请 token 获得会话级临时权限 (绑定 docKey + scope)
@@ -159,6 +171,7 @@ async def collab_auth(
         "username": user.username,
         "can_write": can_write,
         "via_invite": via_invite,
+        "via_override": via_override,
         "repository_id": str(repository_id),
         "branch": branch,
         "path": path,
@@ -210,21 +223,37 @@ async def collab_save(
     repository_id, branch, path = parse_doc_key(body.docKey)
     repo = await _get_repo_or_404(db, repository_id)
 
-    can_write = await _has_role(db, repository_id, user.id, WRITE_ROLES)
+    # 会话级覆盖层: 踢出即时拒绝; 权限覆盖优先于仓库角色与邀请 token
+    override = await get_override(db, body.docKey, user.id)
+    if override is not None and override.is_kicked:
+        raise AuthorizationException(detail="已被移出协作会话", error_code="collab_session_kicked")
+
+    if override is not None and override.scope:
+        can_write = override.scope == "write"
+    else:
+        can_write = await _has_role(db, repository_id, user.id, WRITE_ROLES)
+        if not can_write:
+            # 无写角色者: 需持 write 档位的邀请 token (绑定同一 docKey)
+            invite = verify_invite_token(body.invite_token, doc_key=body.docKey)
+            if invite is None or invite["scope"] != "write":
+                raise AuthorizationException(detail="没有该仓库的写入权限", error_code="collab_repository_write_denied")
     if not can_write:
-        # 无写角色者: 需持 write 档位的邀请 token (绑定同一 docKey)
-        invite = verify_invite_token(body.invite_token, doc_key=body.docKey)
-        if invite is None or invite["scope"] != "write":
-            raise AuthorizationException(detail="没有该仓库的写入权限", error_code="collab_repository_write_denied")
+        raise AuthorizationException(detail="没有该仓库的写入权限", error_code="collab_repository_write_denied")
 
     from services.repository_browser_service import commit_file
     from utils.git_utils import get_repository_storage_path
+
+    # F-204 自动落盘草稿分支: 会话空闲自动保存时, 不触碰用户工作分支,
+    # 落到 `collab/draft-{branch}` 草稿分支 (commit_file 分支不存在即创建)
+    target_branch = branch
+    if body.draft:
+        target_branch = f"collab/draft-{branch}"
 
     repo_path = get_repository_storage_path(repo.path)
     commit_message = (body.message or "").strip() or f"Update {path}"
     commit = await commit_file(
         repo_path,
-        branch,
+        target_branch,
         path,
         body.content,
         user.full_name or user.username,
@@ -240,7 +269,7 @@ async def collab_save(
 
     return {
         "commit_id": str(commit.get("commit_id", "")),
-        "branch": branch,
+        "branch": target_branch,
         "path": path,
         "saved_by": user.username,
         "message": commit_message,

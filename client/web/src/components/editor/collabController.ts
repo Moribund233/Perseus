@@ -14,14 +14,11 @@ export interface CollabParticipant {
   cursor: { anchor: number; head: number } | null;
 }
 
-/** 网关广播的协作保存结果 (collab-gateway onStateless) */
+/** 网关广播的协作保存结果 (collab-gateway onStateless)
+ *  私密性收紧: 仅含提交标识, 不携带 saved_by/branch/path/message 等元数据 */
 export interface CollabSavedMsg {
   docKey: string;
   commit_id: string;
-  path: string;
-  branch: string;
-  saved_by: string;
-  message: string;
 }
 
 export interface CollabControllerOptions {

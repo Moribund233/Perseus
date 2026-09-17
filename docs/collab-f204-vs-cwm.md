@@ -69,9 +69,9 @@ F-204 是以**服务端会话 + Git 提交为权威**的**轻协作能力**（�
 - **UX 影响**：数据丢失风险 + "我走了别人还在编辑吗"的不确定感。多人协作中最后一人静默离开是常态路径，风险真实存在。
 - **规划建议**（按成本递增）：
   1. 短期：前端 `beforeunload`/关闭 tab 时若有 `hasPendingChanges()` 提示；会话参与者列表常显"未保存"徽标。→ **✅ 2026-09-14 beforeunload 拦截已落地（web `routes/editor/index.tsx` / desktop `EditorTabs.tsx`）**；参与者"未保存"徽标未做。
-  2. 中期：服务端会话 TTL 延迟销毁（如最后一人离开后保留 10 分钟，期间重 join 恢复现场，`collab_init` 直接续版本号）。
+  2. 中期：服务端会话 TTL 延迟销毁（如最后一人离开后保留 10 分钟，期间重 join 恢复现场）。→ **✅ 2026-09-17 网关落地**：`collab-gateway/sessionTtl.mjs`（`PERSEUS_COLLAB_SESSION_TTL_MS`，默认 600000ms；合并 Redis 会话快照后，未提交编辑跨副本/重启也可恢复）。
   3. 长期：可选"自动落盘"策略——会话空闲 N 分钟自动 `collab_save` 到草稿分支（`collab/draft-...`），避免污染目标分支。
-  - 涉及：`collab_service.py`（TTL/GC）、`collabController.ts`、编辑器 UI。
+  - 涉及：`collab-gateway/sessionTtl.mjs`（TTL/GC）、`collabController.ts`、编辑器 UI。
 
 ### 3.3 保存语义心智 — **P0**
 
@@ -176,8 +176,8 @@ F-204 是以**服务端会话 + Git 提交为权威**的**轻协作能力**（�
 
 ### 5.6 服务端演进（两端共用）
 
-1. **多副本支持**：会话注册表与广播从进程内单例迁至 Redis pub/sub（`collab_service.py` + `api/websocket/manager.py`），解除 `workers=1` 约束 —— 规模化前置条件。
-2. **会话持久化**：变更日志周期快照 + TTL 恢复窗口（支撑 3.2 中期方案）。
+1. **多副本支持** ✅ **2026-09-17**：Hocuspocus 网关经 `@hocuspocus/extension-redis` 在副本间经 Redis pub/sub 广播 CRDT 变更与感知（进程内广播不再跨进程），解除 `workers=1` 约束 —— 规模化前置条件。实现于 `collab-gateway/server.mjs` + `redisPersistence.mjs`；compose `collab` 服务已接 `REDIS_URL`、移除 `container_name` 以支持 `--scale`。（nginx 动态解析/负载均衡留待真正扩容时处理）
+2. **会话持久化** ✅ **2026-09-17**：`@hocuspocus/extension-database` 将 Y.Doc 全量快照周期写入 Redis，冷加载优先恢复（未提交编辑跨副本/短重启不丢），TTL 保留窗口支撑 3.2 中期方案；多副本冷启动播种经 Redis 锁（`seed-lock`）串行化，避免各自独立 insert 造成 `hellohello` 重复。实现于 `collab-gateway/redisPersistence.mjs`。
 3. ** invited-token 体系**（3.1/3.8）：邀请签发/校验/撤销服务。
 
 ### 5.7 明确不做（成本收益衡量）
@@ -191,10 +191,10 @@ F-204 是以**服务端会话 + Git 提交为权威**的**轻协作能力**（�
 
 | 里程碑 | 端 | 内容 | 对应章节 |
 |--------|----|------|----------|
-| **M1（短期）** | web | ~~未保存离开提示、保存/同步双态徽标~~ **✅ 2026-09-14 两端落地**；会话 TTL 延迟销毁待做 | 3.2 / 3.3 |
+| **M1（短期）** | web | ~~未保存离开提示、保存/同步双态徽标~~ **✅ 2026-09-14 两端落地**；会话 TTL 延迟销毁 **✅ 2026-09-17 网关落地** | 3.2 / 3.3 |
 | **M2** | web | 邀请链接 + 会话级临时权限（token 换权限）、跟随模式基础版 | 3.1 / 3.4 / 3.5 |
 | **M3** | web | 断线策略决策落地（锁定 or rebase 保留）、受限视图（token scope） | 3.6 / 3.8 |
-| **M4** | 服务端 | Redis pub/sub 多副本、会话持久化 | 5.6 |
+| **M4** | 服务端 | Redis pub/sub 多副本、会话持久化 **✅ 2026-09-17 网关落地（= 5.6 第 1/2 项）** | 5.6 |
 | **M5** | desktop | 内核选型冻结 → host 会话模型、多文件会话、音视频联动 | 5.1 / 5.2 / 5.3 / 5.4 |
 | 随 Phase 2 | 平台 | room/chat presence 联动 | 3.7 |
 

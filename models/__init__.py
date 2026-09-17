@@ -243,9 +243,12 @@ from models.activity import Activity
 from models.notification import Notification
 from models.notification_preference import NotificationPreference
 from models.user_oauth import UserOAuthAccount
-from models.realtime_room import RealtimeRoom, RoomMember
+from models.realtime_room import RealtimeRoom, RoomMember, DirectMessage
 from models.chat_message import ChatMessage
+from models.file_comment import FileComment
 from models.build_status import BuildStatus
+from models.build_log_entry import BuildLogEntry
+from models.collab_session_override import CollabSessionOverride
 
 __all__ = [
     "Base", "SessionLocal", "BaseModel",
@@ -266,6 +269,10 @@ __all__ = [
     "UserOAuthAccount",
     "RealtimeRoom",
     "RoomMember",
+    "DirectMessage",
     "ChatMessage",
+    "FileComment",
     "BuildStatus",
+    "BuildLogEntry",
+    "CollabSessionOverride",
 ]

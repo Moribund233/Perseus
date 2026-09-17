@@ -88,21 +88,21 @@
 
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
-| 顶栏 Eye/Search/More 三按钮 | 无 onClick | 无对应后端能力；Search 可接消息搜索（需后端消息检索端点） | P3 |
+| 顶栏 Eye/Search/More 三按钮 | 无 onClick | 后端已就绪（2026-09-17）：消息检索 `GET /api/v1/messages/search?q=`（跨会话）+ `GET /rooms/{room_id}/messages?q=`；Eye/More 仍无对应能力 | P3 |
 | 消息删除 | ✅ 已加本人 hover 删除按钮 + 确认，调用 `chatApi.deleteMessage` | — | P1 |
-| DM 私聊列表 | 成员伪装成 DM，点击无效 | 后端无私聊模型（仅 repo room），需私信会话设计 | P3 |
+| DM 私聊列表 | 成员伪装成 DM，点击无效 | 后端已就绪（2026-09-17）：`DirectMessage` + `POST /api/v1/dm`（幂等获取/创建会话）、`GET /api/v1/dm`（会话列表含 peer 信息+未读数）；消息收发复用 `GET/POST /rooms/{room_id}/messages` | P3 |
 | 成员在线状态 | ✅ 已接 WS presence：进入房间 `presence_list` + join/leave 实时增删（批次 D） | — | P1 |
 | 频道未读数 | ✅ 已接后端 `GET /rooms/unread`（按 repository_id 映射频道）+ 进频道 `POST /rooms/{id}/read`（批次 D） | — | P1 |
 | 表情回应 reactions | UI 死代码（渲染逻辑存在，数据恒空） | ✅ 已接线（2026-09-16 确认前端早已实现）：emoji picker + WS `send_reaction` 增减 + REST `chatApi.addReaction` 兜底；后端 `chat_controller.py:62-83`、`chat_service.py:228` add_reaction 已就绪 | ✅ P1 完成 |
 | 消息按日期分组 | 所有消息归入 "Today" | ✅ 按 created_at 分组渲染：Today/Yesterday（新增 i18n）/本地化日期头，静态 Today 块移除（批次 E） | ✅ P2 完成 |
-| 侧边栏搜索框 | 无 value/onChange | 同顶栏搜索，依赖消息检索 | P3 |
+| 侧边栏搜索框 | 无 value/onChange | 后端已就绪（2026-09-17）：同顶栏搜索，接 `GET /api/v1/messages/search?q=`（可选 `room_id` 限定当前会话） | P3 |
 
 ### 3.4 Editor（editor/index.tsx）
 
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
 | 协同编辑 | ✅ 已实现并迁移 **Yjs 底座**（2026-09-08，D1）：`components/editor/collabController.ts` 接入 `collab-gateway`（Hocuspocus）+ `y-codemirror.next`；远端光标/选区（awareness 标签）+ 协作保存（stateless → 网关 → Git commit 全员广播）+ **断线本地编辑保留**（CRDT 重连收敛，3.6 方案 B 天然解决）；**邀请链接（2026-09-16，M2）**：工具栏「分享协作」生成会话级临时权限链接（仅成员），`?invite=` 经 JSON token 透传网关 | 会话 TTL/空闲卸载未做（Y.Doc 驻留内存至网关重启）；"会话已同步/Git 已提交"双态徽标待接 `hasUnsyncedChanges`/`collab-saved`（原 3.3 项）；不支持离线合并（页面关闭即丢，与旧版一致） | P2 |
-| Discussions 面板 | 空状态占位（mock 已移除） | 行内评论需后端锚定文件+行号存储，可复用 PR 评论模型扩展 | P3 |
+| Discussions 面板 | 空状态占位（mock 已移除） | 后端已就绪（2026-09-17）：`FileComment`（文件+行号/分支/提交锚定）+ `/api/v1/repositories/{repo_id}/discussions`（创建/列表/回复/解决/删除） | P3 |
 | 协作者 "viewing" 状态 | ✅ 已接 WS presence：在线协作者列表即 Editors tab 内容（批次 D）；本文件会话参与者经 `collab_init`/peer 事件展示（F-204） | — | P3 |
 | "Online" 绿点 | ✅ 已接房间 presence（在线人数 > 0 亮绿）（批次 D） | — | P2 |
 | 面包屑点击 | cursor:pointer 无跳转 | ✅ 已接线（批次 E）：目录段点击加载该目录并钉出浮动面板（对齐文件树点位），根段点击回根文件树（清选中与面板链） | ✅ P2 完成 |
@@ -145,7 +145,7 @@
 | **批次 C（用户中心）** ✅ | SSH Keys、OAuth 账号管理、`/me/*` 聚合展示（2.4）；全局搜索（3.1）— **已完成** | — |
 | **批次 D（实时增强）** ✅ | Editor 在线状态（3.4）、聊天 presence/未读数（3.3）— **已完成**（presence 复用原 WS 基础设施，未读数新增 REST 端点） | — |
 | **批次 E（体验完善）** ✅ | 消息 reactions UI（确认已实现，仅回填）、文件树 last-commit 列全层级接线、聊天按日期分组、编辑器面包屑点击跳转、PR Filter 装饰按钮移除 — **已完成（2026-09-16）** | 后端早已就绪，纯前端 + 文档 |
-| 待排期 | DM 私聊、行内评论、亮色主题 | 涉及新后端能力 |
+| 待排期 | DM 私聊、行内评论、消息搜索 — **后端已就绪（2026-09-17）**，待前端接线；亮色主题 | 前端接线 + 亮色主题工程 |
 
 ---
 

@@ -6,81 +6,28 @@
  *   auth 契约 / 文档种子 / 双端 CRDT 同步 / 只读拒绝 / 显式保存广播
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { HocuspocusProvider } from "@hocuspocus/provider";
+
+import {
+  appMock,
+  AUTH_OK_READER,
+  AUTH_OK_WRITER,
+  DOC,
+  installAppMock,
+  makeProvider,
+  waitFor,
+} from "./support.mjs";
 
 const SECRET = "test-internal-secret";
-const DOC = "11111111-1111-1111-1111-111111111111:main:src/app.py";
 
-// app 回调路由 mock 表 (每个用例可覆盖)
-const appMock = {
-  responses: {},
-  calls: [],
-  reset(responses = {}) {
-    this.responses = responses;
-    this.calls = [];
-  },
-};
-
-vi.stubGlobal(
-  "fetch",
-  vi.fn(async (url, init = {}) => {
-    const path = url.replace(/^https?:\/\/[^/]+/, "").split("?")[0];
-    const method = init.method || "GET";
-    let body = null;
-    try {
-      body = JSON.parse(init.body || "null");
-    } catch {
-      body = init.body ?? null;
-    }
-    appMock.calls.push({ path, method, body, url });
-    const handler = appMock.responses[`${method} ${path}`];
-    if (!handler) throw new Error(`unexpected app call: ${method} ${path}`);
-    const { status = 200, data = {} } = typeof handler === "function" ? handler(body) : handler;
-    return new Response(JSON.stringify(data), {
-      status,
-      headers: { "Content-Type": "application/json" },
-    });
-  })
-);
+installAppMock();
 
 process.env.PERSEUS_COLLAB_INTERNAL_SECRET = SECRET;
 process.env.PERSEUS_APP_URL = "http://app.test:8000";
+// 本文件为无外部依赖的集成测试: 显式禁用 Redis, 避免宿主环境变量串入
+delete process.env.REDIS_URL;
+delete process.env.PERSEUS_COLLAB_REDIS_URL;
 
 const { startGateway } = await import("../server.mjs");
-
-const AUTH_OK_WRITER = {
-  status: 200,
-  data: { user_id: "u-writer", username: "alice", can_write: true },
-};
-const AUTH_OK_READER = {
-  status: 200,
-  data: { user_id: "u-reader", username: "bob", can_write: false },
-};
-
-async function waitFor(fn, desc) {
-  const start = Date.now();
-  for (;;) {
-    try {
-      const v = fn();
-      if (v !== false) return v;
-    } catch {
-      // 条件尚未满足
-    }
-    if (Date.now() - start > 5000) throw new Error(`timeout waiting: ${desc}`);
-    await new Promise((r) => setTimeout(r, 25));
-  }
-}
-
-function makeProvider(port, name, token, user) {
-  return new HocuspocusProvider({
-    url: `ws://127.0.0.1:${port}`,
-    name,
-    token,
-    awareness: undefined,
-    onAwarenessUpdate: () => {},
-    user,
-  });
-}
 
 describe("collab-gateway", () => {
   let gw;
@@ -151,7 +98,9 @@ describe("collab-gateway", () => {
 
     const saved = await savedPromise;
     expect(saved.commit_id).toBe("abc1234");
-    expect(saved.saved_by).toBe("alice");
+    expect(saved.docKey).toBe(DOC);
+    // 收紧后广播仅含提交标识, 不泄漏 saved_by/message/branch/path
+    expect(saved.saved_by).toBeUndefined();
 
     const saveCall = appMock.calls.find((c) => c.path === "/api/v1/collab/save");
     expect(saveCall).toBeTruthy();
@@ -217,5 +166,52 @@ describe("collab-gateway", () => {
     expect(saveCall.body.token).toBe("writer-token");
     expect(saveCall.body.invite_token).toBe("invite-abc");
     a.destroy();
+  });
+
+  it("会话 TTL: 窗口内重连复用内存现场, 不重新向 app 加载", async () => {
+    const a = makeProvider(gw.port, DOC, "writer-token", { name: "alice" });
+    await waitFor(() => a.document?.getText("content").toString() === "hello", "synced");
+    a.document.getText("content").insert(5, " warm");
+    await waitFor(() => a.document.getText("content").toString() === "hello warm", "edit applied");
+    a.destroy();
+
+    await waitFor(() => gw.sessionTtl.heldDocuments().includes(DOC), "doc kept warm");
+    expect(gw.hocuspocus.getDocumentsCount()).toBe(1);
+
+    const b = makeProvider(gw.port, DOC, "writer-token", { name: "alice" });
+    await waitFor(() => b.document?.getText("content").toString() === "hello warm", "warm doc reused");
+    expect(appMock.calls.filter((c) => c.path === "/api/v1/collab/doc")).toHaveLength(1);
+    b.destroy();
+  });
+
+  it("会话 TTL: 到期后卸载, 重连重新从 app 加载播种", async () => {
+    await gw.close();
+    gw = await startGateway({ sessionTtlMs: 120 });
+
+    const a = makeProvider(gw.port, DOC, "writer-token", { name: "alice" });
+    await waitFor(() => a.document?.getText("content").toString() === "hello", "synced");
+    a.document.getText("content").insert(5, " stale");
+    await waitFor(() => a.document.getText("content").toString() === "hello stale", "edit applied");
+    a.destroy();
+
+    await waitFor(() => gw.hocuspocus.getDocumentsCount() === 0, "doc unloaded after TTL");
+    expect(gw.sessionTtl.heldDocuments()).toHaveLength(0);
+
+    const b = makeProvider(gw.port, DOC, "writer-token", { name: "alice" });
+    await waitFor(() => b.document?.getText("content").toString() === "hello", "reloaded from app");
+    expect(appMock.calls.filter((c) => c.path === "/api/v1/collab/doc")).toHaveLength(2);
+    b.destroy();
+  });
+
+  it("会话 TTL=0: 禁用保留, 断开即卸载", async () => {
+    await gw.close();
+    gw = await startGateway({ sessionTtlMs: 0 });
+
+    const a = makeProvider(gw.port, DOC, "writer-token", { name: "alice" });
+    await waitFor(() => a.document?.getText("content").toString() === "hello", "synced");
+    a.destroy();
+
+    await waitFor(() => gw.hocuspocus.getDocumentsCount() === 0, "doc unloaded immediately");
+    expect(gw.sessionTtl.heldDocuments()).toHaveLength(0);
   });
 });

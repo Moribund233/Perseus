@@ -2,7 +2,8 @@
 
 > **创建日期**: 2026-09-15
 > **用途**: 汇总 2026-09-15 文档盘点发现的待迭代任务与文档滞后项，作为后续排期与迭代输入。
-> **最近更新**: 2026-09-16（批次 0/1/3/5/7 完成；批次 2 邀请链接后端+网关+web 完成）
+> **最近更新**: 2026-09-17（批次 0/1/3/5/7 完成；会话 TTL 延迟销毁 + Redis 多副本/会话持久化落地；collab 网关多副本收紧：广播私密性/容量上限/403 即时吊销；构建日志流式、自动落盘草稿分支、协作会话级角色覆盖层落地；test 服务补挂载 alembic）；
+> 2026-09-16（批次 2 邀请链接后端+网关+web 完成）
 > **关联**: `docs/api/roadmap.md`、`docs/frontend-placeholders.md`、`docs/collab-f204-vs-cwm.md`、`docs/desktop-port-sync.md`
 > **开发方针**: 所有新功能必须采用 TDD（测试驱动开发）；新文案同步补 `{zh,en}.json`；禁止硬编码兜底假数据。
 
@@ -46,7 +47,7 @@
 
 | 任务 | 说明 | TDD 要点 | 涉及文件 |
 |------|------|----------|----------|
-| 会话 TTL 延迟销毁 | 最后一人离开后保留 ~10 分钟，期间重 join 恢复现场（`collab_init` 续版本号） | `test_collab_session_ttl_rejoin()`、`test_collab_session_gc_after_ttl()` | `services/realtime/collab_service.py`（TTL/GC） |
+| 会话 TTL 延迟销毁 ✅ | 最后一人离开后保留内存 Y.Doc（`PERSEUS_COLLAB_SESSION_TTL_MS`，默认 10 分钟），窗口内重 join 直接复用现场；TTL 到期卸载，下次 join 重新播种 — **已完成（2026-09-17）** | `gateway.test.mjs`：TTL 窗口内重连保留现场不重新加载 / TTL 到期重载 / TTL=0 立即卸载 ✅ | `collab-gateway/sessionTtl.mjs`、`collab-gateway/server.mjs` |
 | 参与者「未保存」徽标 | 会话参与者列表常显未保存/已提交状态 | — | web/desktop 编辑器 UI |
 
 ### P1 — 跟随模式（M2 附带）
@@ -73,14 +74,15 @@
 
 | 任务 | 说明 | 涉及文件 |
 |------|------|----------|
-| 会话级角色覆盖层 | 发起人可改权限/踢人，协议加 `collab_permission` / `collab_kick` | `collab_service.py`、`collab.py` handler |
+| 会话级角色覆盖层 ✅ | 发起人（仓库 owner/admin）可改成员会话权限（read/write）或踢出；覆盖优先于仓库角色与邀请 token，`/collab/auth` 与 `/collab/save` 即时强制执行；改权限即重新接纳；清空覆盖（scope=null）回落仓库角色；顺带修复 `readonly` 角色无法加入会话的缺陷 — **已完成（2026-09-17）** | `test_collab_session_override.py`：10 用例 ✅ | `controller/collab_session_controller.py`、`services/collab_session_service.py`、`models/collab_session_override.py`、`controller/collab_internal_controller.py` |
 
 ### P2 — 多副本支持（服务端演进 5.6）
 
 | 任务 | 说明 | 涉及文件 |
 |------|------|----------|
-| Redis pub/sub 多副本 | 会话注册表与广播从进程内单例迁至 Redis pub/sub，解除 `workers=1` 约束 | `collab_service.py`、`api/websocket/manager.py` |
-| 会话持久化 | 变更日志周期快照 + TTL 恢复窗口 | `collab_service.py` |
+| Redis pub/sub 多副本 ✅ | `@hocuspocus/extension-redis` 经 Redis pub/sub 跨副本广播 CRDT 变更与感知，同一文档落在不同副本也收敛 — **已完成（2026-09-17）**；compose 已接线 `REDIS_URL`、可 `--scale collab=N`（nginx 动态解析留待扩容） | `redisIntegration.test.mjs`：副本间同步 / 快照恢复不回源 Git（需 `TEST_REDIS_URL`）✅ | `collab-gateway/server.mjs`、`collab-gateway/redisPersistence.mjs`、`docker-compose.yml` |
+| 会话持久化 ✅ | `@hocuspocus/extension-database` + Redis Y.Doc 快照：周期落盘、冷加载优先恢复未提交编辑；多副本冷启动播种用 Redis 锁串行化防重复（`hellohello`） — **已完成（2026-09-17）** | 同上 | `collab-gateway/redisPersistence.mjs`、`docker-compose.yml` |
+| 多副本收紧（bugfix） ✅ | 广播私密性（`collab-saved` 仅回 `commit_id`+`docKey`，不再泄漏 `saved_by/branch/path/message`）；单文档内容上限（`PERSEUS_COLLAB_MAX_CONTENT_CHARS`，超限拒加载 413/拒保存）；每文档并发连接上限（`PERSEUS_COLLAB_MAX_CONNECTIONS_PER_DOC`，超限拒新连接）；保存被 app 回 403 即断连强制重认证（多副本即时吊销） — **已完成（2026-09-17）** | `gatewayHardening.test.mjs`：5 用例 ✅ | `collab-gateway/server.mjs`、`client/web/src/components/editor/collabController.ts`、`client/desktop/frontend/src/api/collabSocket.ts` |
 | 邀请 token 体系 | 签发/校验/撤销服务（与 P0 邀请链接联动） | 新 service |
 
 ---
@@ -93,7 +95,7 @@
 | 编辑器面包屑点击跳转 | P2 | ~~cursor:pointer 无跳转~~ | ✅ 已完成（批次 E）：目录段钉出浮动面板 + 根段回根文件树（`editor/index.tsx`） |
 | 顶栏全局搜索三类分组 | P2 | ~~web 为纯代码搜索~~ | ✅ 已完成（批次 C + 2026-09-14）：`GlobalSearch.tsx` 与 `/search` 页均接 `GET /api/v1/search/global` 仓库/Issue/PR/代码分组（`search/index.tsx:50`） |
 | PR Filter 装饰按钮 | P4 | ~~无 onClick，云遮雾绕~~ | ✅ 已完成（批次 E）：移除按钮及 unused i18n key（`pull-requests/index.tsx`） |
-| 聊天侧边栏搜索框 | P3 | 无 value/onChange | 依赖消息检索端点（后端待做） |
+| 聊天侧边栏搜索框 | P3 | 无 value/onChange | 后端已就绪（2026-09-17）：`GET /api/v1/messages/search?q=`（跨会话）+ `GET /rooms/{room_id}/messages?q=`（单会话）；待前端接线 |
 | 主题切换 | P3 | 应用固定 dark | 全站 CSS 变量化，工程量大，可暂缓 |
 
 ---
@@ -103,9 +105,9 @@
 | 任务 | 说明 | TDD 要点 | 涉及文件 |
 |------|------|----------|----------|
 | Watch 仓库 API ✅ | 新表/字段 + 端点（当前只有 star/fork） — **已完成**：`Watcher` 表 + `Repository.watch_count`，`watch_service.py` + `watch_controller.py`（POST/DELETE/GET `/{repo_id}/watch`、GET `/watchers`）；web 仓库页 Watch 按钮已接线 | `test_watch_repository()`、`test_unwatch_repository()` ✅ | `models/watcher.py`、`services/watch_service.py`、`controller/watch_controller.py` |
-| DM 私聊模型 | 当前仅 repo room，无私信 | `test_dm_room_creation()` | 新模型 + `room_service.py` |
+| DM 私聊模型 ✅ | **已完成**（2026-09-17）：`RealtimeRoom.room_type`（`repository`/`dm`）+ `repository_id` 可空 + `DirectMessage` 规范化 pair（`user_a_id < user_b_id`）；`RoomService.get_or_create_dm_room()` 幂等（任一方发起命中同一会话）、`list_dm_rooms()`、`list_rooms()` 仅返回 repo room；复用既有房间消息/WS 广播。端点：`POST/GET /api/v1/dm` | `test_dm_room_creation()` 等 15 例 ✅ | `models/realtime_room.py`、`services/realtime/room_service.py`、`controller/dm_controller.py` |
 | 文件重命名/移动端点 ✅ | move 端点（或 copy+delete 组合提交） — **已完成**：`git_utils.move_file_changes` 单次提交内 copy+delete，`POST /{repo_id}/contents/move` | `test_move_file_in_repo()` ✅ | `utils/git_utils.py`、`services/repository_browser_service.py`、`controller/repository_browser_controller.py` |
-| 行内评论锚定 | 文件+行号存储，可复用 PR 评论模型扩展 | `test_inline_comment_on_file()` | 新模型 + 评论服务 |
+| 行内评论锚定 ✅ | **已完成**（2026-09-17）：新增 `FileComment`（repository_id/file_path/line_number/branch/commit_hash/parent_id/resolved）；`file_comment_service.py` + `controller/file_comment_controller.py`，端点 `/api/v1/repositories/{repo_id}/discussions`（创建/列表/回复/解决/删除，含仓库读权限与作者/负责人鉴权）。另补消息检索：`ChatService.search_messages()` + `GET /api/v1/messages/search`、`get_messages(q=)` | `test_inline_comment_on_file()` 等 13 例 ✅ | `models/file_comment.py`、`services/file_comment_service.py`、`controller/file_comment_controller.py` |
 | 自动落盘草稿分支 | 会话空闲 N 分钟自动 `collab_save` 到 `collab/draft-...` | `test_autosave_to_draft_branch()` | `collab_service.py` 集成 |
 
 ---
@@ -132,9 +134,9 @@
 
 | 优先级 | 任务 | 缺口说明 | TDD 要点 | 涉及文件 |
 |--------|------|----------|----------|----------|
-| P1 | 增量索引接入 | `SearchIndex.update()`（`search_service.py:78`）已实现但**无任何调用点**；push/PR merge 均为全量 rebuild | `test_index_incremental_update()`：改 1 文件只更新该文件，mtime 不变项跳过 | `search_service.py`、push/merge 触发点 |
-| P1 | push 后索引重建异步化 | `event_service.py:162` 在协程内**同步调用** `rebuild_index`，大仓阻塞事件循环（PR merge 已用 `asyncio.to_thread`，此处理应一致） | `test_push_index_rebuild_not_blocking()`：重建期间心跳/其他请求不被卡住 | `services/realtime/event_service.py` |
-| P1 | collab 保存进索引 | `collab/save` → `commit_file` 直接写 git，**不触发索引更新** → 协作编辑后搜不到新内容 | `test_collab_save_index_updated()`：save 后 /search 命中新内容 | `controller/collab_internal_controller.py`（collab_save）、索引更新调用 |
+| P1 | 增量索引接入（PR merge/collab save 已接线，push 仍全量） | `SearchIndex.update()` 已在 PR merge（`pull_request_service.py:549-557` 用 `update_files`）与 collab save（`collab_internal_controller.py:237`）接线；**push 路径仍是全量 rebuild（`event_service.py:167`），大仓 push 代价高** | `test_index_incremental_update()`：改 1 文件只更新该文件，mtime 不变项跳过 | `search_service.py`、push 触发点 |
+| P1 | push 后索引重建异步化 ✅ | `event_service.py:167` 已用 `asyncio.to_thread(SearchService.rebuild_index, ...)`，不再阻塞事件循环（与 PR merge 一致）— **已在批次 1 落地** | `test_push_index_rebuild_not_blocking()`（批次1 用例 ✅） | `services/realtime/event_service.py` |
+| P1 | collab save 进索引 ✅ | `collab_internal_controller.py:237` save → `SearchService.update_files()` 增量更新，搜索立即可检索 — **已在批次 1 落地** | `test_collab_save_index_updated()`（批次1 用例 ✅） | `controller/collab_internal_controller.py`、`SearchService.update_files` |
 | P2 | 索引生命周期管理 | 仓库删除/改名后 `.perseus_search_index/` 残留；构建失败无重试/状态上报 | `test_index_cleanup_on_repo_delete()` | `repository_service.py` 删除/重命名路径 |
 
 > 前端侧：Web 搜索页接 `/search/global` 三类分组已列于批次 3（见第七节），后端已就绪。
@@ -149,7 +151,7 @@
 | ~~P0~~ | ~~push 触发 build~~ ✅ | `broadcast_push`（`event_service.py`）已扩展：携带 `db`/`commit_sha` 时经 room 解析仓库并 `ensure_build_for_commit` 去重建 pending build（避免与 PR merge 重复） | `test_push_creates_build()`、`test_broadcast_push_creates_build_for_commit()` ✅ | `event_service.py`/`build_service.py` |
 | ~~P1~~ | ~~本地 runner~~ | ❌ **取消**（决策为仅外部回调，无需内置轮询/clone/执行器） | — | — |
 | ~~P1~~ | ~~外部回调接入增强~~ ✅ | 外部 CI 回调签名鉴权（`X-Perseus-Signature`，HMAC-SHA256 复用 `generate_signature`）+ `Repository.ci_secret`（alembic 迁移）；`PATCH /builds/{id}` 支持签名或用户 token 双通道 | `test_external_callback_signed()`（`test_update_build_via_signature` 等）✅ | `build_controller.py`、`webhook_service.py`、`models/repository.py` |
-| P2 | 构建日志流式 | 当前 `logs` 为整串字段（`build_controller.py:145`），无分步/时间戳 | `test_build_log_stream()` | 模型字段 + 外部回调写入 |
+| ~~P2~~ | ~~构建日志流式~~ ✅ | 新增 `build_log_entries` 子表（seq 每 build 自增、stream 分流、logged_at timestamptz）；签名回调 PATCH 支持 `log_entries` **追加**（不再整串覆盖）；`GET /logs?after_seq=N` 增量拉取返回 `{logs, entries, next_seq}` | `test_build_log_stream.py` ✅（红→绿，全量 1170 passed） | 模型字段 + 外部回调写入 + 增量拉取 |
 
 ### 6.3 实时协作增强 —— 底座齐，缺会话能力
 
@@ -158,8 +160,8 @@
 | 优先级 | 任务 | 缺口说明 | 涉及文件 |
 |--------|------|----------|----------|
 | P0 | 邀请链接 + 会话级临时权限 ✅ | 已落地：docKey 绑定短时 JWT（`collab_invite_service.py`），`/collab/auth`/`/collab/save` 接受 `invite_token`（无仓库角色者可读写受控） | 第二节 P0 表 |
-| P1 | 会话 TTL 延迟销毁 | 最后一人离开即销毁，重 join 现场不恢复 | 第二节 P0 表 |
-| P2 | Redis pub/sub 多副本 | `workers=1` 单副本约束仍在 | 第二节 P2 表 |
+| P1 | 会话 TTL 延迟销毁 ✅ | **已完成（2026-09-17）**：网关 `sessionTtl.mjs`（`PERSEUS_COLLAB_SESSION_TTL_MS`，默认 10 分钟），最后一人离开后保留内存现场，窗口内重 join 复用；TTL 到期卸载 | 第二节 P0 表 |
+| P2 | Redis pub/sub 多副本 ✅ | **已完成（2026-09-17）**：`@hocuspocus/extension-redis` pub/sub 跨副本广播 + `extension-database` Redis 快照会话持久化（`redisPersistence.mjs`），解除 `workers=1`/单副本约束；compose 已接线 `REDIS_URL` | 第二节 P2 表 |
 
 ---
 
@@ -187,4 +189,4 @@
 | **批次 4（协作 P1）** | 跟随模式、断线策略（方案 B rebase 保留，✅ 已决策）、受限视图 | 1 周 | 批次 2 |
 | **批次 5（CI/CD 闭环）** ✅ | push 触发 build + 外部回调签名（GHA 式）**已完成**；仅剩余双态徽标「版本 N」非阻塞项 | 1~2 周 | 仅剩余双态徽标「版本 N」非阻塞项 |
 | **批次 6（服务端演进）** | Redis pub/sub 多副本、会话持久化、索引生命周期 | 1~2 周 | — |
-| **批次 7（后端 P3）** 🚧 | Watch ✅、文件 move ✅；DM、行内评论、自动落盘 待做 | 2 周+ | — |
+| **批次 7（后端 P3）** 🚧 | Watch ✅、文件 move ✅、DM ✅、行内评论 ✅、消息检索 ✅；自动落盘草稿分支 待做 — **已完成部分（pytest 1168 passed, 3 skipped, 无回归）** | 2 周+ | — |

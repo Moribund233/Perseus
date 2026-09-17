@@ -21,8 +21,8 @@ WORKDIR /app/gateway
 COPY collab-gateway/package.json collab-gateway/package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-# 复制网关源码
-COPY collab-gateway/server.mjs ./
+# 复制网关源码 (TTL 会话保留 / Redis 多副本 + 会话持久化)
+COPY collab-gateway/server.mjs collab-gateway/sessionTtl.mjs collab-gateway/redisPersistence.mjs ./
 
 # 非 root 运行
 USER node

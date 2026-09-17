@@ -62,6 +62,10 @@ class ChatService:
             return
 
         room = await ChatService._get_room_or_raise(db, room_id)
+        if room.repository_id is None:
+            # 私聊房间无仓库访问判定, 仅允许显式加入的 DM 成员
+            raise ValidationException("你不是该房间的成员", error_code="room_not_member")
+
         repo_result = await db.execute(
             select(Repository).filter(Repository.id == room.repository_id)
         )
@@ -296,7 +300,8 @@ class ChatService:
         room_id: uuid.UUID,
         user_id: uuid.UUID,
         before: Optional[uuid.UUID] = None,
-        limit: int = DEFAULT_PAGE_LIMIT
+        limit: int = DEFAULT_PAGE_LIMIT,
+        q: Optional[str] = None
     ) -> Dict[str, Any]:
         await ChatService._get_room_or_raise(db, room_id)
         await ChatService._ensure_membership(db, room_id, user_id)
@@ -310,6 +315,9 @@ class ChatService:
             .order_by(desc(ChatMessage.created_at), desc(ChatMessage.id))
             .limit(limit + 1)
         )
+
+        if q and q.strip():
+            query = query.filter(ChatMessage.content.ilike(f"%{q.strip()}%"))
 
         if before is not None:
             result = await db.execute(
@@ -351,6 +359,62 @@ class ChatService:
             "has_more": has_more,
             "next_before": next_before if has_more else None,
         }
+
+    @staticmethod
+    async def search_messages(
+        db: AsyncSession,
+        user_id: uuid.UUID,
+        q: str,
+        limit: int = DEFAULT_PAGE_LIMIT
+    ) -> Dict[str, Any]:
+        """跨会话消息检索：仅搜索当前用户已加入且处于活跃状态的房间."""
+        q = (q or "").strip()
+        if not q:
+            raise ValidationException("搜索关键词不能为空", error_code="search_query_required")
+        limit = min(limit, MAX_PAGE_LIMIT)
+
+        query = (
+            select(
+                ChatMessage,
+                RealtimeRoom.id.label("room_id_value"),
+                RealtimeRoom.name.label("room_name"),
+                RealtimeRoom.room_type.label("room_type"),
+                RealtimeRoom.repository_id.label("repository_id"),
+            )
+            .join(RoomMember, RoomMember.room_id == ChatMessage.room_id)
+            .join(RealtimeRoom, RealtimeRoom.id == RoomMember.room_id)
+            .options(selectinload(ChatMessage.sender))
+            .filter(
+                RoomMember.user_id == user_id,
+                RealtimeRoom.is_active.is_(True),
+                ChatMessage.message_type != "system",
+                ChatMessage.content.ilike(f"%{q}%"),
+            )
+            .order_by(desc(ChatMessage.created_at), desc(ChatMessage.id))
+            .limit(limit)
+        )
+
+        result = await db.execute(query)
+        rows = result.all()
+
+        messages = []
+        for msg, room_id_value, room_name, room_type, repo_id in rows:
+            messages.append({
+                "id": msg.id,
+                "room_id": room_id_value,
+                "room_name": room_name,
+                "room_type": room_type,
+                "repository_id": repo_id,
+                "sender_id": msg.sender_id,
+                "sender_username": msg.sender.username if msg.sender else "unknown",
+                "message_type": msg.message_type,
+                "content": msg.content,
+                "reply_to": msg.reply_to_id,
+                "created_at": msg.created_at.isoformat() if msg.created_at else None,
+                "reactions": ChatService._format_reactions(msg, user_id),
+            })
+
+        return {"messages": messages}
 
     @staticmethod
     async def edit_message(
