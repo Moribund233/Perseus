@@ -11,7 +11,7 @@
 配置管理、关机、重启等 API 仅在调试模式或管理员权限下可用
 """
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Query, Body
 from pydantic import BaseModel, Field
@@ -21,7 +21,8 @@ from api.routes_prefix import get_route_prefix
 from core.config import get_config
 from services.app_service import get_app_service
 from services.config_service import get_config_service
-from api.dependencies import get_current_user
+from services.orchestration_service import get_orchestration_service
+from api.dependencies import get_current_user, get_current_admin_user
 from models.user import User
 from models.async_db import get_async_db
 from core.exception import AuthorizationException
@@ -105,6 +106,33 @@ class ActionResponse(BaseModel):
     """操作响应模型"""
     success: bool
     message: str
+
+
+class ComponentInfo(BaseModel):
+    """编排组件（容器）状态"""
+    service: str
+    name: str
+    label: Optional[str] = None
+    state: str
+    health: Optional[str] = None
+    running: bool
+    image: Optional[str] = None
+    started_at: Optional[str] = None
+    uptime_seconds: Optional[int] = None
+    restart_count: Optional[int] = None
+    exit_code: Optional[int] = None
+    status_text: Optional[str] = None
+
+
+class ComponentsResponse(BaseModel):
+    """编排组件状态响应模型"""
+    available: bool
+    runtime: str = "docker"
+    project: Optional[str] = None
+    reason: Optional[str] = None
+    generated_at: str
+    components: List[ComponentInfo] = Field(default_factory=list)
+    summary: Dict[str, int] = Field(default_factory=dict)
 
 
 # ============== 依赖函数 ==============
@@ -431,6 +459,28 @@ async def cleanup_logs_endpoint(
     )
 
     return LogCleanupResponse(**result)
+
+
+# ============== 编排组件状态接口 ==============
+
+
+@router.get("/api/app/components", response_model=ComponentsResponse, tags=["app-management"])
+async def get_components_endpoint(
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    获取编排中各组件（容器）的状态。
+
+    通过只读 Docker socket 代理查询，用于 admin 控制台可视化各组件健康度。
+    仅管理员可访问；Docker 不可用时返回 available=false 而非报错。
+
+    Returns:
+        ComponentsResponse: 组件状态列表与汇总
+    """
+    orchestration_service = get_orchestration_service()
+    data = await orchestration_service.get_components()
+
+    return ComponentsResponse(**data)
 
 
 

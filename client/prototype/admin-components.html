@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Perseus · 组件健康</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cpath d='M43.9 46.1 A24 24 0 0 1 69.9 67.9' fill='none' stroke='%233D7BFF' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M39.7 34.5 A36 36 0 0 1 81.9 73.1' fill='none' stroke='%233D7BFF' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M62.4 24.9 A48 48 0 0 1 92.4 57.6' fill='none' stroke='%2312A38B' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M37.8 92.6 A24 24 0 0 1 23.4 78.2' fill='none' stroke='%23E9F1FF' stroke-width='8' stroke-linecap='round'/%3E%3Ccircle cx='46' cy='70' r='11' fill='%233D7BFF'/%3E%3Ccircle cx='10' cy='73' r='4.5' fill='%2312A38B'/%3E%3C/svg%3E" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+  :root{
+    --bg:#0d1117; --band:#0f151d; --raised:#161b22; --panel:#111820;
+    --rule:#21262d; --rule-strong:#30363d;
+    --text:#e6edf3; --muted:#8b949e; --faint:#6e7681;
+    --accent:#1f6feb; --accent-bright:#58a6ff;
+    --ok:#3fb950; --warn:#d29922; --danger:#f85149; --violet:#bc8cff;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+    font-size:13px;line-height:1.55;-webkit-font-smoothing:antialiased;
+    display:flex;flex-direction:column;height:100vh;overflow:hidden;
+  }
+  .mono{font-family:var(--mono);font-variant-ligatures:none}
+  button{font-family:inherit;font-size:inherit;color:inherit;background:none;border:none;cursor:pointer}
+  :focus-visible{outline:2px solid var(--accent-bright);outline-offset:2px;border-radius:3px}
+  ::selection{background:rgba(31,111,235,.35)}
+
+  /* ribbon */
+  .ribbon{
+    flex-shrink:0;height:46px;display:flex;align-items:center;gap:16px;
+    padding:0 18px;border-bottom:1px solid var(--rule);background:var(--raised);z-index:20;
+  }
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand svg{width:22px;height:22px;display:block}
+  .brand-name{font-weight:700;letter-spacing:.14em;font-size:12px}
+  .brand-sep{color:var(--rule-strong)}
+  .brand-sub{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .ribbon-right{margin-left:auto;display:flex;align-items:center;gap:16px}
+  .updated{font-size:11.5px;color:var(--faint)}
+  .live{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .live .dot{width:6px;height:6px;border-radius:50%;background:var(--ok);position:relative}
+  .live.off .dot{background:var(--faint)}
+  .live:not(.off) .dot::after{
+    content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid var(--ok);
+    animation:beat 2.4s ease-out infinite;
+  }
+  @keyframes beat{0%{transform:scale(.4);opacity:.8}70%{transform:scale(1.6);opacity:0}100%{opacity:0}}
+
+  .shell{flex:1;display:flex;min-height:0}
+  .stage{flex:1;min-width:0;overflow-y:auto}
+
+  .page-head{padding:20px 26px 16px;border-bottom:1px solid var(--rule)}
+  .page-head h1{margin:0;font-size:19px;font-weight:700;letter-spacing:-.01em}
+  .page-head p{margin:5px 0 0;font-size:12.5px;color:var(--muted);max-width:74ch}
+  .head-actions{margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .seg{display:inline-flex;border:1px solid var(--rule-strong);border-radius:7px;overflow:hidden}
+  .seg button{padding:5px 12px;font-size:12px;color:var(--muted);background:var(--raised)}
+  .seg button + button{border-left:1px solid var(--rule-strong)}
+  .seg button.on{background:#1a2332;color:var(--text)}
+  .toggle{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .switch{width:32px;height:18px;border-radius:10px;background:var(--rule-strong);position:relative;transition:background .16s;flex-shrink:0}
+  .switch::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#8b949e;transition:transform .16s,background .16s}
+  .switch.on{background:rgba(31,111,235,.35)}
+  .switch.on::after{transform:translateX(14px);background:var(--accent-bright)}
+  .spacer{margin-left:auto}
+
+  /* summary ledger */
+  .summary{display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid var(--rule)}
+  .s{padding:14px 20px;border-left:1px solid var(--rule);min-width:0}
+  .s:first-child{border-left:none;padding-left:26px}
+  .s .n{font-family:var(--mono);font-size:21px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+  .s .l{font-size:11px;color:var(--faint);margin-top:3px}
+  .s.ok .n{color:var(--ok)} .s.bad .n{color:var(--danger)} .s.warn .n{color:var(--warn)}
+
+  /* degraded banner */
+  .degraded{
+    margin:16px 26px;padding:14px 16px;border:1px solid rgba(210,153,34,.4);
+    background:rgba(210,153,34,.07);border-radius:9px;display:flex;gap:12px;align-items:flex-start;
+  }
+  .degraded .ic{color:var(--warn);font-size:16px;line-height:1.3}
+  .degraded h3{margin:0 0 3px;font-size:13px}
+  .degraded p{margin:0;font-size:12px;color:var(--muted)}
+  .degraded code{font-family:var(--mono);font-size:11px;color:var(--warn)}
+  .hidden{display:none!important}
+
+  /* groups */
+  .group{border-bottom:1px solid var(--rule)}
+  .group-head{
+    display:flex;align-items:center;gap:12px;padding:11px 26px;
+    background:linear-gradient(90deg,#0c1219,transparent);
+  }
+  .group-head .gname{font-size:12px;font-weight:600;color:var(--text)}
+  .group-head .gdesc{font-size:11px;color:var(--faint)}
+  .group-head .gcount{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+
+  .comp{
+    display:grid;grid-template-columns:14px 200px 118px 96px 1fr 132px;
+    align-items:center;gap:14px;padding:11px 26px;border-top:1px solid #171d24;
+    cursor:pointer;transition:background .13s;position:relative;
+  }
+  .comp:hover{background:#0c1219}
+  .comp.sel{background:#111d2b}
+  .comp.sel::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--accent)}
+  .comp.problem{background:rgba(248,81,73,.035)}
+
+  .status-dot{width:9px;height:9px;border-radius:50%;position:relative;flex-shrink:0}
+  .status-dot.ok{background:var(--ok)}
+  .status-dot.run{background:var(--accent-bright)}
+  .status-dot.warn{background:var(--warn)}
+  .status-dot.warn::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid var(--warn);animation:beat 1.8s ease-out infinite}
+  .status-dot.bad{background:var(--danger)}
+  .status-dot.stopped{background:var(--rule-strong)}
+
+  .comp-id{min-width:0}
+  .comp-id .svc{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:7px}
+  .comp-id .name{font-family:var(--mono);font-size:10.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .one-shot{font-family:var(--mono);font-size:9.5px;color:var(--violet);border:1px solid rgba(188,140,255,.35);border-radius:3px;padding:0 5px}
+
+  .chip{
+    display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;
+    padding:2px 8px;border-radius:4px;border:1px solid var(--rule-strong);color:var(--muted);background:var(--bg);
+    width:fit-content;
+  }
+  .chip.ok{color:var(--ok);border-color:rgba(63,185,80,.4);background:rgba(63,185,80,.07)}
+  .chip.bad{color:var(--danger);border-color:rgba(248,81,73,.4);background:rgba(248,81,73,.07)}
+  .chip.warn{color:var(--warn);border-color:rgba(210,153,34,.4);background:rgba(210,153,34,.07)}
+  .chip.run{color:var(--accent-bright);border-color:rgba(88,166,255,.35);background:rgba(88,166,255,.07)}
+  .chip.stopped{color:var(--faint)}
+
+  .hist{display:flex;gap:2px;align-items:flex-end;height:18px}
+  .hist i{width:4px;border-radius:1px;background:var(--rule-strong);display:block}
+  .hist i.ok{background:rgba(63,185,80,.75)} .hist i.warn{background:rgba(210,153,34,.8)} .hist i.bad{background:rgba(248,81,73,.85)}
+
+  .comp-meta{display:flex;gap:16px;justify-content:flex-end;font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+  .comp-meta b{color:var(--text);font-weight:500}
+  .comp-meta .k{color:var(--faint)}
+
+  /* inspector */
+  .inspector{
+    width:340px;flex-shrink:0;border-left:1px solid var(--rule);background:var(--band);
+    display:flex;flex-direction:column;overflow-y:auto;
+  }
+  .inspector .ins-head{padding:16px 18px;border-bottom:1px solid var(--rule)}
+  .inspector .ins-head .cap{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--faint)}
+  .inspector .ins-head h2{margin:6px 0 4px;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .inspector .ins-head .sub{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .kv{display:grid;grid-template-columns:112px 1fr;gap:0 12px;padding:8px 18px}
+  .kv dt{font-size:11.5px;color:var(--faint);padding:4px 0}
+  .kv dd{margin:0;font-family:var(--mono);font-size:11.5px;color:var(--text);padding:4px 0;word-break:break-all}
+  .ins-actions{padding:12px 18px;border-top:1px solid var(--rule);display:flex;gap:8px;flex-wrap:wrap}
+  .btn{
+    display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:6px;
+    font-size:12px;font-weight:500;border:1px solid var(--rule-strong);background:var(--raised);color:var(--text);
+  }
+  .btn:hover{background:#1c2333;border-color:#4b5563}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+  .btn.ghost:hover{background:#1c2333;color:var(--text)}
+  .raw{margin:0 18px 18px;background:#0a0e13;border:1px solid var(--rule);border-radius:7px;padding:11px 12px;
+    font-family:var(--mono);font-size:10.5px;line-height:1.7;color:#b9c3cd;overflow:auto;white-space:pre}
+  .ins-cap{padding:0 18px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--faint);margin-bottom:8px}
+  .empty-ins{padding:36px 18px;text-align:center;color:var(--faint);font-size:12px}
+
+  .foot{padding:12px 26px;color:var(--faint);font-size:11px;font-family:var(--mono);display:flex;gap:14px;flex-wrap:wrap}
+
+  @media (max-width:1180px){
+    .comp{grid-template-columns:14px 180px 118px 1fr 120px}
+    .comp .hist{display:none}
+  }
+  @media (max-width:900px){
+    .shell{flex-direction:column}
+    .inspector{width:100%;border-left:none;border-top:1px solid var(--rule);max-height:46vh}
+    .summary{grid-template-columns:repeat(3,1fr)}
+    .s:nth-child(3n+1){border-left:none;padding-left:26px}
+    .comp{grid-template-columns:14px 1fr auto;gap:10px}
+    .comp .comp-meta{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="ribbon">
+  <div class="brand">
+    <svg viewBox="0 0 120 120" aria-hidden="true">
+      <path d="M43.9 46.1 A24 24 0 0 1 69.9 67.9" fill="none" stroke="#3D7BFF" stroke-width="9" stroke-linecap="round"/>
+      <path d="M39.7 34.5 A36 36 0 0 1 81.9 73.1" fill="none" stroke="#3D7BFF" stroke-width="9" stroke-linecap="round"/>
+      <path d="M62.4 24.9 A48 48 0 0 1 92.4 57.6" fill="none" stroke="#12A38B" stroke-width="9" stroke-linecap="round"/>
+      <path d="M37.8 92.6 A24 24 0 0 1 23.4 78.2" fill="none" stroke="#E9F1FF" stroke-width="8" stroke-linecap="round"/>
+      <circle cx="46" cy="70" r="11" fill="#3D7BFF"/>
+      <circle cx="10" cy="73" r="4.5" fill="#12A38B"/>
+    </svg>
+    <span class="brand-name">PERSEUS</span>
+    <span class="brand-sep">//</span>
+    <span class="brand-sub">components</span>
+  </div>
+  <div class="ribbon-right">
+    <span class="live" id="live"><span class="dot"></span><span id="liveText">自动刷新</span></span>
+    <span class="updated mono" id="updated">—</span>
+  </div>
+</header>
+
+<div class="shell">
+  <main class="stage">
+    <div class="page-head">
+      <h1>组件健康</h1>
+      <p>来自 <span class="mono">GET /api/app/components</span>（仅管理员）· 只读 Docker socket 代理 · 显示各编排容器的状态、健康检查、运行时长与重启次数。</p>
+      <div class="head-actions">
+        <div class="seg" role="tablist">
+          <button class="on" data-filter="all">全部组件</button>
+          <button data-filter="problems">仅异常</button>
+        </div>
+        <div class="toggle"><span>自动刷新</span><button class="switch on" id="swAuto" role="switch" aria-checked="true" aria-label="自动刷新"></button></div>
+        <div class="spacer"></div>
+        <div class="toggle"><span>模拟异常</span><button class="switch" id="swProblem" role="switch" aria-checked="false" aria-label="模拟异常"></button></div>
+        <div class="toggle"><span>模拟不可用</span><button class="switch" id="swDown" role="switch" aria-checked="false" aria-label="模拟不可用"></button></div>
+      </div>
+    </div>
+
+    <section class="summary" id="summary"></section>
+
+    <div class="degraded hidden" id="degraded">
+      <span class="ic" aria-hidden="true">⚠</span>
+      <div>
+        <h3>无法获取编排状态</h3>
+        <p>Docker socket 代理不可用或未部署。端点已优雅降级（<code>available:false</code>），其余应用管理功能不受影响。请确认 <code>docker-socket-proxy</code> 服务已启动且 <code>PERSEUS_DOCKER_HOST</code> 配置正确。</p>
+      </div>
+    </div>
+
+    <section id="groups"></section>
+    <div class="foot">
+      <span>project=<b id="footProject">perseus</b></span>
+      <span>runtime=docker</span>
+      <span>source=/containers/json?all=1</span>
+    </div>
+  </main>
+
+  <aside class="inspector" id="inspector"></aside>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var COMPONENTS = [
+    {group:'接入层', gdesc:'外部流量入口', service:'gateway', name:'perseus-gateway', label:'网关 (OpenResty)', state:'running', health:'healthy', image:'openresty/openresty:1.31.1.1-0-bookworm-fat', uptime:3*86400+4*3600+12*60, restarts:0, exitCode:0, statusText:'Up 3 days (healthy)', oneShot:false},
+    {group:'应用层', gdesc:'核心 API 与协作', service:'app', name:'perseus-app', label:'后端 (FastAPI)', state:'running', health:'healthy', image:'perseus-app:latest', uptime:3*86400+4*3600+12*60, restarts:0, exitCode:0, statusText:'Up 3 days (healthy)', oneShot:false},
+    {group:'应用层', gdesc:'核心 API 与协作', service:'collab', name:'perseus-collab-1', label:'协作网关 (Hocuspocus)', state:'running', health:'healthy', image:'perseus-collab:latest', uptime:3*86400+4*3600+12*60, restarts:0, exitCode:0, statusText:'Up 3 days (healthy)', oneShot:false},
+    {group:'Git 服务', gdesc:'HTTP / SSH 传输', service:'git-cgi', name:'perseus-git-cgi', label:'Git HTTP (git-http-backend)', state:'running', health:null, image:'perseus-git-cgi:latest', uptime:3*86400+4*3600+12*60, restarts:0, exitCode:0, statusText:'Up 3 days', oneShot:false},
+    {group:'Git 服务', gdesc:'HTTP / SSH 传输', service:'sshd', name:'perseus-sshd', label:'SSH (Git over SSH)', state:'running', health:null, image:'perseus-sshd:latest', uptime:3*86400+4*3600+12*60, restarts:0, exitCode:0, statusText:'Up 3 days', oneShot:false},
+    {group:'数据层', gdesc:'持久化与缓存', service:'postgres', name:'perseus-postgres', label:'PostgreSQL', state:'running', health:'healthy', image:'postgres:16-alpine', uptime:3*86400+4*3600+12*60, restarts:0, exitCode:0, statusText:'Up 3 days (healthy)', oneShot:false},
+    {group:'数据层', gdesc:'持久化与缓存', service:'redis', name:'perseus-redis', label:'Redis', state:'running', health:'healthy', image:'redis:7-alpine', uptime:3*86400+4*3600+12*60, restarts:0, exitCode:0, statusText:'Up 3 days (healthy)', oneShot:false},
+    {group:'任务', gdesc:'一次性作业', service:'init', name:'perseus-init', label:'数据库初始化任务', state:'exited', health:null, image:'perseus-app:latest', uptime:null, restarts:0, exitCode:0, statusText:'Exited (0) 3 days ago', oneShot:true}
+  ];
+
+  var state = {
+    filter:'all',
+    auto:true,
+    problem:false,
+    down:false,
+    selected:'app',
+    updatedAt:Date.now(),
+    history:{}
+  };
+
+  // 每个组件最近 16 次检查历史（ok/warn/bad）
+  COMPONENTS.forEach(function(c){
+    var base = statusOf(c).k;
+    state.history[c.service] = Array.from({length:16}, function(){ return base; });
+  });
+
+  function statusOf(c){
+    if(c.state==='running'){
+      if(c.health==='unhealthy') return {k:'bad', label:'unhealthy'};
+      if(c.health==='starting') return {k:'warn', label:'starting'};
+      if(c.health==='healthy') return {k:'ok', label:'healthy'};
+      return {k:'run', label:'running'};
+    }
+    if(c.state==='restarting') return {k:'warn', label:'restarting'};
+    if(c.state==='exited') return {k:'stopped', label:'exited'};
+    return {k:'stopped', label:c.state};
+  }
+  function isProblem(c){
+    var k = statusOf(c).k;
+    if(k==='bad' || k==='warn') return true;
+    return !c.oneShot && c.state!=='running';
+  }
+  function fmtUptime(sec){
+    if(sec==null) return '—';
+    var d=Math.floor(sec/86400), h=Math.floor(sec%86400/3600), m=Math.floor(sec%3600/60);
+    var p=[];
+    if(d) p.push(d+'d');
+    if(h) p.push(h+'h');
+    if(m) p.push(m+'m');
+    if(!p.length) p.push(Math.floor(sec%60)+'s');
+    return p.join(' ');
+  }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(ch){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]; }); }
+
+  function visible(){
+    return COMPONENTS.filter(function(c){
+      return state.filter==='all' || isProblem(c);
+    });
+  }
+
+  function renderSummary(){
+    var comps = COMPONENTS;
+    var running = comps.filter(function(c){ return c.state==='running'; }).length;
+    var healthy = comps.filter(function(c){ return c.health==='healthy'; }).length;
+    var unhealthy = comps.filter(function(c){ return c.health==='unhealthy'; }).length;
+    var starting = comps.filter(function(c){ return c.health==='starting'; }).length;
+    var problems = comps.filter(isProblem).length;
+    var cells = [
+      {n:comps.length, l:'组件总数', cls:''},
+      {n:running, l:'运行中', cls:'ok'},
+      {n:healthy, l:'健康', cls:'ok'},
+      {n:starting, l:'启动中', cls:starting?'warn':''},
+      {n:unhealthy, l:'异常', cls:unhealthy?'bad':''},
+      {n:problems, l:'需关注', cls:problems?'bad':''}
+    ];
+    document.getElementById('summary').innerHTML = cells.map(function(c){
+      return '<div class="s '+c.cls+'"><div class="n">'+c.n+'</div><div class="l">'+c.l+'</div></div>';
+    }).join('');
+  }
+
+  function histHtml(service){
+    var h = state.history[service] || [];
+    return '<div class="hist" title="最近检查">'+h.map(function(k){
+      var cls = (k==='ok'||k==='run') ? 'ok' : (k==='warn' ? 'warn' : (k==='bad' ? 'bad' : ''));
+      var hgt = k==='ok'||k==='run' ? 16 : (k==='warn' ? 12 : (k==='bad' ? 16 : 6));
+      return '<i class="'+cls+'" style="height:'+hgt+'px"></i>';
+    }).join('')+'</div>';
+  }
+
+  function renderGroups(){
+    var comps = visible();
+    var container = document.getElementById('groups');
+    if(!comps.length){
+      container.innerHTML = '<div class="foot" style="justify-content:center;padding:44px">没有匹配的组件</div>';
+      return;
+    }
+    var groups = [];
+    comps.forEach(function(c){
+      var g = groups.filter(function(x){ return x.name===c.group; })[0];
+      if(!g){ g = {name:c.group, desc:c.gdesc, items:[]}; groups.push(g); }
+      g.items.push(c);
+    });
+    container.innerHTML = groups.map(function(g){
+      var probs = g.items.filter(isProblem).length;
+      var rows = g.items.map(function(c){
+        var st = statusOf(c);
+        var sel = state.selected===c.service;
+        var prob = isProblem(c);
+        return '<div class="comp'+(sel?' sel':'')+(prob?' problem':'')+'" data-svc="'+c.service+'" tabindex="0">'+
+          '<span class="status-dot '+st.k+'" aria-hidden="true"></span>'+
+          '<div class="comp-id"><div class="svc">'+esc(c.service)+
+            (c.oneShot?' <span class="one-shot">one-shot</span>':'')+
+          '</div><div class="name">'+esc(c.name)+' · '+esc(c.label)+'</div></div>'+
+          '<span class="chip '+st.k+'">'+esc(st.label)+'</span>'+
+          histHtml(c.service)+
+          '<div class="comp-meta">'+
+            '<span><span class="k">uptime </span><b>'+fmtUptime(c.uptime)+'</b></span>'+
+            '<span><span class="k">restarts </span><b>'+c.restarts+'</b></span>'+
+          '</div>'+
+          '<div class="comp-meta"><span><span class="k">exit </span><b>'+(c.exitCode==null?'—':c.exitCode)+'</b></span></div>'+
+        '</div>';
+      }).join('');
+      return '<section class="group"><div class="group-head">'+
+        '<span class="gname">'+esc(g.name)+'</span><span class="gdesc">'+esc(g.desc)+'</span>'+
+        '<span class="gcount">'+g.items.length+' 组件'+(probs?' · '+probs+' 异常':'')+'</span>'+
+      '</div>'+rows+'</section>';
+    }).join('');
+  }
+
+  function renderInspector(){
+    var c = COMPONENTS.filter(function(x){ return x.service===state.selected; })[0];
+    var el = document.getElementById('inspector');
+    if(state.down){ el.innerHTML = '<div class="empty-ins">Docker 代理不可用 · 暂无组件数据</div>'; return; }
+    if(!c){ el.innerHTML = '<div class="empty-ins">选择左侧组件查看详情</div>'; return; }
+    var st = statusOf(c);
+    var raw = {
+      service:c.service, name:c.name, label:c.label, state:c.state, health:c.health,
+      running:c.state==='running', image:c.image, uptime_seconds:c.uptime,
+      restart_count:c.restarts, exit_code:c.exitCode, status_text:c.statusText
+    };
+    el.innerHTML =
+      '<div class="ins-head"><div class="cap">COMPONENT</div>'+
+        '<h2><span class="status-dot '+st.k+'"></span>'+esc(c.service)+'</h2>'+
+        '<div class="sub">'+esc(c.name)+'</div></div>'+
+      '<dl class="kv">'+
+        kv('显示名', c.label)+
+        kv('状态', '<span class="chip '+st.k+'">'+esc(st.label)+'</span>')+
+        kv('运行时长', fmtUptime(c.uptime))+
+        kv('重启次数', c.restarts)+
+        kv('退出码', c.exitCode==null?'—':c.exitCode)+
+        kv('镜像', c.image)+
+        kv('status', c.statusText)+
+      '</dl>'+
+      '<div class="ins-actions">'+
+        '<button class="btn" data-act="logs">查看日志</button>'+
+        '<button class="btn ghost" data-act="copy">复制名称</button>'+
+      '</div>'+
+      '<div class="ins-cap">RAW /containers/{id}/json</div>'+
+      '<pre class="raw">'+esc(JSON.stringify(raw, null, 2))+'</pre>';
+  }
+  function kv(k,v){ return '<dt>'+esc(k)+'</dt><dd>'+v+'</dd>'; }
+
+  function render(){
+    document.getElementById('degraded').classList.toggle('hidden', !state.down);
+    document.getElementById('summary').style.opacity = state.down ? '.35' : '1';
+    document.getElementById('groups').style.opacity = state.down ? '.35' : '1';
+    document.getElementById('live').classList.toggle('off', !state.auto);
+    document.getElementById('liveText').textContent = state.auto ? '自动刷新' : '已暂停';
+    document.getElementById('footProject').textContent = state.down ? '—' : 'perseus';
+    renderSummary();
+    renderGroups();
+    renderInspector();
+    updateTimestamp();
+  }
+
+  function updateTimestamp(){
+    var secs = Math.floor((Date.now()-state.updatedAt)/1000);
+    document.getElementById('updated').textContent = secs<=1 ? '刚刚更新' : (secs+'s 前更新');
+  }
+
+  // events
+  document.querySelector('.page-head').addEventListener('click', function(e){
+    var seg = e.target.closest('[data-filter]');
+    if(seg){
+      state.filter = seg.getAttribute('data-filter');
+      document.querySelectorAll('[data-filter]').forEach(function(b){ b.classList.toggle('on', b===seg); });
+      renderGroups(); return;
+    }
+    var sw = e.target.closest('.switch');
+    if(sw){
+      var on = !sw.classList.contains('on');
+      sw.classList.toggle('on', on); sw.setAttribute('aria-checked', String(on));
+      if(sw.id==='swAuto'){ state.auto=on; render(); }
+      if(sw.id==='swProblem'){ state.problem=on; applyProblem(on); render(); }
+      if(sw.id==='swDown'){ state.down=on; render(); }
+    }
+  });
+
+  document.getElementById('groups').addEventListener('click', function(e){
+    var row = e.target.closest('[data-svc]');
+    if(row){ state.selected = row.getAttribute('data-svc'); renderGroups(); renderInspector(); }
+  });
+  document.getElementById('groups').addEventListener('keydown', function(e){
+    if(e.key==='Enter' || e.key===' '){
+      var row = e.target.closest('[data-svc]');
+      if(row){ e.preventDefault(); state.selected = row.getAttribute('data-svc'); renderGroups(); renderInspector(); }
+    }
+  });
+
+  document.getElementById('inspector').addEventListener('click', function(e){
+    var act = e.target.closest('[data-act]');
+    if(!act) return;
+    if(act.getAttribute('data-act')==='logs'){
+      act.textContent='日志流已打开 (占位)';
+    } else {
+      var c = COMPONENTS.filter(function(x){ return x.service===state.selected; })[0];
+      if(c && navigator.clipboard){ navigator.clipboard.writeText(c.name); act.textContent='已复制'; }
+    }
+  });
+
+  function applyProblem(on){
+    var app = COMPONENTS.filter(function(c){ return c.service==='app'; })[0];
+    var collab = COMPONENTS.filter(function(c){ return c.service==='collab'; })[0];
+    var redis = COMPONENTS.filter(function(c){ return c.service==='redis'; })[0];
+    if(on){
+      app.health='unhealthy'; app.statusText='Up 3 days (unhealthy)';
+      collab.health='starting'; collab.statusText='Up 2 minutes (health: starting)';
+      redis.state='restarting'; redis.health=null; redis.uptime=null; redis.restarts=3; redis.statusText='Restarting (1) 3 seconds ago';
+      pushHist('app','bad'); pushHist('collab','warn'); pushHist('redis','warn');
+    } else {
+      app.health='healthy'; app.statusText='Up 3 days (healthy)';
+      collab.health='healthy'; collab.statusText='Up 3 days (healthy)';
+      redis.state='running'; redis.health='healthy'; redis.uptime=3*86400+4*3600; redis.restarts=0; redis.statusText='Up 3 days (healthy)';
+      state.history.app = state.history.app.map(function(){ return 'ok'; });
+      state.history.collab = state.history.collab.map(function(){ return 'ok'; });
+      state.history.redis = state.history.redis.map(function(){ return 'ok'; });
+    }
+  }
+  function pushHist(service, k){
+    var h = state.history[service];
+    if(h){ h.push(k); if(h.length>16) h.shift(); }
+  }
+
+  // timers
+  setInterval(function(){
+    if(!state.auto) return;
+    state.updatedAt = Date.now();
+    COMPONENTS.forEach(function(c){ if(c.state==='running' && c.uptime!=null) c.uptime++; });
+    COMPONENTS.forEach(function(c){
+      var k = statusOf(c).k;
+      pushHist(c.service, (k==='ok'||k==='run')?'ok':(k==='warn'?'warn':'bad'));
+    });
+    if(state.filter==='problems') renderGroups();
+    renderSummary();
+    renderInspector();
+    updateTimestamp();
+  }, 5000);
+  setInterval(updateTimestamp, 1000);
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -3,11 +3,14 @@
 
 覆盖 AppService 的权限校验、状态聚合、运行时间格式化、日志读取与重启命令推导。
 """
-import sys
-
 import pytest
 
-from services.app_service import AppService, get_app_service, _get_restart_command
+from services.app_service import (
+    AppService,
+    get_app_service,
+    _build_restart_command,
+    _get_restart_command,
+)
 from core.exception import AuthorizationException, ValidationException
 
 
@@ -90,25 +93,58 @@ def test_cleanup_old_logs_requires_permission(service):
         service.cleanup_old_logs(keep_days=30, is_debug=False, is_admin=False)
 
 
-def test_get_restart_command_python_mode(monkeypatch):
-    """Python 脚本模式：解释器 + argv[0]"""
-    monkeypatch.setattr(sys, "frozen", False, raising=False)
-    monkeypatch.setattr(sys, "executable", "/usr/bin/python3")
-    monkeypatch.setattr(sys, "argv", ["app.py"])
-
-    cmd = _get_restart_command()
-    assert cmd[0] == "/usr/bin/python3"
-    assert "app.py" in cmd
+def test_build_restart_command_python_script_fallback():
+    """无原始命令行时回退：解释器 + argv[0]"""
+    cmd = _build_restart_command(None, ["app.py"], "/usr/bin/python3", False)
+    assert cmd == ["/usr/bin/python3", "app.py"]
 
 
-def test_get_restart_command_frozen(monkeypatch):
+def test_build_restart_command_frozen():
     """PyInstaller 冻结模式：直接返回可执行文件"""
-    monkeypatch.setattr(sys, "frozen", True, raising=False)
-    monkeypatch.setattr(sys, "executable", "/opt/perseus/perseus")
+    assert _build_restart_command(None, ["app.py"], "/opt/perseus/perseus", True) \
+        == ["/opt/perseus/perseus"]
 
-    assert _get_restart_command() == ["/opt/perseus/perseus"]
+
+def test_build_restart_command_uses_orig_argv():
+    """优先复现原始启动命令行（如 uvicorn console script）"""
+    orig = ["/usr/local/bin/uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+    assert _build_restart_command(orig, [], "/usr/local/bin/python", False) == orig
+
+
+def test_build_restart_command_replaces_python_interpreter():
+    """原始命令行首项为 python 时替换为当前解释器绝对路径"""
+    cmd = _build_restart_command(["python", "app.py", "--x"], [], "/usr/local/bin/python3.12", False)
+    assert cmd == ["/usr/local/bin/python3.12", "app.py", "--x"]
+
+
+def test_get_restart_command_reads_current_process():
+    """实际读取当前进程启动信息，返回非空命令列表"""
+    cmd = _get_restart_command()
+    assert isinstance(cmd, list) and cmd
 
 
 def test_get_app_service_singleton():
     """全局服务实例应复用"""
     assert get_app_service() is get_app_service()
+
+
+def test_cleanup_old_logs_deletes_old_dirs(service, tmp_path, monkeypatch):
+    """保留天数之外的日期目录被删除，近期目录保留"""
+    from datetime import datetime
+
+    from utils.logging import LogManager
+
+    monkeypatch.setattr(LogManager, "DEFAULT_LOG_DIR", str(tmp_path))
+
+    old_dir = tmp_path / "2000-01-01"
+    old_dir.mkdir()
+    (old_dir / "app.log").write_text("stale", encoding="utf-8")
+    recent_dir = tmp_path / datetime.now().strftime("%Y-%m-%d")
+    recent_dir.mkdir()
+
+    result = service.cleanup_old_logs(keep_days=1, is_debug=True)
+
+    assert result["success"] is True
+    assert result["deleted_count"] == 1
+    assert not old_dir.exists()
+    assert recent_dir.exists()

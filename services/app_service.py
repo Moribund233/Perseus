@@ -12,6 +12,7 @@ import os
 import sys
 import signal
 import logging
+import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
@@ -35,30 +36,86 @@ def _terminate_process():
     os.kill(os.getpid(), signal.SIGTERM)
 
 
+def _build_restart_command(
+    orig_argv: Optional[List[str]],
+    argv: List[str],
+    executable: str,
+    frozen: bool,
+) -> List[str]:
+    """
+    构建重启命令（纯函数，便于测试）。
+
+    优先复现原始启动命令行（``sys.orig_argv``），这样无论以
+    ``python app.py``、``uvicorn app:app`` 还是 console script 启动，
+    都能用相同方式重新拉起。仅当无法取得原始命令行时才回退到
+    「解释器 + argv[0]」。
+
+    Args:
+        orig_argv: 原始命令行（sys.orig_argv，可能为 None）
+        argv: 当前 argv（sys.argv）
+        executable: Python 解释器路径（sys.executable）
+        frozen: 是否为 PyInstaller 冻结可执行文件
+
+    Returns:
+        List[str]: 可直接用于 subprocess 的命令列表
+    """
+    # PyInstaller 打包的可执行文件：直接重启自身
+    if frozen:
+        return [executable]
+
+    if orig_argv:
+        cmd = [str(a) for a in orig_argv]
+        # 首项若为 python 解释器，替换为当前解释器绝对路径，避免 PATH 差异
+        if cmd and os.path.basename(cmd[0]).lower().startswith("python"):
+            cmd[0] = executable
+        return cmd
+
+    # 回退：Python 脚本模式
+    script = argv[0] if argv else "app.py"
+    return [executable, script]
+
+
 def _get_restart_command() -> List[str]:
     """
-    获取重启命令
-
-    根据当前运行环境返回适当的重启命令。
-    支持Python脚本、PyInstaller可执行文件等模式。
+    获取重启命令（读取当前进程的启动信息）。
 
     Returns:
         List[str]: 命令列表，可直接用于 subprocess
     """
-    executable = sys.executable.lower()
+    return _build_restart_command(
+        getattr(sys, "orig_argv", None),
+        list(sys.argv),
+        sys.executable,
+        getattr(sys, "frozen", False),
+    )
 
-    # PyInstaller打包的可执行文件
-    # 特征: sys.frozen为True，或executable不是python解释器
-    if getattr(sys, 'frozen', False):
-        return [sys.executable]
 
-    # 检查是否为PyInstaller单文件模式（Linux下frozen可能为False）
-    if not executable.endswith(('.exe', 'python', 'python3')):
-        return [sys.executable]
+def _spawn_restart(cmd: List[str], delay: float = 3.0) -> None:
+    """
+    延迟拉起新进程，等待旧进程释放监听端口后再启动。
 
-    # Python脚本模式
-    script = sys.argv[0] if sys.argv else "app.py"
-    return [sys.executable, script]
+    通过一个分离的 Python 助手进程实现跨平台延迟启动：助手进程
+    sleep 后以独立会话执行重启命令，因此当前进程随后退出也不会
+    影响新进程启动。
+
+    Args:
+        cmd: 重启命令
+        delay: 延迟秒数
+    """
+    helper = (
+        "import subprocess, sys, time;"
+        "time.sleep(float(sys.argv[1]));"
+        "subprocess.Popen(sys.argv[2:])"
+    )
+    kwargs: Dict[str, Any] = {}
+    if os.name == "posix":
+        kwargs["start_new_session"] = True
+    subprocess.Popen(
+        [sys.executable, "-c", helper, str(delay)] + list(cmd),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        **kwargs,
+    )
 
 
 class AppService:
@@ -149,7 +206,6 @@ class AppService:
         def _restart():
             """执行重启流程"""
             import time
-            import subprocess
             import asyncio
 
             time.sleep(0.5)
@@ -157,12 +213,8 @@ class AppService:
             cmd = _get_restart_command()
 
             try:
-                subprocess.Popen(
-                    cmd,
-                    start_new_session=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
+                # 延迟拉起新进程，等待本进程释放端口
+                _spawn_restart(cmd)
 
                 time.sleep(1)
 

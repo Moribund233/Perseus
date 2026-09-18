@@ -202,3 +202,7 @@ def start_server():
             workers=1,
             reload_excludes=["frontend/**"]
         )
+
+
+if __name__ == "__main__":
+    start_server()

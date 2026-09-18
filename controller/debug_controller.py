@@ -13,7 +13,8 @@
 import os
 import shutil
 from datetime import datetime
-from typing import Optional
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -26,6 +27,10 @@ from utils.logging import get_named_logger
 
 router = APIRouter(prefix="/api/v1/debug", tags=["debug"])
 logger = get_named_logger("debug")
+
+# 配置文件路径（模块级常量，便于测试替换）
+CONFIG_PATH = "config.toml"
+EXAMPLE_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.example.toml"
 
 
 # ============== Pydantic 模型 ==============
@@ -188,6 +193,32 @@ async def init_database(
         )
 
 
+def regenerate_config_file(config_path: str, example_path: Path) -> None:
+    """
+    用默认模板重写配置文件（确保真正落盘）。
+
+    `ConfigManager` 的构造函数在文件缺失时只会加载默认值而不会写文件，
+    因此这里显式读取 config.example.toml 并通过 `update_config` 落盘。
+
+    Args:
+        config_path: 目标配置文件路径
+        example_path: 默认配置模板路径
+
+    Raises:
+        FileNotFoundError: 模板不存在
+        PermissionError: 目标文件只读（如容器只读挂载）
+    """
+    import toml
+
+    with open(example_path, "r", encoding="utf-8") as f:
+        example_config: Dict[str, Any] = toml.load(f)
+
+    reset_module_config_manager()
+    manager = ConfigManager(config_path)
+    manager.update_config(example_config)
+    manager.get_config(force_reload=True)
+
+
 @router.post("/initconf", response_model=InitConfResponse)
 async def init_config(
     force: bool = False,
@@ -198,7 +229,8 @@ async def init_config(
     """
     重置配置文件
 
-    删除当前配置文件并从 config.example.toml 恢复
+    将 config.toml 恢复为 config.example.toml 的默认内容（真正写回文件）。
+    原配置会带时间戳备份。
 
     Args:
         force: 是否强制重置（跳过确认提示，始终为 true）
@@ -208,29 +240,33 @@ async def init_config(
         InitConfResponse: 操作结果
 
     Raises:
-        HTTPException: 非调试模式或权限不足时
+        HTTPException: 非调试模式、权限不足或配置文件只读时
     """
-    config_path = "config.toml"
+    config_path = CONFIG_PATH
     backup_path = None
 
     try:
+        if not EXAMPLE_CONFIG_PATH.exists():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="config.example.toml 不存在，无法重置配置",
+            )
+
         # 如果配置文件存在，进行备份
         if os.path.exists(config_path) and backup:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = f"config.toml.backup.{timestamp}"
+            backup_path = f"{config_path}.backup.{timestamp}"
             shutil.copy2(config_path, backup_path)
             logger.info(f"配置文件已备份到: {backup_path}")
 
-        # 删除原配置文件
-        if os.path.exists(config_path):
-            os.remove(config_path)
-            logger.info(f"已删除原配置文件: {config_path}")
+        # 用默认模板重新生成配置文件（真正落盘）
+        regenerate_config_file(config_path, EXAMPLE_CONFIG_PATH)
 
-        # 重置配置管理器单例
-        reset_module_config_manager()
-
-        # 重新初始化配置管理器（会自动生成默认配置）
-        ConfigManager(config_path)
+        if not os.path.exists(config_path):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="配置文件重置后未能生成 config.toml",
+            )
 
         logger.info("配置文件已重置为默认值")
 
@@ -241,6 +277,21 @@ async def init_config(
             backup_path=backup_path
         )
 
+    except HTTPException:
+        raise
+    except OSError as e:
+        # EPERM(1) / EACCES(13) / EROFS(30)：只读文件系统（如容器只读挂载）
+        if getattr(e, "errno", None) in (1, 13, 30):
+            logger.error(f"配置文件只读，无法重置: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="config.toml 为只读挂载，无法重置配置",
+            )
+        logger.error(f"配置文件重置失败: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Config reset failed: {str(e)}"
+        )
     except Exception as e:
         logger.error(f"配置文件重置失败: {e}")
         raise HTTPException(

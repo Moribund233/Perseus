@@ -45,6 +45,8 @@ services:
       PERSEUS_ADMIN_PASSWORD: ${PERSEUS_ADMIN_PASSWORD:?必需设置管理员初始密码}
       PERSEUS_ADMIN_EMAIL: ${PERSEUS_ADMIN_EMAIL:-admin@perseus.local}
       PERSEUS_COLLAB_INTERNAL_SECRET: ${PERSEUS_COLLAB_INTERNAL_SECRET:?必需设置协作网关内部密钥 (scripts/generate_env.py)}
+      # 编排组件状态：经只读 docker-socket-proxy 查询容器状态（admin 控制台）
+      PERSEUS_DOCKER_HOST: "http://docker-socket-proxy:2375"
     volumes:
       - ./config.toml:/app/config.toml:ro
       - repos:/data/repositories
@@ -201,6 +203,29 @@ services:
         limits:
           cpus: '0.5'
           memory: 64M
+
+  # 只读 Docker socket 代理 — 供 app 查询编排组件状态（admin 控制台）
+  # 仅暴露 /containers* 的 GET，禁止一切写操作（POST=0），
+  # 避免把 Docker 控制面直接交给应用容器。
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.2.0
+    container_name: perseus-docker-proxy
+    environment:
+      CONTAINERS: "1"   # 允许 GET /containers/*
+      POST: "0"         # 禁止写操作
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - default
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 32M
+        reservations:
+          cpus: '0.05'
+          memory: 16M
 
   # 一次性数据库初始化任务（Alembic 迁移 + 管理员引导）
   # 运行: docker compose --profile init run --rm init

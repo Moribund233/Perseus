@@ -108,3 +108,42 @@ class TestSearchRoute:
 
     def test_repository_search_route(self, app: FastAPI):
         _assert_route(app, "GET", "/api/v1/repositories/{repo_id}/search")
+
+
+class TestAppManagementRoutes:
+    """应用管理（admin/app）路由契约"""
+
+    def test_root_and_health(self, app: FastAPI):
+        _assert_route(app, "GET", "/")
+        _assert_route(app, "GET", "/health")
+
+    def test_status_and_platform_stats(self, app: FastAPI):
+        _assert_route(app, "GET", "/api/app/status")
+        _assert_route(app, "GET", "/api/v1/stats/platform")
+
+    def test_components_route(self, app: FastAPI):
+        _assert_route(app, "GET", "/api/app/components")
+
+    def test_config_routes(self, app: FastAPI):
+        _assert_route(app, "GET", "/api/app/config")
+        _assert_route(app, "POST", "/api/app/config")
+        _assert_route(app, "POST", "/api/app/config/reset")
+        _assert_route(app, "POST", "/api/app/config/validate")
+
+    def test_log_routes(self, app: FastAPI):
+        _assert_route(app, "GET", "/api/app/logs")
+        _assert_route(app, "GET", "/api/app/logs/content")
+        _assert_route(app, "POST", "/api/app/logs/cleanup")
+
+    def test_operation_routes(self, app: FastAPI):
+        _assert_route(app, "POST", "/api/app/shutdown")
+        _assert_route(app, "POST", "/api/app/restart")
+
+
+class TestDebugRoutes:
+    """调试工具路由契约"""
+
+    def test_debug_routes(self, app: FastAPI):
+        _assert_route(app, "GET", "/api/v1/debug/status")
+        _assert_route(app, "POST", "/api/v1/debug/initdb")
+        _assert_route(app, "POST", "/api/v1/debug/initconf")

@@ -1,0 +1,1323 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Perseus · 应用管理台</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cpath d='M43.9 46.1 A24 24 0 0 1 69.9 67.9' fill='none' stroke='%233D7BFF' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M39.7 34.5 A36 36 0 0 1 81.9 73.1' fill='none' stroke='%233D7BFF' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M62.4 24.9 A48 48 0 0 1 92.4 57.6' fill='none' stroke='%2312A38B' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M37.8 92.6 A24 24 0 0 1 23.4 78.2' fill='none' stroke='%23E9F1FF' stroke-width='8' stroke-linecap='round'/%3E%3Ccircle cx='46' cy='70' r='11' fill='%233D7BFF'/%3E%3Ccircle cx='10' cy='73' r='4.5' fill='%2312A38B'/%3E%3C/svg%3E" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --bg:#0d1117;
+    --band:#0f151d;
+    --panel:#111820;
+    --raised:#161b22;
+    --rule:#21262d;
+    --rule-strong:#30363d;
+    --text:#e6edf3;
+    --muted:#8b949e;
+    --faint:#6e7681;
+    --accent:#1f6feb;
+    --accent-bright:#58a6ff;
+    --ok:#3fb950;
+    --warn:#d29922;
+    --danger:#f85149;
+    --violet:#bc8cff;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+    --rail:232px;
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    font-size:13px;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+    display:flex;
+    flex-direction:column;
+    height:100vh;
+    overflow:hidden;
+  }
+  .mono{font-family:var(--mono);font-variant-ligatures:none}
+  button{font-family:inherit;font-size:inherit;color:inherit;background:none;border:none;cursor:pointer}
+  ::selection{background:rgba(31,111,235,.35)}
+  :focus-visible{outline:2px solid var(--accent-bright);outline-offset:2px;border-radius:3px}
+
+  /* ============ status ribbon ============ */
+  .ribbon{
+    flex-shrink:0;
+    height:46px;
+    display:flex;
+    align-items:center;
+    gap:16px;
+    padding:0 18px;
+    border-bottom:1px solid var(--rule);
+    background:var(--raised);
+    z-index:20;
+  }
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand svg{width:22px;height:22px;display:block}
+  .brand-name{font-weight:700;letter-spacing:.14em;font-size:12px;color:var(--text)}
+  .brand-sep{color:var(--rule-strong)}
+  .brand-sub{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.02em}
+
+  .ribbon-status{display:flex;align-items:center;gap:14px;margin-left:8px}
+  .pulse{position:relative;width:7px;height:7px;border-radius:50%;background:var(--ok);flex-shrink:0}
+  .pulse::after{
+    content:'';position:absolute;inset:-4px;border-radius:50%;
+    border:1px solid var(--ok);opacity:.7;
+    animation:beat 2.4s ease-out infinite;
+  }
+  @keyframes beat{0%{transform:scale(.4);opacity:.8}70%{transform:scale(1.5);opacity:0}100%{opacity:0}}
+  .status-word{font-size:12px;color:var(--ok);font-weight:500}
+  .chip{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;
+    padding:2px 7px;border-radius:4px;border:1px solid var(--rule-strong);
+    color:var(--muted);background:var(--bg);
+  }
+  .chip.debug{color:var(--warn);border-color:rgba(210,153,34,.45);background:rgba(210,153,34,.08)}
+  .chip.prod{color:var(--accent-bright);border-color:rgba(88,166,255,.4);background:rgba(88,166,255,.08)}
+
+  .ribbon-right{margin-left:auto;display:flex;align-items:center;gap:16px}
+  .clock{font-size:12px;color:var(--muted)}
+  .who{display:flex;align-items:center;gap:8px}
+  .who .av{
+    width:22px;height:22px;border-radius:50%;
+    background:linear-gradient(135deg,#1f6feb,#bc8cff);
+    display:grid;place-items:center;font-size:10px;font-weight:700;color:#fff;
+  }
+  .who .name{font-size:12px;color:var(--text)}
+
+  /* ============ shell ============ */
+  .shell{flex:1;display:flex;min-height:0}
+
+  .rail{
+    width:var(--rail);flex-shrink:0;
+    border-right:1px solid var(--rule);
+    background:var(--band);
+    display:flex;flex-direction:column;
+    padding:16px 12px 12px;
+    overflow-y:auto;
+  }
+  .rail-cap{
+    font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+    color:var(--faint);padding:0 10px 10px;
+  }
+  .idx{display:flex;flex-direction:column;gap:1px}
+  .idx-item{
+    display:flex;align-items:center;gap:10px;
+    padding:8px 10px;border-radius:6px;
+    color:var(--muted);cursor:pointer;position:relative;
+    transition:background .14s,color .14s;
+    text-align:left;width:100%;
+  }
+  .idx-item:hover{background:#1c2333;color:var(--text)}
+  .idx-item.on{background:#141d2b;color:var(--text)}
+  .idx-item.on::before{
+    content:'';position:absolute;left:-12px;top:50%;transform:translateY(-50%);
+    width:2px;height:18px;background:var(--accent);border-radius:0 2px 2px 0;
+  }
+  .idx-num{font-family:var(--mono);font-size:10px;color:var(--faint);width:16px;flex-shrink:0}
+  .idx-item.on .idx-num{color:var(--accent-bright)}
+  .idx-label{font-size:12.5px;font-weight:500;flex:1}
+  .idx-lock{font-size:10px;color:var(--faint);opacity:0}
+  .idx-item.locked .idx-lock{opacity:1}
+  .idx-item.locked .idx-label{color:var(--faint)}
+  .idx-item.on .idx-lock{color:var(--warn)}
+
+  .sim{
+    margin-top:auto;padding-top:16px;border-top:1px solid var(--rule);
+  }
+  .sim-cap{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--faint);padding:0 10px 8px}
+  .sim-row{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:6px 10px;font-size:12px;color:var(--muted);
+  }
+  .sim-row .mono{font-size:11px}
+  .switch{
+    width:32px;height:18px;border-radius:10px;background:var(--rule-strong);
+    position:relative;transition:background .16s;flex-shrink:0;
+  }
+  .switch::after{
+    content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;
+    border-radius:50%;background:#8b949e;transition:transform .16s,background .16s;
+  }
+  .switch.on{background:rgba(31,111,235,.35)}
+  .switch.on::after{transform:translateX(14px);background:var(--accent-bright)}
+
+  /* ============ stage ============ */
+  .stage{flex:1;min-width:0;overflow-y:auto;background:var(--bg)}
+
+  .page-head{
+    padding:22px 28px 18px;
+    border-bottom:1px solid var(--rule);
+    display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;
+  }
+  .page-head h1{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em}
+  .page-head p{margin:5px 0 0;font-size:12.5px;color:var(--muted);max-width:70ch}
+  .head-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+  .band{border-bottom:1px solid var(--rule)}
+  .band-pad{padding:18px 28px}
+  .band-head{
+    display:flex;align-items:baseline;gap:12px;
+    padding:0 0 12px;
+  }
+  .band-head h2{margin:0;font-size:14px;font-weight:600}
+  .band-head .hint{font-size:11.5px;color:var(--faint)}
+  .band-head .right{margin-left:auto}
+
+  /* ============ vitals ledger ============ */
+  .vitals{display:grid;grid-template-columns:repeat(5,1fr)}
+  .vital{
+    padding:16px 20px 14px;
+    border-left:1px solid var(--rule);
+    min-width:0;
+  }
+  .vital:first-child{border-left:none;padding-left:28px}
+  .vital-label{font-size:11px;color:var(--faint);margin-bottom:6px}
+  .vital-value{
+    font-family:var(--mono);font-size:22px;font-weight:600;color:var(--text);
+    letter-spacing:-.02em;line-height:1.1;white-space:nowrap;
+  }
+  .vital-value small{font-size:11px;font-weight:400;color:var(--muted);margin-left:3px}
+  .vital-foot{margin-top:8px;display:flex;align-items:center;gap:8px;min-height:28px}
+  .vital-note{font-size:11px;color:var(--muted)}
+  .spark{width:100%;max-width:120px;height:28px;display:block;overflow:visible}
+
+  /* ============ definition ledger ============ */
+  .ledger{display:grid;grid-template-columns:180px 1fr;gap:0 24px}
+  .ledger + .ledger{border-top:1px solid var(--rule);margin-top:12px;padding-top:12px}
+  .ledger dt{font-size:12px;color:var(--muted);padding:5px 0}
+  .ledger dd{margin:0;font-family:var(--mono);font-size:12px;color:var(--text);padding:5px 0}
+  .ledger dd .dim{color:var(--faint)}
+
+  .statline{display:flex;gap:28px;flex-wrap:wrap}
+  .statline .s{display:flex;flex-direction:column;gap:2px}
+  .statline .s .n{font-family:var(--mono);font-size:19px;font-weight:600}
+  .statline .s .l{font-size:11px;color:var(--faint)}
+
+  /* ============ config ============ */
+  .cfg-sec{border-bottom:1px solid var(--rule)}
+  .cfg-sec:last-child{border-bottom:none}
+  .cfg-sec-head{
+    display:flex;align-items:center;gap:12px;
+    padding:16px 28px;cursor:pointer;user-select:none;
+    transition:background .14s;
+  }
+  .cfg-sec-head:hover{background:#0c1219}
+  .cfg-sec-head .caret{
+    font-family:var(--mono);font-size:12px;line-height:1;color:var(--muted);
+    transition:transform .18s;width:12px;flex-shrink:0;
+  }
+  .cfg-sec.collapsed .caret{transform:rotate(-90deg)}
+  .cfg-sec.collapsed .cfg-body{display:none}
+  .cfg-sec-name{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)}
+  .cfg-sec-name::before{content:'[';color:var(--faint);margin-right:1px}
+  .cfg-sec-name::after{content:']';color:var(--faint);margin-left:1px}
+  .cfg-sec-desc{font-size:11.5px;color:var(--faint)}
+  .cfg-sec-count{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .cfg-sec-count.dirty{color:var(--warn)}
+
+  .cfg-body{padding:2px 28px 18px}
+  .field{
+    display:grid;grid-template-columns:220px 1fr 96px;
+    align-items:center;gap:16px;
+    padding:7px 0;border-top:1px solid #171d24;
+  }
+  .field:first-child{border-top:none}
+  .field-key{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .field-label{font-size:12.5px;color:var(--text)}
+  .field-name{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .field-ctl{min-width:0}
+  .field-meta{display:flex;justify-content:flex-end;gap:6px}
+
+  .inp{
+    width:100%;max-width:360px;
+    background:var(--bg);border:1px solid var(--rule-strong);
+    border-radius:6px;color:var(--text);
+    font-family:var(--mono);font-size:12px;
+    padding:6px 10px;transition:border-color .14s,box-shadow .14s;
+  }
+  .inp:hover{border-color:#4b5563}
+  .inp:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(31,111,235,.16)}
+  .inp:disabled{color:var(--faint);background:#0a0e13;cursor:not-allowed}
+  select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--faint) 50%),linear-gradient(135deg,var(--faint) 50%,transparent 50%);background-position:calc(100% - 15px) 13px,calc(100% - 10px) 13px;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:30px}
+
+  .ro{
+    font-family:var(--mono);font-size:12px;color:var(--faint);
+    display:inline-flex;align-items:center;gap:8px;
+  }
+  .tag{
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.04em;
+    padding:1.5px 6px;border-radius:3px;white-space:nowrap;
+  }
+  .tag.restart{color:var(--warn);border:1px solid rgba(210,153,34,.35);background:rgba(210,153,34,.07)}
+  .tag.dirty{color:var(--accent-bright);border:1px solid rgba(88,166,255,.35);background:rgba(88,166,255,.07)}
+  .tag.lock{color:var(--faint);border:1px solid var(--rule-strong)}
+  .tag.off{opacity:0}
+
+  .locked-sec{
+    padding:16px 28px;border-top:1px solid var(--rule);
+    background:repeating-linear-gradient(135deg,#0c1116,#0c1116 8px,#0d1319 8px,#0d1319 16px);
+  }
+  .locked-sec .lt{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .locked-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .locked-list .li{
+    font-family:var(--mono);font-size:11px;color:var(--faint);
+    border:1px dashed var(--rule-strong);border-radius:5px;padding:3px 9px;
+  }
+
+  /* ============ buttons ============ */
+  .btn{
+    display:inline-flex;align-items:center;gap:7px;
+    height:30px;padding:0 13px;border-radius:6px;
+    font-size:12.5px;font-weight:500;
+    border:1px solid var(--rule-strong);background:var(--raised);color:var(--text);
+    transition:background .14s,border-color .14s,color .14s;
+    white-space:nowrap;
+  }
+  .btn:hover{background:#1c2333;border-color:#4b5563}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{background:#2a7aef}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+  .btn.ghost:hover{background:#1c2333;color:var(--text)}
+  .btn.danger{background:transparent;border-color:rgba(248,81,73,.5);color:var(--danger)}
+  .btn.danger:hover{background:rgba(248,81,73,.12);border-color:var(--danger)}
+  .btn.danger.solid{background:var(--danger);border-color:var(--danger);color:#fff}
+  .btn.danger.solid:hover{background:#ff6259}
+  .btn:disabled{opacity:.42;cursor:not-allowed}
+  .btn.sm{height:26px;padding:0 10px;font-size:11.5px}
+
+  /* ============ logs ============ */
+  .log-toolbar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:14px 28px;border-bottom:1px solid var(--rule);
+  }
+  .log-toolbar .lab{font-size:11px;color:var(--faint)}
+  .log-toolbar select.inp{width:auto;max-width:none;padding-top:5px;padding-bottom:5px;font-size:11.5px}
+  .filters{display:flex;gap:4px;margin-left:auto}
+  .fchip{
+    font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:5px;
+    color:var(--muted);border:1px solid transparent;
+  }
+  .fchip:hover{color:var(--text);background:#1c2333}
+  .fchip.on{color:var(--text);background:var(--raised);border-color:var(--rule-strong)}
+  .fchip[data-level="ERROR"].on{color:var(--danger);border-color:rgba(248,81,73,.4)}
+  .fchip[data-level="WARNING"].on{color:var(--warn);border-color:rgba(210,153,34,.4)}
+
+  .term{
+    margin:0;background:#0a0e13;border-bottom:1px solid var(--rule);
+    font-family:var(--mono);font-size:11.5px;line-height:1.75;
+    max-height:calc(100vh - 320px);overflow:auto;
+  }
+  .term-cap{
+    position:sticky;top:0;z-index:2;
+    display:flex;align-items:center;gap:12px;
+    padding:8px 28px;background:rgba(10,14,19,.94);backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--rule);
+    font-size:10.5px;color:var(--faint);
+  }
+  .term-cap .path{color:var(--muted)}
+  .term-cap .dot{width:5px;height:5px;border-radius:50%;background:var(--ok);display:none}
+  .term.live .term-cap .dot{display:block;animation:beat 2.4s ease-out infinite}
+  .term-body{padding:10px 0 16px}
+  .ln{display:grid;grid-template-columns:52px 148px 62px 1fr;gap:14px;padding:0 28px 0 18px}
+  .ln:hover{background:rgba(88,166,255,.045)}
+  .ln .no{color:#30363d;text-align:right;user-select:none}
+  .ln .ts{color:#4b5563}
+  .ln .lvl{font-weight:600}
+  .ln .msg{color:#b9c3cd;white-space:pre-wrap;word-break:break-word}
+  .ln[data-level="DEBUG"] .lvl{color:#6e7681}
+  .ln[data-level="INFO"]  .lvl{color:var(--accent-bright)}
+  .ln[data-level="WARNING"] .lvl{color:var(--warn)}
+  .ln[data-level="ERROR"] .lvl{color:var(--danger)}
+  .ln[data-level="ERROR"] .msg{color:#e8b4b0}
+
+  /* ============ ops ============ */
+  .op-row{
+    display:grid;grid-template-columns:1fr auto;gap:24px;align-items:center;
+    padding:18px 28px;border-bottom:1px solid var(--rule);
+  }
+  .op-row:last-child{border-bottom:none}
+  .op-row h3{margin:0 0 4px;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .op-row p{margin:0;font-size:12px;color:var(--muted);max-width:62ch}
+  .op-row .ep{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-top:6px}
+  .op-row.risky h3{color:var(--danger)}
+  .op-flag{font-family:var(--mono);font-size:10px;color:var(--danger);border:1px solid rgba(248,81,73,.4);border-radius:3px;padding:1px 5px}
+
+  /* ============ debug / env ============ */
+  .env-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px}
+  .env-table th{
+    text-align:left;font-weight:500;font-size:10.5px;color:var(--faint);
+    padding:8px 28px;border-bottom:1px solid var(--rule);letter-spacing:.04em;
+  }
+  .env-table td{padding:8px 28px;border-bottom:1px solid #171d24;color:var(--muted)}
+  .env-table td:first-child{color:var(--text)}
+  .env-table tr:hover td{background:#0c1219}
+  .mask{color:var(--faint);font-style:italic}
+
+  /* ============ gate ============ */
+  .gate{
+    margin:40px auto;max-width:520px;padding:32px;
+    border:1px dashed var(--rule-strong);border-radius:10px;
+    text-align:center;background:var(--band);
+  }
+  .gate .ic{
+    width:44px;height:44px;margin:0 auto 14px;border-radius:50%;
+    border:1px solid var(--rule-strong);display:grid;place-items:center;
+    color:var(--warn);font-size:20px;
+  }
+  .gate h2{margin:0 0 8px;font-size:15px}
+  .gate p{margin:0 auto 18px;font-size:12.5px;color:var(--muted);max-width:44ch}
+  .gate code{
+    font-family:var(--mono);font-size:11.5px;color:var(--accent-bright);
+    background:var(--bg);border:1px solid var(--rule);border-radius:4px;padding:1px 6px;
+  }
+
+  /* ============ modal ============ */
+  .scrim{
+    position:fixed;inset:0;background:rgba(1,4,9,.66);backdrop-filter:blur(2px);
+    display:grid;place-items:center;z-index:100;padding:20px;
+    opacity:0;pointer-events:none;transition:opacity .16s;
+  }
+  .scrim.open{opacity:1;pointer-events:auto}
+  .modal{
+    width:100%;max-width:440px;background:var(--raised);
+    border:1px solid var(--rule-strong);border-radius:10px;
+    transform:translateY(8px);transition:transform .18s;
+    box-shadow:0 18px 50px rgba(0,0,0,.55);
+  }
+  .scrim.open .modal{transform:none}
+  .modal-head{padding:18px 20px 12px;display:flex;gap:12px;align-items:flex-start}
+  .modal-head .warnic{color:var(--danger);font-size:18px;line-height:1.3}
+  .modal-head h3{margin:0 0 6px;font-size:14.5px}
+  .modal-head p{margin:0;font-size:12.5px;color:var(--muted)}
+  .modal-body{padding:0 20px 4px}
+  .modal-body .field-hint{font-size:11.5px;color:var(--faint);margin:0 0 8px}
+  .modal-body code{font-family:var(--mono);color:var(--danger);background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.25);border-radius:4px;padding:1px 6px}
+  .modal-foot{padding:16px 20px 18px;display:flex;justify-content:flex-end;gap:8px}
+
+  /* ============ toasts ============ */
+  .toasts{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:200;max-width:380px}
+  .toast{
+    display:flex;gap:10px;align-items:flex-start;
+    background:var(--raised);border:1px solid var(--rule-strong);
+    border-left-width:3px;border-radius:7px;padding:11px 14px;
+    font-size:12.5px;box-shadow:0 10px 30px rgba(0,0,0,.45);
+    animation:toast-in .2s ease;
+  }
+  .toast.ok{border-left-color:var(--ok)}
+  .toast.warn{border-left-color:var(--warn)}
+  .toast.err{border-left-color:var(--danger)}
+  .toast .ti{font-size:14px;line-height:1.2}
+  .toast .tt{color:var(--text);font-weight:500}
+  .toast .td{color:var(--muted);font-size:11.5px;margin-top:2px}
+  @keyframes toast-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .empty{padding:48px 28px;text-align:center;color:var(--faint);font-size:12.5px}
+
+  @media (max-width:980px){
+    .vitals{grid-template-columns:repeat(2,1fr)}
+    .vital{border-left:none;border-top:1px solid var(--rule);padding-left:28px}
+    .vital:nth-child(-n+2){border-top:none}
+  }
+  @media (max-width:760px){
+    :root{--rail:100%}
+    .shell{flex-direction:column}
+    .rail{width:100%;border-right:none;border-bottom:1px solid var(--rule);flex-direction:row;align-items:center;overflow-x:auto;padding:10px}
+    .rail-cap,.sim{margin:0;border:none;padding:0}
+    .idx{flex-direction:row}
+    .idx-item{white-space:nowrap}
+    .idx-item.on::before{display:none}
+    .ledger{grid-template-columns:1fr}
+    .ledger dt{padding-bottom:0}
+    .field{grid-template-columns:1fr;gap:6px}
+    .ln{grid-template-columns:38px 1fr;gap:8px}
+    .ln .ts,.ln .lvl{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+  }
+</style>
+</head>
+<body>
+
+<header class="ribbon">
+  <div class="brand">
+    <svg viewBox="0 0 120 120" aria-hidden="true">
+      <path d="M43.9 46.1 A24 24 0 0 1 69.9 67.9" fill="none" stroke="#3D7BFF" stroke-width="9" stroke-linecap="round"/>
+      <path d="M39.7 34.5 A36 36 0 0 1 81.9 73.1" fill="none" stroke="#3D7BFF" stroke-width="9" stroke-linecap="round"/>
+      <path d="M62.4 24.9 A48 48 0 0 1 92.4 57.6" fill="none" stroke="#12A38B" stroke-width="9" stroke-linecap="round"/>
+      <path d="M37.8 92.6 A24 24 0 0 1 23.4 78.2" fill="none" stroke="#E9F1FF" stroke-width="8" stroke-linecap="round"/>
+      <circle cx="46" cy="70" r="11" fill="#3D7BFF"/>
+      <circle cx="10" cy="73" r="4.5" fill="#12A38B"/>
+    </svg>
+    <span class="brand-name">PERSEUS</span>
+    <span class="brand-sep">//</span>
+    <span class="brand-sub">application console</span>
+  </div>
+  <div class="ribbon-status">
+    <span class="pulse" aria-hidden="true"></span>
+    <span class="status-word">healthy</span>
+    <span class="chip" id="envChip">DEBUG</span>
+    <span class="mono" style="font-size:11.5px;color:var(--muted)">v0.1.0</span>
+  </div>
+  <div class="ribbon-right">
+    <span class="mono" style="font-size:11.5px;color:var(--faint)">API /api/v1 · :8000</span>
+    <span class="clock mono" id="clock">--:--:--</span>
+    <div class="who">
+      <span class="av">AD</span>
+      <span class="name mono" style="font-size:11.5px">admin</span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="rail">
+    <div class="rail-cap">SYSTEM INDEX</div>
+    <nav class="idx" id="rail"></nav>
+    <div class="sim">
+      <div class="sim-cap">PERMISSION SIMULATOR</div>
+      <div class="sim-row">
+        <span>管理员 <span class="mono">is_admin</span></span>
+        <button class="switch on" id="swAdmin" role="switch" aria-checked="true" aria-label="模拟管理员"></button>
+      </div>
+      <div class="sim-row">
+        <span>调试模式 <span class="mono">app.debug</span></span>
+        <button class="switch on" id="swDebug" role="switch" aria-checked="true" aria-label="模拟调试模式"></button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="stage" id="stage"></main>
+</div>
+
+<div class="scrim" id="scrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <div class="modal-head">
+      <span class="warnic" aria-hidden="true">⚠</span>
+      <div>
+        <h3 id="mTitle">确认操作</h3>
+        <p id="mDesc"></p>
+      </div>
+    </div>
+    <div class="modal-body">
+      <p class="field-hint">此操作不可撤销。输入 <code id="mToken"></code> 以确认。</p>
+      <input class="inp" id="mInput" autocomplete="off" spellcheck="false" placeholder="在此输入确认词" />
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="mCancel">取消</button>
+      <button class="btn danger solid" id="mConfirm" disabled>确认执行</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ================= state ================= */
+  var state = {
+    view:'overview',
+    admin:true,
+    debug:true,
+    logFilter:'ALL',
+    logAuto:false,
+    logDate:'2026-09-18',
+    logFile:'perseus',
+    logLines:200,
+    logs:[],
+    cfg:{},
+    initial:{},
+    collapse:{server:false,gunicorn:false,cors:false,proxy:false,database:false}
+  };
+
+  var canConfig = function(){ return state.admin || state.debug; };
+  var canDebug  = function(){ return state.admin && state.debug; };
+
+  /* ================= config schema ================= */
+  var SECTIONS = [
+    { id:'server', desc:'监听地址、端口与日志级别', fields:[
+      {k:'host', l:'监听地址', t:'text', v:'0.0.0.0', restart:true},
+      {k:'port', l:'监听端口', t:'number', v:8000, restart:true},
+      {k:'reload', l:'热重载', t:'readonly', v:false, note:'运行时热重载设置，不可修改'},
+      {k:'log_level', l:'日志级别', t:'select', v:'info', opts:['debug','info','warning','error','critical'], restart:true}
+    ]},
+    { id:'gunicorn', desc:'Worker 进程、并发与超时', fields:[
+      {k:'workers', l:'Worker 进程数', t:'number', v:4, restart:true},
+      {k:'worker_class', l:'Worker 类', t:'text', v:'gunicorn_worker.PerseusUvicornWorker', restart:true},
+      {k:'threads', l:'线程数', t:'number', v:1, restart:true},
+      {k:'worker_connections', l:'最大并发连接数', t:'number', v:1000, restart:true},
+      {k:'backlog', l:'连接队列长度', t:'number', v:2048, restart:true},
+      {k:'timeout', l:'Worker 超时 (s)', t:'number', v:30, restart:true},
+      {k:'graceful_timeout', l:'优雅关闭超时 (s)', t:'number', v:30, restart:true},
+      {k:'keepalive', l:'Keep-alive (s)', t:'number', v:2, restart:true},
+      {k:'max_requests', l:'最大请求数', t:'number', v:10000, restart:true},
+      {k:'preload_app', l:'预加载应用', t:'bool', v:false, restart:true},
+      {k:'daemon', l:'守护进程模式', t:'bool', v:false, restart:true},
+      {k:'access_log', l:'访问日志', t:'bool', v:true, restart:true},
+      {k:'enable_reuse_port', l:'SO_REUSEPORT', t:'bool', v:true, restart:true}
+    ]},
+    { id:'cors', desc:'跨域策略，生产环境应限制来源', fields:[
+      {k:'allow_origins', l:'允许来源', t:'list', v:['*']},
+      {k:'allow_credentials', l:'允许携带凭证', t:'bool', v:true},
+      {k:'allow_methods', l:'允许方法', t:'list', v:['GET','POST','PUT','DELETE','OPTIONS']},
+      {k:'allow_headers', l:'允许请求头', t:'list', v:['Content-Type','Authorization','X-Requested-With']},
+      {k:'max_age', l:'预检缓存 (s)', t:'number', v:600}
+    ]},
+    { id:'proxy', desc:'反向代理模式开关', fields:[
+      {k:'proxy', l:'位于反向代理之后', t:'bool', v:true, note:'启用后跳过 CORS / HSTS 等中间件'}
+    ]},
+    { id:'database', desc:'连接池与数据库驱动参数', fields:[
+      {k:'url', l:'连接 URL', t:'readonly', v:'postgresql://perseus:***@db:5432/perseus', note:'由环境变量 DATABASE_URL 注入'},
+      {k:'pool_size', l:'连接池大小', t:'number', v:20},
+      {k:'max_overflow', l:'最大溢出连接', t:'number', v:40},
+      {k:'pool_timeout', l:'获取连接超时 (s)', t:'number', v:10},
+      {k:'pool_recycle', l:'连接回收 (s)', t:'number', v:1800},
+      {k:'echo', l:'打印 SQL', t:'bool', v:false},
+      {k:'sqlite_timeout', l:'SQLite 超时 (s)', t:'number', v:10},
+      {k:'enable_wal', l:'SQLite WAL 模式', t:'bool', v:true},
+      {k:'pg_ssl_mode', l:'PostgreSQL SSL 模式', t:'select', v:'prefer', opts:['disable','allow','prefer','require','verify-ca','verify-full']},
+      {k:'pg_connect_timeout', l:'PG 连接超时 (s)', t:'number', v:10}
+    ]}
+  ];
+
+  var LOCKED = [
+    {n:'storage', d:'仓库存储根目录与配额'},
+    {n:'security', d:'JWT 密钥与令牌策略（密钥经环境变量注入）'},
+    {n:'app', d:'应用元信息与调试开关'},
+    {n:'logging', d:'审计日志'},
+    {n:'system', d:'系统级保留配置'}
+  ];
+
+  function cloneSections(){
+    var out = {};
+    SECTIONS.forEach(function(s){
+      out[s.id] = {};
+      s.fields.forEach(function(f){ out[s.id][f.k] = Array.isArray(f.v) ? f.v.slice() : f.v; });
+    });
+    return out;
+  }
+
+  /* ================= helpers ================= */
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function pad(n){ return n<10 ? '0'+n : ''+n; }
+  function $(id){ return document.getElementById(id); }
+  function lockSvg(size){
+    var s = size || 12;
+    return '<svg viewBox="0 0 16 16" width="'+s+'" height="'+s+'" fill="none" stroke="currentColor" '+
+      'stroke-width="1.4" stroke-linecap="round" aria-hidden="true" style="display:block">'+
+      '<rect x="3.2" y="7" width="9.6" height="6.6" rx="1.6"/>'+
+      '<path d="M5.6 7V5.3a2.4 2.4 0 0 1 4.8 0V7"/></svg>';
+  }
+
+  function fmtUptime(sec){
+    var d=Math.floor(sec/86400), h=Math.floor(sec%86400/3600), m=Math.floor(sec%3600/60), s=sec%60;
+    var p=[];
+    if(d) p.push(d+'天');
+    if(h) p.push(h+'小时');
+    if(m) p.push(m+'分');
+    if(!p.length || s) p.push(s+'秒');
+    return p.join('');
+  }
+
+  function toast(kind, title, detail){
+    var el = document.createElement('div');
+    el.className = 'toast ' + kind;
+    var ic = kind==='ok' ? '✓' : kind==='warn' ? '!' : '×';
+    el.innerHTML = '<span class="ti">'+ic+'</span><div><div class="tt">'+esc(title)+'</div>'+
+      (detail ? '<div class="td">'+esc(detail)+'</div>' : '')+'</div>';
+    $('toasts').appendChild(el);
+    setTimeout(function(){
+      el.style.transition='opacity .25s,transform .25s';
+      el.style.opacity='0'; el.style.transform='translateY(6px)';
+      setTimeout(function(){ el.remove(); }, 260);
+    }, 4200);
+  }
+
+  /* ================= typed confirm ================= */
+  var confirmCb = null, confirmToken = '';
+  function openConfirm(opt){
+    confirmToken = opt.token; confirmCb = opt.onConfirm;
+    $('mTitle').textContent = opt.title;
+    $('mDesc').textContent = opt.desc;
+    $('mToken').textContent = opt.token;
+    $('mConfirm').textContent = opt.confirmLabel || '确认执行';
+    $('mInput').value = '';
+    $('mConfirm').disabled = true;
+    $('scrim').classList.add('open');
+    setTimeout(function(){ $('mInput').focus(); }, 60);
+  }
+  function closeConfirm(){ $('scrim').classList.remove('open'); confirmCb=null; }
+  $('mCancel').addEventListener('click', closeConfirm);
+  $('scrim').addEventListener('click', function(e){ if(e.target===$('scrim')) closeConfirm(); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeConfirm(); });
+  $('mInput').addEventListener('input', function(e){
+    $('mConfirm').disabled = e.target.value.trim() !== confirmToken;
+  });
+  $('mConfirm').addEventListener('click', function(){
+    if($('mInput').value.trim() !== confirmToken) return;
+    var cb = confirmCb; closeConfirm(); if(cb) cb();
+  });
+
+  /* ================= rail ================= */
+  var NAV = [
+    {id:'overview', n:'01', l:'状态概览', gate:null},
+    {id:'config',   n:'02', l:'配置管理', gate:canConfig},
+    {id:'logs',     n:'03', l:'日志查看器', gate:canConfig},
+    {id:'ops',      n:'04', l:'运维操作', gate:canConfig},
+    {id:'debug',    n:'05', l:'调试工具', gate:canDebug}
+  ];
+
+  function renderRail(){
+    $('rail').innerHTML = NAV.map(function(it){
+      var locked = it.gate ? !it.gate() : false;
+      return '<button class="idx-item'+(state.view===it.id?' on':'')+(locked?' locked':'')+'" data-nav="'+it.id+'">'+
+        '<span class="idx-num">'+it.n+'</span>'+
+        '<span class="idx-label">'+it.l+'</span>'+
+        '<span class="idx-lock">'+lockSvg(11)+'</span>'+
+      '</button>';
+    }).join('');
+  }
+
+  $('rail').addEventListener('click', function(e){
+    var b = e.target.closest('[data-nav]');
+    if(!b) return;
+    state.view = b.getAttribute('data-nav');
+    if(location.hash !== '#'+state.view) location.hash = state.view;
+    render();
+  });
+
+  /* ================= sparkline ================= */
+  function spark(data, color){
+    var w=120,h=28,mx=Math.max.apply(null,data),mn=Math.min.apply(null,data),rng=(mx-mn)||1;
+    var pts = data.map(function(d,i){
+      var x = (i/(data.length-1))*w;
+      var y = h-((d-mn)/rng)*(h-6)-3;
+      return x.toFixed(1)+','+y.toFixed(1);
+    }).join(' ');
+    return '<svg class="spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" aria-hidden="true">'+
+      '<polyline points="'+pts+'" fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  }
+
+  /* ================= runtime metrics ================= */
+  var metrics = {
+    startSec: 3*86400 + 4*3600 + 12*60 + 8,
+    mem: [412,418,409,430,441,436,452,448,461,455,470,463],
+    cpu: [3.1,4.4,2.8,6.2,5.1,3.9,7.4,4.2,3.3,5.8,4.6,3.7],
+    rps: [12,18,9,22,16,11,25,19,14,21,17,13]
+  };
+
+  /* ================= log data ================= */
+  var LOG_POOL = [
+    ['INFO','perseus','应用启动完成 lifecycle startup complete (pid=4821)'],
+    ['INFO','uvicorn','Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)'],
+    ['INFO','perseus','数据库连接校验通过 SELECT 1'],
+    ['INFO','perseus','schema 已应用 revision=a58c8a7aeb0a head=a58c8a7aeb0a'],
+    ['INFO','gunicorn','Booting worker with pid: 4823 / 4824 / 4825 / 4826'],
+    ['INFO','http','GET  /health 200 1.8ms'],
+    ['INFO','http','POST /api/v1/auth/login 200 84.3ms user=admin'],
+    ['INFO','git','clone admin/Eridanus.git → /data/repositories/admin/Eridanus.git 1.24s'],
+    ['INFO','http','GET  /api/v1/repositories?page=1 200 21.7ms'],
+    ['INFO','collab','collab session join doc=Eridanus:master:README.md clients=2'],
+    ['DEBUG','http','GET  /api/app/status 200 3.1ms'],
+    ['DEBUG','orm','SQL pool: size=20 in_use=3 overflow=0'],
+    ['INFO','git','push admin/Eridanus.git refs/heads/master 4c1f9a2..8b3d7e0 (2 objects)'],
+    ['INFO','http','GET  /api/v1/repositories/8f2/issues 200 18.9ms'],
+    ['WARNING','git','slow git operation: fetch upstream 3.4s exceeds 2s budget'],
+    ['INFO','ws','websocket connected /ws/notifications user=admin conns=3'],
+    ['INFO','http','PUT  /api/v1/repositories/8f2/contents/README.md 200 112.6ms'],
+    ['INFO','perseus','websocket heartbeat ok peers=3 latency=0.9ms'],
+    ['ERROR','http','GET  /api/v1/repositories/missing 404 2.2ms'],
+    ['INFO','http','GET  /api/v1/notifications?unread=true 200 9.4ms'],
+    ['INFO','collab','collab save doc=Eridanus:master:README.md commit=9a0c4f1'],
+    ['WARNING','orm','connection pool approaching capacity in_use=17/20'],
+    ['INFO','http','POST /api/v1/repositories 201 143.2ms repo=smoke-1a2b'],
+    ['INFO','git','gc /data/repositories/admin/Eridanus.git freed=12.4MB'],
+    ['DEBUG','http','GET  /api/app/logs/content?lines=200 200 4.7ms'],
+    ['INFO','perseus','scheduled audit log rotation size=10MB keep=5'],
+    ['INFO','http','GET  /api/v1/search/global?q=perseus 200 31.5ms'],
+    ['ERROR','orm','deadlock detected on repository_members, retrying (attempt 1/3)'],
+    ['INFO','orm','retry succeeded after 42ms'],
+    ['INFO','perseus','request stats flushed total=18423 active=2 rps=14.2']
+  ];
+  var logSeq = 0;
+  function makeLog(){
+    var t = LOG_POOL[logSeq % LOG_POOL.length];
+    var now = new Date();
+    logSeq++;
+    return {
+      no: 1024 + logSeq,
+      ts: now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+' '+pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds()),
+      level: t[0], src: t[1], msg: t[2]
+    };
+  }
+  for(var i=0;i<30;i++) state.logs.push(makeLog());
+
+  /* ================= views ================= */
+  function pageHead(title, sub, actions){
+    return '<div class="page-head"><div><h1>'+esc(title)+'</h1><p>'+esc(sub)+'</p></div>'+
+      (actions ? '<div class="head-actions">'+actions+'</div>' : '')+'</div>';
+  }
+
+  function gateView(kind){
+    var need, desc;
+    if(kind==='config'){ need='管理员权限 或 调试模式'; desc='读取与修改应用配置需要 <code>is_admin</code> 或 <code>app.debug</code>。当前身份不具备该权限。'; }
+    else if(kind==='logs'){ need='管理员权限 或 调试模式'; desc='日志内容与清理接口需要 <code>is_admin</code> 或 <code>app.debug</code>。'; }
+    else if(kind==='ops'){ need='管理员权限 或 调试模式'; desc='关机与重启接口需要 <code>is_admin</code> 或 <code>app.debug</code>。'; }
+    else { need='管理员权限 且 调试模式'; desc='调试工具同时要求 <code>is_admin</code> 与 <code>app.debug</code>，二者缺一不可。'; }
+    return '<div class="gate"><div class="ic" aria-hidden="true">'+lockSvg(18)+'</div>'+
+      '<h2>需要 '+need+'</h2><p>'+desc+'</p>'+
+      '<button class="btn primary" data-enable="'+kind+'">在模拟器中授予权限</button></div>';
+  }
+
+  function renderOverview(){
+    var uptime = fmtUptime(metrics.startSec);
+    var mem = metrics.mem[metrics.mem.length-1];
+    var cpu = metrics.cpu[metrics.cpu.length-1];
+    var rps = metrics.rps[metrics.rps.length-1];
+
+    var h = pageHead('状态概览','运行时生命体征、进程账本与数据库 schema 对齐情况。数据来自 /api/app/status 与 /api/v1/stats/platform。',
+      '<button class="btn sm" data-act="refresh">刷新</button>');
+
+    h += '<section class="band"><div class="vitals">';
+    h += vital('运行时长','<span id="vUptime">'+uptime+'</span>', spark(metrics.rps,'#1f6feb'), '请求速率 '+rps.toFixed(1)+' req/s');
+    h += vital('内存占用','<span id="vMem">'+mem+'</span><small>MB</small>', spark(metrics.mem,'#3fb950'), 'RSS · 近 60s');
+    h += vital('CPU','<span id="vCpu">'+cpu.toFixed(1)+'</span><small>%</small>', spark(metrics.cpu,'#d29922'), '单进程占用');
+    h += vital('线程 / 连接','<span id="vThr">18</span><small>/ 3</small>', '', 'threads / sockets');
+    h += vital('数据库 schema','<span style="font-size:15px">a58c8a7</span>', '', 'applied = head');
+    h += '</div></section>';
+
+    h += '<section class="band band-pad">';
+    h += '<div class="band-head"><h2>进程账本</h2><span class="hint">/api/app/status · process</span></div>';
+    h += '<div class="ledger">';
+    h += row('进程 PID','<span class="mono">4821</span>');
+    h += row('内存 RSS','<span class="mono">'+mem+' MB</span>');
+    h += row('CPU 占用','<span class="mono">'+cpu.toFixed(1)+' %</span>');
+    h += row('线程数','<span class="mono">18</span>');
+    h += row('活动连接','<span class="mono">3</span>');
+    h += row('服务器时间','<span class="mono" id="vServerTime">--</span>');
+    h += '</div></section>';
+
+    h += '<section class="band band-pad">';
+    h += '<div class="band-head"><h2>请求与 Git 队列</h2><span class="hint">middleware/request_stats · git_operations</span></div>';
+    h += '<div class="statline">'+
+      stat('18,423','总请求数')+
+      stat('2','活动请求')+
+      stat('14.2','请求 / 秒')+
+      stat('21.4','平均响应 ms')+
+      stat('0','活动克隆')+
+      stat('0','活动推送')+
+      stat('0','队列长度')+
+    '</div></section>';
+
+    h += '<section class="band band-pad">';
+    h += '<div class="band-head"><h2>平台统计</h2><span class="hint">/api/v1/stats/platform · 公开</span></div>';
+    h += '<div class="statline">'+
+      stat('128','仓库数')+
+      stat('3,902','提交数')+
+      stat('47','用户数')+
+      stat('3天4小时','实例运行时长')+
+    '</div></section>';
+
+    h += '<section class="band band-pad" style="border-bottom:none">';
+    h += '<div class="band-head"><h2>最近日志</h2><span class="hint">最后 6 行 · 完整视图见「日志查看器」</span>'+
+      '<div class="right"><button class="btn ghost sm" data-nav="logs">打开日志 →</button></div></div>';
+    h += '<div class="term" style="border:1px solid var(--rule);border-radius:8px;max-height:none"><div class="term-body">';
+    state.logs.slice(-6).forEach(function(l){ h += logLine(l); });
+    h += '</div></div></section>';
+    return h;
+  }
+
+  function vital(label, value, sparkHtml, note){
+    return '<div class="vital"><div class="vital-label">'+label+'</div>'+
+      '<div class="vital-value">'+value+'</div>'+
+      '<div class="vital-foot">'+(sparkHtml||'')+(note?'<span class="vital-note">'+note+'</span>':'')+'</div></div>';
+  }
+  function row(k,v){ return '<dt>'+esc(k)+'</dt><dd>'+v+'</dd>'; }
+  function stat(n,l){ return '<div class="s"><span class="n">'+n+'</span><span class="l">'+l+'</span></div>'; }
+
+  /* -------- config -------- */
+  function cfgVal(id,k){ return state.cfg[id][k]; }
+
+  function fieldHtml(sec, f){
+    var v = cfgVal(sec.id, f.k);
+    var ctl;
+    if(f.t==='readonly'){
+      ctl = '<span class="ro">'+lockSvg(11)+' '+esc(v)+'</span>';
+    } else if(f.t==='bool'){
+      ctl = '<button class="switch'+(v?' on':'')+'" role="switch" aria-checked="'+!!v+'" data-cfg="'+sec.id+'.'+f.k+'" data-type="bool"></button>';
+    } else if(f.t==='select'){
+      ctl = '<select class="inp" data-cfg="'+sec.id+'.'+f.k+'" data-type="select">'+
+        f.opts.map(function(o){ return '<option'+(o===v?' selected':'')+'>'+esc(o)+'</option>'; }).join('')+'</select>';
+    } else if(f.t==='list'){
+      ctl = '<input class="inp" data-cfg="'+sec.id+'.'+f.k+'" data-type="list" value="'+esc(v.join(', '))+'" />';
+    } else if(f.t==='number'){
+      ctl = '<input class="inp" type="number" data-cfg="'+sec.id+'.'+f.k+'" data-type="number" value="'+esc(v)+'" />';
+    } else {
+      ctl = '<input class="inp" data-cfg="'+sec.id+'.'+f.k+'" data-type="text" value="'+esc(v)+'" />';
+    }
+    var tags = '';
+    if(f.restart) tags += '<span class="tag restart" title="修改后需重启服务生效">需重启</span>';
+    if(f.t==='readonly') tags += '<span class="tag lock">只读</span>';
+    tags += '<span class="tag dirty off" data-dirtytag="'+sec.id+'.'+f.k+'">已修改</span>';
+    return '<div class="field"><div class="field-key"><span class="field-label">'+esc(f.l)+'</span>'+
+      '<span class="field-name">'+sec.id+'.'+esc(f.k)+'</span></div>'+
+      '<div class="field-ctl">'+ctl+(f.note?'<div class="field-name" style="margin-top:3px">'+esc(f.note)+'</div>':'')+'</div>'+
+      '<div class="field-meta">'+tags+'</div></div>';
+  }
+
+  function renderConfig(){
+    if(!canConfig()) return pageHead('配置管理','读取、校验、修改与重置应用配置。') + gateView('config');
+
+    var dirtyCount = countDirty();
+    var actions = '<button class="btn sm" data-act="cfg-validate">校验</button>'+
+      '<button class="btn sm" data-act="cfg-reset">重置为默认</button>'+
+      '<button class="btn primary sm" data-act="cfg-save"'+(dirtyCount?'':' disabled')+' id="cfgSave">保存更改'+(dirtyCount?' ('+dirtyCount+')':'')+'</button>';
+    var h = pageHead('配置管理','可修改 server / gunicorn / proxy / cors / database；受保护配置节只读。修改部分字段需重启服务生效。', actions);
+
+    h += '<div id="cfgBanner"></div>';
+
+    SECTIONS.forEach(function(sec){
+      var d = sectionDirty(sec.id);
+      h += '<section class="cfg-sec'+(state.collapse[sec.id]?' collapsed':'')+'" data-sec="'+sec.id+'">';
+      h += '<div class="cfg-sec-head" data-toggle="'+sec.id+'">'+
+        '<span class="caret">▾</span>'+
+        '<span class="cfg-sec-name">'+sec.id+'</span>'+
+        '<span class="cfg-sec-desc">'+esc(sec.desc)+'</span>'+
+        '<span class="cfg-sec-count'+(d?' dirty':'')+'" data-count="'+sec.id+'">'+(d?d+' 项已修改':sec.fields.length+' 项')+'</span>'+
+      '</div>';
+      h += '<div class="cfg-body">'+sec.fields.map(function(f){ return fieldHtml(sec,f); }).join('')+'</div>';
+      h += '</section>';
+    });
+
+    h += '<section class="locked-sec"><div class="lt"><span>◼</span> 受保护配置节 · 通过 config_service.PROTECTED_CONFIG_SECTIONS 拒绝写入</div>'+
+      '<div class="locked-list">'+LOCKED.map(function(s){
+        return '<span class="li">['+s.n+'] '+esc(s.d)+'</span>';
+      }).join('')+'</div></section>';
+
+    return h;
+  }
+
+  function countDirty(){
+    var n=0; SECTIONS.forEach(function(s){ n += sectionDirty(s.id); }); return n;
+  }
+  function sectionDirty(id){
+    var n=0;
+    SECTIONS.filter(function(s){return s.id===id;})[0].fields.forEach(function(f){
+      if(f.t==='readonly') return;
+      var a = state.cfg[id][f.k], b = state.initial[id][f.k];
+      if(JSON.stringify(a)!==JSON.stringify(b)) n++;
+    });
+    return n;
+  }
+
+  /* -------- logs -------- */
+  function logLine(l){
+    return '<div class="ln" data-level="'+l.level+'"><span class="no">'+l.no+'</span>'+
+      '<span class="ts">'+l.ts+'</span><span class="lvl">'+l.level+'</span>'+
+      '<span class="msg">['+esc(l.src)+'] '+esc(l.msg)+'</span></div>';
+  }
+  function renderLogs(){
+    if(!canConfig()) return pageHead('日志查看器','按日期、文件与级别检索运行日志。') + gateView('logs');
+
+    var levels = ['ALL','DEBUG','INFO','WARNING','ERROR'];
+    var filtered = state.logs.filter(function(l){ return state.logFilter==='ALL' || l.level===state.logFilter; });
+
+    var h = pageHead('日志查看器','日志位于 logs/{date}/ 下；读取上限 1000 行，支持级别过滤。',
+      '<button class="btn sm" data-act="log-cleanup">清理旧日志</button>'+
+      '<button class="btn primary sm" data-act="log-refresh">刷新</button>');
+
+    h += '<div class="log-toolbar">'+
+      '<span class="lab">日期</span><select class="inp" data-log="date">'+
+        ['2026-09-18','2026-09-17','2026-09-16','2026-09-15'].map(function(d){return '<option'+(d===state.logDate?' selected':'')+'>'+d+'</option>';}).join('')+
+      '</select>'+
+      '<span class="lab">文件</span><select class="inp" data-log="file">'+
+        ['perseus','app','error'].map(function(f){return '<option'+(f===state.logFile?' selected':'')+'>'+f+'</option>';}).join('')+
+      '</select>'+
+      '<span class="lab">行数</span><select class="inp" data-log="lines">'+
+        [100,200,500,1000].map(function(n){return '<option'+(n===state.logLines?' selected':'')+'>'+n+'</option>';}).join('')+
+      '</select>'+
+      '<button class="btn ghost sm" data-act="log-auto" id="autoBtn">'+(state.logAuto?'停止跟随':'实时跟随')+'</button>'+
+      '<div class="filters">'+levels.map(function(l){
+        return '<button class="fchip'+(state.logFilter===l?' on':'')+'" data-level="'+l+'" data-filter="'+l+'">'+l+'</button>';
+      }).join('')+'</div>'+
+    '</div>';
+
+    h += '<div class="term'+(state.logAuto?' live':'')+'" id="term"><div class="term-cap">'+
+      '<span class="dot"></span><span class="path mono">logs/'+state.logDate+'/'+state.logFile+'.log</span>'+
+      '<span class="mono">'+filtered.length+' / '+state.logs.length+' 行</span>'+
+      '<span class="mono" style="margin-left:auto">'+(state.logAuto?'FOLLOW':'PAUSED')+'</span>'+
+    '</div><div class="term-body" id="termBody">'+
+      (filtered.length ? filtered.map(logLine).join('') : '<div class="empty">当前级别无匹配日志</div>')+
+    '</div></div>';
+    return h;
+  }
+
+  /* -------- ops -------- */
+  function renderOps(){
+    if(!canConfig()) return pageHead('运维操作','应用级关机与重启。') + gateView('ops');
+    var h = pageHead('运维操作','以下操作作用于整个应用进程，需要管理员权限或调试模式。执行前需二次确认。');
+    h += '<section class="band" style="border-bottom:none">';
+    h += '<div class="op-row"><div><h3>重启服务 <span class="op-flag">短暂中断</span></h3>'+
+      '<p>触发优雅关闭并按当前运行方式重新拉起进程。调试模式下由 Uvicorn 接管，生产模式下重新执行启动命令。进行中的请求可能被中断。</p>'+
+      '<div class="ep">POST /api/app/restart · 需要 is_admin 或 app.debug</div></div>'+
+      '<button class="btn danger" data-act="op-restart">重启服务</button></div>';
+    h += '<div class="op-row risky"><div><h3>关闭服务 <span class="op-flag">服务停止</span></h3>'+
+      '<p>广播关闭消息、断开全部 WebSocket 连接、释放数据库连接池，然后终止进程。关闭后需人工重新启动。</p>'+
+      '<div class="ep">POST /api/app/shutdown · 需要 is_admin 或 app.debug</div></div>'+
+      '<button class="btn danger" data-act="op-shutdown">关闭服务</button></div>';
+    h += '</section>';
+    return h;
+  }
+
+  /* -------- debug -------- */
+  var ENV = [
+    ['PERSEUS_APP_DEBUG','true'],
+    ['PERSEUS_STRESS_TEST','false'],
+    ['PERSEUS_ADMIN_USERNAME','admin'],
+    ['PERSEUS_ADMIN_EMAIL','admin@perseus.local'],
+    ['DATABASE_URL','postgresql://perseus:***@db:5432/perseus','mask'],
+    ['PERSEUS_SECURITY_SECRET_KEY','***masked***','mask'],
+    ['PERSEUS_SENTRY_DSN','(未设置)','mask']
+  ];
+  function renderDebug(){
+    if(!canDebug()) return pageHead('调试工具','破坏性调试接口，仅调试模式下对管理员开放。') + gateView('debug');
+
+    var h = pageHead('调试工具','仅在 app.debug=true 且当前用户为管理员时可用。环境变量中的敏感字段已脱敏。');
+    h += '<section class="band band-pad">';
+    h += '<div class="band-head"><h2>调试状态</h2><span class="hint">GET /api/v1/debug/status</span></div>';
+    h += '<div class="ledger">'+
+      row('调试模式','<span class="mono" style="color:var(--warn)">true</span>')+
+      row('配置文件','<span class="mono">config.toml</span> <span class="dim">存在</span>')+
+      row('数据库类型','<span class="mono">postgresql</span>')+
+      row('数据库 URL','<span class="mono">postgresql://perseus:***@db:5432/perseus</span>')+
+      row('压力测试模式','<span class="mono">false</span>')+
+    '</div></section>';
+
+    h += '<section class="band">';
+    h += '<div class="band-head" style="padding:18px 28px 12px"><h2>环境变量</h2><span class="hint">PERSEUS_* · 敏感值脱敏</span></div>';
+    h += '<table class="env-table"><thead><tr><th>KEY</th><th>VALUE</th></tr></thead><tbody>'+
+      ENV.map(function(e){ return '<tr><td>'+e[0]+'</td><td'+(e[2]==='mask'?' class="mask"':'')+'>'+esc(e[1])+'</td></tr>'; }).join('')+
+    '</tbody></table></section>';
+
+    h += '<section class="band" style="border-bottom:none">';
+    h += '<div class="op-row risky"><div><h3>重置数据库 <span class="op-flag">数据销毁</span></h3>'+
+      '<p>删除全部数据表并重新创建，启动时重新引导管理员账号。所有仓库元数据、用户、Issue、PR 将永久丢失。</p>'+
+      '<div class="ep">POST /api/v1/debug/initdb · 需要 is_admin 且 app.debug</div></div>'+
+      '<button class="btn danger" data-act="debug-initdb">重置数据库</button></div>';
+    h += '<div class="op-row risky"><div><h3>重置配置文件 <span class="op-flag">配置销毁</span></h3>'+
+      '<p>删除当前 config.toml，从 config.example.toml 重新生成默认配置。原文件会带时间戳备份。</p>'+
+      '<div class="ep">POST /api/v1/debug/initconf · 需要 is_admin 且 app.debug</div></div>'+
+      '<button class="btn danger" data-act="debug-initconf">重置配置</button></div>';
+    h += '</section>';
+    return h;
+  }
+
+  /* ================= render ================= */
+  function render(){
+    renderRail();
+    var html;
+    if(state.view==='overview') html = renderOverview();
+    else if(state.view==='config') html = renderConfig();
+    else if(state.view==='logs') html = renderLogs();
+    else if(state.view==='ops') html = renderOps();
+    else html = renderDebug();
+    $('stage').innerHTML = html;
+    $('stage').scrollTop = 0;
+    syncEnvChip();
+  }
+
+  function syncEnvChip(){
+    var c = $('envChip');
+    if(state.debug){ c.textContent='DEBUG'; c.className='chip debug'; }
+    else { c.textContent='PRODUCTION'; c.className='chip prod'; }
+  }
+
+  /* ================= events (delegated) ================= */
+  $('stage').addEventListener('click', function(e){
+    var nav = e.target.closest('[data-nav]');
+    if(nav){ state.view = nav.getAttribute('data-nav'); if(location.hash!=='#'+state.view) location.hash = state.view; render(); return; }
+
+    var toggle = e.target.closest('[data-toggle]');
+    if(toggle){
+      var id = toggle.getAttribute('data-toggle');
+      state.collapse[id] = !state.collapse[id];
+      toggle.closest('.cfg-sec').classList.toggle('collapsed', state.collapse[id]);
+      return;
+    }
+
+    var sw = e.target.closest('[data-cfg][data-type="bool"]');
+    if(sw){
+      var path = sw.getAttribute('data-cfg').split('.');
+      state.cfg[path[0]][path[1]] = !state.cfg[path[0]][path[1]];
+      sw.classList.toggle('on', state.cfg[path[0]][path[1]]);
+      sw.setAttribute('aria-checked', String(state.cfg[path[0]][path[1]]));
+      refreshDirty(path[0]);
+      return;
+    }
+
+    var filter = e.target.closest('[data-filter]');
+    if(filter){ state.logFilter = filter.getAttribute('data-filter'); render(); return; }
+
+    var enable = e.target.closest('[data-enable]');
+    if(enable){ grantFor(enable.getAttribute('data-enable')); return; }
+
+    var act = e.target.closest('[data-act]');
+    if(act){ handleAction(act.getAttribute('data-act')); return; }
+  });
+
+  $('stage').addEventListener('input', function(e){
+    var inp = e.target.closest('[data-cfg]');
+    if(inp && inp.getAttribute('data-type')!=='bool'){
+      var path = inp.getAttribute('data-cfg').split('.');
+      var type = inp.getAttribute('data-type');
+      var raw = inp.value;
+      if(type==='number') state.cfg[path[0]][path[1]] = raw==='' ? '' : Number(raw);
+      else if(type==='list') state.cfg[path[0]][path[1]] = raw.split(',').map(function(s){return s.trim();}).filter(Boolean);
+      else state.cfg[path[0]][path[1]] = raw;
+      refreshDirty(path[0]);
+    }
+  });
+
+  $('stage').addEventListener('change', function(e){
+    var sel = e.target.closest('[data-log]');
+    if(sel){
+      var k = sel.getAttribute('data-log');
+      if(k==='date') state.logDate = sel.value;
+      if(k==='file') state.logFile = sel.value;
+      if(k==='lines') state.logLines = Number(sel.value);
+      render();
+    }
+  });
+
+  function refreshDirty(secId){
+    var d = sectionDirty(secId);
+    var c = document.querySelector('[data-count="'+secId+'"]');
+    if(c){
+      var total = SECTIONS.filter(function(s){return s.id===secId;})[0].fields.length;
+      c.textContent = d ? (d+' 项已修改') : (total+' 项');
+      c.classList.toggle('dirty', !!d);
+    }
+    // per-field dirty tags
+    SECTIONS.filter(function(s){return s.id===secId;})[0].fields.forEach(function(f){
+      if(f.t==='readonly') return;
+      var tag = document.querySelector('[data-dirtytag="'+secId+'.'+f.k+'"]');
+      if(!tag) return;
+      var dirty = JSON.stringify(state.cfg[secId][f.k]) !== JSON.stringify(state.initial[secId][f.k]);
+      tag.classList.toggle('off', !dirty);
+    });
+    var total = countDirty();
+    var save = $('cfgSave');
+    if(save){
+      save.disabled = !total;
+      save.textContent = '保存更改' + (total ? ' ('+total+')' : '');
+    }
+  }
+
+  function handleAction(act){
+    if(act==='refresh'){ toast('ok','状态已刷新','/api/app/status 已重新拉取'); return; }
+    if(act==='cfg-validate'){
+      var errs = validateConfig();
+      if(errs.length) toast('err','校验未通过', errs.join('；'));
+      else toast('ok','配置校验通过','POST /api/app/config/validate');
+      return;
+    }
+    if(act==='cfg-save'){
+      var changed = changedFields();
+      var restart = changed.filter(function(x){ return x.restart; }).map(function(x){ return x.path; });
+      state.initial = JSON.parse(JSON.stringify(state.cfg));
+      render();
+      toast('ok','配置已保存','POST /api/app/config');
+      if(restart.length) toast('warn','部分修改需重启生效', restart.join('、'));
+      return;
+    }
+    if(act==='cfg-reset'){
+      openConfirm({
+        title:'重置配置为默认值', token:'RESET CONFIG', confirmLabel:'重置配置',
+        desc:'将 config.toml 全部可修改配置节恢复为 config.example.toml 默认值。',
+        onConfirm:function(){
+          state.cfg = cloneSections(); state.initial = cloneSections(); render();
+          toast('ok','配置已重置','POST /api/app/config/reset');
+        }
+      });
+      return;
+    }
+    if(act==='log-refresh'){ state.logs = state.logs.slice(-30); for(var i=0;i<6;i++) state.logs.push(makeLog()); render(); toast('ok','日志已刷新'); return; }
+    if(act==='log-auto'){
+      state.logAuto = !state.logAuto; render();
+      toast(state.logAuto?'ok':'warn', state.logAuto?'已开启实时跟随':'已暂停跟随');
+      return;
+    }
+    if(act==='log-cleanup'){
+      openConfirm({
+        title:'清理旧日志', token:'CLEANUP', confirmLabel:'清理日志',
+        desc:'删除保留天数之外的日志目录与文件。默认保留最近 30 天。',
+        onConfirm:function(){ toast('ok','旧日志已清理','POST /api/app/logs/cleanup?keep_days=30 · 已删除 12 个文件'); }
+      });
+      return;
+    }
+    if(act==='op-restart'){
+      openConfirm({
+        title:'重启服务', token:'RESTART', confirmLabel:'重启服务',
+        desc:'应用将优雅关闭并重新拉起，期间服务短暂不可用，进行中的请求可能被中断。',
+        onConfirm:function(){ toast('warn','重启已触发','POST /api/app/restart · 服务将在约 1 秒后重启'); }
+      });
+      return;
+    }
+    if(act==='op-shutdown'){
+      openConfirm({
+        title:'关闭服务', token:'SHUTDOWN', confirmLabel:'关闭服务',
+        desc:'全部连接将被断开、数据库连接池释放，进程终止。关闭后需人工重新启动。',
+        onConfirm:function(){ toast('err','关闭已触发','POST /api/app/shutdown · 服务即将停止'); }
+      });
+      return;
+    }
+    if(act==='debug-initdb'){
+      openConfirm({
+        title:'重置数据库', token:'RESET DATABASE', confirmLabel:'重置数据库',
+        desc:'删除并重建全部数据表，所有业务数据将永久丢失，随后重新引导管理员账号。',
+        onConfirm:function(){ toast('err','数据库重置已执行','POST /api/v1/debug/initdb · 已重建表结构'); }
+      });
+      return;
+    }
+    if(act==='debug-initconf'){
+      openConfirm({
+        title:'重置配置文件', token:'RESET CONFIG', confirmLabel:'重置配置文件',
+        desc:'删除当前 config.toml 并从示例配置重新生成，原文件将带时间戳备份。',
+        onConfirm:function(){ toast('warn','配置文件已重置','POST /api/v1/debug/initconf · 已备份 config.toml.backup.<ts>'); }
+      });
+      return;
+    }
+  }
+
+  function changedFields(){
+    var out = [];
+    SECTIONS.forEach(function(s){
+      s.fields.forEach(function(f){
+        if(f.t==='readonly') return;
+        if(JSON.stringify(state.cfg[s.id][f.k]) !== JSON.stringify(state.initial[s.id][f.k])){
+          out.push({path:s.id+'.'+f.k, restart:!!f.restart});
+        }
+      });
+    });
+    return out;
+  }
+
+  function validateConfig(){
+    var errs = [];
+    SECTIONS.forEach(function(s){
+      s.fields.forEach(function(f){
+        var v = state.cfg[s.id][f.k];
+        if(f.t==='number'){
+          if(v==='' || isNaN(Number(v))) errs.push(s.id+'.'+f.k+' 必须是整数');
+          else if(Number(v)<0) errs.push(s.id+'.'+f.k+' 必须是非负整数');
+        }
+        if(s.id==='server' && f.k==='port'){
+          var p = Number(v);
+          if(p<1||p>65535) errs.push('server.port 必须在 1-65535 之间');
+        }
+      });
+    });
+    if(state.cfg.server.host==='') errs.push('server.host 不能为空');
+    return errs;
+  }
+
+  function grantFor(kind){
+    if(kind==='debug'){ state.admin=true; state.debug=true; }
+    else { if(!state.admin && !state.debug) state.admin = true; }
+    syncSim(); render();
+    toast('ok','已在模拟器中授予权限','门控内容已解锁');
+  }
+
+  function syncSim(){
+    $('swAdmin').classList.toggle('on', state.admin);
+    $('swAdmin').setAttribute('aria-checked', String(state.admin));
+    $('swDebug').classList.toggle('on', state.debug);
+    $('swDebug').setAttribute('aria-checked', String(state.debug));
+  }
+  $('swAdmin').addEventListener('click', function(){ state.admin=!state.admin; syncSim(); render(); toast('ok','管理员权限 '+(state.admin?'已授予':'已撤销'),'is_admin='+state.admin); });
+  $('swDebug').addEventListener('click', function(){ state.debug=!state.debug; syncSim(); render(); toast('ok','调试模式 '+(state.debug?'已开启':'已关闭'),'app.debug='+state.debug); });
+
+  /* ================= timers ================= */
+  function tickClock(){
+    var n = new Date();
+    $('clock').textContent = pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds());
+    var st = $('vServerTime');
+    if(st) st.textContent = n.getFullYear()+'-'+pad(n.getMonth()+1)+'-'+pad(n.getDate())+' '+pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds());
+  }
+  function tickMetrics(){
+    metrics.startSec++;
+    var u = $('vUptime'); if(u) u.textContent = fmtUptime(metrics.startSec);
+
+    metrics.mem.push(Math.max(360, Math.min(620, metrics.mem[metrics.mem.length-1] + (Math.random()*24-12))));
+    metrics.mem.shift();
+    metrics.cpu.push(Math.max(0.4, Math.min(28, metrics.cpu[metrics.cpu.length-1] + (Math.random()*4-2))));
+    metrics.cpu.shift();
+    metrics.rps.push(Math.max(2, Math.min(40, metrics.rps[metrics.rps.length-1] + (Math.random()*8-4))));
+    metrics.rps.shift();
+
+    if(state.view==='overview'){
+      var m = $('vMem'); if(m) m.textContent = Math.round(metrics.mem[metrics.mem.length-1]);
+      var c = $('vCpu'); if(c) c.textContent = metrics.cpu[metrics.cpu.length-1].toFixed(1);
+      document.querySelectorAll('.vital .spark').forEach(function(svg,i){
+        var arr = i===0 ? metrics.rps : i===1 ? metrics.mem : i===2 ? metrics.cpu : null;
+        if(!arr) return;
+        var color = i===0 ? '#1f6feb' : i===1 ? '#3fb950' : '#d29922';
+        svg.outerHTML = spark(arr, color);
+      });
+    }
+  }
+  function tickLogs(){
+    if(!state.logAuto || state.view!=='logs') return;
+    state.logs.push(makeLog());
+    if(state.logs.length>300) state.logs.shift();
+    var body = $('termBody');
+    if(!body) return;
+    var l = state.logs[state.logs.length-1];
+    if(state.logFilter==='ALL' || l.level===state.logFilter){
+      body.insertAdjacentHTML('beforeend', logLine(l));
+      var term = $('term');
+      if(term) term.scrollTop = term.scrollHeight;
+    }
+  }
+
+  /* ================= init ================= */
+  function readLocation(){
+    var q = new URLSearchParams(location.search);
+    if(q.has('admin')) state.admin = q.get('admin') !== '0';
+    if(q.has('debug')) state.debug = q.get('debug') !== '0';
+    var h = location.hash.replace('#','');
+    if(NAV.some(function(n){ return n.id===h; })) state.view = h;
+  }
+  window.addEventListener('hashchange', function(){
+    var h = location.hash.replace('#','');
+    if(h && h!==state.view){ state.view = h; render(); }
+  });
+
+  state.cfg = cloneSections();
+  state.initial = cloneSections();
+  readLocation();
+  syncSim();
+  render();
+  tickClock();
+  setInterval(tickClock, 1000);
+  setInterval(tickMetrics, 2200);
+  setInterval(tickLogs, 2600);
+})();
+</script>
+</body>
+</html>
