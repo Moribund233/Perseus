@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { App as AntApp, Modal } from 'antd';
-import { DownOutlined, TeamOutlined } from '@ant-design/icons';
+import { CommentOutlined, DownOutlined, TeamOutlined, ShareAltOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import * as monaco from 'monaco-editor';
 import { readFile, writeFile, type FileContent, type Workspace } from '../../api/workspaces';
-import { CollabSession, type CollabParticipant, type CollabStatus } from '../../api/collabSocket';
+import { repositoriesApi } from '../../api/repositories';
+import { useServersStore } from '../../stores/servers';
+import { CollabSession, type CollabParticipant, type CollabStatus, type FollowState } from '../../api/collabSocket';
 import { useEditorStatusStore } from '../../stores/editorStatus';
 import { useWorkspaceRepo } from '../../hooks/useWorkspaceRepo';
 import { useProblemsStore } from '../../stores/problems';
@@ -30,10 +32,12 @@ interface Props {
   auxOpen?: boolean;
   onToggleAux?: () => void;
   onToggleBottom?: () => void;
+  discussionsOn?: boolean;
+  onToggleDiscussions?: () => void;
   onCursor?: (path: string | null, lang: string | null, dirty: boolean, cursor?: { line: number; column: number }) => void;
 }
 
-export default function EditorTabs({ workspaceId, workspacePath, workspace, openPath, openLine, auxOpen, onToggleAux, onToggleBottom, onCursor }: Props) {
+export default function EditorTabs({ workspaceId, workspacePath, workspace, openPath, openLine, auxOpen, onToggleAux, onToggleBottom, discussionsOn, onToggleDiscussions, onCursor }: Props) {
   const { t } = useTranslation();
   const { message } = AntApp.useApp();
   const repo = useWorkspaceRepo(workspace);
@@ -50,11 +54,36 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
   const [collabEnabled, setCollabEnabled] = useState<Record<string, boolean>>({});
   const [collabStatus, setCollabStatus] = useState<CollabStatus>('disconnected');
   const [participants, setParticipants] = useState<CollabParticipant[]>([]);
+  const [followState, setFollowState] = useState<FollowState>({ following: null, followingName: null, followerCount: 0, spotlightOn: false });
   const [pending, setPending] = useState(false);
   const [savedCommits, setSavedCommits] = useState<Record<string, string>>({});
   const sessionsRef = useRef<Record<string, CollabSession>>({});
 
   const diagnostics = useProblemsStore((s) => s.diagnostics);
+
+  // F-605 协作邀请: 生成会话级临时写权限邀请链接 (web/desktop 均可打开),
+  // 格式与 web 编辑器分享按钮一致 (?invite= 透传网关 JSON token)
+  const currentServer = useServersStore((s) => s.servers.find(
+    (x) => x.id === (useServersStore.getState().currentServerId ?? workspace.server_id),
+  ));
+  const shareCollabLink = useCallback(async () => {
+    const rid = repo.repoId;
+    const sid = repo.serverId;
+    if (!rid || !sid || !active) return;
+    const branch = workspace.branch || repo.defaultBranch || 'main';
+    try {
+      const res = await repositoriesApi.createCollabInvite(sid, rid, {
+        doc_key: `${rid}:${branch}:${active}`,
+        scope: 'write',
+      });
+      const base = (currentServer?.base_url ?? '').replace(/\/+$/, '');
+      const link = `${base}/editor/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}?file=${encodeURIComponent(active)}&invite=${encodeURIComponent(res.token)}`;
+      await navigator.clipboard.writeText(link);
+      message.success(t('desktop.collab.shareCopied'));
+    } catch (e) {
+      message.error(`${t('desktop.collab.shareFailed')}: ${(e as Error).message}`);
+    }
+  }, [repo, workspace.branch, active, currentServer, message, t]);
 
   const activePathRef = useRef<string | null>(null);
   activePathRef.current = active;
@@ -111,6 +140,7 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
     for (const s of Object.values(sessionsRef.current)) s.detach();
     sessionsRef.current = {};
     setSavedCommits({});
+    setFollowState({ following: null, followingName: null, followerCount: 0, spotlightOn: false });
     useEditorStatusStore.getState().reset();
   }, [workspaceId]);
 
@@ -195,6 +225,7 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
       docKey: `${repo.repoId}:${branch}:${path}`,
       onStatus: (s) => { if (activePathRef.current === path) setCollabStatus(s); },
       onParticipants: (peers) => { if (activePathRef.current === path) setParticipants(peers); },
+      onFollowChange: (state) => { if (activePathRef.current === path) setFollowState(state); },
       onSaved: (msg) => {
         message.success(t('desktop.collab.saved', { commit: (msg.commit_id || '').slice(0, 7) }));
         setSavedCommits((prev) => ({ ...prev, [path]: (msg.commit_id || '').slice(0, 7) }));
@@ -234,6 +265,7 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
       detachSession(path);
       setCollabStatus('disconnected');
       setParticipants([]);
+      setFollowState({ following: null, followingName: null, followerCount: 0, spotlightOn: false });
       setPending(false);
       setSavedCommits((prev) => {
         if (!(path in prev)) return prev;
@@ -362,13 +394,35 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
           ))}
         </span>
         <span className="right">
+          {repo.repoId && repo.serverId && (
+            <button
+              className={`icon-btn${discussionsOn ? ' on' : ''}`}
+              title={t('desktop.discussions.title')}
+              onClick={onToggleDiscussions}
+              style={discussionsOn ? { color: '#58a6ff', background: 'var(--hover)' } : undefined}
+            >
+              <CommentOutlined />
+            </button>
+          )}
+          {repo.repoId && repo.serverId && !current.content.binary && !current.content.truncated && (
+            <button
+              className="icon-btn"
+              title={t('desktop.collab.share')}
+              onClick={() => void shareCollabLink()}
+            >
+              <ShareAltOutlined />
+            </button>
+          )}
           {repo.repoId && !current.content.binary && !current.content.truncated && (
             <CollabMonaco
               enabled={!!collabEnabled[current.path]}
               status={collabStatus}
               participants={participants}
               pending={pending}
+              followState={followState}
               onToggle={toggleCollab}
+              onFollow={(id) => sessionsRef.current[active!]?.follow(id)}
+              onSpotlight={(on) => sessionsRef.current[active!]?.setSpotlight(on)}
             />
           )}
           <span className="faint">{t('desktop.editor.saveHint', { size: (current.content.size / 1024).toFixed(1) })}</span>

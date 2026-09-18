@@ -14,13 +14,23 @@ import {
   EyeOutlined,
   MoreOutlined,
   DeleteOutlined,
+  MessageOutlined,
+  LoadingOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import ChatSkeleton from '../../components/skeleton/ChatSkeleton';
 import Markdown from '../../components/Markdown';
 import { useRepositoriesStore } from '../../stores/repositories';
 import { useAuthStore } from '../../stores/auth';
-import { chatApi, type ChatMessage, type RoomMember, type RealtimeRoom } from '../../api/chat';
+import {
+  chatApi,
+  dmApi,
+  type ChatMessage,
+  type RoomMember,
+  type RealtimeRoom,
+  type DMSession,
+  type MessageSearchHit,
+} from '../../api/chat';
 import { chatSocket, type ChatSocketStatus } from '../../api/chatSocket';
 import type { Repository } from '../../api/repositories';
 
@@ -53,14 +63,6 @@ interface Channel {
   name: string;
   type: 'public' | 'private';
   unread: number;
-}
-
-interface DM {
-  id: string;
-  name: string;
-  status: 'online' | 'away' | 'offline';
-  initials: string;
-  color: string;
 }
 
 interface Message {
@@ -153,11 +155,18 @@ function StatusDot({ status, size = 8 }: { status: string; size?: number }) {
 export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [activeChannel, setActiveChannel] = useState<string | null>(null);
+  const [activeDmId, setActiveDmId] = useState<string | null>(null);
+  const [activeKind, setActiveKind] = useState<'channel' | 'dm' | null>(null);
   const [activeRepoId, setActiveRepoId] = useState<string | null>(null);
   const [room, setRoom] = useState<RealtimeRoom | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
-  const [dms, setDms] = useState<DM[]>([]);
+  const [dms, setDms] = useState<DMSession[]>([]);
+  const [dmLoaded, setDmLoaded] = useState(false);
+  const [searchQ, setSearchQ] = useState('');
+  const [searchResults, setSearchResults] = useState<MessageSearchHit[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [sendError, setSendError] = useState<string | null>(null);
@@ -173,6 +182,8 @@ export default function ChatPage() {
   const joinedRoomIdRef = useRef<string | null>(null);
   const textAreaRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchBoxWrapRef = useRef<HTMLDivElement>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { user } = useAuthStore();
   const { repositories, fetchRepositoriesByUser } = useRepositoriesStore();
@@ -220,6 +231,7 @@ export default function ChatPage() {
           chatApi.markRead(msg.room_id).catch(() => {});
         } else {
           refreshUnread();
+          dmApi.listDms().then(setDms).catch(() => {});
         }
       },
       onReactionAck: (msg) => {
@@ -270,6 +282,50 @@ export default function ChatPage() {
     }
   }, [user?.id, fetchRepositoriesByUser]);
 
+  // Fetch DM sessions on mount
+  useEffect(() => {
+    let disposed = false;
+    dmApi.listDms()
+      .then((items) => { if (!disposed) setDms(items); })
+      .catch(() => {})
+      .finally(() => { if (!disposed) setDmLoaded(true); });
+    return () => { disposed = true; };
+  }, []);
+
+  // 绑定房间: 加入/离开 WS 房间、拉取在线成员、标记已读、加载消息与成员
+  const bindRoom = useCallback(async (roomId: string) => {
+    if (joinedRoomIdRef.current !== roomId) {
+      if (joinedRoomIdRef.current) {
+        chatSocket.leaveRoom(joinedRoomIdRef.current);
+      }
+      chatSocket.joinRoom(roomId);
+      joinedRoomIdRef.current = roomId;
+    }
+
+    setOnlineUserIds(new Set());
+    chatSocket.requestPresenceList(roomId);
+    chatApi.markRead(roomId).catch(() => {});
+
+    const [messagesRes, membersRes] = await Promise.all([
+      chatApi.getRoomMessages(roomId, { limit: 50 }),
+      chatApi.getRoomMembers(roomId),
+    ]);
+
+    setMessages(messagesRes.messages.map(mapChatMessage).reverse());
+    setMembers(membersRes.map((m: RoomMember) => {
+      const name = m.username || m.user_id;
+      const initials = getInitials(name);
+      return {
+        user_id: m.user_id,
+        name,
+        role: m.role === 'admin' ? 'Admin' : 'Member',
+        status: 'offline',
+        initials,
+        color: getAvatarColor(initials),
+      };
+    }));
+  }, []);
+
   // Load room, messages and members when channel changes
   const loadChannel = useCallback(async (repoId: string, options?: { selectOnSuccess?: boolean }) => {
     setLoading(true);
@@ -277,61 +333,12 @@ export default function ChatPage() {
     try {
       const roomData = await chatApi.getRepositoryRoom(repoId);
       setRoom(roomData);
+      setActiveKind('channel');
+      setActiveDmId(null);
       setActiveRepoId(repoId);
       activeRoomIdRef.current = roomData.id;
-
-      // 切换房间: 离开旧的, 加入新的以接收实时广播
-      if (joinedRoomIdRef.current !== roomData.id) {
-        if (joinedRoomIdRef.current) {
-          chatSocket.leaveRoom(joinedRoomIdRef.current);
-        }
-        chatSocket.joinRoom(roomData.id);
-        joinedRoomIdRef.current = roomData.id;
-      }
-
-      // 进入频道: 拉取在线成员并标记已读
-      setOnlineUserIds(new Set());
-      chatSocket.requestPresenceList(roomData.id);
       setUnreadByRepo((prev) => ({ ...prev, [repoId]: 0 }));
-      chatApi.markRead(roomData.id).catch(() => {});
-
-      const [messagesRes, membersRes] = await Promise.all([
-        chatApi.getRoomMessages(roomData.id, { limit: 50 }),
-        chatApi.getRoomMembers(roomData.id),
-      ]);
-
-      const mappedMessages: Message[] = messagesRes.messages
-        .map(mapChatMessage)
-        .reverse();
-
-      const mappedMembers: Member[] = membersRes.map((m: RoomMember) => {
-        const name = m.username || m.user_id;
-        const initials = getInitials(name);
-        return {
-          user_id: m.user_id,
-          name,
-          role: m.role === 'admin' ? 'Admin' : 'Member',
-          status: 'offline',
-          initials,
-          color: getAvatarColor(initials),
-        };
-      });
-
-      const mappedDms: DM[] = membersRes.map((m: RoomMember) => {
-        const name = m.username || m.user_id;
-        const initials = getInitials(name);
-        return {
-          id: m.user_id,
-          name,
-          status: 'offline',
-          initials,
-          color: getAvatarColor(initials),
-        };
-      });
-
-      setMessages(mappedMessages);
-      setMembers(mappedMembers);
-      setDms(mappedDms);
+      await bindRoom(roomData.id);
       if (options?.selectOnSuccess) {
         setActiveChannel(repoId);
       }
@@ -340,24 +347,146 @@ export default function ChatPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [bindRoom]);
+
+  // Load a DM session (复用与频道相同的房间消息/成员接口)
+  const loadDm = useCallback(async (session: DMSession) => {
+    setLoading(true);
+    setError(null);
+    try {
+      setRoom({
+        id: session.room_id,
+        repository_id: null,
+        name: session.room_name,
+        topic: null,
+        room_type: session.room_type,
+        is_active: true,
+        created_at: session.created_at,
+      });
+      setActiveKind('dm');
+      setActiveDmId(session.room_id);
+      setActiveRepoId(null);
+      setActiveChannel(null);
+      activeRoomIdRef.current = session.room_id;
+      setDms((prev) => prev.map((d) => d.room_id === session.room_id ? { ...d, unread_count: 0 } : d));
+      await bindRoom(session.room_id);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [bindRoom]);
 
   // Auto-select first channel
   useEffect(() => {
-    if (!activeChannel && channels.length > 0) {
+    if (!activeChannel && !activeDmId && channels.length > 0) {
       const first = channels[0];
       // 通过微任务延迟加载，避免在 effect 同步体中触发状态更新
       Promise.resolve().then(() => {
         loadChannel(first.id, { selectOnSuccess: true });
       });
     }
-  }, [channels, activeChannel, loadChannel]);
+  }, [channels, activeChannel, activeDmId, loadChannel]);
 
   const handleChannelClick = useCallback((channelId: string) => {
     if (channelId === activeChannel) return;
     setActiveChannel(channelId);
+    setActiveDmId(null);
     loadChannel(channelId);
   }, [activeChannel, loadChannel]);
+
+  const handleDmClick = useCallback((session: DMSession) => {
+    if (activeDmId === session.room_id) return;
+    loadDm(session);
+  }, [activeDmId, loadDm]);
+
+  const handleMemberClick = useCallback(async (m: Member) => {
+    if (!user || m.user_id === user.id) return;
+    const existing = dms.find((d) => d.peer_user_id === m.user_id);
+    if (existing) {
+      handleDmClick(existing);
+      return;
+    }
+    try {
+      const created = await dmApi.createDm(m.user_id);
+      const session: DMSession = {
+        room_id: created.id,
+        room_name: created.name || m.name,
+        room_type: created.room_type,
+        peer_user_id: m.user_id,
+        peer_username: m.name,
+        created_at: created.created_at,
+        unread_count: 0,
+      };
+      setDms((prev) => [session, ...prev.filter((d) => d.room_id !== session.room_id)]);
+      loadDm(session);
+      // 以服务端为准刷新列表顺序与名称
+      dmApi.listDms().then(setDms).catch(() => {});
+    } catch (e) {
+      antdMessage.error((e as Error).message || t('app.teamChat.newDmFailed', { defaultValue: '发起私聊失败' }));
+    }
+  }, [user, dms, handleDmClick, loadDm, t]);
+
+  // 全局消息检索 (F-603): GET /api/v1/messages/search
+  const doSearch = useCallback((q: string) => {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
+    const trimmed = q.trim();
+    if (!trimmed) {
+      setSearchResults([]);
+      setSearchOpen(false);
+      setSearchLoading(false);
+      return;
+    }
+    searchDebounceRef.current = setTimeout(async () => {
+      searchDebounceRef.current = null;
+      setSearchLoading(true);
+      try {
+        const res = await chatApi.searchMessages(trimmed, 20);
+        setSearchResults(res.messages);
+        setSearchOpen(true);
+      } catch {
+        setSearchResults([]);
+        setSearchOpen(true);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+  }, []);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQ(value);
+    doSearch(value);
+  }, [doSearch]);
+
+  const focusSearch = useCallback(() => {
+    searchBoxWrapRef.current?.querySelector('input')?.focus();
+  }, []);
+
+  const openSearchHit = useCallback((hit: MessageSearchHit) => {
+    setSearchOpen(false);
+    setSearchQ('');
+    setSearchResults([]);
+    if (hit.room_type === 'repository' && hit.repository_id) {
+      loadChannel(hit.repository_id, { selectOnSuccess: true });
+    } else {
+      loadDm({
+        room_id: hit.room_id,
+        room_name: hit.room_name,
+        room_type: hit.room_type,
+        peer_user_id: hit.sender_id,
+        peer_username: hit.sender_username,
+        created_at: hit.created_at,
+        unread_count: 0,
+      });
+    }
+  }, [loadChannel, loadDm]);
+
+  useEffect(() => () => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+  }, []);
 
   const handleSend = useCallback(() => {
     const content = input.trim();
@@ -527,14 +656,71 @@ export default function ChatPage() {
           flexShrink: 0,
         }}
       >
-        <div style={{ padding: 16, borderBottom: `1px solid ${borderColor}` }}>
+        <div style={{ padding: 16, borderBottom: `1px solid ${borderColor}`, position: 'relative' }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, color: textPrimary }}>Perseus Team</h3>
-          <Input
-            placeholder={t('app.topBar.searchPlaceholder')}
-            prefix={<SearchOutlined style={{ color: textTertiary, fontSize: 14 }} />}
-            style={{ background: bgPrimary, borderColor: '#30363d', color: textPrimary }}
-            size="small"
-          />
+          <div ref={searchBoxWrapRef}>
+            <Input
+              value={searchQ}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              onFocus={() => { if (searchQ.trim()) setSearchOpen(true); }}
+              placeholder={t('app.topBar.searchPlaceholder')}
+              prefix={<SearchOutlined style={{ color: textTertiary, fontSize: 14 }} />}
+              suffix={searchLoading ? <LoadingOutlined style={{ color: textTertiary }} /> : undefined}
+              style={{ background: bgPrimary, borderColor: '#30363d', color: textPrimary }}
+              size="small"
+            />
+          </div>
+          {searchOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 56,
+                left: 8,
+                right: 8,
+                zIndex: 20,
+                background: bgTertiary,
+                border: `1px solid ${borderColor}`,
+                borderRadius: 8,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                maxHeight: 320,
+                overflowY: 'auto',
+              }}
+            >
+              {searchResults.length === 0 ? (
+                <div style={{ padding: '12px 14px', fontSize: 12, color: textTertiary }}>
+                  {t('app.teamChat.searchNoResults', { defaultValue: 'No matching messages' })}
+                </div>
+              ) : (
+                searchResults.map((hit) => (
+                  <div
+                    key={hit.id}
+                    onClick={() => openSearchHit(hit)}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      padding: '8px 14px',
+                      cursor: 'pointer',
+                      borderBottom: `1px solid ${borderColor}`,
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                      <span style={{ color: bluePrimary, fontWeight: 600 }}>{hit.sender_username}</span>
+                      <span style={{ color: textTertiary }}>
+                        {hit.room_type === 'dm' ? '@' : '#'}{hit.room_name}
+                      </span>
+                      <span style={{ color: textTertiary, marginLeft: 'auto' }}>{formatMessageTime(hit.created_at)}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {hit.content}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
           <div
@@ -614,41 +800,78 @@ export default function ChatPage() {
           >
             {t('app.teamChat.directMessages')}
           </div>
-          {dms.map((dm) => (
-            <div
-              key={dm.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '6px 16px',
-                cursor: 'pointer',
-                color: textSecondary,
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textPrimary; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = textSecondary; }}
-            >
-              <div style={{ position: 'relative' }}>
-                <Avatar size={22} style={{ background: dm.color, fontSize: 9, fontWeight: 600 }}>
-                  {dm.initials}
-                </Avatar>
-                <span
-                  style={{
-                    position: 'absolute',
-                    bottom: -1,
-                    right: -1,
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: statusColor(onlineUserIds.has(dm.id) ? 'online' : 'offline'),
-                    border: `2px solid ${bgSecondary}`,
-                  }}
-                />
-              </div>
-              <span style={{ fontSize: 13 }}>{dm.name}</span>
+          {dms.length === 0 && dmLoaded && (
+            <div style={{ padding: '4px 16px', fontSize: 12, color: textTertiary }}>
+              {t('app.teamChat.noDMs', { defaultValue: 'No direct messages yet' })}
             </div>
-          ))}
+          )}
+          {dms.map((dm) => {
+            const isActive = activeDmId === dm.room_id;
+            const dmName = dm.peer_username || dm.room_name;
+            const dmInitials = getInitials(dmName);
+            const dmColor = getAvatarColor(dmInitials);
+            return (
+              <div
+                key={dm.room_id}
+                onClick={() => handleDmClick(dm)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '6px 16px',
+                  cursor: 'pointer',
+                  color: isActive ? textPrimary : textSecondary,
+                  background: isActive ? activeBg : 'transparent',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = hoverBg;
+                    e.currentTarget.style.color = textPrimary;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = textSecondary;
+                  }
+                }}
+              >
+                <div style={{ position: 'relative' }}>
+                  <Avatar size={22} style={{ background: dmColor, fontSize: 9, fontWeight: 600 }}>
+                    {dmInitials}
+                  </Avatar>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      bottom: -1,
+                      right: -1,
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: statusColor(onlineUserIds.has(dm.peer_user_id) ? 'online' : 'offline'),
+                      border: `2px solid ${bgSecondary}`,
+                    }}
+                  />
+                </div>
+                <span style={{ flex: 1, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dmName}</span>
+                {dm.unread_count > 0 && (
+                  <span
+                    style={{
+                      background: '#f85149',
+                      color: '#fff',
+                      fontSize: 10,
+                      fontWeight: 600,
+                      padding: '1px 6px',
+                      borderRadius: 10,
+                    }}
+                  >
+                    {dm.unread_count}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </Sider>
 
@@ -677,7 +900,12 @@ export default function ChatPage() {
                 color: textPrimary,
               }}
             >
-              <NumberOutlined style={{ color: textSecondary }} /> #{activeChannelName}
+              {activeKind === 'dm' ? (
+                <MessageOutlined style={{ color: textSecondary }} />
+              ) : (
+                <NumberOutlined style={{ color: textSecondary }} />
+              )}{' '}
+              {activeKind === 'dm' ? activeChannelName : `#${activeChannelName}`}
             </h3>
             <p style={{ fontSize: 12, color: textSecondary, margin: '2px 0 0' }}>{onlineMembers.length} members online</p>
           </div>
@@ -686,7 +914,7 @@ export default function ChatPage() {
               <Button type="text" icon={<EyeOutlined style={{ color: textTertiary, fontSize: 16 }} />} style={{ width: 32, height: 32 }} />
             </Tooltip>
             <Tooltip title="Search messages">
-              <Button type="text" icon={<SearchOutlined style={{ color: textTertiary, fontSize: 16 }} />} style={{ width: 32, height: 32 }} />
+              <Button type="text" icon={<SearchOutlined style={{ color: textTertiary, fontSize: 16 }} />} style={{ width: 32, height: 32 }} onClick={focusSearch} />
             </Tooltip>
             <Tooltip title="More">
               <Button type="text" icon={<MoreOutlined style={{ color: textTertiary, fontSize: 16 }} />} style={{ width: 32, height: 32 }} />
@@ -1017,7 +1245,8 @@ export default function ChatPage() {
           </div>
           {onlineMembers.map((m) => (
             <div
-              key={m.name}
+              key={m.user_id || m.name}
+              onClick={() => handleMemberClick(m)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -1070,7 +1299,8 @@ export default function ChatPage() {
           </div>
           {offlineMembers.map((m) => (
             <div
-              key={m.name}
+              key={m.user_id || m.name}
+              onClick={() => handleMemberClick(m)}
               style={{
                 display: 'flex',
                 alignItems: 'center',

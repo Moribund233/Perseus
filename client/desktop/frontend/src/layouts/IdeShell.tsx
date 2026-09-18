@@ -28,6 +28,7 @@ import ProblemsPanel from '../views/workspace/ProblemsPanel';
 import OutputPanel from '../views/workspace/OutputPanel';
 import TerminalPanel from '../views/workspace/TerminalPanel';
 import CollabAuxPanel from '../views/workspace/CollabAuxPanel';
+import DiscussionsPanel from '../views/workspace/DiscussionsPanel';
 import ActivityChatPanel from '../views/chat/ActivityChatPanel';
 import StatusBar, { type BottomTab } from '../views/workspace/StatusBar';
 import CommandPalette, { type PaneId } from '../views/workspace/CommandPalette';
@@ -68,6 +69,7 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
   const [bottom, setBottom] = useState<BottomTab>('problems');
   const [collapsed, setCollapsed] = useState(false);
   const [auxOpen, setAuxOpen] = useState(false);
+  const [discussionsOpen, setDiscussionsOpen] = useState(false);
   const [palette, setPalette] = useState(false);
   const [file, setFile] = useState<string | null>(null);
   const [lang, setLang] = useState<string | null>(null);
@@ -242,6 +244,8 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
               auxOpen={auxOpen}
               onToggleAux={() => setAuxOpen((v) => !v)}
               onToggleBottom={() => setCollapsed((v) => !v)}
+              discussionsOn={discussionsOpen}
+              onToggleDiscussions={() => setDiscussionsOpen((v) => !v)}
               onCursor={(p, l, _d, pos) => { setFile(p); setLang(l); setCursor(pos ?? null); }}
             />
           )}
@@ -272,6 +276,16 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
         {auxOpen && (
           <aside style={{ width: 264, flexShrink: 0 }}>
             <CollabAuxPanel workspace={workspace} />
+          </aside>
+        )}
+        {discussionsOpen && (
+          <aside style={{ width: 320, flexShrink: 0, borderLeft: '1px solid #21262d' }}>
+            <DiscussionsPanel
+              workspace={workspace}
+              filePath={openPath}
+              cursorLine={cursor?.line ?? null}
+              onGoLine={(path, line) => openFileLine(path, line)}
+            />
           </aside>
         )}
       </div>

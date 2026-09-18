@@ -23,6 +23,10 @@
  *   PERSEUS_COLLAB_REDIS_URL        可选, 覆盖 REDIS_URL
  *   PERSEUS_COLLAB_MAX_CONTENT_CHARS      单文档文本上限 (默认 2000000), 超限拒绝加载/保存
  *   PERSEUS_COLLAB_MAX_CONNECTIONS_PER_DOC 单文档并发连接上限 (默认 50), 超限拒绝新连接
+ *   PERSEUS_COLLAB_MAX_AWARENESS_BYTES    单条 awareness 状态上限 (默认 8192), 超限剔除可选字段/丢弃
+ *
+ * 跟随模式 (Follow me): awareness 扩展字段 viewport/follow 由网关校验盖章
+ * (beforeHandleAwareness), "跟我来"信令走 stateless collab-spotlight (写权限者)。
  */
 import http from "node:http";
 import { pathToFileURL } from "node:url";
@@ -45,6 +49,9 @@ export const MAX_CONTENT_CHARS = Number(
 );
 export const MAX_CONNECTIONS_PER_DOC = Number(
   process.env.PERSEUS_COLLAB_MAX_CONNECTIONS_PER_DOC || 50
+);
+export const MAX_AWARENESS_BYTES = Number(
+  process.env.PERSEUS_COLLAB_MAX_AWARENESS_BYTES || 8192
 );
 
 export const log = (...args) =>
@@ -81,6 +88,80 @@ export function deny(status, detail) {
   err.status = status;
   err.reason = detail;
   return err;
+}
+
+/** awareness 状态序列化字节数 (无法序列化时视为超限) */
+function awarenessBytes(state) {
+  try {
+    return Buffer.byteLength(JSON.stringify(state));
+  } catch {
+    return Infinity;
+  }
+}
+
+/** 视口锚点: 仅接受 >=0 整数, 否则移除该字段 (跟随模式滚动同步用) */
+function sanitizeViewport(state) {
+  const vp = state.viewport;
+  if (vp === undefined) return;
+  if (vp && typeof vp === "object" && Number.isInteger(vp.anchor) && vp.anchor >= 0) {
+    state.viewport = { anchor: vp.anchor };
+  } else {
+    delete state.viewport;
+  }
+}
+
+/** 跟随目标: 仅接受 {target: 整数 clientID | null}, 否则移除该字段 */
+function sanitizeFollow(state) {
+  const follow = state.follow;
+  if (follow === undefined) return;
+  if (
+    follow &&
+    typeof follow === "object" &&
+    (follow.target === null || Number.isInteger(follow.target))
+  ) {
+    state.follow = { target: follow.target };
+  } else {
+    delete state.follow;
+  }
+}
+
+/**
+ * 服务端 awareness 策略 (beforeHandleAwareness):
+ *   - 用连接上下文 (onAuthenticate 已校验的身份) 盖章 user, 防客户端冒名;
+ *     保留客户端自带的 color 等展示字段。
+ *   - 校验/归一化跟随模式扩展字段 viewport / follow。
+ *   - 单条状态超过 maxBytes 时先剔除可选字段, 再剔除白名单 (user/cursor) 外的
+ *     其余字段; 仍超限则收敛为最小身份, 防止感知通道被滥用。
+ * 仅对客户端来源 (context 存在) 盖章; Redis 对端同步 (context 为 undefined) 直接跳过。
+ *
+ * @param {Map<number, Record<string, any>>} states
+ * @param {any} context
+ * @param {number} maxBytes
+ */
+export function applyAwarenessPolicy(states, context, maxBytes = MAX_AWARENESS_BYTES) {
+  for (const [clientId, state] of states) {
+    if (!state || typeof state !== "object") {
+      states.delete(clientId);
+      continue;
+    }
+    if (context) {
+      const base = state.user && typeof state.user === "object" ? state.user : {};
+      state.user = { ...base, user_id: context.user_id, name: context.username };
+    }
+    sanitizeViewport(state);
+    sanitizeFollow(state);
+    if (awarenessBytes(state) <= maxBytes) continue;
+    // 超限: 先剔除跟随模式可选字段, 再剔除白名单外的其余字段 (保留 user/cursor)
+    delete state.viewport;
+    delete state.follow;
+    for (const key of Object.keys(state)) {
+      if (key !== "user" && key !== "cursor") delete state[key];
+    }
+    if (awarenessBytes(state) > maxBytes) {
+      state.user = context ? { user_id: context.user_id, name: context.username } : {};
+      delete state.cursor;
+    }
+  }
 }
 
 /** 等待 Y.Text 被对端更新填充 (多副本播种协调); 返回是否等到 */
@@ -134,6 +215,7 @@ export function buildGateway({
   createRedisClient,
   maxContentChars = MAX_CONTENT_CHARS,
   maxConnectionsPerDoc = MAX_CONNECTIONS_PER_DOC,
+  maxAwarenessBytes = MAX_AWARENESS_BYTES,
 } = {}) {
   const ttl = sessionTtl ?? createSessionTtlExtension({ ttlMs: sessionTtlMs, log });
   const extensions = [ttl];
@@ -189,6 +271,13 @@ export function buildGateway({
       };
     },
 
+    // 跟随模式 (Follow me): 感知层字段策略。
+    // viewport / follow 由客户端写入 awareness, 网关只做盖章与校验, 不做业务转发
+    // (awareness 经 extension-redis 跨副本同步, 跟随关系由客户端从感知状态派生)。
+    async beforeHandleAwareness({ states, context }) {
+      applyAwarenessPolicy(states, context, maxAwarenessBytes);
+    },
+
     // 连接建立后登记计数 (以实际建立为准, 避免加载失败时计数泄漏);
     // 并发竞争下超限则直接关闭连接。
     async connected({ documentName, connection, context }) {
@@ -202,8 +291,21 @@ export function buildGateway({
       if (context && typeof context === "object") countedContexts.add(context);
     },
 
-    async onDisconnect({ documentName, context }) {
+    async onDisconnect({ documentName, context, document }) {
       releaseConnection(documentName, context);
+      // 跟随模式: 发起者离开即广播取消, 避免对端持续跟随已离线的目标。
+      if (context && context.spotlight) {
+        context.spotlight = false;
+        document.broadcastStateless(
+          JSON.stringify({
+            type: "collab-spotlight",
+            docKey: documentName,
+            from: { user_id: context.user_id, username: context.username },
+            on: false,
+          })
+        );
+        log(`spotlight ended (disconnect) doc=${documentName} user=${context.username}`);
+      }
     },
 
     // 播种放在 afterLoadDocument: 此时 Redis 扩展已完成会话快照恢复与跨副本
@@ -257,6 +359,35 @@ export function buildGateway({
       } catch {
         return;
       }
+
+      // 跟随模式 (Follow me) 的"跟我来"信令: 仅写权限者可发起, 全员广播。
+      // 接收端据 from.user_id 在 awareness 中定位发起者 clientID 并设置 follow.target。
+      if (msg?.type === "collab-spotlight") {
+        const spotContext = connection.context || {};
+        const on = msg.on !== false;
+        if (!spotContext.can_write) {
+          connection.sendStateless(
+            JSON.stringify({
+              type: "collab-spotlight-error",
+              docKey: documentName,
+              error: "没有发起跟随的权限",
+            })
+          );
+          return;
+        }
+        spotContext.spotlight = on;
+        document.broadcastStateless(
+          JSON.stringify({
+            type: "collab-spotlight",
+            docKey: documentName,
+            from: { user_id: spotContext.user_id, username: spotContext.username },
+            on,
+          })
+        );
+        log(`spotlight doc=${documentName} user=${spotContext.username} on=${on}`);
+        return;
+      }
+
       if (msg?.type !== "collab-save") return;
 
       const context = connection.context || {};
@@ -281,7 +412,7 @@ export function buildGateway({
 
       const { status, data } = await callApp("/api/v1/collab/save", {
         method: "POST",
-        body: { token: context.token, docKey: documentName, content, message: msg.message, invite_token: context.invite_token },
+        body: { token: context.token, docKey: documentName, content, message: msg.message, invite_token: context.invite_token, draft: msg.draft === true },
       });
 
       if (status === 403) {
@@ -332,6 +463,7 @@ export async function startGateway({
   createRedisClient,
   maxContentChars,
   maxConnectionsPerDoc,
+  maxAwarenessBytes,
 } = {}) {
   const gateway = buildGateway({
     ...(sessionTtlMs === undefined ? {} : { sessionTtlMs }),
@@ -339,6 +471,7 @@ export async function startGateway({
     ...(createRedisClient === undefined ? {} : { createRedisClient }),
     ...(maxContentChars === undefined ? {} : { maxContentChars }),
     ...(maxConnectionsPerDoc === undefined ? {} : { maxConnectionsPerDoc }),
+    ...(maxAwarenessBytes === undefined ? {} : { maxAwarenessBytes }),
   });
   const hocuspocus = await gateway.listen(port ?? Number(process.env.PORT || 4444));
   const health = http

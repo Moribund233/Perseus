@@ -146,6 +146,47 @@ func TestWorkspaceCloneAndGit(t *testing.T) {
 	}
 }
 
+func TestWorkspaceRename(t *testing.T) {
+	g, _ := newTestGateway(t)
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "proj"), 0o755)
+	rr := authedReq(t, g, "POST", "/api/local/workspaces", map[string]string{"name": "proj", "path": filepath.Join(dir, "proj")})
+	if rr.Code != 200 {
+		t.Fatalf("create = %d body=%s", rr.Code, rr.Body.String())
+	}
+	var ws struct{ ID string `json:"id"` }
+	_ = json.Unmarshal(rr.Body.Bytes(), &ws)
+
+	rr = authedReq(t, g, "PUT", "/api/local/workspaces/"+ws.ID+"/file", map[string]string{"path": "a.txt", "content": "hello"})
+	if rr.Code != 200 {
+		t.Fatalf("write = %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	// 重命名到子目录（自动补建父目录）。
+	rr = authedReq(t, g, "POST", "/api/local/workspaces/"+ws.ID+"/rename", map[string]string{"from": "a.txt", "to": "sub/b.txt"})
+	if rr.Code != 200 {
+		t.Fatalf("rename = %d body=%s", rr.Code, rr.Body.String())
+	}
+	if _, err := os.Stat(filepath.Join(dir, "proj", "sub", "b.txt")); err != nil {
+		t.Fatalf("target missing after rename: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "proj", "a.txt")); !os.IsNotExist(err) {
+		t.Fatalf("source still present after rename: %v", err)
+	}
+
+	// 源不存在 → 400。
+	rr = authedReq(t, g, "POST", "/api/local/workspaces/"+ws.ID+"/rename", map[string]string{"from": "nope.txt", "to": "x.txt"})
+	if rr.Code != 400 {
+		t.Fatalf("rename missing source = %d, want 400 body=%s", rr.Code, rr.Body.String())
+	}
+
+	// 路径逃逸 → 400。
+	rr = authedReq(t, g, "POST", "/api/local/workspaces/"+ws.ID+"/rename", map[string]string{"from": "sub/b.txt", "to": "../../escape.txt"})
+	if rr.Code != 400 {
+		t.Fatalf("rename escape = %d, want 400 body=%s", rr.Code, rr.Body.String())
+	}
+}
+
 func runIn(t *testing.T, dir string, args ...string) {
 	t.Helper()
 	cmd := exec.Command("git", args...)

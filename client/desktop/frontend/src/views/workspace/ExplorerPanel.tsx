@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Empty, Tooltip, message } from 'antd';
+import { Empty, Input, Modal, Tooltip, message } from 'antd';
 import {
+  EditOutlined,
   FolderOutlined,
   ReloadOutlined,
   PlusOutlined,
   RightOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
-import { getTree, type FileNode } from '../../api/workspaces';
+import { getTree, renameFile, type FileNode } from '../../api/workspaces';
 import { logInfo } from '../../stores/logs';
 import { FloatingTreePanel } from '../../components/FloatingTreePanel';
 
@@ -46,6 +47,11 @@ export default function ExplorerPanel({ workspaceId, workspaceName, onOpen }: Pr
   const [refreshing, setRefreshing] = useState(false);
 
   const [pinnedChain, setPinnedChain] = useState<FloatPanelPos[]>([]);
+
+  const [renameTarget, setRenameTarget] = useState<string | null>(null);
+  const [renameFrom, setRenameFrom] = useState('');
+  const [renameTo, setRenameTo] = useState('');
+  const [renaming, setRenaming] = useState(false);
 
   const nodeMap = useMemo(() => {
     const map = new Map<string, FileNode>();
@@ -114,6 +120,34 @@ export default function ExplorerPanel({ workspaceId, workspaceName, onOpen }: Pr
     });
   }, []);
 
+  const handleOpenRename = useCallback((path: string) => {
+    setPinnedChain([]);
+    setRenameFrom(path);
+    setRenameTo(path);
+    setRenameTarget(path);
+  }, []);
+
+  const handleRenameSubmit = useCallback(async () => {
+    if (!renameTarget) return;
+    const from = renameFrom.trim();
+    const to = renameTo.trim();
+    if (!from || !to) {
+      message.warning(t('desktop.explorer.renameFailed', { defaultValue: '移动/重命名失败' }));
+      return;
+    }
+    setRenaming(true);
+    try {
+      await renameFile(workspaceId, from, to);
+      setRenameTarget(null);
+      message.success(t('desktop.explorer.fileRenamed', { defaultValue: '已移动/重命名' }));
+      await load(true);
+    } catch (e) {
+      message.error(`${t('desktop.explorer.renameFailed', { defaultValue: '移动/重命名失败' })}: ${(e as Error).message}`);
+    } finally {
+      setRenaming(false);
+    }
+  }, [renameTarget, renameFrom, renameTo, workspaceId, load, t]);
+
   const displayChain = pinnedChain;
   const activeKeys = useMemo(() => {
     const s = new Set<string>();
@@ -141,6 +175,16 @@ export default function ExplorerPanel({ workspaceId, workspaceName, onOpen }: Pr
               <FolderOutlined />
             </span>
             <span className="fname">{node.name}</span>
+            <button
+              className="icon-btn sm row-rename-btn"
+              title={t('desktop.explorer.rename', { defaultValue: '移动/重命名' })}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenRename(node.path);
+              }}
+            >
+              <EditOutlined />
+            </button>
           </div>
         </div>
       );
@@ -158,6 +202,16 @@ export default function ExplorerPanel({ workspaceId, workspaceName, onOpen }: Pr
       >
         <span className={b.cls}>{b.label}</span>
         <span className="fname">{node.name}</span>
+        <button
+          className="icon-btn sm row-rename-btn"
+          title={t('desktop.explorer.rename', { defaultValue: '移动/重命名' })}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleOpenRename(node.path);
+          }}
+        >
+          <EditOutlined />
+        </button>
       </div>
     );
   };
@@ -198,6 +252,31 @@ export default function ExplorerPanel({ workspaceId, workspaceName, onOpen }: Pr
         </div>
       )}
 
+      <Modal
+        open={renameTarget !== null}
+        title={t('desktop.explorer.renameTitle', { defaultValue: '移动/重命名文件' })}
+        okText={t('desktop.explorer.rename', { defaultValue: '移动/重命名' })}
+        cancelText={t('desktop.common.cancel', { defaultValue: '取消' })}
+        confirmLoading={renaming}
+        onOk={() => void handleRenameSubmit()}
+        onCancel={() => { if (!renaming) setRenameTarget(null); }}
+        destroyOnClose
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+          <Input
+            value={renameFrom}
+            placeholder={t('desktop.explorer.renameFromPlaceholder', { defaultValue: '当前路径' })}
+            onChange={(e) => setRenameFrom(e.target.value)}
+          />
+          <Input
+            value={renameTo}
+            placeholder={t('desktop.explorer.renameToPlaceholder', { defaultValue: '目标路径' })}
+            onChange={(e) => setRenameTo(e.target.value)}
+            onPressEnter={() => void handleRenameSubmit()}
+          />
+        </div>
+      </Modal>
+
       {displayChain.map((pos, i) => {
         const node = nodeMap.get(pos.key);
         if (!node || !node.is_dir || !node.children?.length) return null;
@@ -213,6 +292,7 @@ export default function ExplorerPanel({ workspaceId, workspaceName, onOpen }: Pr
               activeKeys={activeKeys}
               onItemClick={handlePanelClick}
               onOpenFile={onOpen}
+              onRename={handleOpenRename}
             />
           </div>
         );

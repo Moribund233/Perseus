@@ -16,7 +16,7 @@
 | 仓库浏览 | ✅ 列表/详情/树/blob | ✅ 移植（2A, proxy 化）+ 原型还原度补全（F1：文件表 last-commit 列、README Markdown、branch pill、Tab 计数/复刻按钮；F3：卡片主语言色点取自 §4 聚合） | 2A | 文件内容 `<pre>` 只读, web 为编辑器 |
 | Issues | ✅ 列表/详情/创建/评论/关闭 | ✅ 移植（2B） | 2B | |
 | Pull Requests | ✅ 列表/详情/merge/close/review | ✅ 移植（T1 补创建 Modal） | T1 ✅ | |
-| 聊天 | ✅ 会话/频道/附件/reactions/presence | ✅ 移植（T4：门户三栏全屏页 + IDE 活动栏面板；后端补 `GET /api/v1/rooms`） | T4 | 频道=仓库房间语义与 web 一致；DM 私聊两端均未实现 |
+| 聊天 | ✅ 会话/频道/附件/reactions/presence | ✅ 移植（T4：门户三栏全屏页 + IDE 活动栏面板；后端补 `GET /api/v1/rooms`）+ DM 私聊/消息检索（2026-09-18，`chat.ts` dmApi/searchMessages + ChatView 搜索框/DM 列表） | T4 / 2026-09-18 | 频道=仓库房间语义与 web 一致 |
 | 通知 | ✅ 面板/未读/跳转 | ✅ 移植（T5：铃铛 Popover 面板 + 未读/已读/删除 + target_type 深链）；偏好设置页已补（2026-09-14，Settings 通知分区，四项开关与 web 对齐，按当前连接服务器存取） | T5 | |
 | **协作编辑（F-204）** | ✅ **Yjs 底座**（Hocuspocus 网关 + y-codemirror.next，2026-09-08 迁移） | ✅ **T9 接入**（Monaco + y-monaco；Go 网关首帧 token 注入代理；awareness/保存语义与 web 对齐） | T9 ✅ | 两端同底座；desktop 经本地网关 collab 代理（web 直连同源网关） |
 | 全局搜索 | ✅ 代码/issue 聚合搜索 | ✅ 门户聚合搜索（仓库/Issue/PR，T3；后端 `GET /api/v1/search/global` 两端可共用） | T3 | web 端 `GlobalSearch.tsx` 仍为纯代码搜索，可后续复用该端点增强 |
@@ -40,7 +40,11 @@
 |------|----------|---------------------|
 | 2026-09-07 | F-204 协作编辑合入（含断线 rejoin/权限缓存等修复） | ~~协作能力整体~~ → ✅ 2026-09-10 T9 y-monaco 接入完成（Yjs 同底座） |
 | 2026-09-07 | Editor 状态栏协作 presence/双态徽标 | ~~双态徽标~~ → ✅ 2026-09-14 两端落地（desktop `stores/editorStatus.ts` + StatusBar；web editor 状态栏；会话已同步=connected 且无未同步变更，Git 已提交=最近协作保存 short-SHA，内容再编辑即失效） |
-| 2026-09-16 | 协作邀请链接（M2）：web 编辑器「分享协作」生成会话级临时权限链接（`?invite=` 透传 `invite_token`，网关 JSON token 解析） | 协作会话邀请入口（y-monaco 会话）：编辑器工具栏分享按钮 + 以 `?invite=` 加入会话 |
+| 2026-09-16 | 协作邀请链接（M2）：web 编辑器「分享协作」生成会话级临时权限链接（`?invite=` 透传 `invite_token`，网关 JSON token 解析） | ~~协作会话邀请入口（y-monaco 会话）：编辑器工具栏分享按钮 + 以 `?invite=` 加入会话~~ → ✅ 2026-09-18（F-605）：编辑器 crumbs 分享按钮 → `repositoriesApi.createCollabInvite` → 复制 `<base>/editor/owner/repo?file=&invite=` 链接（格式与 web 一致） |
+| 2026-09-17 | 跟随模式（Follow me）：web 接线参与者点选跟随/停止、工具栏「跟我来」（写权限）、跟随者计数、有跟随者时节流广播 `viewport` awareness | ✅ 2026-09-17 已补：desktop `CollabMonaco` 跟随菜单/跟我来/跟随指示 + `CollabSession` awareness `viewport`（字符偏移与 web 同单位）/`follow` + spotlight 信令 |
+
+| 2026-09-18 | 批次 F1/F2（web）: DM 私聊/消息检索（聊天）+ 行内评论 Discussions/文件移动重命名 UI（编辑器） | ~~聊天 DM/搜索 + 编辑器 Discussions/移动 UI — desktop 待跟进~~ → ✅ 2026-09-18 desktop 落地：聊天页 DM 列表/私聊按钮 + 消息搜索框（`ChatView.tsx`）；IDE 行内评论面板（`DiscussionsPanel.tsx`，文件级线程/回复/解决/删除/跳行，`useWorkspaceRepo`+远端 proxy）；文件移动重命名（workspace rename 端点 `POST /api/local/workspaces/{id}/rename` 新增 + ExplorerPanel 重命名 Modal，TDD `TestWorkspaceRename`） |
+| 2026-09-18 | 批次 F3: F-606 空闲自动落盘（web 计时 → 网关转发 `draft` → 落 `collab/draft-{branch}`）；F-605 desktop 分享邀请已补 | F-606 不适用 desktop（本地 fs 直接写盘即保存） |
 
 > **2026-09-14 起移植债务清零。** 后续 web 合入影响两端的功能时按登记规则在此追加。
 > **2026-09-16**: 邀请链接（M2）已登记 desktop 跟进项（见上表）。

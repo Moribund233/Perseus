@@ -72,6 +72,13 @@ export const writeFile = (wsId: string, path: string, content: string) =>
     body: JSON.stringify({ path, content }),
   });
 
+// renameFile 移动/重命名工作区内文件（相对路径，自动补建目标父目录）。
+export const renameFile = (wsId: string, from: string, to: string) =>
+  apiRequest<{ ok: boolean; from: string; to: string }>(`/api/local/workspaces/${wsId}/rename`, {
+    method: 'POST',
+    body: JSON.stringify({ from, to }),
+  });
+
 export const gitStatus = (wsId: string) =>
   apiRequest<GitStatus>(`/api/local/workspaces/${wsId}/git/status`, { method: 'POST' });
 

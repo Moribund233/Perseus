@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { FolderOutlined, FileOutlined, DeleteOutlined } from '@ant-design/icons';
+import { FolderOutlined, FileOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { Tooltip } from 'antd';
 import { useTranslation } from 'react-i18next';
 
@@ -36,6 +36,7 @@ interface Props {
   onItemClick: (level: number, key: string, el: HTMLElement) => void;
   onSelectFile: (key: string) => void;
   onDelete?: (node: TreeNode) => void;
+  onMove?: (node: TreeNode) => void;
 }
 
 const itemStyle = {
@@ -60,6 +61,7 @@ export function FloatingTreePanel({
   onItemClick,
   onSelectFile,
   onDelete,
+  onMove,
 }: Props) {
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -125,35 +127,61 @@ export function FloatingTreePanel({
                 <FileOutlined />
               </span>
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{child.title}</span>
-              {onDelete && (
-                <Tooltip title={t('app.codeEditor.deleteFile', { defaultValue: '删除文件' })}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(child);
-                    }}
-                    className="cm-tree-delete-btn"
-                    style={{
-                      position: 'absolute',
-                      right: 6,
-                      background: 'none',
-                      border: 'none',
-                      color: textTertiary,
-                      cursor: 'pointer',
-                      padding: '0 2px',
-                      fontSize: 12,
-                      display: 'flex',
-                      alignItems: 'center',
-                      opacity: 0,
-                      transition: 'opacity 0.15s',
-                      fontFamily: "'JetBrains Mono', monospace",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = '#f85149'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = textTertiary; }}
-                  >
-                    <DeleteOutlined />
-                  </button>
-                </Tooltip>
+              {(onMove || onDelete) && (
+                <div className="cm-tree-delete-btn" style={{ position: 'absolute', right: 6, display: 'flex', gap: 4, opacity: 0, transition: 'opacity 0.15s' }}>
+                  {onMove && (
+                    <Tooltip title={t('app.codeEditor.moveFile', { defaultValue: '移动/重命名' })}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onMove(child);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: textTertiary,
+                          cursor: 'pointer',
+                          padding: '0 2px',
+                          fontSize: 12,
+                          display: 'flex',
+                          alignItems: 'center',
+                          opacity: 1,
+                          fontFamily: "'JetBrains Mono', monospace",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = blueLight; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = textTertiary; }}
+                      >
+                        <EditOutlined />
+                      </button>
+                    </Tooltip>
+                  )}
+                  {onDelete && (
+                    <Tooltip title={t('app.codeEditor.deleteFile', { defaultValue: '删除文件' })}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(child);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: textTertiary,
+                          cursor: 'pointer',
+                          padding: '0 2px',
+                          fontSize: 12,
+                          display: 'flex',
+                          alignItems: 'center',
+                          opacity: 1,
+                          fontFamily: "'JetBrains Mono', monospace",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = '#f85149'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = textTertiary; }}
+                      >
+                        <DeleteOutlined />
+                      </button>
+                    </Tooltip>
+                  )}
+                </div>
               )}
             </div>
           );

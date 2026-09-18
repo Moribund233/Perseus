@@ -1,16 +1,13 @@
 # Perseus 开发规划
 
-> **更新日期**: 2026-09-15
+> **更新日期**: 2026-09-17
 > **开发方针**: 所有新功能必须采用 **TDD（测试驱动开发）**
 > **开发环境**: wsl docker-compose / command: `wsl docker-compose -f docker-compose-dev.yml up -d`
-> **当前阶段**: 实时协作层 — F-201 房间/频道管理 ✅
-> **当前阶段**: 实时协作层 — F-202 团队聊天 ✅
-> **当前阶段**: 实时协作层 — F-203 业务事件广播 ✅
-> **当前阶段**: 实时协作层 — F-204 协作文本编辑 ✅
-> **当前阶段**: F-205 实时通知推送 ✅（2026-09-14：user_notification WS 推送 + 双端接入）
-> **当前阶段**: F-055 Controller 覆盖率 81% ✅（2026-09-15，目标 >80%）
-> **当前阶段**: F-048~F-050 国际化 ✅（2026-09-14~15：后端 error_code 双语映射 150 码；前端 web/desktop i18next 双语 462/731 词条 + 切换 UI）
-> **下一阶段**: 阶段四 P2 全部完成 🎉 进入代码搜索/CI-CD/协作增强迭代
+> **当前阶段**: 阶段一~四后端全部完成 ✅（2026-09-17 全量复核：`1191 passed / 3 skipped`，含 API 契约测试）
+> **当前阶段**: F-201~F-205 实时协作层全部完成 ✅（房间/聊天/事件广播/协作编辑 Yjs/实时通知推送）
+> **当前阶段**: F-048~F-050 国际化 ✅、F-051~F-057 生产准备 ✅、Controller 覆盖率 81% ✅
+> **当前阶段**: 协作增强 M2/M3（邀请链接+会话级权限、会话 TTL、Redis 多副本/持久化）✅（2026-09-17）
+> **下一阶段**: 前端接线 — 批次 F（web DM 私聊 / 行内评论 Discussions / 消息检索 / 文件移动 UI / desktop 邀请入口）✅ 全部完成（2026-09-18）；desktop 移植接线（DM 私聊 + 消息检索 + Discussions 面板 + 文件移动/重命名）✅ 也已完成（2026-09-18），双端对齐收官
 
 ---
 
@@ -49,7 +46,7 @@
 
 > **阶段二核心后端功能已完成** ✅ — Controller + API 测试已全部完成，路由已注册；Webhook 单次投递已可用，重试机制作为后续增强项
 
-### 当前阶段：阶段三 — 高级功能（部分完成）
+### 阶段三：高级功能 ✅（全部完成）
 
 | 模块 | 已完成 | 待完成 | 进度 |
 |------|--------|--------|------|
@@ -57,13 +54,15 @@
 | P1 — 代码搜索 | F-037, F-038, F-039 | — | 100% ✅ |
 | P1 — WebSocket 实时协作 | F-040, F-041, F-042 | — | 100% ✅ |
 | P2 — 通知系统 | F-043, F-044, F-045 | — | 100% ✅ |
-| P2 — CI/CD 集成 | F-046 | F-047 (构建状态展示) | 50% 🟡 |
+| P2 — CI/CD 集成 | F-046, F-047 | — | 100% ✅ |
 | P2 — 国际化 | F-048, F-049, F-050 | — | 100% ✅ |
 
-> **状态说明**:
+> **状态说明**（2026-09-17 复核）:
 > - LFS、通知系统、WebSocket 实时事件广播/在线状态已完成
-> - 代码搜索仅有单仓库接口，跨仓库搜索与索引自动维护待实现
-> - CI/CD 仅有构建状态存储 API，真实 push/PR 触发闭环待接入
+> - 代码搜索已闭环：单仓 `/{repo_id}/search` + 跨仓 `/search/code` + 三类聚合 `/search/global`；
+>   索引保鲜已落地（push/PR merge/collab save 增量更新、仓库改名/删除清理索引残留）
+> - CI/CD 已闭环（GHA 式仅外部回调）：push 与 PR merge 均触发 build（去重）、外部回调 `X-Perseus-Signature` 签名鉴权、
+>   构建日志流式（`build_log_entries` + `GET /logs?after_seq=`）；F-047 构建状态展示前后端已落地
 > - 国际化 ✅（2026-09-14~15）：后端 `core/i18n.py` ERROR_MESSAGES 双语映射 150 错误码 + `Accept-Language` 按语言返回（`core/exception.py` error_code 注入，38 文件），`tests/test_i18n.py` 14 用例全绿；前端 web `locales/{zh,en}.json` 462 词条、desktop 731 词条，i18next + react-i18next，设置页/顶栏语言切换就绪；独立实时通知推送（F-205）已完成（2026-09-14，`user_notification` WS 推送 + 双端接入，见 `docs/api/websocket/README.md` 第 4 节）；协作文本编辑（F-204）已完成（Yjs 底座，见同文件第 7 节）
 > - Controller 层覆盖率已达 **81%**（2026-09-15，目标 >80%，见 F-055）
 
@@ -333,7 +332,7 @@ pytest -v -m e2e
 | ID | 任务 | TDD 要点 | 涉及文件 | 状态 |
 |----|------|---------|----------|------|
 | F-046 | PR Merge → CI Build 触发闭环 | `test_merge_pr_creates_build_record()` | `services/pull_request_service.py`<br>`services/build_service.py` | ✅ PR merge 后自动创建 Build 记录；**2026-09-16**：push 触发 build（`broadcast_push` + `ensure_build_for_commit` 去重）+ 外部回调签名鉴权（`X-Perseus-Signature` + `Repository.ci_secret`） |
-| F-047 | 构建状态展示 | — | 前端新组件 | ❌ 待实现 |
+| F-047 | 构建状态展示 | — | 前端 Builds 列表/日志 + PR 分支构建状态 | ✅ 已实现（web/desktop） |
 
 ### P2 — 国际化 ✅
 

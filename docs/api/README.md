@@ -1,7 +1,7 @@
 # Perseus API 功能点文档
 
 > **项目**: Perseus — Git 代码托管平台
-> **更新日期**: 2026-07-24
+> **更新日期**: 2026-09-17
 
 ---
 
@@ -179,6 +179,7 @@
 | 标记已读 | ✅ | 单条已读 / 全部已读 |
 | 通知偏好设置 | ✅ | 邮件/站内通知开关（提及、PR 审查、Issue 评论、PR 合并、Release） |
 | 邮件通知 | ✅ | 基于 SMTP + Jinja2 HTML 模板发送通知邮件 |
+| 实时通知推送 | ✅ | 通知落库即经 `/ws/notifications` 推送 `user_notification`（含完整通知对象 + `unread_count`），REST 轮询降级为对账兜底 |
 
 ### 16. 活动流 / 审计日志
 
@@ -196,10 +197,12 @@
 | 功能 | 状态 | 说明 |
 |------|------|------|
 | Build 创建 | ✅ | 为指定分支 + commit 创建构建记录 |
-| Build 列表 | ✅ | 分页查询仓库构建记录 |
+| Build 列表 | ✅ | 分页查询仓库构建记录，支持 `branch` / `status` 过滤 |
 | Build 详情 | ✅ | 查询单个构建状态与元信息 |
 | Build 状态更新 | ✅ | 更新 pending/running/success/failure/error/cancelled 等状态 |
-| Build 日志 | ✅ | 获取构建日志文本 |
+| Build 日志 | ✅ | 获取构建日志文本；`GET /logs?after_seq=N` 增量拉取（`build_log_entries` 流式追加） |
+| 构建触发闭环 | ✅ | PR merge 与 push 均自动创建 pending Build（`ensure_build_for_commit` 去重） |
+| 外部回调鉴权 | ✅ | `PATCH /builds/{id}` 支持用户 token 或 `X-Perseus-Signature`（HMAC-SHA256，`Repository.ci_secret`）双通道 |
 
 ### 18. Git LFS 大文件存储
 
@@ -245,7 +248,8 @@
 | 同步状态推送 | ✅ | 实时同步进度通知（pull/push/fetch） |
 | 进度推送 | ✅ | clone/pull/push/upload/download 等操作进度 |
 | 实时房间 | ✅ | 仓库关联房间、成员列表、在线状态 |
-| 实时聊天 | ✅ | 房间消息发送/删除、正在输入状态 |
+| 实时聊天 | ✅ | 房间消息发送/删除、正在输入状态、表情回应、消息检索 |
+| 私聊会话（DM） | ✅ | `room_type=dm` 规范化 pair，`POST/GET /api/v1/dm`（幂等获取/创建 + 会话列表含 peer/未读） |
 
 ### 22. 系统配置
 
@@ -267,6 +271,51 @@
 | Nginx 反向代理 | ✅ | 请求转发 + Git HTTP Smart Protocol |
 | Git HTTP Smart Protocol | ✅ | 独立 git-cgi 容器 (fcgiwrap) |
 | Nginx 限流 | ✅ | API / Git / 登录分级限速 |
+
+### 24. Watch 订阅
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| Watch / Unwatch | ✅ | `POST/DELETE /api/v1/repositories/{repo_id}/watch` |
+| 订阅状态查询 | ✅ | `GET .../watch` 返回 `watching` + `watch_count` |
+| Watcher 列表 | ✅ | `GET .../watchers` |
+
+### 25. 私聊（DM）
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| 获取/创建私聊会话 | ✅ | `POST /api/v1/dm`（幂等，任一方发起命中同一会话） |
+| 私聊会话列表 | ✅ | `GET /api/v1/dm`（含 peer 信息 + 未读数） |
+| 消息收发 | ✅ | 复用 `GET/POST /api/v1/rooms/{room_id}/messages` |
+| 消息检索 | ✅ | `GET /api/v1/messages/search?q=`（跨会话）、`GET /rooms/{room_id}/messages?q=`（单会话） |
+
+### 26. 行内评论（Discussions）
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| 创建行内评论 | ✅ | `POST /api/v1/repositories/{repo_id}/discussions`（文件+行号/分支/提交锚定） |
+| 评论列表 | ✅ | `GET .../discussions`（可按 file_path/branch/line_number/include_resolved 过滤） |
+| 回复 | ✅ | 创建时携带 `parent_id` |
+| 解决/重新打开 | ✅ | `PATCH .../discussions/{comment_id}`（作者或仓库负责人） |
+| 删除 | ✅ | `DELETE .../discussions/{comment_id}`（含级联删除回复） |
+
+### 27. 协作会话管理
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| 邀请链接签发 | ✅ | `POST /api/v1/repositories/{repo_id}/collab/invites`（仅成员，短时 JWT 绑定 docKey + read/write） |
+| 邀请链接撤销 | ✅ | `POST .../collab/invites/revoke`（仅 owner/admin，jti 黑名单即时生效） |
+| 会话级权限覆盖 | ✅ | `controller/collab_session_controller.py`：改成员会话权限/踢出，优先于仓库角色与邀请 token |
+| 内部回调 | ✅ | `/collab/auth`、`/collab/doc`、`/collab/save`（服务间鉴权） |
+
+### 28. 代码搜索聚合
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| 单仓库搜索 | ✅ | `GET /api/v1/repositories/{repo_id}/search?q=` |
+| 跨仓库代码搜索 | ✅ | `GET /api/v1/search/code?q=`（按可访问仓库聚合） |
+| 三类聚合搜索 | ✅ | `GET /api/v1/search/global?q=`（仓库 / Issue / PR 分组） |
+| 索引维护 | ✅ | push / PR merge / collab save 增量更新，仓库改名/删除清理残留 |
 
 ---
 

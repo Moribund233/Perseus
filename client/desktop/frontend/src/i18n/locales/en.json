@@ -599,6 +599,12 @@
       "repoCount": "repo channels",
       "channels": "Channels",
       "searchChannels": "Search channels…",
+      "searchMessages": "Search messages…",
+      "directMessages": "Direct messages",
+      "noDMs": "No direct messages yet",
+      "newDm": "Start direct message",
+      "newDmFailed": "Failed to start a direct message",
+      "searchNoResults": "No matching messages",
       "noChannels": "No channels available",
       "noChannelsHint": "No channels joined yet — open any repository to enter its channel",
       "selectChannel": "Pick a channel to start chatting",
@@ -629,6 +635,25 @@
       "link": "Link [text](URL)",
       "sendHint": "Enter to send · Shift+Enter for newline",
       "placeholder": "Message #{{channel}}… Markdown supported"
+    },
+    "discussions": {
+      "title": "Discussions",
+      "loadFailed": "Failed to load discussions",
+      "created": "Comment posted",
+      "failed": "Discussion action failed",
+      "noRepo": "Only available for remote workspaces linked to a server",
+      "selectFile": "Open a file to see its discussions",
+      "empty": "No discussions on this file",
+      "resolved": "Resolved",
+      "goLine": "Go to line",
+      "resolve": "Mark as resolved",
+      "reopen": "Reopen",
+      "delete": "Delete",
+      "deleteTitle": "Delete this comment?",
+      "cancel": "Cancel",
+      "replyPlaceholder": "Reply…",
+      "createPlaceholder": "Add a discussion…",
+      "post": "Post"
     },
     "notifications": {
       "title": "Notifications",
@@ -681,7 +706,18 @@
       "toggle": "Toggle collaborative editing (Yjs realtime)",
       "pending": "Unsynced changes buffered offline",
       "saved": "Collaborative edit committed ({{commit}})",
-      "saveFailed": "Collaborative save failed"
+      "saveFailed": "Collaborative save failed",
+      "followMenu": "Follow a participant",
+      "noParticipants": "No other peers in this file",
+      "follow": "Follow",
+      "followStop": "Stop following",
+      "following": "Following {{name}}",
+      "followerCount": "{{count}} following me",
+      "spotlightStart": "Follow me",
+      "spotlightStop": "Stop follow me",
+      "share": "Share collaboration invite link",
+      "shareCopied": "Collaboration invite link copied",
+      "shareFailed": "Failed to create invite link"
     },
     "aux": {
       "toggle": "Collab sidebar (PRs / Issues / members)",
@@ -881,7 +917,13 @@
       "noFiles": "No files",
       "refresh": "Refresh",
       "newFile": "New file…",
-      "loadFail": "Failed to load file tree"
+      "loadFail": "Failed to load file tree",
+      "rename": "Move / rename",
+      "renameTitle": "Move / rename file",
+      "renameFromPlaceholder": "Current path",
+      "renameToPlaceholder": "Target path",
+      "renameFailed": "Failed to move / rename",
+      "fileRenamed": "Moved / renamed"
     },
     "editor": {
       "selectFile": "Select a file on the left to start editing",

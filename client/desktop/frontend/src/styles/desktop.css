@@ -347,6 +347,9 @@ kbd { font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; font-si
 .frow .chev-placeholder { width: 10px; height: 10px; flex: none; }
 .frow.dir-row { position: relative; }
 .frow .fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.frow .row-rename-btn { opacity: 0; flex: none; padding: 2px 5px; font-size: 11px; }
+.frow:hover .row-rename-btn   { opacity: 1; }
+.frow .row-rename-btn:hover   { opacity: 1; color: var(--acc); }
 .kids { margin-left: 16px; }
 
 /* ---- 浮动文件树面板 ---- */

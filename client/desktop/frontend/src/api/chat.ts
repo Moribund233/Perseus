@@ -31,9 +31,10 @@ export interface MessagesResponse {
 
 export interface RealtimeRoom {
   id: string;
-  repository_id: string;
+  repository_id: string | null;
   name: string;
   topic: string | null;
+  room_type: string;
   is_active: boolean;
   created_at: string | null;
 }
@@ -50,6 +51,35 @@ export interface RoomUnread {
   repository_id: string;
   room_name: string;
   unread_count: number;
+}
+
+export interface DMSession {
+  room_id: string;
+  room_name: string;
+  room_type: string;
+  peer_user_id: string;
+  peer_username: string;
+  created_at: string | null;
+  unread_count: number;
+}
+
+export interface MessageSearchHit {
+  id: string;
+  room_id: string;
+  room_name: string;
+  room_type: string;
+  repository_id: string | null;
+  sender_id: string;
+  sender_username: string;
+  message_type: string;
+  content: string;
+  reply_to: string | null;
+  created_at: string | null;
+  reactions?: { emoji: string; count: number; active: boolean }[];
+}
+
+export interface MessageSearchResponse {
+  messages: MessageSearchHit[];
 }
 
 // chatApi：桌面端聊天 REST，全部经本地网关 proxy 转发，首个参数为服务器 id。
@@ -89,6 +119,9 @@ export const chatApi = {
   markRead: (serverId: string, roomId: string) =>
     proxyRequest<{ success: boolean }>(serverId, `/api/v1/rooms/${roomId}/read`, { method: 'POST' }),
 
+  searchMessages: (serverId: string, q: string, limit = 20) =>
+    proxyRequest<MessageSearchResponse>(serverId, `/api/v1/messages/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+
   uploadAttachment: (serverId: string, roomId: string, file: File) => {
     const form = new FormData();
     form.append('file', file);
@@ -97,4 +130,16 @@ export const chatApi = {
       body: form,
     });
   },
+};
+
+// dmApi：桌面端私聊，经本地网关 proxy 转发。
+export const dmApi = {
+  listDms: (serverId: string) =>
+    proxyRequest<DMSession[]>(serverId, '/api/v1/dm'),
+
+  createDm: (serverId: string, peerUserId: string) =>
+    proxyRequest<RealtimeRoom>(serverId, '/api/v1/dm', {
+      method: 'POST',
+      body: JSON.stringify({ peer_user_id: peerUserId }),
+    }),
 };

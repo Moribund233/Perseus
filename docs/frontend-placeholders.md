@@ -1,6 +1,6 @@
 # 前端占位实现清单与开发规划
 
-> **更新日期**: 2026-09-16
+> **更新日期**: 2026-09-17
 > **背景**: 前端多处 UI 为占位/装饰实现（无 onClick 的按钮、硬编码 mock 数据、假状态）。
 > 本文档梳理**尚未真实化**的占位点，作为后续迭代规划依据。
 >
@@ -88,14 +88,14 @@
 
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
-| 顶栏 Eye/Search/More 三按钮 | 无 onClick | 后端已就绪（2026-09-17）：消息检索 `GET /api/v1/messages/search?q=`（跨会话）+ `GET /rooms/{room_id}/messages?q=`；Eye/More 仍无对应能力 | P3 |
+| 顶栏 Eye/Search/More 三按钮 | ✅ Search 已接（2026-09-18）：聚焦侧栏消息检索框 | Eye/More 仍无对应能力 | P3 |
 | 消息删除 | ✅ 已加本人 hover 删除按钮 + 确认，调用 `chatApi.deleteMessage` | — | P1 |
-| DM 私聊列表 | 成员伪装成 DM，点击无效 | 后端已就绪（2026-09-17）：`DirectMessage` + `POST /api/v1/dm`（幂等获取/创建会话）、`GET /api/v1/dm`（会话列表含 peer 信息+未读数）；消息收发复用 `GET/POST /rooms/{room_id}/messages` | P3 |
+| DM 私聊列表 | ✅ 已接（2026-09-18）：侧栏 DM 列表 `GET /api/v1/dm` 真数据（peer/未读/在线），点击打开会话；右侧成员点击发起私聊（`POST /api/v1/dm` 幂等创建）；消息收发复用 `GET/POST /rooms/{room_id}/messages` + WS 房间广播 | — | P1 ✅ |
 | 成员在线状态 | ✅ 已接 WS presence：进入房间 `presence_list` + join/leave 实时增删（批次 D） | — | P1 |
 | 频道未读数 | ✅ 已接后端 `GET /rooms/unread`（按 repository_id 映射频道）+ 进频道 `POST /rooms/{id}/read`（批次 D） | — | P1 |
 | 表情回应 reactions | UI 死代码（渲染逻辑存在，数据恒空） | ✅ 已接线（2026-09-16 确认前端早已实现）：emoji picker + WS `send_reaction` 增减 + REST `chatApi.addReaction` 兜底；后端 `chat_controller.py:62-83`、`chat_service.py:228` add_reaction 已就绪 | ✅ P1 完成 |
 | 消息按日期分组 | 所有消息归入 "Today" | ✅ 按 created_at 分组渲染：Today/Yesterday（新增 i18n）/本地化日期头，静态 Today 块移除（批次 E） | ✅ P2 完成 |
-| 侧边栏搜索框 | 无 value/onChange | 后端已就绪（2026-09-17）：同顶栏搜索，接 `GET /api/v1/messages/search?q=`（可选 `room_id` 限定当前会话） | P3 |
+| 侧边栏搜索框 | ✅ 已接（2026-09-18）：`GET /api/v1/messages/search?q=` 300ms 防抖 + 结果下拉（发件人/会话名/时间/内容摘要），点击跳转对应频道或私聊 | — | P2 ✅ |
 
 ### 3.4 Editor（editor/index.tsx）
 
@@ -145,11 +145,44 @@
 | **批次 C（用户中心）** ✅ | SSH Keys、OAuth 账号管理、`/me/*` 聚合展示（2.4）；全局搜索（3.1）— **已完成** | — |
 | **批次 D（实时增强）** ✅ | Editor 在线状态（3.4）、聊天 presence/未读数（3.3）— **已完成**（presence 复用原 WS 基础设施，未读数新增 REST 端点） | — |
 | **批次 E（体验完善）** ✅ | 消息 reactions UI（确认已实现，仅回填）、文件树 last-commit 列全层级接线、聊天按日期分组、编辑器面包屑点击跳转、PR Filter 装饰按钮移除 — **已完成（2026-09-16）** | 后端早已就绪，纯前端 + 文档 |
-| 待排期 | DM 私聊、行内评论、消息搜索 — **后端已就绪（2026-09-17）**，待前端接线；亮色主题 | 前端接线 + 亮色主题工程 |
+| 待排期 | ~~DM 私聊、行内评论、消息搜索 — desktop 待跟进~~ → **web/desktop 均已接线（2026-09-18）**；亮色主题 | 亮色主题工程 |
 
 ---
 
-## 五、约定与注意事项
+## 五、批次 F：后端就绪待接线清单（2026-09-17 规划）
+
+> 依据 2026-09-17 后端复核（`1191 passed / 3 skipped`，含 API 契约测试）与前端代码库现状盘点。
+> 下列能力后端 API 已就绪，前端（web 优先，desktop 跟进）仅需接线。
+
+### 5.1 接线项总表
+
+| ID | 任务 | 后端端点（已就绪） | web 现状 | desktop 现状 | 级别 |
+|----|------|-------------------|----------|--------------|------|
+| F-601 | DM 私聊 | `POST/GET /api/v1/dm` | ✅ 2026-09-18：`chat.ts` 封装 `dmApi`；侧栏私聊列表接 `GET /api/v1/dm`（含未读徽标/在线点），点击打开会话（复用房间消息/WS）；成员点击发起私聊（无会话时 `POST /api/v1/dm` 幂等创建） | ✅ 2026-09-18：同 web（`api/chat.ts` dmApi + ChatView 侧栏 DM 列表/成员行发起私聊，ActivityChatPanel 并入 `@ peer` 选项） | P1 |
+| F-602 | 行内评论 Discussions | `/api/v1/repositories/{repo_id}/discussions` CRUD | ✅ 2026-09-18：`discussions.ts` 封装（list/create/resolve/remove）+ 标签文件/回复/解决/重开/删除（作者或仓库 admin）/跳转行/未读数徽标 | ✅ 2026-09-18：IDE 右侧面板（EditorTabs 评论按钮开合）；`api/discussions.ts` 经网关 proxy；`DiscussionsPanel.tsx` 文件级线程/回复/解决/删除/跳行，新建评论锚定当前光标行 + 工作分支（`useWorkspaceRepo`） | P2 |
+| F-603 | 消息检索 | `GET /api/v1/messages/search`、`GET /rooms/{id}/messages?q=` | ✅ 2026-09-18：侧栏搜索框接 `GET /api/v1/messages/search`（300ms 防抖 + 结果下拉，点击跳转对应房间/私聊）；顶栏 Search 按钮聚焦搜索框 | ✅ 2026-09-18：同 web（ChatView 顶部搜索框 + 结果下拉，命中跳转频道/DM） | P2 |
+| F-604 | 文件重命名/移动 UI | `POST /api/v1/repositories/{repo_id}/contents/move` | ✅ 2026-09-18：文件树行 hover 移动/重命名按钮（主树 + 浮动树面板），弹窗填目标路径与提交信息，成功后刷新树并迁移已打开 tab | ✅ 2026-09-18：本地工作区走新增 `POST /api/local/workspaces/{id}/rename`（TDD `TestWorkspaceRename`；ExplorerPanel 重命名 Modal + 树行 hover 按钮，FloatingTreePanel `onRename` 透传） | P2 |
+| F-605 | 协作邀请 desktop 跟进 | `POST .../collab/invites` | ✅ 已完成（编辑器分享按钮） | ✅ 2026-09-18：编辑器 crumbs 分享按钮生成邀请链接（`?invite=`，格式与 web 一致）并复制剪贴板（`desktop/frontend .../workspace/EditorTabs.tsx` + `repositoriesApi.createCollabInvite`） | P2 |
+| F-606 | 会话空闲自动落盘前端计时 | `/collab/save` 草稿分支已就绪 | ✅ 2026-09-18：web 编辑器连续 5 分钟无编辑且存在未保存内容 → 经协作会话触发草稿保存（`draft=true`，落 `collab/draft-{branch}`，不触碰工作分支）；网关转发 `draft` 标志；无协作会话时不自动提交 | 无（本地 fs 替代） | P3 |
+| F-607 | 跟随模式（Follow me） | Awareness `viewport`/`follow` + stateless `collab-spotlight`（✅ 后端 2026-09-17） | ✅ 2026-09-17：web — 参与者列表点选跟随/停止、工具栏"跟我来"（写权限）、状态栏跟随指示；desktop — CollabMonaco 跟随菜单/跟我来/跟随指示，`viewport` 以字符偏移与 web 同单位可互跟 | 无 | P2 ✅ |
+
+### 5.2 接线顺序建议
+
+1. **批次 F1（聊天增强）**：F-601 DM 私聊 + F-603 消息检索（同一 `chat.ts` 模块，UI 相邻）— **web ✅ 2026-09-18 / desktop ✅ 2026-09-18**
+2. **批次 F2（编辑器增强）**：F-602 Discussions + F-604 文件移动 UI — **web ✅ 2026-09-18 / desktop ✅ 2026-09-18**（desktop 文件重命名走本地 `POST /api/local/workspaces/{id}/rename`）
+3. **批次 F3（跨端对齐）**：F-605 desktop 邀请入口 + F-606 空闲落盘计时 — **✅ 2026-09-18**（F-605 desktop 落地；F-606 web + 网关 `draft` 转发，desktop 无此职责）
+4. **批次 F4（编辑器协作增强）**：F-607 跟随模式（后端协议 ✅ 2026-09-17，前端接线）
+
+### 5.3 关键契约备注
+
+- **DM 会话列表**：`room_id`、`room_name`、`room_type`、`peer_user_id`、`peer_username`、`created_at`（+ `unread_count` 由控制器注入）
+- **Discussions 响应**：`id`、`author_id`、`author_username`、`content`、`file_path`、`line_number`、`branch`、`commit_hash`、`parent_id`、`resolved`、`created_at`、`updated_at`
+- **消息检索响应**：`{ messages: [{ id, room_id, room_name, room_type, repository_id, sender_id, sender_username, message_type, content, reply_to, created_at, reactions }] }`
+- **移动文件**：请求体 `{ from_path, to_path, message?, branch? }`，响应 `{ commit_id, branch, from, to }`
+
+---
+
+## 六、约定与注意事项
 
 1. **防回归**：本批已修复 `build_pr_response` 系列懒加载 500。新增/修改 PR 相关查询时，
    凡是 `build_pr_response` 的调用方，必须 `selectinload(author/merger/pr_labels)`，

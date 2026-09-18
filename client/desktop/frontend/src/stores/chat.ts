@@ -1,7 +1,10 @@
 import { create } from 'zustand';
 import {
   chatApi,
+  dmApi,
   type ChatMessage,
+  type DMSession,
+  type MessageSearchHit,
   type RealtimeRoom,
   type RoomMember,
   type RoomUnread,
@@ -31,12 +34,18 @@ interface ChatState {
   typingByRoom: Record<string, Record<string, TypingUser>>;
   status: 'idle' | 'connecting' | 'connected' | 'disconnected' | 'error';
   error: string | null;
+  dms: DMSession[];
+  dmLoaded: boolean;
 
   start: () => void;
   stop: () => void;
   reset: () => void;
   setActiveRoom: (roomId: string | null) => void;
   openChannel: (repoId: string) => Promise<void>;
+  openDm: (session: DMSession) => Promise<void>;
+  startDm: (peerUserId: string, peerUsername: string) => Promise<void>;
+  fetchDms: () => Promise<void>;
+  searchMessages: (q: string, limit?: number) => Promise<{ messages: MessageSearchHit[] }>;
   fetchRoom: (repoId: string) => Promise<RealtimeRoom | null>;
   fetchChatRooms: () => Promise<void>;
   fetchMessages: (roomId: string) => Promise<void>;
@@ -77,11 +86,16 @@ function wireSocket(set: (fn: (s: ChatState) => Partial<ChatState>) => void) {
   chatSocket.setHandlers({
     onStatusChange: (status) =>
       set(() => ({ status: status as ChatState['status'] })),
-    onChatMessage: (msg) =>
+    onChatMessage: (msg) => {
+      const activeRoomId = useChatStore.getState().activeRoomId;
       set((s) => ({
         messages: upsertMessage(s, msg),
-        ...(s.activeRoomId === msg.room_id ? {} : bumpUnread(s, msg.room_id)),
-      })),
+        ...(activeRoomId === msg.room_id ? {} : bumpUnread(s, msg.room_id)),
+      }));
+      if (activeRoomId !== msg.room_id) {
+        void useChatStore.getState().fetchDms();
+      }
+    },
     onAck: (msg) =>
       set((s) => ({ messages: upsertMessage(s, msg) })),
     onReaction: (msg) =>
@@ -128,6 +142,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   typingByRoom: {},
   status: 'idle',
   error: null,
+  dms: [],
+  dmLoaded: false,
 
   start: () => {
     wireSocket(set);
@@ -154,6 +170,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       typingByRoom: {},
       status: 'idle',
       error: null,
+      dms: [],
+      dmLoaded: false,
     });
   },
 
@@ -182,6 +200,76 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!room) return;
     get().setActiveRoom(room.id);
     await Promise.all([get().fetchMessages(room.id), get().fetchMembers(room.id)]);
+  },
+
+  // 打开私聊会话：将 DM 房间并入 rooms（对齐频道渲染路径），标记已读。
+  openDm: async (session) => {
+    const rid = session.room_id;
+    set((s) => ({
+      dms: s.dms.some((d) => d.room_id === rid)
+        ? s.dms.map((d) => (d.room_id === rid ? { ...d, unread_count: 0 } : d))
+        : s.dms,
+      rooms: s.rooms.some((r) => r.id === rid)
+        ? s.rooms
+        : [
+            ...s.rooms,
+            {
+              id: rid,
+              repository_id: null,
+              name: session.room_name,
+              topic: null,
+              room_type: session.room_type,
+              is_active: true,
+              created_at: session.created_at,
+            } as RealtimeRoom,
+          ],
+    }));
+    get().setActiveRoom(rid);
+    await Promise.all([get().fetchMessages(rid), get().fetchMembers(rid)]);
+  },
+
+  // 发起/打开与某成员的私聊（幂等：已存在则直接打开）。
+  startDm: async (peerUserId, peerUsername) => {
+    const sid = serverId();
+    if (!sid) return;
+    const existing = get().dms.find((d) => d.peer_user_id === peerUserId);
+    if (existing) {
+      await get().openDm(existing);
+      return;
+    }
+    const created = await dmApi.createDm(sid, peerUserId);
+    const session: DMSession = {
+      room_id: created.id,
+      room_name: created.name || peerUsername,
+      room_type: created.room_type,
+      peer_user_id: peerUserId,
+      peer_username: peerUsername,
+      created_at: created.created_at,
+      unread_count: 0,
+    };
+    set((s) => ({ dms: [session, ...s.dms.filter((d) => d.room_id !== session.room_id)] }));
+    await get().openDm(session);
+    // 以服务端为准刷新列表顺序与名称。
+    void get().fetchDms();
+  },
+
+  fetchDms: async () => {
+    const sid = serverId();
+    if (!sid) return;
+    try {
+      const items = await dmApi.listDms(sid);
+      set({ dms: items });
+    } catch {
+      /* 离线时保留上次私聊列表 */
+    } finally {
+      set({ dmLoaded: true });
+    }
+  },
+
+  searchMessages: async (q: string, limit = 20) => {
+    const sid = serverId();
+    if (!sid) return { messages: [] };
+    return chatApi.searchMessages(sid, q, limit);
   },
 
   fetchRoom: async (repoId) => {

@@ -599,6 +599,12 @@
       "repoCount": "个仓库频道",
       "channels": "频道",
       "searchChannels": "搜索频道…",
+      "searchMessages": "搜索消息…",
+      "directMessages": "私聊",
+      "noDMs": "暂无私聊会话",
+      "newDm": "发起私聊",
+      "newDmFailed": "发起私聊失败",
+      "searchNoResults": "未找到匹配消息",
       "noChannels": "暂无可用频道",
       "noChannelsHint": "尚未加入任何频道 — 在仓库页打开任意仓库即可进入对应频道",
       "selectChannel": "选择一个频道开始会话",
@@ -629,6 +635,25 @@
       "link": "链接 [文本](URL)",
       "sendHint": "Enter 发送 · Shift+Enter 换行",
       "placeholder": "给 #{{channel}} 发送消息… 支持 Markdown"
+    },
+    "discussions": {
+      "title": "行内评论",
+      "loadFailed": "加载评论失败",
+      "created": "评论已发布",
+      "failed": "评论操作失败",
+      "noRepo": "仅对连接服务器的远端工作区可用",
+      "selectFile": "打开文件后展示该文件的评论",
+      "empty": "该文件暂无评论",
+      "resolved": "已解决",
+      "goLine": "跳到行",
+      "resolve": "标记已解决",
+      "reopen": "重新打开",
+      "delete": "删除",
+      "deleteTitle": "确认删除该评论？",
+      "cancel": "取消",
+      "replyPlaceholder": "回复…",
+      "createPlaceholder": "新增评论…",
+      "post": "发布"
     },
     "notifications": {
       "title": "通知",
@@ -681,7 +706,18 @@
       "toggle": "开启/关闭协作编辑（Yjs 实时协同）",
       "pending": "有未同步到服务端的变更（断线缓冲中）",
       "saved": "协作编辑已提交 ({{commit}})",
-      "saveFailed": "协作保存失败"
+      "saveFailed": "协作保存失败",
+      "followMenu": "跟随参与者",
+      "noParticipants": "当前文件暂无其他协作者",
+      "follow": "跟随",
+      "followStop": "停止跟随",
+      "following": "跟随 {{name}}",
+      "followerCount": "{{count}} 人跟随我",
+      "spotlightStart": "发起跟我来",
+      "spotlightStop": "结束跟我来",
+      "share": "分享协作邀请链接",
+      "shareCopied": "协作邀请链接已复制",
+      "shareFailed": "生成邀请链接失败"
     },
     "aux": {
       "toggle": "协作辅助栏（PR / Issue / 成员）",
@@ -881,7 +917,13 @@
       "noFiles": "暂无文件",
       "refresh": "刷新",
       "newFile": "新建文件…",
-      "loadFail": "加载文件树失败"
+      "loadFail": "加载文件树失败",
+      "rename": "移动/重命名",
+      "renameTitle": "移动/重命名文件",
+      "renameFromPlaceholder": "当前路径",
+      "renameToPlaceholder": "目标路径",
+      "renameFailed": "移动/重命名失败",
+      "fileRenamed": "已移动/重命名"
     },
     "editor": {
       "selectFile": "选择左侧文件开始编辑",

@@ -82,7 +82,7 @@ Perseus 提供完整的代码仓库管理、Pull Request 工作流、Issue 跟�
     └────┬─────────────────────────────────────────────┘
          │
     ┌────▼─────────────────────────────────────────────┐
-    │              29 API Controllers                   │
+    │              34 API Controllers                   │
     │  Auth · Users · Repos · PRs · Issues             │
     │  Releases · Webhooks · Search · WebSocket        │
     │  OAuth · SSH Keys · LFS · Stats · Chat · Build   │
@@ -227,7 +227,7 @@ perseus/
 │   └── build_status.py           # 构建状态
 │
 ├── api/                          # API 路由层
-│   ├── routes_config.py          # 中心路由注册器（31 个控制器）
+│   ├── routes_config.py          # 中心路由注册器（34 个控制器）
 │   ├── dependencies.py           # FastAPI 依赖注入（用户认证）
 │   ├── error.py                  # 错误信息 API
 │   └── websocket/                # WebSocket 子系统
@@ -238,7 +238,7 @@ perseus/
 │           ├── chat.py / room.py / notification.py
 │           ├── sync.py / progress.py / log_handler.py
 │
-├── controller/                   # HTTP 路由处理器（31 个控制器）
+├── controller/                   # HTTP 路由处理器（34 个控制器）
 │   ├── app_controller.py         # 应用管理（状态/重启/日志）
 │   ├── auth_controller.py        # 登录/刷新
 │   ├── git_auth_controller.py    # Git HTTP Smart Protocol 认证
@@ -267,7 +267,10 @@ perseus/
 │   ├── room_controller.py        # 实时聊天室
 │   ├── chat_controller.py        # 聊天消息
 │   ├── collab_internal_controller.py # 协作编辑内部回调（Yjs 网关）
-│   ├── collab_invite_controller.py # 协作邀请链接签发（仅成员）
+│   ├── collab_invite_controller.py # 协作邀请链接签发/撤销（仅成员）
+│   ├── collab_session_controller.py # 协作会话级权限覆盖（改权限/踢人）
+│   ├── file_comment_controller.py # 行内评论 Discussions（文件+行号锚定）
+│   ├── dm_controller.py          # 私聊会话（DM）
 │   ├── watch_controller.py       # Watch/Unwatch
 │   └── debug_controller.py       # 调试端点
 │

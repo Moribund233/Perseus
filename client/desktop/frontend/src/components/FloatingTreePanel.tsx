@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import {
+  EditOutlined,
   FolderOutlined,
   FolderOpenOutlined,
   RightOutlined,
@@ -13,6 +14,7 @@ interface Props {
   activeKeys: Set<string>;
   onItemClick: (level: number, key: string, el: HTMLElement) => void;
   onOpenFile: (path: string) => void;
+  onRename?: (path: string) => void;
 }
 
 export function FloatingTreePanel({
@@ -21,6 +23,7 @@ export function FloatingTreePanel({
   activeKeys,
   onItemClick,
   onOpenFile,
+  onRename,
 }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
   const dirs = node.children!.filter((c) => c.is_dir);
@@ -68,6 +71,18 @@ export function FloatingTreePanel({
                     {active ? <FolderOpenOutlined /> : <FolderOutlined />}
                   </span>
                   <span className="fname">{child.name}</span>
+                  {onRename && (
+                    <button
+                      className="icon-btn sm row-rename-btn"
+                      title="Move / rename"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRename(child.path);
+                      }}
+                    >
+                      <EditOutlined />
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -81,6 +96,18 @@ export function FloatingTreePanel({
             >
               <span className={b.cls}>{b.label}</span>
               <span className="fname">{child.name}</span>
+              {onRename && (
+                <button
+                  className="icon-btn sm row-rename-btn"
+                  title="Move / rename"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRename(child.path);
+                  }}
+                >
+                  <EditOutlined />
+                </button>
+              )}
             </div>
           );
         })}

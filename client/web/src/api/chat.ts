@@ -31,11 +31,41 @@ export interface MessagesResponse {
 
 export interface RealtimeRoom {
   id: string;
-  repository_id: string;
+  repository_id: string | null;
   name: string;
   topic: string | null;
+  room_type: string;
   is_active: boolean;
   created_at: string | null;
+}
+
+export interface DMSession {
+  room_id: string;
+  room_name: string;
+  room_type: string;
+  peer_user_id: string;
+  peer_username: string;
+  created_at: string | null;
+  unread_count: number;
+}
+
+export interface MessageSearchHit {
+  id: string;
+  room_id: string;
+  room_name: string;
+  room_type: string;
+  repository_id: string | null;
+  sender_id: string;
+  sender_username: string;
+  message_type: string;
+  content: string;
+  reply_to: string | null;
+  created_at: string | null;
+  reactions?: { emoji: string; count: number; active: boolean }[];
+}
+
+export interface MessageSearchResponse {
+  messages: MessageSearchHit[];
 }
 
 export interface ChatAttachment {
@@ -79,6 +109,11 @@ export const chatApi = {
   getRepositoryRoom: (repoId: string) =>
     apiRequest<RealtimeRoom>(`/api/v1/repositories/${repoId}/room`),
 
+  searchMessages: (q: string, limit = 20) =>
+    apiRequest<MessageSearchResponse>(
+      `/api/v1/messages/search?q=${encodeURIComponent(q)}&limit=${limit}`
+    ),
+
   getUnreadCounts: () =>
     apiRequest<RoomUnread[]>('/api/v1/rooms/unread'),
 
@@ -93,4 +128,14 @@ export const chatApi = {
       body: form,
     });
   },
+};
+
+export const dmApi = {
+  listDms: () => apiRequest<DMSession[]>('/api/v1/dm'),
+
+  createDm: (peerUserId: string) =>
+    apiRequest<RealtimeRoom>('/api/v1/dm', {
+      method: 'POST',
+      body: JSON.stringify({ peer_user_id: peerUserId }),
+    }),
 };

@@ -15,10 +15,19 @@ export default function ActivityChatPanel({ workspace }: { workspace: Workspace 
   const { t } = useTranslation();
   const { rooms, activeRoomId, activeRoom, status } = useWorkspaceChatRoom(workspace);
   const setActiveRoom = useChatStore((s) => s.setActiveRoom);
+  const dms = useChatStore((s) => s.dms);
 
-  const roomOptions = rooms.map((r) => ({ value: r.id, label: `# ${r.name}` }));
+  const roomOptions = [
+    ...rooms.map((r) => ({ value: r.id, label: `# ${r.name}` })),
+    ...dms.map((d) => ({ value: d.room_id, label: `@ ${d.peer_username || d.room_name}` })),
+  ];
 
   const onSelectRoom = (roomId: string) => {
+    const dm = dms.find((d) => d.room_id === roomId);
+    if (dm) {
+      void useChatStore.getState().openDm(dm);
+      return;
+    }
     setActiveRoom(roomId);
     void useChatStore.getState().fetchMessages(roomId);
     void useChatStore.getState().fetchMembers(roomId);

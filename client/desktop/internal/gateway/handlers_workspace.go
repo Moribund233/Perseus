@@ -185,6 +185,46 @@ func (g *Gateway) handleDeleteWorkspace(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
+// handleRenameFile 重命名/移动工作区内文件：POST /api/local/workspaces/{id}/rename
+// body: {"from": "a/b.txt", "to": "c/d.txt"}（相对路径，自动补建目标父目录）。
+func (g *Gateway) handleRenameFile(w http.ResponseWriter, r *http.Request) {
+	ws, err := g.store.GetWorkspace(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, "STORE_NOT_FOUND", "workspace not found")
+		return
+	}
+	var body struct {
+		From string `json:"from"`
+		To   string `json:"to"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+		return
+	}
+	if body.From == "" || body.To == "" {
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "from and to required")
+		return
+	}
+	from := filepath.Join(ws.Path, filepath.FromSlash(body.From))
+	to := filepath.Join(ws.Path, filepath.FromSlash(body.To))
+	for _, p := range []string{from, to} {
+		rel, err := filepath.Rel(ws.Path, p)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			writeError(w, http.StatusBadRequest, "FS_RENAME_ESCAPE", "path escapes workspace")
+			return
+		}
+	}
+	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+		writeError(w, http.StatusInternalServerError, "FS_MKDIR", err.Error())
+		return
+	}
+	if err := os.Rename(from, to); err != nil {
+		writeError(w, http.StatusBadRequest, "FS_RENAME", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "from": body.From, "to": body.To})
+}
+
 func (g *Gateway) handleGitOp(w http.ResponseWriter, r *http.Request) {
 	ws, err := g.store.GetWorkspace(r.PathValue("id"))
 	if err != nil {

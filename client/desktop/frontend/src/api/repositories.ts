@@ -283,4 +283,14 @@ export const repositoriesApi = {
     const qs = `?q=${encodeURIComponent(query)}`;
     return proxyRequest<CodeSearchResponse>(serverId, `/api/v1/repositories/${repoId}/search${qs}`);
   },
+
+  createCollabInvite: (serverId: string, repoId: string, data: { doc_key: string; scope?: 'read' | 'write'; ttl_minutes?: number }) =>
+    proxyRequest<{ token: string; url: string; doc_key: string; scope: string; expires_at: string }>(
+      serverId,
+      `/api/v1/repositories/${repoId}/collab/invites`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    ),
 };

@@ -107,9 +107,35 @@ describe("collab-gateway", () => {
     expect(saveCall.body.content).toBe("hello!");
     expect(saveCall.body.token).toBe("writer-token");
     expect(saveCall.body.docKey).toBe(DOC);
+    // 显式保存不带 draft 标志 → 落到用户工作分支
+    expect(saveCall.body.draft).toBe(false);
     // 内部密钥头随调用传递
     const authHeader = vi.mocked(fetch).mock.calls.at(-1)[1].headers["X-Collab-Internal-Secret"];
     expect(authHeader).toBe(SECRET);
+    a.destroy();
+  });
+
+  it("草稿保存: draft=true 转发给 app, app 落到 collab/draft-{branch}", async () => {
+    const a = makeProvider(gw.port, DOC, "writer-token", { name: "alice" });
+    await waitFor(() => a.document?.getText("content").toString() === "hello", "synced");
+
+    a.document.getText("content").insert(5, "?");
+    await waitFor(() => a.document?.getText("content").toString() === "hello?", "edit applied");
+
+    const savedPromise = new Promise((resolve) => a.on("stateless", ({ payload }) => {
+      const msg = JSON.parse(payload);
+      if (msg.type === "collab-saved") resolve(msg);
+    }));
+
+    a.sendStateless(JSON.stringify({ type: "collab-save", message: "idle autosave", draft: true }));
+
+    const saved = await savedPromise;
+    expect(saved.commit_id).toBe("abc1234");
+
+    const saveCall = appMock.calls.find((c) => c.path === "/api/v1/collab/save" && c.body.draft === true);
+    expect(saveCall).toBeTruthy();
+    expect(saveCall.body.content).toBe("hello?");
+    expect(saveCall.body.message).toBe("idle autosave");
     a.destroy();
   });
 

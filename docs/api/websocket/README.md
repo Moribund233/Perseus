@@ -415,6 +415,38 @@ compose 由 `scripts/generate_env.py` 生成并注入 app 与 collab 两容器�
   配置 `REDIS_URL` 时，另将 Y.Doc 全量状态快照写入 Redis（会话持久化，非 Git commit）。
 - 自动保存到 Git（草稿分支）仍是待办，见 `docs/collab-f204-vs-cwm.md` 3.2 长期方案。
 
+### 跟随模式（Follow me，2026-09-17 后端就绪）
+
+> 后端实现：`collab-gateway/server.mjs`（`beforeHandleAwareness` 策略 + `onStateless` spotlight）；
+> 测试：`collab-gateway/tests/gatewayFollow.test.mjs`（7 例）。
+> 前端：web ✅ 2026-09-17（`collabController.ts` + `routes/editor/index.tsx`）；desktop ✅ 2026-09-17（`collabSocket.ts` + `CollabMonaco.tsx`）。
+
+跟随状态完全落在 **Awareness**（感知层）：跟随关系由客户端从感知状态派生，网关只做盖章/校验，
+不保存业务状态（awareness 经 `extension-redis` 跨副本同步，多副本天然一致）。
+
+**Awareness 扩展字段**
+
+| 字段 | 写入方 | 说明 |
+|------|--------|------|
+| `user` | 客户端 → 网关盖章 | `{name, color, user_id}`；`user_id`/`name` 由网关以已认证身份覆盖（防冒名），`color` 等展示字段保留 |
+| `cursor` | y-codemirror / y-monaco | 光标/选区（既有，binding 管理） |
+| `viewport` | 客户端 | `{anchor: number}` 视口顶部位置（≥0 整数，非法被剔除） |
+| `follow` | 客户端 | `{target: clientID \| null}` 被跟随者（非整数被剔除） |
+
+- 网关 `beforeHandleAwareness` 对单条 awareness 强制 `PERSEUS_COLLAB_MAX_AWARENESS_BYTES`（默认 8192）：
+  超限先剔除 `viewport`/`follow`，再剔除白名单（`user`/`cursor`）外字段；仍超限则收敛为最小身份。
+- 只读连接不受影响：只读仅拒绝文档 update，awareness 照常广播（只读者可显示光标、可跟随）。
+- 客户端建议仅在检测到有 peer 的 `follow.target === 自身 clientID` 时才广播 `viewport`（节流 ~120ms）。
+
+**stateless 消息（"跟我来" / Spotlight）**
+
+| 消息 | 方向 | 载荷 | 说明 |
+|------|------|------|------|
+| `collab-spotlight` | C→S | `{on: boolean}` | 仅写权限（`can_write`）者可发起 |
+| `collab-spotlight` | S→C 广播 | `{docKey, from:{user_id, username}, on}` | 全员广播（含发起者）；接收端据 `from.user_id` 在 awareness 中定位发起者 clientID，并 `setLocalStateField("follow", {target})` |
+| `collab-spotlight-error` | S→C（点对点） | `{error}` | 无写权限时返回 |
+| `collab-spotlight` | S→C 广播 | `{on:false}` | 发起者断开时网关自动广播（`onDisconnect`），对端停止跟随 |
+
 ### 权限与只读
 
 - 连接时校验读权限（owner/admin/developer/viewer）与写权限（owner/admin/developer）
@@ -437,6 +469,7 @@ compose 由 `scripts/generate_env.py` 生成并注入 app 与 collab 两容器�
 - 容器: `docker/collab/Dockerfile`（node:22-alpine），prod/dev compose `collab` 服务，
   nginx `/ws/collab` 分流至网关（优先于 `/ws` 通配）
 - 测试: `collab-gateway/tests/gateway.test.mjs`（vitest，双客户端真实同步）、
+  `collab-gateway/tests/gatewayFollow.test.mjs`（跟随模式：盖章/字段校验/spotlight 权限）、
   `tests/test_collab_internal_api.py`（app 端点契约）、
   `scripts` 侧 E2E 冒烟（注册→建仓→双端同步→保存→Git 落盘回读）
 

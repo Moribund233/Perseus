@@ -54,7 +54,8 @@
 
 | 任务 | 说明 | TDD 要点 | 涉及文件 |
 |------|------|----------|----------|
-| Follow me | `collab_follow {targetClientID, on}` 状态机 + 滚动位置广播 + 前端平滑滚动跟随 | `test_collab_follow_attach()`、`test_collab_follow_rights()` | 协议扩展（`docs/api/websocket/README.md` 第 7 节）、`collabController.ts`、编辑器工具栏开关 |
+| Follow me 后端协议 ✅ | **已完成（2026-09-17）**：Yjs 版重定义——跟随状态落 Awareness（`viewport` 视口锚点 + `follow.target`），网关 `beforeHandleAwareness` 盖章/校验/限容（`PERSEUS_COLLAB_MAX_AWARENESS_BYTES`）；"跟我来"走 stateless `collab-spotlight`（仅 `can_write` 可发起，断开自动广播 `on=false`） | `gatewayFollow.test.mjs` 7 例 ✅（盖章防冒名 / viewport·follow 校验 / 超限剔除 / spotlight 写权限·广播·断开收尾） | `collab-gateway/server.mjs`、`docs/api/websocket/README.md` 第 7 节 |
+| Follow me 前端接线 | 编辑器参与者列表点选跟随 + `viewport` 广播（有跟随者时）/平滑滚动 + 工具栏"跟我来"开关 + 接收 spotlight 设置 `follow.target` — **web ✅ 2026-09-17 / desktop ✅ 2026-09-17** | — | web `collabController.ts`+`routes/editor/index.tsx`；desktop `collabSocket.ts`+`CollabMonaco.tsx` |
 
 ### P1 — 断线策略决策落地（M3）
 
@@ -95,7 +96,9 @@
 | 编辑器面包屑点击跳转 | P2 | ~~cursor:pointer 无跳转~~ | ✅ 已完成（批次 E）：目录段钉出浮动面板 + 根段回根文件树（`editor/index.tsx`） |
 | 顶栏全局搜索三类分组 | P2 | ~~web 为纯代码搜索~~ | ✅ 已完成（批次 C + 2026-09-14）：`GlobalSearch.tsx` 与 `/search` 页均接 `GET /api/v1/search/global` 仓库/Issue/PR/代码分组（`search/index.tsx:50`） |
 | PR Filter 装饰按钮 | P4 | ~~无 onClick，云遮雾绕~~ | ✅ 已完成（批次 E）：移除按钮及 unused i18n key（`pull-requests/index.tsx`） |
-| 聊天侧边栏搜索框 | P3 | 无 value/onChange | 后端已就绪（2026-09-17）：`GET /api/v1/messages/search?q=`（跨会话）+ `GET /rooms/{room_id}/messages?q=`（单会话）；待前端接线 |
+| 聊天侧边栏搜索框 | P3 | ~~无 value/onChange~~ | ✅ 已完成（批次 F1，2026-09-18）：`GET /api/v1/messages/search?q=`（跨会话）300ms 防抖 + 结果下拉跳转；顶栏 Search 按钮聚焦搜索框（`chat/index.tsx`）。房间内 `GET /rooms/{room_id}/messages?q=` 单会话检索待用 |
+| 行内评论 Discussions 前置 DS 项 | P2 | ~~面板为占位~~ | ✅ 已完成（批次 F2，2026-09-18）：List 伪装项（`/api/v1/repositories/{repo_id}/discussions`）— 现为真实数据（`discussions.ts` + 标签文件/回复/解决/重开/删除/跳转行/未读数徽标，`editor/index.tsx`） |
+| 文件移动/重命名前端 UI | P2 | ~~无 UI 入口~~ | ✅ 已完成（批次 F2，2026-09-18）：文件树 hover 移动/重命名（主树+浮动面板）→ `POST /contents/move` 弹窗提交，成功后刷新树并迁移已打开 tab（`editor/index.tsx`） |
 | 主题切换 | P3 | 应用固定 dark | 全站 CSS 变量化，工程量大，可暂缓 |
 
 ---

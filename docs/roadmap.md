@@ -155,6 +155,7 @@ Nginx/OpenResty (反向代理)
 | 团队聊天 | `services/realtime/chat.py` | ✅ Phase 2 |
 | 业务事件广播 | `services/realtime/event_service.py` | ✅ Phase 2 |
 | 协作文本编辑 | `collab-gateway/`（Hocuspocus 网关）<br>`controller/collab_internal_controller.py` | ✅ F-204 完成（Yjs 底座） |
+| 跟随模式（Follow me） | `collab-gateway/server.mjs`（awareness `viewport`/`follow` + `collab-spotlight`）<br>`collabController.ts`（web）+ `collabSocket.ts`/`CollabMonaco.tsx`（desktop） | ✅ 后端 2026-09-17 / web+desktop 2026-09-17 |
 | 在线状态 | `services/realtime/room_service.py`<br>`api/websocket/manager.py` | ✅ Phase 2 |
 | 通知系统（实时推送） | `services/realtime/notify.py` → `api/websocket/handlers/notification.py` | ✅ F-205 完成（user_notification WS 推送，2026-09-14 两端接入） |
 | 文件上传 | ✅ (代码附件) | ✅ |
@@ -180,4 +181,4 @@ Nginx/OpenResty (反向代理)
     `user_notification` 消息（含完整通知对象 + `unread_count`）；web（AppLayout 常驻订阅）与 desktop
     （PortalShell 订阅，经网关 WS 透传）均已接入，REST 轮询降级为对账兜底。协议见 `docs/api/websocket/README.md` 第 4 节
   - **已完成** ✅：国际化（F-048~050）— **2026-09-15**：后端 `error_code` + `Accept-Language` 双语错误消息（150 码，`core/i18n.py`），前端 web（462 词条）与 desktop（731 词条）i18next 双语词库及语言切换 UI 全部就绪
-- **阶段四（生产准备）**：Docker 基础、Nginx 反向代理、基础中间件审计已就绪；Prometheus 监控 + **Sentry 错误追踪（F-053 完成 2026-09-15）**、Controller 覆盖率 81%（F-055）、告警规则（F-057）已完成；压测、安全审计、文档收尾 — **部分完成** 🔴
+- **阶段四（生产准备）**：Docker 基础、Nginx 反向代理、基础中间件审计已就绪；Prometheus 监控 + **Sentry 错误追踪（F-053 完成 2026-09-15）**、Controller 覆盖率 81%（F-055）、告警规则（F-057）、压测（F-052）、安全审计（F-056）、文档（F-054）已完成 — **阶段一~四后端全部完成** ✅（2026-09-17 复核：`1191 passed / 3 skipped`）

@@ -15,6 +15,7 @@ func (g *Gateway) buildRouter() http.Handler {
 	mux.HandleFunc("GET /api/local/workspaces/{id}/tree", g.handleTree)
 	mux.HandleFunc("GET /api/local/workspaces/{id}/file", g.handleReadFile)
 	mux.HandleFunc("PUT /api/local/workspaces/{id}/file", g.handleWriteFile)
+	mux.HandleFunc("POST /api/local/workspaces/{id}/rename", g.handleRenameFile)
 	mux.HandleFunc("GET /api/local/workspaces/{id}/search", g.handleSearch)
 	mux.HandleFunc("POST /api/local/workspaces/{id}/touch", g.handleTouchWorkspace)
 	mux.HandleFunc("GET /api/local/workspaces/{id}/terminal", g.handleTerminal)
