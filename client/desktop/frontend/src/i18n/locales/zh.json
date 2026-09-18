@@ -634,7 +634,12 @@
       "code": "行内代码 `code`",
       "link": "链接 [文本](URL)",
       "sendHint": "Enter 发送 · Shift+Enter 换行",
-      "placeholder": "给 #{{channel}} 发送消息… 支持 Markdown"
+      "placeholder": "给 #{{channel}} 发送消息… 支持 Markdown",
+      "muteRoom": "静音会话",
+      "unmuteRoom": "取消静音会话",
+      "roomMuted": "已静音该会话，不再累计未读",
+      "roomUnmuted": "已取消静音",
+      "muteFailed": "设置静音失败"
     },
     "discussions": {
       "title": "行内评论",

@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from models.realtime_room import RealtimeRoom, RoomMember, DirectMessage
 from models.user import User
-from core.exception import ValidationException
+from core.exception import ValidationException, NotFoundException
 
 
 VALID_ROLES = {"member", "admin"}
@@ -235,6 +235,34 @@ class RoomService:
             }
             for m in members
         ]
+
+    @staticmethod
+    async def set_member_muted(
+        db: AsyncSession,
+        room_id: uuid.UUID,
+        user_id: uuid.UUID,
+        muted: bool,
+    ) -> Dict[str, Any]:
+        """设置本人对某一会话的静音状态（不改变其他成员维度）."""
+        result = await db.execute(
+            select(RoomMember).filter(
+                RoomMember.room_id == room_id,
+                RoomMember.user_id == user_id
+            )
+        )
+        member = result.scalar_one_or_none()
+        if member is None:
+            raise NotFoundException("你不是该房间的成员", error_code="room_member_not_found")
+
+        member.is_muted = bool(muted)
+        await db.commit()
+        await db.refresh(member)
+        return {
+            "room_id": str(member.room_id),
+            "user_id": str(member.user_id),
+            "role": member.role,
+            "is_muted": member.is_muted,
+        }
 
     @staticmethod
     async def update_member_role(

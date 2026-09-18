@@ -19,6 +19,7 @@ import { useAuthStore } from '../../stores/auth';
 import { useNotificationsStore } from '../../stores/notifications';
 import { notificationSocket } from '../../api/notificationSocket';
 import { repositoriesApi, type Repository } from '../../api/repositories';
+import { chatApi, dmApi, type DMSession } from '../../api/chat';
 import type { Notification } from '../../api/notifications';
 import GlobalSearch from './GlobalSearch';
 
@@ -77,6 +78,24 @@ export default function AppLayout() {
     const timer = setInterval(() => fetchUnreadCount(), 60_000);
     return () => clearInterval(timer);
   }, [user, fetchUnreadCount]);
+
+  // 团队聊天未读徽标：频道未读 + 私聊未读 聚合（恢复 P3 侧边栏未读徽标）
+  const [chatUnread, setChatUnread] = useState(0);
+  useEffect(() => {
+    if (!user) return;
+    const refreshChatUnread = () => {
+      Promise.all([chatApi.getUnreadCounts(), dmApi.listDms()])
+        .then(([channels, dms]) => {
+          const channelsSum = channels.reduce((a, b) => a + b.unread_count, 0);
+          const dmsSum = (dms as DMSession[]).reduce((a, b) => a + (b.unread_count || 0), 0);
+          setChatUnread(channelsSum + dmsSum);
+        })
+        .catch(() => {});
+    };
+    refreshChatUnread();
+    const timer = setInterval(refreshChatUnread, 60_000);
+    return () => clearInterval(timer);
+  }, [user, location.pathname]);
 
   // F-205: 订阅 /ws/notifications 实时推送
   useEffect(() => {
@@ -163,7 +182,7 @@ export default function AppLayout() {
     { key: 'repositories', path: '/repositories', icon: <CodeOutlined />, label: t('app.nav.repositories') },
     { key: 'pulls', path: '/pulls', icon: <PullRequestOutlined />, label: t('app.nav.pullRequests') },
     { key: 'editor', path: '/editor', icon: <EditOutlined />, label: t('app.nav.codeEditor') },
-    { key: 'chat', path: '/chat', icon: <MessageOutlined />, label: t('app.nav.teamChat') },
+    { key: 'chat', path: '/chat', icon: <MessageOutlined />, label: t('app.nav.teamChat'), badge: chatUnread || undefined },
   ];
 
   const activeKey = navItems.find((item) => location.pathname.startsWith(item.path))?.key || 'dashboard';

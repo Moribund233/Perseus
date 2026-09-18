@@ -150,6 +150,7 @@ class ChatService:
             .join(RoomMember, RoomMember.room_id == ChatMessage.room_id)
             .filter(
                 RoomMember.user_id == user_id,
+                RoomMember.is_muted.is_(False),
                 ChatMessage.sender_id != user_id,
                 ChatMessage.message_type != "system",
                 RoomMember.last_read_at.isnot(None),

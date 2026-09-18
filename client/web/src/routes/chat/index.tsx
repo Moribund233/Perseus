@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'react';
-import { Layout, Input, Button, Avatar, Tooltip, Popover, message as antdMessage } from 'antd';
+import { Layout, Input, Button, Avatar, Tooltip, Popover, Drawer, Dropdown, Switch, message as antdMessage } from 'antd';
+import type { MenuProps } from 'antd';
 import {
   NumberOutlined,
   LockOutlined,
@@ -16,6 +17,9 @@ import {
   DeleteOutlined,
   MessageOutlined,
   LoadingOutlined,
+  BellOutlined,
+  TeamOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import ChatSkeleton from '../../components/skeleton/ChatSkeleton';
@@ -84,6 +88,7 @@ interface Member {
   initials: string;
   color: string;
   user_id: string;
+  is_muted: boolean;
 }
 
 function getInitials(name: string): string {
@@ -176,6 +181,9 @@ export default function ChatPage() {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const [unreadByRepo, setUnreadByRepo] = useState<Record<string, number>>({});
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [myMuted, setMyMuted] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(true);
   const { t } = useTranslation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeRoomIdRef = useRef<string | null>(null);
@@ -322,9 +330,12 @@ export default function ChatPage() {
         status: 'offline',
         initials,
         color: getAvatarColor(initials),
+        is_muted: m.is_muted,
       };
     }));
-  }, []);
+    const self = membersRes.find((m) => m.user_id === user?.id);
+    setMyMuted(!!self?.is_muted);
+  }, [user]);
 
   // Load room, messages and members when channel changes
   const loadChannel = useCallback(async (repoId: string, options?: { selectOnSuccess?: boolean }) => {
@@ -426,6 +437,24 @@ export default function ChatPage() {
       antdMessage.error((e as Error).message || t('app.teamChat.newDmFailed', { defaultValue: '发起私聊失败' }));
     }
   }, [user, dms, handleDmClick, loadDm, t]);
+
+  // 静音/取消静音当前会话: 后端排除该会话未读累计
+  const toggleMute = useCallback(async () => {
+    if (!room) return;
+    const next = !myMuted;
+    try {
+      const res = await chatApi.setMemberMuted(room.id, next);
+      setMyMuted(res.is_muted);
+      refreshUnread();
+      if (res.is_muted) {
+        antdMessage.success(t('app.teamChat.roomMuted', { defaultValue: '已静音该会话，不再累计未读' }));
+      } else {
+        antdMessage.success(t('app.teamChat.roomUnmuted', { defaultValue: '已取消静音' }));
+      }
+    } catch (e) {
+      antdMessage.error((e as Error).message || t('app.teamChat.muteFailed', { defaultValue: '设置静音失败' }));
+    }
+  }, [room, myMuted, refreshUnread, t]);
 
   // 全局消息检索 (F-603): GET /api/v1/messages/search
   const doSearch = useCallback((q: string) => {
@@ -637,6 +666,24 @@ export default function ChatPage() {
 
   const onlineMembers = members.filter((m) => onlineUserIds.has(m.user_id));
   const offlineMembers = members.filter((m) => !onlineUserIds.has(m.user_id));
+
+  const moreMenu: MenuProps['items'] = [
+    {
+      key: 'details',
+      icon: <InfoCircleOutlined />,
+      label: t('app.teamChat.roomDetails', { defaultValue: '频道信息与成员' }),
+      onClick: () => setDetailsOpen(true),
+    },
+    { type: 'divider' },
+    {
+      key: 'mute',
+      icon: <BellOutlined style={{ color: myMuted ? textTertiary : undefined }} />,
+      label: myMuted
+        ? t('app.teamChat.unmuteRoom', { defaultValue: '取消静音会话' })
+        : t('app.teamChat.muteRoom', { defaultValue: '静音会话' }),
+      onClick: () => { void toggleMute(); },
+    },
+  ];
 
   return (
     <Layout style={{ height: '100%', background: 'transparent' }}>
@@ -910,15 +957,22 @@ export default function ChatPage() {
             <p style={{ fontSize: 12, color: textSecondary, margin: '2px 0 0' }}>{onlineMembers.length} members online</p>
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
-            <Tooltip title="View channel details">
-              <Button type="text" icon={<EyeOutlined style={{ color: textTertiary, fontSize: 16 }} />} style={{ width: 32, height: 32 }} />
+            <Tooltip title={t('app.teamChat.roomDetails', { defaultValue: 'View channel details' })}>
+              <Button
+                type="text"
+                icon={<EyeOutlined style={{ color: membersOpen ? bluePrimary : textTertiary, fontSize: 16 }} />}
+                style={{ width: 32, height: 32 }}
+                onClick={() => setMembersOpen((v) => !v)}
+              />
             </Tooltip>
-            <Tooltip title="Search messages">
+            <Tooltip title={t('app.teamChat.searchMessages', { defaultValue: 'Search messages' })}>
               <Button type="text" icon={<SearchOutlined style={{ color: textTertiary, fontSize: 16 }} />} style={{ width: 32, height: 32 }} onClick={focusSearch} />
             </Tooltip>
-            <Tooltip title="More">
-              <Button type="text" icon={<MoreOutlined style={{ color: textTertiary, fontSize: 16 }} />} style={{ width: 32, height: 32 }} />
-            </Tooltip>
+            <Dropdown menu={{ items: moreMenu }} trigger={['click']} placement="bottomRight">
+              <Tooltip title={t('app.teamChat.moreActions', { defaultValue: 'More' })}>
+                <Button type="text" icon={<MoreOutlined style={{ color: textTertiary, fontSize: 16 }} />} style={{ width: 32, height: 32 }} />
+              </Tooltip>
+            </Dropdown>
           </div>
         </div>
 
@@ -1218,7 +1272,8 @@ export default function ChatPage() {
         </div>
       </Layout>
 
-      {/* Right Members */}
+      {/* Right Members (Eye 显隐) */}
+      {membersOpen && (
       <Sider
         width={220}
         style={{
@@ -1336,6 +1391,102 @@ export default function ChatPage() {
           ))}
         </div>
       </Sider>
+      )}
+
+      {/* 频道信息 Drawer (More → 频道信息与成员) */}
+      <Drawer
+        title={room ? (activeKind === 'dm' ? activeChannelName : `#${activeChannelName}`) : ''}
+        placement="right"
+        width={300}
+        open={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+        styles={{
+          content: { background: bgSecondary },
+          header: { background: bgSecondary, borderColor, color: textPrimary },
+          body: { padding: 16, color: textSecondary },
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: textTertiary, fontWeight: 600 }}>
+              {t('app.teamChat.roomInfo', { defaultValue: '频道信息' })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+              <span style={{ color: textTertiary }}>{t('app.teamChat.roomType', { defaultValue: '类型' })}</span>
+              <span style={{ color: textPrimary }}>{activeKind === 'dm' ? t('app.teamChat.dmType', { defaultValue: '私聊' }) : (room?.room_type === 'dm' ? t('app.teamChat.dmType', { defaultValue: '私聊' }) : t('app.teamChat.channelType', { defaultValue: '频道' }))}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+              <span style={{ color: textTertiary }}>{t('app.teamChat.memberCount', { defaultValue: '成员' })}</span>
+              <span style={{ color: textPrimary }}>{members.length}（{t('app.teamChat.onlineCount', { defaultValue: '在线 {{n}}', n: onlineMembers.length })}）</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+              <span style={{ color: textTertiary }}>{t('app.teamChat.unread', { defaultValue: '未读' })}</span>
+              <span style={{ color: textPrimary }}>{activeKind === 'channel' && activeRepoId ? (unreadByRepo[activeRepoId] ?? 0) : 0}</span>
+            </div>
+          </div>
+
+          <div style={{ borderTop: `1px solid ${borderColor}` }} />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 13, color: textPrimary }}>
+                  <BellOutlined style={{ marginRight: 6, color: textTertiary }} />
+                  {myMuted
+                    ? t('app.teamChat.roomMuted', { defaultValue: '已静音该会话' })
+                    : t('app.teamChat.muteRoom', { defaultValue: '静音会话' })}
+                </span>
+                <span style={{ fontSize: 12, color: textTertiary }}>
+                  {t('app.teamChat.muteDesc', { defaultValue: '静音后不再累计未读' })}
+                </span>
+              </div>
+              <Switch
+                size="small"
+                checked={myMuted}
+                onChange={() => { void toggleMute(); }}
+                checkedChildren={t('app.teamChat.mutedShort', { defaultValue: '静音' })}
+                unCheckedChildren={t('app.teamChat.unmutedShort', { defaultValue: '响铃' })}
+              />
+            </div>
+          </div>
+
+          <div style={{ borderTop: `1px solid ${borderColor}` }} />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: textTertiary, fontWeight: 600 }}>
+              <TeamOutlined style={{ marginRight: 6 }} />
+              {t('app.teamChat.members')} — {members.length}
+            </div>
+            {members.map((m) => (
+              <div
+                key={m.user_id || m.name}
+                onClick={() => { setDetailsOpen(false); void handleMemberClick(m); }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '6px 4px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <Avatar size={28} style={{ background: m.color, fontSize: 11, fontWeight: 600 }}>{m.initials}</Avatar>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</span>
+                    {m.is_muted && <BellOutlined style={{ fontSize: 11, color: textTertiary }} />}
+                  </div>
+                  <div style={{ fontSize: 10, color: textTertiary }}>{m.role}</div>
+                </div>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: statusColor(onlineUserIds.has(m.user_id) ? 'online' : 'offline'), border: `2px solid ${bgSecondary}`, flexShrink: 0 }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </Drawer>
     </Layout>
   );
 }

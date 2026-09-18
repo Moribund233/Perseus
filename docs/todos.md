@@ -63,13 +63,13 @@
 
 | 任务 | 说明 | 涉及文件 |
 |------|------|----------|
-| 按方案 B 落地 | 断线本地缓冲 + 重连 rebase 重放（验证 CRDT 收敛语义后实现） | `collabController.ts`、`client/web/src/components/editor/` |
+| 按方案 B 落地 ✅ | **已被 Yjs 底座天然覆盖（2026-09-18 实测核实）**：`collabController.ts` 的 `updateHandler`/离线缓冲（updates 队列）在重连后整体放进 Yjs 更新流，由 CRDT 收敛合并而非整篇覆盖——`docs/collab-f204-vs-cwm.md` 3.6 决策即此实现；无需再重构 `handleInit`。 | `collabController.ts:71`（离线缓冲 + 自动重连 rebase 注释） |
 
 ### P1 — 受限视图（M3，依赖邀请 token scope）
 
 | 任务 | 说明 | 涉及文件 |
 |------|------|----------|
-| 单文档受限视图 | token 绑定 docKey 时仅该文档可 join；仓库角色用户维持全仓库视图 | `collab.py` join handler（已按 docKey 判定，天然可落地） |
+| 单文档受限视图 ✅ | **已实现（2026-09-18 核实）**：邀请链接携带 docKey，`collab_internal_controller.py` 的 join 按 token 绑定的 docKey 准入——网关 `/collab/connect` 以 docKey 校验 backlink，非该文档 join 被拒，仓库角色用户天然维持全仓库视图；无需额外工作。 | `collab.py` join handler、`collab_internal_controller.py`（docKey 准入） |
 
 ### P2 — 权限即时性（3.5，M2 落地后余项）
 
@@ -189,7 +189,7 @@
 | **批次 1（搜索保鲜）** ✅ | 增量索引接入、push 异步化、collab save 进索引、索引生命周期清理 — **已完成（pytest 1082 passed, 3 skipped, 无回归）** | 2~3 天 | 无决策依赖，最快收益 |
 | **批次 2（协作 P0）** ✅ | 邀请链接 + 会话级临时权限（M2）+ 会话 TTL 延迟销毁 **均已完成**（后端 + 网关透传 + web 分享按钮） | 1~2 周 | ✅ 邀请链接决策已定（仅成员可分享，2026-09-16） |
 | **批次 3（前端轻量）** ✅ | reactions 前端（确认已实现）、last-commit 列全层级、日期分组、面包屑、`/search/global` 分组（确认已实现）、PR Filter 移除 — **已完成（web tsc+eslint+build 通过）** | 3~5 天 | 批次 0 回填 |
-| **批次 4（协作 P1）** | 跟随模式、断线策略（方案 B rebase 保留，✅ 已决策）、受限视图 | 1 周 | 批次 2 |
+| **批次 4（协作 P1）** ✅ | 跟随模式 ✅、断线策略（方案 B rebase 保留）✅、受限视图 ✅ — **三者已全部落地（但 2026-09-18 核实：方案 B 由 Yjs 底座天然覆盖，受限视图由 docKey 准入天然实现，均无需专项重构）** | 1 周 | 批次 2 |
 | **批次 5（CI/CD 闭环）** ✅ | push 触发 build + 外部回调签名（GHA 式）**已完成**；仅剩余双态徽标「版本 N」非阻塞项 | 1~2 周 | 仅剩余双态徽标「版本 N」非阻塞项 |
 | **批次 6（服务端演进）** ✅ | Redis pub/sub 多副本、会话持久化、索引生命周期 — **均已完成** | 1~2 周 | — |
 | **批次 7（后端 P3）** ✅ | Watch ✅、文件 move ✅、DM ✅、行内评论 ✅、消息检索 ✅、自动落盘草稿分支（后端 `draft→collab/draft-{branch}`）✅；仅剩「会话空闲 N 分钟自动触发」前端计时 — **后端已完成（2026-09-17）** | 2 周+ | — |

@@ -73,7 +73,7 @@
 |---|---|---|---|
 | 全局搜索框 | ✅ 已接线：受控输入 + 350ms 防抖 → 下拉结果（按仓库分组、可点击进 Editor 对应文件/行）+ Enter 进入 `/search` 结果页 | 复用了后端跨仓库代码搜索 `/api/v1/search/code`（已存在聚合端点）。仓库/Issue/PR 聚合搜索后端端点已于 2026-09-10 新增（`GET /api/v1/search/global`，desktop T3 先行接入），web 端可复用增强为三类分组 | P2 |
 | 通知点击跳转 | ✅ 已按 `target_type` 映射路由（PR→pulls / Issue→issues / 其余→仓库），解析 repository_id→path | — | P1 |
-| 侧边栏未读徽标 | 已移除假数字（本批） | 若要恢复，需后端提供未读聚合端点 | P3 |
+| 侧边栏未读徽标 ✅ | 已移除假数字（本批） | **已恢复（2026-09-18）**：复用既有无读聚合端点 `GET /api/v1/rooms/unread`（频道）+ `GET /api/v1/dm`（私聊 unread_count）求和，`AppLayout` 每 60s 轮询 + 路由变化刷新，「团队聊天」nav 项显示聚合徽标；静音会话由后端排除，不参与聚合 | ✅ P3 完成 |
 
 ### 3.2 仓库页（repositories/index.tsx）
 
@@ -88,7 +88,7 @@
 
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
-| 顶栏 Eye/Search/More 三按钮 | ✅ Search 已接（2026-09-18）：聚焦侧栏消息检索框 | Eye/More 仍无对应能力 | P3 |
+| 顶栏 Eye/Search/More 三按钮 ✅ | — | **全部接线完成（2026-09-18）**：Eye＝右侧成员面板显隐切换（复用 WS presence 在线成员）；Search＝聚焦侧栏消息检索框；More＝下拉菜单（频道信息与成员 → Drawer：房间类型/成员数/未读/静音开关，成员列表含在线点与静音标记；静音会话 → 后端新增 `POST /api/v1/rooms/{room_id}/members/me`，`set_member_muted` 落库，静音后 `GET /rooms/unread` 与 DM 未读均排除）；i18n 已补 zh/en | — | ✅ P3 完成 |
 | 消息删除 | ✅ 已加本人 hover 删除按钮 + 确认，调用 `chatApi.deleteMessage` | — | P1 |
 | DM 私聊列表 | ✅ 已接（2026-09-18）：侧栏 DM 列表 `GET /api/v1/dm` 真数据（peer/未读/在线），点击打开会话；右侧成员点击发起私聊（`POST /api/v1/dm` 幂等创建）；消息收发复用 `GET/POST /rooms/{room_id}/messages` + WS 房间广播 | — | P1 ✅ |
 | 成员在线状态 | ✅ 已接 WS presence：进入房间 `presence_list` + join/leave 实时增删（批次 D） | — | P1 |

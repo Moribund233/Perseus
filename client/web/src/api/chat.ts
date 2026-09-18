@@ -109,6 +109,12 @@ export const chatApi = {
   getRepositoryRoom: (repoId: string) =>
     apiRequest<RealtimeRoom>(`/api/v1/repositories/${repoId}/room`),
 
+  setMemberMuted: (roomId: string, muted: boolean) =>
+    apiRequest<{ room_id: string; user_id: string; role: string; is_muted: boolean }>(
+      `/api/v1/rooms/${roomId}/members/me`,
+      { method: 'POST', body: JSON.stringify({ muted }) },
+    ),
+
   searchMessages: (q: string, limit = 20) =>
     apiRequest<MessageSearchResponse>(
       `/api/v1/messages/search?q=${encodeURIComponent(q)}&limit=${limit}`

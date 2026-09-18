@@ -7,6 +7,7 @@ import {
   NumberOutlined,
   SearchOutlined,
   TeamOutlined,
+  BellOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useRepositoriesStore } from '../../stores/repositories';
@@ -59,6 +60,7 @@ export default function ChatView() {
   const startDm = useChatStore((s) => s.startDm);
   const fetchDms = useChatStore((s) => s.fetchDms);
   const setActiveRoom = useChatStore((s) => s.setActiveRoom);
+  const setMemberMuted = useChatStore((s) => s.setMemberMuted);
 
   const [showMembers, setShowMembers] = useState(true);
   const [searchQ, setSearchQ] = useState('');
@@ -106,6 +108,18 @@ export default function ChatView() {
   const onlineMembers = roomMembers.filter((m) => onlineIds.has(m.user_id));
   const offlineMembers = roomMembers.filter((m) => !onlineIds.has(m.user_id));
   const onlineCount = new Set([...onlineIds, me?.id].filter(Boolean)).size;
+  const myMuted = roomMembers.find((m) => m.user_id === me?.id)?.is_muted ?? false;
+
+  // 静音/取消静音当前会话：服务端落库（排除未读聚合），本地回写 is_muted 并刷新未读。
+  const toggleMute = async () => {
+    if (!activeRoomId) return;
+    try {
+      const muted = await setMemberMuted(activeRoomId, !myMuted);
+      message.success(muted ? t('desktop.chat.roomMuted') : t('desktop.chat.roomUnmuted'));
+    } catch (e) {
+      message.error(`${t('desktop.chat.muteFailed')}: ${(e as Error).message}`);
+    }
+  };
 
   // 跨会话消息检索 (F-603): GET /api/v1/messages/search（300ms 防抖）。
   const doSearch = useMemo(() => (q: string) => {
@@ -360,6 +374,14 @@ export default function ChatView() {
                 >
                   <TeamOutlined />
                 </button>
+                <button
+                  className={`icon-btn${myMuted ? ' on' : ''}`}
+                  title={myMuted ? t('desktop.chat.unmuteRoom') : t('desktop.chat.muteRoom')}
+                  onClick={() => void toggleMute()}
+                  style={{ background: myMuted ? activeBg : 'transparent', border: `1px solid ${borderColor}`, borderRadius: 6, color: myMuted ? blueLight : textSecondary, cursor: 'pointer', padding: '3px 8px' }}
+                >
+                  <BellOutlined />
+                </button>
               </div>
             </div>
             <ChatMessages roomId={activeRoom.id} />
@@ -399,7 +421,7 @@ export default function ChatView() {
 
 function MemberGroup({ label, members, onlineIds, meUserId, onStartDm }: {
   label: string;
-  members: Array<{ user_id: string; username: string; role: string }>;
+  members: Array<{ user_id: string; username: string; role: string; is_muted?: boolean }>;
   onlineIds: Set<string>;
   meUserId: string | null;
   onStartDm: (userId: string, username: string) => void;
@@ -427,6 +449,7 @@ function MemberGroup({ label, members, onlineIds, meUserId, onStartDm }: {
             <span style={{ flex: 1, fontSize: 13, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {m.username}
               {m.role === 'admin' && <Tag style={{ marginLeft: 6, fontSize: 10, lineHeight: '16px', padding: '0 6px' }}>{t('desktop.chat.roleAdmin')}</Tag>}
+              {m.is_muted && <BellOutlined style={{ marginLeft: 6, fontSize: 11, color: textTertiary }} />}
             </span>
             {!isSelf && (
               <button

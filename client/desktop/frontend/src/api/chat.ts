@@ -116,6 +116,13 @@ export const chatApi = {
   getUnreadCounts: (serverId: string) =>
     proxyRequest<RoomUnread[]>(serverId, '/api/v1/rooms/unread'),
 
+  setMemberMuted: (serverId: string, roomId: string, muted: boolean) =>
+    proxyRequest<{ room_id: string; user_id: string; role: string; is_muted: boolean }>(
+      serverId,
+      `/api/v1/rooms/${roomId}/members/me`,
+      { method: 'POST', body: JSON.stringify({ muted }) },
+    ),
+
   markRead: (serverId: string, roomId: string) =>
     proxyRequest<{ success: boolean }>(serverId, `/api/v1/rooms/${roomId}/read`, { method: 'POST' }),
 

@@ -634,7 +634,12 @@
       "code": "Inline code `code`",
       "link": "Link [text](URL)",
       "sendHint": "Enter to send · Shift+Enter for newline",
-      "placeholder": "Message #{{channel}}… Markdown supported"
+      "placeholder": "Message #{{channel}}… Markdown supported",
+      "muteRoom": "Mute room",
+      "unmuteRoom": "Unmute room",
+      "roomMuted": "Room muted. Unread no longer counts",
+      "roomUnmuted": "Room unmuted",
+      "muteFailed": "Failed to update mute setting"
     },
     "discussions": {
       "title": "Discussions",

@@ -51,6 +51,7 @@ interface ChatState {
   fetchMessages: (roomId: string) => Promise<void>;
   fetchMembers: (roomId: string) => Promise<void>;
   fetchUnread: () => Promise<void>;
+  setMemberMuted: (roomId: string, muted: boolean) => Promise<boolean>;
   sendMessage: (roomId: string, content: string, replyTo?: string) => void;
   sendTyping: (roomId: string, isTyping: boolean) => void;
   toggleReaction: (roomId: string, msgId: string, emoji: string, add: boolean) => void;
@@ -348,6 +349,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
+  // 静音/取消静音当前会话：服务端落库并排除未读聚合；本地回写 is_muted 后刷新未读。
+  setMemberMuted: async (roomId, muted) => {
+    const sid = serverId();
+    if (!sid) return false;
+    try {
+      const res = await chatApi.setMemberMuted(sid, roomId, muted);
+      set((s) => ({
+        members: {
+          ...s.members,
+          [roomId]: (s.members[roomId] ?? []).map((m) =>
+            m.user_id === res.user_id ? { ...m, is_muted: res.is_muted } : m,
+          ),
+        },
+      }));
+      await get().fetchUnread();
+      return res.is_muted;
+    } catch (e) {
+      set({ error: (e as Error).message });
+      throw e;
+    }
+  },
+
   sendMessage: (roomId, content, replyTo) => {
     chatSocket.sendChatMessage(roomId, content, replyTo);
   },
@@ -392,6 +415,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
 // 供 Chat 视图读取房间列表。
 export function useChatRoomList(): RealtimeRoom[] {
   return useChatStore((s) => s.rooms);
+}
+
+// 侧边栏/门户聊天总未读 = 频道未读（unreadByRepo 来自 GET /rooms/unread，静音会话已被后端排除）+ 私聊未读。
+export function useChatUnreadBadge(): number {
+  const byRepo = useChatStore((s) => s.unreadByRepo);
+  const dms = useChatStore((s) => s.dms);
+  const repoSum = Object.values(byRepo).reduce((a, b) => a + b, 0);
+  const dmSum = dms.reduce((a, d) => a + (d.unread_count || 0), 0);
+  return repoSum + dmSum;
 }
 
 export type { RealtimeRoom, RoomMember, RoomUnread };

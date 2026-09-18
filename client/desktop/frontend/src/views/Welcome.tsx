@@ -16,6 +16,7 @@ import { useWorkspaceStore } from '../stores/workspace';
 import { useServersStore } from '../stores/servers';
 import { useGatewayStore } from '../stores/gateway';
 import { useNavigationStore } from '../stores/navigation';
+import { useChatUnreadBadge } from '../stores/chat';
 import { timeAgo } from '../utils/time';
 import Brand from '../components/Brand';
 
@@ -34,6 +35,7 @@ export default function Welcome() {
   const setCurrentServer = useServersStore((s) => s.setCurrent);
   const config = useGatewayStore((s) => s.config);
   const navigate = useNavigationStore((s) => s.navigate);
+  const chatUnread = useChatUnreadBadge();
 
   const [url, setUrl] = useState('');
   const [token, setToken] = useState('');
@@ -137,6 +139,9 @@ export default function Welcome() {
               {icons.chat}
               <b>{t('desktop.welcome.actions.chat')}</b>
               <span>{t('desktop.welcome.actions.chatDesc')}</span>
+              {chatUnread > 0 && (
+                <span className="badge red" style={{ position: 'absolute', right: 14, top: 12 }}>{chatUnread}</span>
+              )}
             </button>
             <button className="wb-action" onClick={() => navigate('myWork')}>
               {icons.myWork}

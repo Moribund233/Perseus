@@ -18,6 +18,7 @@ import { useIdentityStore } from '../stores/identity';
 import { useProblemsStore } from '../stores/problems';
 import { usePullRequestsStore } from '../stores/pullRequests';
 import { useIssuesStore } from '../stores/issues';
+import { useChatUnreadBadge } from '../stores/chat';
 import ExplorerPanel from '../views/workspace/ExplorerPanel';
 import SearchPanel from '../views/workspace/SearchPanel';
 import GitPanel from '../views/workspace/GitPanel';
@@ -61,6 +62,7 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
   const problemCount = useProblemsStore((s) => s.diagnostics.length);
   const prCount = usePullRequestsStore((s) => (s.pullRequests ?? []).length);
   const issueCount = useIssuesStore((s) => (s.issues ?? []).length);
+  const chatUnread = useChatUnreadBadge();
 
   const [pane, setPane] = useState<PaneId>('explorer');
   const [openPath, setOpenPath] = useState<string | null>(null);
@@ -148,6 +150,7 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
     if (id === 'issues' && issueCount > 0) return <i className="badge gray">{issueCount}</i>;
     if (id === 'prs' && prCount > 0) return <i className="badge">{prCount}</i>;
     if (id === 'git' && problemCount > 0) return <i className="badge red">{problemCount}</i>;
+    if (id === 'chat' && chatUnread > 0) return <i className="badge red">{chatUnread}</i>;
     return null;
   };
 
@@ -211,9 +214,6 @@ export default function IdeShell({ workspace }: { workspace: Workspace }) {
             </button>
           ))}
           <span className="sp" />
-          <button className={`act${pane === 'chat' ? ' on' : ''}`} title={t('desktop.menu.chat')} onClick={() => setPane('chat')}>
-            <MessageOutlined />
-          </button>
           <button className="act" title={t('desktop.menu.exit')} onClick={() => leaveTo('servers')}>
             <DatabaseOutlined />
           </button>

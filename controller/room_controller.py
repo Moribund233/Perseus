@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routes_prefix import get_route_prefix
@@ -86,6 +87,25 @@ async def get_room_members(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
     members = await RoomService.get_members(db, room_id)
     return members
+
+
+class RoomMemberMuteRequest(BaseModel):
+    """设置本人对某一会话的静音状态"""
+    muted: bool
+
+
+@router.post("/api/v1/rooms/{room_id}/members/me")
+async def set_room_member_muted(
+    room_id: uuid.UUID,
+    data: RoomMemberMuteRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user),
+):
+    """本人静音/取消静音某会话（频道或私聊）。静音后该会话不再累计未读。"""
+    room = await RoomService.get_room(db, room_id)
+    if not room:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
+    return await RoomService.set_member_muted(db, room_id, current_user.id, data.muted)
 
 
 @router.delete("/api/v1/rooms/{room_id}")
