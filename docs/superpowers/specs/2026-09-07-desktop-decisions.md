@@ -40,7 +40,7 @@
   → Y 网关基建 + web 端 F-204 迁移 Yjs（D1 既定路线）✅ 2026-09-08 完成
 之后:
   → desktop 接入 Yjs 协同（y-monaco）✅ 2026-09-10 完成（T9：Go 首帧 token 注入代理 + Monaco 绑定）
-  → Phase 2C 聊天/通知 🟡 已随 UI 补全批次完成（T4/T5，2026-09-10）；host 模型/follow/受限视图仍待排期
+  → Phase 2C 聊天/通知 ✅ 已随 UI 补全批次完成（T4/T5，2026-09-10）；follow ✅ 2026-09-17 双端、受限视图 ✅ 2026-09-18（邀请 token 绑定 docKey 准入天然实现）；host-authoritative 模型在 Yjs 底座下已非必需，维持未决观察
   → Phase 4 增强收尾（SSH 推送、mDNS、托盘/单实例/NSIS）
 ```
 

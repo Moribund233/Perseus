@@ -444,6 +444,8 @@
       "spotlightStart": "Follow me",
       "spotlightStop": "Stop follow me",
       "spotlightHint": "Invite collaborators to follow your viewport",
+      "unsavedBadge": "Unsaved",
+      "savedBadge": "Committed",
       "noDiscussions": "No code discussions yet",
       "noDiscussionsHint": "Use the composer below to comment on the current file and line",
       "commentPlaceholder": "Comment on L{{line}}...",
@@ -497,7 +499,9 @@
       "muteDesc": "Muted rooms stop accumulating unread",
       "mutedShort": "Mute",
       "unmutedShort": "Unmute",
-      "searchMessages": "Search messages"
+      "searchMessages": "Search messages",
+      "searchScopeAll": "All conversations",
+      "searchScopeRoom": "This conversation"
     },
     "settings": {
       "title": "Settings",

@@ -398,6 +398,15 @@ pytest -v -m e2e
 - 修复：`send_message` 显式写入微秒级 `created_at`，规避 SQLite `CURRENT_TIMESTAMP` 秒级存储与水位比较不一致
 - 在线状态沿用既有 WS presence（`presence_list`/`join`/`leave`），前端 chat/editor 页已接线
 
+### 7.5 批次 H 增量（2026-09-18 收尾）
+
+| 项 | 说明 | 涉及 |
+|----|------|------|
+| JWT 撤销黑名单 | 访问/刷新 token 携带 `jti`；新增 `revoked_tokens` 表与 `POST /api/v1/auth/logout`；`verify_token_active` 在 HTTP/WS/refresh 三处叠加撤销校验，登出即时失效 | `models/revoked_token.py`、`services/token_service.py`、`controller/auth_controller.py`、`api/dependencies.py`、`api/websocket/auth.py` |
+| 多语言符号解析 | `get_file_symbols` 从仅 Python 扩展为 Python/JS/TS/Go/Rust/Java/C/C++/C#/Ruby/PHP/Swift/Kotlin/Scala 正则提取 | `services/repository_browser_service.py`（`_SYMBOL_PATTERNS`/`_extract_symbols`） |
+| PR 审阅者列表透出 | 列表响应新增 `reviewers` + `review_count`（预加载 `reviews.reviewer`），供前端头像堆叠 | `utils/response_builder.py`、`services/pull_request_service.py` |
+| 测试补齐 | 新增 `test_app_service.py`、`test_database_manager.py`；token 撤销/登出、多语言符号、PR reviewers 测试；全量 `1228 passed / 3 skipped` | `tests/` |
+
 ---
 
 ## 附录：现有测试基础
@@ -428,9 +437,9 @@ pytest -v -m e2e
 | 模块 | 测试文件 | 优先级 | 关联阶段 | 状态 |
 |------|---------|--------|---------|------|
 | 配置管理 | `test_config.py` | P1 | 阶段一 | ✅ |
-| 应用服务 | `test_app_service.py` | P1 | 阶段一 | ❌ |
+| 应用服务 | `test_app_service.py` | P1 | 阶段一 | ✅ |
 | 仓库浏览器 | `test_repository_browser_async.py` | P1 | 阶段一 | ✅ |
-| 数据库管理 | `test_database_manager.py` | P2 | 阶段四 | ❌ |
+| 数据库管理 | `test_database_manager.py` | P2 | 阶段四 | ✅ |
 | API 集成测试 | `test_api_*.py`, `test_controller_*.py` | P0 | 阶段一/二 | ✅ 已有：auth, issue, notification, pr, repository |
 | WebSocket 测试 | `test_websocket_manager.py` | P1 | 阶段三 | ✅ |
 | SSH Key | `test_key_service_async.py` | P0 | 阶段二 | ✅ |

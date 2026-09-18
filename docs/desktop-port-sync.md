@@ -42,10 +42,10 @@
 | 2026-09-07 | Editor 状态栏协作 presence/双态徽标 | ~~双态徽标~~ → ✅ 2026-09-14 两端落地（desktop `stores/editorStatus.ts` + StatusBar；web editor 状态栏；会话已同步=connected 且无未同步变更，Git 已提交=最近协作保存 short-SHA，内容再编辑即失效）；**「版本 N」✅ 2026-09-18 两端**：「会话已同步 · v{N}」由 `collab-saved` 广播的 `version` 驱动（网关 `collab-gateway/versionCounter.mjs`，Redis INCR 持久计数 / 无 Redis 回退内存） |
 | 2026-09-16 | 协作邀请链接（M2）：web 编辑器「分享协作」生成会话级临时权限链接（`?invite=` 透传 `invite_token`，网关 JSON token 解析） | ~~协作会话邀请入口（y-monaco 会话）：编辑器工具栏分享按钮 + 以 `?invite=` 加入会话~~ → ✅ 2026-09-18（F-605）：编辑器 crumbs 分享按钮 → `repositoriesApi.createCollabInvite` → 复制 `<base>/editor/owner/repo?file=&invite=` 链接（格式与 web 一致） |
 | 2026-09-17 | 跟随模式（Follow me）：web 接线参与者点选跟随/停止、工具栏「跟我来」（写权限）、跟随者计数、有跟随者时节流广播 `viewport` awareness | ✅ 2026-09-17 已补：desktop `CollabMonaco` 跟随菜单/跟我来/跟随指示 + `CollabSession` awareness `viewport`（字符偏移与 web 同单位）/`follow` + spotlight 信令 |
-
 | 2026-09-18 | 批次 F1/F2（web）: DM 私聊/消息检索（聊天）+ 行内评论 Discussions/文件移动重命名 UI（编辑器） | ~~聊天 DM/搜索 + 编辑器 Discussions/移动 UI — desktop 待跟进~~ → ✅ 2026-09-18 desktop 落地：聊天页 DM 列表/私聊按钮 + 消息搜索框（`ChatView.tsx`）；IDE 行内评论面板（`DiscussionsPanel.tsx`，文件级线程/回复/解决/删除/跳行，`useWorkspaceRepo`+远端 proxy）；文件移动重命名（workspace rename 端点 `POST /api/local/workspaces/{id}/rename` 新增 + ExplorerPanel 重命名 Modal，TDD `TestWorkspaceRename`） |
 | 2026-09-18 | 批次 F3: F-606 空闲自动落盘（web 计时 → 网关转发 `draft` → 落 `collab/draft-{branch}`）；F-605 desktop 分享邀请已补 | F-606 不适用 desktop（本地 fs 直接写盘即保存） |
 | 2026-09-18 | 批次 G（web）: 聊天顶栏 Eye/More 接线（Eye=右侧成员面板显隐；More=频道信息 Drawer+静音开关）+ 静音会话排除未读（后端 `POST /api/v1/rooms/{room_id}/members/me` → `set_member_muted`，`GET /rooms/unread` 与 DM 未读均排除）+ 侧边栏未读徽标恢复（`AppLayout` 轮询聚合） | ~~desktop 待跟进~~ → ✅ 2026-09-18：ChatView 顶栏成员面板显隐已有（T4）；本批补静音开关（header Bell 按钮，`chatApi.setMemberMuted` proxy + store `setMemberMuted` 回写 is_muted + 刷新未读，未读排除被动受益）+ 成员行静音标记 + 活动栏聊天徽标/Welcome 聊天入口徽标（`useChatUnreadBadge`=频道未读+DM 未读聚合）；顺带移除活动栏重复 chat 按钮 |
+| 2026-09-18 | 批次 H（web）: 参与者「未保存/已提交」徽标（awareness `unsaved`）、PR 列表审阅者头像堆叠（后端 `reviewers`）、聊天搜索「全部会话/本会话」范围切换（`GET /rooms/{id}/messages?q=`） | ✅ 2026-09-18 desktop：`collabSocket.ts` awareness `unsaved` + `CollabMonaco` 参与者徽标/tooltip；PR 列表头像堆叠（`PullRequestsView.tsx`，复用后端 `reviewers`）。聊天单会话搜索范围切换为 web 专属，未移植（desktop ChatView 保留跨会话搜索） |
 
 > **2026-09-14 起移植债务清零。** 后续 web 合入影响两端的功能时按登记规则在此追加。
 > **2026-09-16**: 邀请链接（M2）已登记 desktop 跟进项（见上表）。

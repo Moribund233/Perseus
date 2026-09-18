@@ -12,7 +12,7 @@ from sqlalchemy import select
 import uuid
 import logging
 
-from services.token_service import verify_token as jwt_verify_token
+from services.token_service import verify_token as jwt_verify_token, is_token_revoked
 from models.async_db import get_async_db_context
 from models.user import User
 
@@ -73,6 +73,10 @@ async def verify_token(token: str) -> Optional[Dict[str, Any]]:
     # 从数据库获取完整的用户信息
     try:
         async with get_async_db_context() as db:
+            if await is_token_revoked(db, token_data.jti):
+                logger.warning("WebSocket token verification failed: token revoked")
+                return None
+
             result = await db.execute(select(User).filter(User.id == token_data.user_id))
             user = result.scalar_one_or_none()
 

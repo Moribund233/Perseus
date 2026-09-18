@@ -53,6 +53,10 @@ export default function CollabMonaco({ enabled, status, participants, pending, f
           <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>
             {p.username || String(p.clientID).slice(0, 6)}
           </span>
+          <span style={{ fontSize: 10, color: p.unsaved ? yellow : green, display: 'inline-flex', alignItems: 'center', gap: 3, flex: 'none' }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: p.unsaved ? yellow : green }} />
+            {p.unsaved ? t('desktop.collab.unsavedBadge') : t('desktop.collab.savedBadge')}
+          </span>
           {p.isSelf ? (
             <span style={{ fontSize: 11, opacity: 0.7 }}>
               {followState.followerCount > 0 ? t('desktop.collab.followerCount', { count: followState.followerCount }) : ''}
@@ -85,7 +89,7 @@ export default function CollabMonaco({ enabled, status, participants, pending, f
         .filter((p) => p.username)
         .slice(0, 6)
         .map((p) => (
-          <Tooltip key={p.clientID} title={`${p.username}${p.clientID === myFollowing ? ` · ${t('desktop.collab.following', { name: followState.followingName ?? '' })}` : ''}`}>
+          <Tooltip key={p.clientID} title={`${p.username} · ${p.unsaved ? t('desktop.collab.unsavedBadge') : t('desktop.collab.savedBadge')}${p.clientID === myFollowing ? ` · ${t('desktop.collab.following', { name: followState.followingName ?? '' })}` : ''}`}>
             <span
               style={{
                 width: 18, height: 18, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',

@@ -122,10 +122,11 @@ describe("collab-gateway 跟随模式 (Follow me)", () => {
 
     a.awareness.setLocalStateField("viewport", { anchor: 42 });
     a.awareness.setLocalStateField("follow", { target: 123 });
+    a.awareness.setLocalStateField("unsaved", true);
 
     await waitFor(() => {
       const s = findPeer(b, "u-writer");
-      return s?.viewport?.anchor === 42 && s?.follow?.target === 123;
+      return s?.viewport?.anchor === 42 && s?.follow?.target === 123 && s?.unsaved === true;
     }, "follow fields propagated");
 
     a.destroy();
@@ -141,6 +142,7 @@ describe("collab-gateway 跟随模式 (Follow me)", () => {
 
     a.awareness.setLocalStateField("viewport", { anchor: -5 });
     a.awareness.setLocalStateField("follow", { target: "not-a-client-id" });
+    a.awareness.setLocalStateField("unsaved", "not-a-boolean");
 
     await waitFor(() => !!findPeer(b, "u-writer"), "state propagated");
     await new Promise((r) => setTimeout(r, 250));
@@ -149,6 +151,7 @@ describe("collab-gateway 跟随模式 (Follow me)", () => {
     expect(s.user.user_id).toBe("u-writer");
     expect(s.viewport).toBeUndefined();
     expect(s.follow).toBeUndefined();
+    expect(s.unsaved).toBeUndefined();
 
     a.destroy();
     b.destroy();

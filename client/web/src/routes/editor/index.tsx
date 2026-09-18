@@ -1072,6 +1072,7 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
         file: activeTab || '—',
         status: 'viewing' as const,
         clientID: peer?.clientID ?? null,
+        unsaved: peer?.unsaved ?? false,
         isSelf: u.user_id === currentUserId,
       };
     });
@@ -1769,6 +1770,21 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
                       />
                       {ed.status}
                     </div>
+                    {ed.clientID && (
+                      <div style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: '50%',
+                            background: ed.unsaved ? '#d29922' : green,
+                          }}
+                        />
+                        {ed.unsaved
+                          ? t('app.codeEditor.unsavedBadge', { defaultValue: '未保存' })
+                          : t('app.codeEditor.savedBadge', { defaultValue: '已提交' })}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

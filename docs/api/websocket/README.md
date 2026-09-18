@@ -379,7 +379,7 @@ ws://host:port/ws/repository/42?token=your_jwt_token
 > **架构**: Hocuspocus 哑管道网关（`collab-gateway/`，独立容器）+ app 内部回调端点
 > **同步协议**: y-websocket（CRDT，`Y.Doc` 文档模型）；光标/在线状态走 Awareness
 > **前端集成**: `client/web/src/components/editor/collabController.ts`（CM6 `y-codemirror.next`）
-> **desktop 接入**: `y-monaco`（D1 决策，待排期）
+> **desktop 接入**: ✅ `y-monaco`（D1 决策，2026-09-10 T9 完成；Go 网关首帧 token 注入代理 + Monaco 绑定）
 
 文档会话标识 `docKey = {repository_id}:{branch}:{path}`（经 provider 协议消息传输，
 不依赖 URL 路径）。`Y.Doc` 中唯一共享文本类型为 `getText("content")`，
@@ -413,7 +413,7 @@ compose 由 `scripts/generate_env.py` 生成并注入 app 与 collab 两容器�
 
 - `onStoreDocument`（debounce/断开自动触发）：**Git 提交仅由显式 `collab-save` 触发**，防止高频自动 commit。
   配置 `REDIS_URL` 时，另将 Y.Doc 全量状态快照写入 Redis（会话持久化，非 Git commit）。
-- 自动保存到 Git（草稿分支）仍是待办，见 `docs/collab-f204-vs-cwm.md` 3.2 长期方案。
+- ✅ 自动保存到 Git（草稿分支）已落地（2026-09-17 后端 + 2026-09-18 web 计时）：会话空闲 N 分钟经协作会话触发 `collab-save` 携带 `draft=true`，落 `collab/draft-{branch}` 草稿分支，不触碰工作分支；网关转发 `draft` 标志。见 `docs/collab-f204-vs-cwm.md` 3.2 长期方案。
 
 ### 跟随模式（Follow me，2026-09-17 后端就绪）
 

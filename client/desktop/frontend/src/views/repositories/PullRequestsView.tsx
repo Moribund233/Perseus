@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Modal, Form, Input, Select, App as AntApp } from 'antd';
+import { Button, Modal, Form, Input, Select, Avatar, App as AntApp } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { PullRequestOutlined, MergeOutlined, CloseCircleOutlined, MessageOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
 import { usePullRequestsStore } from '../../stores/pullRequests';
@@ -30,6 +30,20 @@ function relativeTime(dateStr: string): string {
   if (days < 7) return `${days}d ago`;
   if (weeks < 5) return `${weeks}w ago`;
   return `${months}mo ago`;
+}
+
+const avatarColors = ['#1f6feb', '#3fb950', '#58a6ff', '#bc8cff', '#d29922', '#f85149', '#f0883e', '#7956d9'];
+
+function getInitials(name: string): string {
+  return name.split(/[\s_-]/).map((n) => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+}
+
+function getAvatarColor(initials: string): string {
+  let hash = 0;
+  for (let i = 0; i < initials.length; i++) {
+    hash = initials.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return avatarColors[Math.abs(hash) % avatarColors.length];
 }
 
 const statusIcon = (status: string) => {
@@ -171,6 +185,22 @@ export default function PullRequestsView({ repoId, onOpenPR }: PullRequestsViewP
                 <span style={{ fontSize: 12, color: textTertiary, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <MessageOutlined style={{ color: blueLight, fontSize: 14 }} /> {pr.comment_count ?? 0}
                 </span>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  {Array.from(new Set([
+                    getInitials(pr.author?.full_name || pr.author?.username || 'Unknown'),
+                    ...(pr.reviewers || [])
+                      .filter((r) => r.username !== pr.author?.username)
+                      .map((r) => getInitials(r.full_name || r.username)),
+                  ])).slice(0, 4).map((a, i) => (
+                    <Avatar
+                      key={`${a}-${i}`}
+                      size={22}
+                      style={{ background: getAvatarColor(a), fontSize: 9, fontWeight: 600, marginLeft: i > 0 ? -7 : 0, border: `2px solid ${bgSecondary}` }}
+                    >
+                      {a}
+                    </Avatar>
+                  ))}
+                </div>
               </div>
             </div>
           ))

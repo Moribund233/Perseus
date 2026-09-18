@@ -201,3 +201,74 @@ async def test_refresh_token_api_missing_token():
     assert response.status_code == 422, "缺少必需字段应该返回 422"
 
     print("✓ test_refresh_token_api_missing_token 通过")
+
+
+# =============================================================================
+# JWT 撤销黑名单：登出即时失效
+# =============================================================================
+
+@pytest.mark.asyncio
+async def test_logout_revokes_access_token(async_db: AsyncSession, test_user):
+    """
+    测试登出后访问令牌立即失效
+
+    验证点：
+    1. 登出前访问受保护端点返回 200
+    2. 登出接口返回 access_revoked=True
+    3. 登出后同一访问令牌返回 401
+    """
+    token = token_service.create_access_token({
+        "sub": str(test_user.id),
+        "username": test_user.username,
+        "is_admin": test_user.is_admin,
+    })
+    headers = {"Authorization": f"Bearer {token}"}
+
+    assert client.get("/api/v1/users/me", headers=headers).status_code == 200
+
+    logout_resp = client.post("/api/v1/auth/logout", headers=headers, json={})
+    assert logout_resp.status_code == 200
+    assert logout_resp.json()["access_revoked"] is True
+
+    assert client.get("/api/v1/users/me", headers=headers).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_logout_revokes_refresh_token(async_db: AsyncSession, test_user):
+    """
+    测试登出时携带 refresh_token 一并撤销
+
+    验证点：
+    1. 登出返回 refresh_revoked=True
+    2. 被撤销的刷新令牌无法再换取访问令牌
+    """
+    access_token = token_service.create_access_token({
+        "sub": str(test_user.id),
+        "username": test_user.username,
+        "is_admin": test_user.is_admin,
+    })
+    refresh_token = token_service.create_refresh_token({
+        "sub": str(test_user.id),
+        "username": test_user.username,
+        "is_admin": test_user.is_admin,
+    })
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    logout_resp = client.post(
+        "/api/v1/auth/logout",
+        headers=headers,
+        json={"refresh_token": refresh_token},
+    )
+    assert logout_resp.status_code == 200
+    assert logout_resp.json()["refresh_revoked"] is True
+
+    refresh_resp = client.post(
+        "/api/v1/auth/refresh", json={"refresh_token": refresh_token}
+    )
+    assert refresh_resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_logout_requires_auth():
+    """未认证登出应返回 401"""
+    assert client.post("/api/v1/auth/logout", json={}).status_code == 401

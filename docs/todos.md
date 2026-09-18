@@ -2,7 +2,8 @@
 
 > **创建日期**: 2026-09-15
 > **用途**: 汇总 2026-09-15 文档盘点发现的待迭代任务与文档滞后项，作为后续排期与迭代输入。
-> **最近更新**: 2026-09-17（批次 0/1/3/5/7 完成；会话 TTL 延迟销毁 + Redis 多副本/会话持久化落地；collab 网关多副本收紧：广播私密性/容量上限/403 即时吊销；构建日志流式、自动落盘草稿分支、协作会话级角色覆盖层落地；后端闭环补齐：邀请 token 撤销体系 + push 路径增量索引；test 服务补挂载 alembic）；
+> **最近更新**: 2026-09-18（批次 H 收尾：JWT 撤销黑名单 + `POST /auth/logout`、多语言符号解析、PR 审阅者列表、测试补齐 `test_app_service`/`test_database_manager`、参与者未保存徽标、聊天单会话检索；文档滞后项二次回填：F-602 Discussions / F-604 文件移动 / 自动落盘草稿分支 / desktop y-monaco / M2+ 待排期均已过期标注为完成）；
+> 2026-09-17（批次 0/1/3/5/7 完成；会话 TTL 延迟销毁 + Redis 多副本/会话持久化落地；collab 网关多副本收紧：广播私密性/容量上限/403 即时吊销；构建日志流式、自动落盘草稿分支、协作会话级角色覆盖层落地；后端闭环补齐：邀请 token 撤销体系 + push 路径增量索引；test 服务补挂载 alembic）；
 > 2026-09-16（批次 2 邀请链接后端+网关+web 完成）
 > **关联**: `docs/api/roadmap.md`、`docs/frontend-placeholders.md`、`docs/collab-f204-vs-cwm.md`、`docs/desktop-port-sync.md`
 > **开发方针**: 所有新功能必须采用 TDD（测试驱动开发）；新文案同步补 `{zh,en}.json`；禁止硬编码兜底假数据。
@@ -48,7 +49,7 @@
 | 任务 | 说明 | TDD 要点 | 涉及文件 |
 |------|------|----------|----------|
 | 会话 TTL 延迟销毁 ✅ | 最后一人离开后保留内存 Y.Doc（`PERSEUS_COLLAB_SESSION_TTL_MS`，默认 10 分钟），窗口内重 join 直接复用现场；TTL 到期卸载，下次 join 重新播种 — **已完成（2026-09-17）** | `gateway.test.mjs`：TTL 窗口内重连保留现场不重新加载 / TTL 到期重载 / TTL=0 立即卸载 ✅ | `collab-gateway/sessionTtl.mjs`、`collab-gateway/server.mjs` |
-| 参与者「未保存」徽标 | 会话参与者列表常显未保存/已提交状态 | — | web/desktop 编辑器 UI |
+| 参与者「未保存」徽标 ✅ | 会话参与者列表常显未保存/已提交状态 — **已完成（2026-09-18）**：本地编辑（非 provider 来源）置 awareness `unsaved=true`，`collab-saved` 后清除；web 编辑器 Editors 面板 + desktop CollabMonaco 参与者列表/头像 tooltip 显示「未保存/已提交」；网关 `sanitizeUnsaved` 校验布尔值 | — | web `collabController.ts`+`routes/editor/index.tsx`；desktop `collabSocket.ts`+`CollabMonaco.tsx`；`collab-gateway/server.mjs` |
 
 ### P1 — 跟随模式（M2 附带）
 
@@ -96,7 +97,7 @@
 | 编辑器面包屑点击跳转 | P2 | ~~cursor:pointer 无跳转~~ | ✅ 已完成（批次 E）：目录段钉出浮动面板 + 根段回根文件树（`editor/index.tsx`） |
 | 顶栏全局搜索三类分组 | P2 | ~~web 为纯代码搜索~~ | ✅ 已完成（批次 C + 2026-09-14）：`GlobalSearch.tsx` 与 `/search` 页均接 `GET /api/v1/search/global` 仓库/Issue/PR/代码分组（`search/index.tsx:50`） |
 | PR Filter 装饰按钮 | P4 | ~~无 onClick，云遮雾绕~~ | ✅ 已完成（批次 E）：移除按钮及 unused i18n key（`pull-requests/index.tsx`） |
-| 聊天侧边栏搜索框 | P3 | ~~无 value/onChange~~ | ✅ 已完成（批次 F1，2026-09-18）：`GET /api/v1/messages/search?q=`（跨会话）300ms 防抖 + 结果下拉跳转；顶栏 Search 按钮聚焦搜索框（`chat/index.tsx`）。房间内 `GET /rooms/{room_id}/messages?q=` 单会话检索待用 |
+| 聊天侧边栏搜索框 | P3 | ~~无 value/onChange~~ | ✅ 已完成（批次 F1，2026-09-18）：`GET /api/v1/messages/search?q=`（跨会话）300ms 防抖 + 结果下拉跳转；顶栏 Search 按钮聚焦搜索框（`chat/index.tsx`）。**单会话检索已接线（2026-09-18）**：搜索框下方「全部会话 / 本会话」切换，本会话走 `GET /rooms/{room_id}/messages?q=`（`chat.ts searchRoomMessages`） |
 | 行内评论 Discussions 前置 DS 项 | P2 | ~~面板为占位~~ | ✅ 已完成（批次 F2，2026-09-18）：List 伪装项（`/api/v1/repositories/{repo_id}/discussions`）— 现为真实数据（`discussions.ts` + 标签文件/回复/解决/重开/删除/跳转行/未读数徽标，`editor/index.tsx`） |
 | 文件移动/重命名前端 UI | P2 | ~~无 UI 入口~~ | ✅ 已完成（批次 F2，2026-09-18）：文件树 hover 移动/重命名（主树+浮动面板）→ `POST /contents/move` 弹窗提交，成功后刷新树并迁移已打开 tab（`editor/index.tsx`） |
 | 主题切换 | P3 | 应用固定 dark | 全站 CSS 变量化，工程量大，可暂缓 |
@@ -111,19 +112,19 @@
 | DM 私聊模型 ✅ | **已完成**（2026-09-17）：`RealtimeRoom.room_type`（`repository`/`dm`）+ `repository_id` 可空 + `DirectMessage` 规范化 pair（`user_a_id < user_b_id`）；`RoomService.get_or_create_dm_room()` 幂等（任一方发起命中同一会话）、`list_dm_rooms()`、`list_rooms()` 仅返回 repo room；复用既有房间消息/WS 广播。端点：`POST/GET /api/v1/dm` | `test_dm_room_creation()` 等 15 例 ✅ | `models/realtime_room.py`、`services/realtime/room_service.py`、`controller/dm_controller.py` |
 | 文件重命名/移动端点 ✅ | move 端点（或 copy+delete 组合提交） — **已完成**：`git_utils.move_file_changes` 单次提交内 copy+delete，`POST /{repo_id}/contents/move` | `test_move_file_in_repo()` ✅ | `utils/git_utils.py`、`services/repository_browser_service.py`、`controller/repository_browser_controller.py` |
 | 行内评论锚定 ✅ | **已完成**（2026-09-17）：新增 `FileComment`（repository_id/file_path/line_number/branch/commit_hash/parent_id/resolved）；`file_comment_service.py` + `controller/file_comment_controller.py`，端点 `/api/v1/repositories/{repo_id}/discussions`（创建/列表/回复/解决/删除，含仓库读权限与作者/负责人鉴权）。另补消息检索：`ChatService.search_messages()` + `GET /api/v1/messages/search`、`get_messages(q=)` | `test_inline_comment_on_file()` 等 13 例 ✅ | `models/file_comment.py`、`services/file_comment_service.py`、`controller/file_comment_controller.py` |
-| 自动落盘草稿分支 | 会话空闲 N 分钟自动 `collab_save` 到 `collab/draft-...` | `test_autosave_to_draft_branch()` | `collab_service.py` 集成 |
+| 自动落盘草稿分支 ✅ | **已完成（2026-09-17 后端 / 2026-09-18 web）**：会话空闲 5 分钟且存在未保存内容 → 经协作会话触发 `collab-save` 携带 `draft=true`，落 `collab/draft-{branch}` 草稿分支（不触碰工作分支）；网关转发 `draft` 标志。desktop 不适用（本地 fs 直接写盘） | 后端已完成；web 计时已接线（`editor/index.tsx` `IDLE_AUTOSAVE_MS`） | `controller/collab_internal_controller.py`、`collab-gateway/server.mjs`、`client/web/src/routes/editor/index.tsx` |
 
 ---
 
 ## 五、desktop 跟进项
 
-> 2026-09-14 起移植债务已清零。web 端上述协作增强（M2/M3）落地后，需在 `docs/desktop-port-sync.md` 第 3 节按登记规则追加债务行并移植。
+> 2026-09-14 起移植债务已清零；2026-09-18 web 协作增强（M2/M3 + 批次 F/G）已全部在 `docs/desktop-port-sync.md` 第 3 节登记并移植完毕；参与者未保存徽标亦已双端落地。
 
-| 触发项 | 预期 desktop 跟进 |
-|--------|------------------|
-| 邀请链接（M2） | 协作会话邀请入口（y-monaco 会话） |
-| 跟随模式 | EditorTabs 跟随开关 + 滚动联动 |
-| 会话 TTL / 未保存徽标 | StatusBar 已有双态徽标，补齐参与者列表 |
+| 触发项 | 预期 desktop 跟进 | 状态 |
+|--------|------------------|------|
+| 邀请链接（M2） | 协作会话邀请入口（y-monaco 会话） | ✅ 2026-09-18（F-605，编辑器 crumbs 分享按钮） |
+| 跟随模式 | EditorTabs 跟随开关 + 滚动联动 | ✅ 2026-09-17（CollabMonaco 跟随菜单 + awareness viewport） |
+| 会话 TTL / 未保存徽标 | StatusBar 已有双态徽标，补齐参与者列表 | ✅ 双态徽标 2026-09-14；参与者列表未保存徽标 2026-09-18（web/desktop 均完成） |
 
 ---
 
@@ -193,3 +194,4 @@
 | **批次 5（CI/CD 闭环）** ✅ | push 触发 build + 外部回调签名（GHA 式）**已完成**；**双态徽标「版本 N」✅（2026-09-18 落地）**：网关 `versionCounter.mjs`（Redis INCR 持久计数 / 无 Redis 回退内存）随 `collab-saved` 广播 `version`，web 状态栏 + desktop StatusBar 显示「会话已同步 · v{N}」 | 1~2 周 | — |
 | **批次 6（服务端演进）** ✅ | Redis pub/sub 多副本、会话持久化、索引生命周期 — **均已完成** | 1~2 周 | — |
 | **批次 7（后端 P3）** ✅ | Watch ✅、文件 move ✅、DM ✅、行内评论 ✅、消息检索 ✅、自动落盘草稿分支（后端 `draft→collab/draft-{branch}`）✅；仅剩「会话空闲 N 分钟自动触发」前端计时 — **后端已完成（2026-09-17）** | 2 周+ | — |
+| **批次 H（收尾）** ✅ | JWT 撤销黑名单 + `/auth/logout`、多语言符号解析、PR 审阅者列表透出、`test_app_service`/`test_database_manager` 补齐、参与者未保存徽标（双端）、聊天单会话检索范围切换、PR 审阅者头像堆叠（双端）— **已完成（2026-09-18：pytest 1228 passed/3 skipped、gateway 33 passed/3 skipped、web+desktop build/lint 通过）**；亮色主题与 Landing 页脚链接经决策暂缓 | — | — |

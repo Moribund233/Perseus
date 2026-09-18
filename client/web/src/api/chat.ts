@@ -83,10 +83,15 @@ export interface RoomUnread {
 }
 
 export const chatApi = {
-  getRoomMessages: (roomId: string, params?: { limit?: number; before?: string }) => {
+  getRoomMessages: (roomId: string, params?: { limit?: number; before?: string; q?: string }) => {
     const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
     return apiRequest<MessagesResponse>(`/api/v1/rooms/${roomId}/messages${qs}`);
   },
+
+  searchRoomMessages: (roomId: string, q: string, limit = 20) =>
+    apiRequest<MessagesResponse>(
+      `/api/v1/rooms/${roomId}/messages?q=${encodeURIComponent(q)}&limit=${limit}`
+    ),
 
   getRoomMembers: (roomId: string) =>
     apiRequest<RoomMember[]>(`/api/v1/rooms/${roomId}/members`),

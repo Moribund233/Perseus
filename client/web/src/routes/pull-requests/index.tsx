@@ -174,7 +174,12 @@ export default function PullRequestsPage() {
 
   const mappedPRs: PR[] = pullRequests.map((pr) => {
     const authorName = pr.author?.full_name || pr.author?.username || 'Unknown';
-    const initials = getInitials(authorName);
+    const authorInitials = getInitials(authorName);
+    // 作者 + 审阅者头像堆叠（去重、排除作者本人，最多 4 个）
+    const reviewerInitials = (pr.reviewers || [])
+      .filter((r) => r.username !== pr.author?.username)
+      .map((r) => getInitials(r.full_name || r.username));
+    const avatars = Array.from(new Set([authorInitials, ...reviewerInitials])).slice(0, 4);
     return {
       id: String(pr.pr_number),
       title: pr.title,
@@ -184,7 +189,7 @@ export default function PullRequestsPage() {
       labels: (pr.labels || []).map((l) => ({ name: l.name, color: l.color })),
       comments: pr.comment_count ?? 0,
       reviews: pr.review_count ?? 0,
-      avatars: [initials],
+      avatars,
     };
   });
 
@@ -427,7 +432,7 @@ export default function PullRequestsPage() {
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   {pr.avatars.map((a, i) => (
                     <Avatar
-                      key={a}
+                      key={`${a}-${i}`}
                       size={24}
                       style={{
                         background: getAvatarColor(a),

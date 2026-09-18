@@ -722,7 +722,9 @@
       "spotlightStop": "Stop follow me",
       "share": "Share collaboration invite link",
       "shareCopied": "Collaboration invite link copied",
-      "shareFailed": "Failed to create invite link"
+      "shareFailed": "Failed to create invite link",
+      "unsavedBadge": "Unsaved",
+      "savedBadge": "Committed"
     },
     "aux": {
       "toggle": "Collab sidebar (PRs / Issues / members)",

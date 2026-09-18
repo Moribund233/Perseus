@@ -65,4 +65,13 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  logout: (data?: { refresh_token?: string }) =>
+    apiRequest<{ success: boolean; access_revoked: boolean; refresh_revoked: boolean }>(
+      '/api/v1/auth/logout',
+      {
+        method: 'POST',
+        body: JSON.stringify(data ?? {}),
+      },
+    ),
 };

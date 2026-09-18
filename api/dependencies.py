@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from models.async_db import get_async_db
 from models.user import User
-from services.token_service import verify_token
+from services.token_service import verify_token_active
 
 # 使用 HTTPBearer 从 Authorization 头中提取 token
 security = HTTPBearer(auto_error=False)
@@ -42,7 +42,7 @@ async def get_current_user(
         )
 
     token = credentials.credentials
-    token_data = verify_token(token, token_type="access")
+    token_data = await verify_token_active(db, token, token_type="access")
 
     if token_data is None:
         raise HTTPException(

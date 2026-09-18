@@ -138,13 +138,15 @@ def build_issue_comment_response(comment) -> Dict[str, Any]:
     }
 
 
-def build_pr_response(pr, include_details: bool = False) -> Dict[str, Any]:
+def build_pr_response(pr, include_details: bool = False, include_reviewers: bool = False) -> Dict[str, Any]:
     """
     构建 Pull Request 响应数据
 
     Args:
         pr: PullRequest 模型对象
         include_details: 是否包含详细信息（评论、审查等）
+        include_reviewers: 是否附带审查者摘要（列表页头像堆叠用）。
+            需调用方已预加载 `pr.reviews`（含 reviewer），否则会触发懒加载 500。
 
     Returns:
         dict: PR 数据
@@ -169,6 +171,18 @@ def build_pr_response(pr, include_details: bool = False) -> Dict[str, Any]:
     if pr.status == "merged":
         data["merged_by"] = build_user_info(pr.merger, ["id", "username"])
         data["merged_commit_hash"] = pr.merged_commit_hash
+
+    if include_reviewers:
+        seen: set = set()
+        reviewers = []
+        for review in pr.reviews:
+            reviewer = getattr(review, "reviewer", None)
+            if reviewer is None or reviewer.id in seen:
+                continue
+            seen.add(reviewer.id)
+            reviewers.append(build_user_info(reviewer))
+        data["reviewers"] = reviewers
+        data["review_count"] = len(pr.reviews)
 
     if include_details:
         data["comments"] = [build_pr_comment_response(c) for c in pr.comments]

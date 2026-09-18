@@ -112,11 +112,56 @@ def test_create_token_pair(test_user: User):
     assert tokens["token_type"] == "bearer"
 
 
-def test_revoke_token():
-    """测试撤销令牌"""
-    token = token_service.create_access_token({"sub": "1"})
-    result = token_service.revoke_token(token)
+@pytest.mark.asyncio
+async def test_revoke_token(async_db: AsyncSession):
+    """测试撤销令牌：撤销后 verify_token_active 拒绝，verify_token(纯签名) 仍通过"""
+    data = {"sub": "00000000-0000-0000-0000-000000000001", "username": "testuser"}
+    token = token_service.create_access_token(data)
+    assert token_service.verify_token(token) is not None
+
+    result = await token_service.revoke_token(async_db, token)
     assert result is True
+
+    token_data = token_service.verify_token(token)
+    assert await token_service.is_token_revoked(async_db, token_data.jti) is True
+    assert await token_service.verify_token_active(async_db, token) is None
+
+
+@pytest.mark.asyncio
+async def test_revoke_token_idempotent(async_db: AsyncSession):
+    """重复撤销同一令牌应幂等返回 True"""
+    token = token_service.create_access_token(
+        {"sub": "00000000-0000-0000-0000-000000000001", "username": "testuser"}
+    )
+    assert await token_service.revoke_token(async_db, token) is True
+    assert await token_service.revoke_token(async_db, token) is True
+
+
+@pytest.mark.asyncio
+async def test_verify_token_active_valid(async_db: AsyncSession):
+    """未撤销令牌 verify_token_active 正常返回"""
+    token = token_service.create_access_token(
+        {"sub": "00000000-0000-0000-0000-000000000001", "username": "testuser"}
+    )
+    token_data = await token_service.verify_token_active(async_db, token)
+    assert token_data is not None
+    assert token_data.jti is not None
+
+
+@pytest.mark.asyncio
+async def test_revoked_refresh_token_rejected(async_db: AsyncSession):
+    """撤销刷新令牌后 verify_token_active(refresh) 拒绝"""
+    refresh_token = token_service.create_refresh_token(
+        {"sub": "00000000-0000-0000-0000-000000000001", "username": "testuser"}
+    )
+    assert await token_service.revoke_token(async_db, refresh_token, token_type="refresh") is True
+    assert await token_service.verify_token_active(async_db, refresh_token, token_type="refresh") is None
+
+
+@pytest.mark.asyncio
+async def test_revoke_invalid_token_returns_false(async_db: AsyncSession):
+    """非法令牌撤销返回 False"""
+    assert await token_service.revoke_token(async_db, "invalid_token") is False
 
 
 # =============================================================================

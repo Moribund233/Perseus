@@ -14,6 +14,8 @@ export interface CollabParticipant {
   cursor: { anchor: number; head: number } | null;
   /** 该参与者正在跟随的 clientID (follow.target), 未跟随时为 null */
   following: string | null;
+  /** 该参与者是否有尚未提交到 Git 的本地编辑 (awareness unsaved) */
+  unsaved: boolean;
   /** 是否为本地客户端 */
   isSelf: boolean;
 }
@@ -95,6 +97,10 @@ export class CollabController {
   private viewportTimer: ReturnType<typeof setTimeout> | null = null;
   private scrollCleanup: (() => void) | null = null;
 
+  // 未提交到 Git 的本地编辑标记 (广播 awareness unsaved, 供参与者列表徽标)
+  private unsaved = false;
+  private docObserver: ((update: Uint8Array, origin: unknown) => void) | null = null;
+
   constructor(opts: CollabControllerOptions) {
     this.opts = opts;
   }
@@ -144,6 +150,8 @@ export class CollabController {
       color: peerColor(username),
       user_id: userId,
     });
+    // 未提交状态: 参与者列表徽标 (本地编辑置 true, collab-saved 后置 false)
+    provider.awareness?.setLocalStateField('unsaved', false);
     provider.awareness?.on('update', () => this.emitParticipants());
 
     // 用户主动滚动/输入即退出跟随 (wheel/touch 手势 + 键盘)
@@ -179,6 +187,11 @@ export class CollabController {
     }
     this.scrollCleanup?.();
     this.scrollCleanup = null;
+    if (this.docObserver && this.provider) {
+      this.provider.document.off('update', this.docObserver);
+    }
+    this.docObserver = null;
+    this.unsaved = false;
     this.provider?.destroy();
     this.provider = null;
     this.view = null;
@@ -239,6 +252,14 @@ export class CollabController {
         yCollab(provider.document.getText('content'), awareness),
       ]),
     });
+    // 本地编辑 (非 provider 来源) → 置未提交标记; 远端更新不改变本地标记
+    const onDocUpdate = (_update: Uint8Array, origin: unknown) => {
+      if (origin === provider || this.unsaved) return;
+      this.unsaved = true;
+      awareness.setLocalStateField('unsaved', true);
+    };
+    provider.document.on('update', onDocUpdate);
+    this.docObserver = onDocUpdate;
     this.configured = true;
     this.emitParticipants();
   }
@@ -258,6 +279,7 @@ export class CollabController {
     }
     if (msg.docKey !== this.opts.docKey) return;
     if (msg.type === 'collab-saved') {
+      this.markSaved();
       this.opts.onSaved?.(msg as unknown as CollabSavedMsg);
     } else if (msg.type === 'collab-save-error') {
       this.opts.onError?.(msg.error || '保存失败');
@@ -286,6 +308,13 @@ export class CollabController {
       if (targetId && this.followTarget === targetId) this.follow(null);
       else this.emitParticipants();
     }
+  }
+
+  /** 保存成功后清除本地未提交标记 (参与者列表徽标回"已提交") */
+  private markSaved(): void {
+    if (!this.unsaved) return;
+    this.unsaved = false;
+    this.provider?.awareness?.setLocalStateField('unsaved', false);
   }
 
   private findClientByUserId(userId?: string): string | null {
@@ -374,6 +403,7 @@ export class CollabController {
         username: user?.name ?? '',
         cursor: null,
         following,
+        unsaved: state.unsaved === true,
         isSelf: id === myId,
       });
       if (following != null && following === myId) followers.add(id);

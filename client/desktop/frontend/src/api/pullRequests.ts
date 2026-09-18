@@ -17,6 +17,7 @@ export interface PR {
   updated_at: string;
   author?: { id: string; username: string; full_name: string | null };
   labels?: { id: string; name: string; color: string; description?: string }[];
+  reviewers?: { id: string; username: string; full_name: string | null }[];
   comment_count?: number;
   review_count?: number;
 }

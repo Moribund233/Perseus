@@ -329,6 +329,59 @@ async def test_get_file_symbols_python():
 
 
 @pytest.mark.asyncio
+async def test_get_file_symbols_javascript():
+    """测试提取 JavaScript 文件符号"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_path = create_test_repository_with_various_files(tmpdir)
+
+        result = await get_file_symbols(repo_path, ref="HEAD", path="app.js")
+
+        assert result["language"] == "javascript"
+        names = {(s["name"], s["type"]) for s in result["symbols"]}
+        assert ("init", "function") in names
+
+
+@pytest.mark.asyncio
+async def test_get_file_symbols_go():
+    """测试提取 Go 文件符号"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_path = create_test_repository_with_various_files(tmpdir)
+
+        result = await get_file_symbols(repo_path, ref="HEAD", path="main.go")
+
+        assert result["language"] == "go"
+        names = {(s["name"], s["type"]) for s in result["symbols"]}
+        assert ("main", "function") in names
+
+
+@pytest.mark.asyncio
+async def test_get_file_symbols_rust():
+    """测试提取 Rust 文件符号"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_path = create_test_repository_with_various_files(tmpdir)
+
+        result = await get_file_symbols(repo_path, ref="HEAD", path="lib.rs")
+
+        assert result["language"] == "rust"
+        names = {(s["name"], s["type"]) for s in result["symbols"]}
+        assert ("add", "function") in names
+
+
+@pytest.mark.asyncio
+async def test_get_file_symbols_java():
+    """测试提取 Java 文件符号（类 + 方法）"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_path = create_test_repository_with_various_files(tmpdir)
+
+        result = await get_file_symbols(repo_path, ref="HEAD", path="Main.java")
+
+        assert result["language"] == "java"
+        names = {(s["name"], s["type"]) for s in result["symbols"]}
+        assert ("Main", "class") in names
+        assert ("main", "function") in names
+
+
+@pytest.mark.asyncio
 async def test_get_file_symbols_unsupported_language():
     """测试不支持的语言返回空符号列表"""
     with tempfile.TemporaryDirectory() as tmpdir:

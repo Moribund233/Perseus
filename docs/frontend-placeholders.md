@@ -1,6 +1,6 @@
 # 前端占位实现清单与开发规划
 
-> **更新日期**: 2026-09-17
+> **更新日期**: 2026-09-18（回填 F-602 Discussions、F-604 文件移动/重命名、Landing「Docs」链接失效；批次 H 接线：参与者未保存徽标、PR 审阅者头像堆叠、聊天单会话检索范围切换；仅剩亮色主题）
 > **背景**: 前端多处 UI 为占位/装饰实现（无 onClick 的按钮、硬编码 mock 数据、假状态）。
 > 本文档梳理**尚未真实化**的占位点，作为后续迭代规划依据。
 >
@@ -95,26 +95,26 @@
 | 频道未读数 | ✅ 已接后端 `GET /rooms/unread`（按 repository_id 映射频道）+ 进频道 `POST /rooms/{id}/read`（批次 D） | — | P1 |
 | 表情回应 reactions | UI 死代码（渲染逻辑存在，数据恒空） | ✅ 已接线（2026-09-16 确认前端早已实现）：emoji picker + WS `send_reaction` 增减 + REST `chatApi.addReaction` 兜底；后端 `chat_controller.py:62-83`、`chat_service.py:228` add_reaction 已就绪 | ✅ P1 完成 |
 | 消息按日期分组 | 所有消息归入 "Today" | ✅ 按 created_at 分组渲染：Today/Yesterday（新增 i18n）/本地化日期头，静态 Today 块移除（批次 E） | ✅ P2 完成 |
-| 侧边栏搜索框 | ✅ 已接（2026-09-18）：`GET /api/v1/messages/search?q=` 300ms 防抖 + 结果下拉（发件人/会话名/时间/内容摘要），点击跳转对应频道或私聊 | — | P2 ✅ |
+| 侧边栏搜索框 | ✅ 已接（2026-09-18）：`GET /api/v1/messages/search?q=` 300ms 防抖 + 结果下拉（发件人/会话名/时间/内容摘要），点击跳转对应频道或私聊；**「全部会话 / 本会话」范围切换**（本会话走 `GET /rooms/{id}/messages?q=`） | — | P2 ✅ |
 
 ### 3.4 Editor（editor/index.tsx）
 
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
 | 协同编辑 | ✅ 已实现并迁移 **Yjs 底座**（2026-09-08，D1）：`components/editor/collabController.ts` 接入 `collab-gateway`（Hocuspocus）+ `y-codemirror.next`；远端光标/选区（awareness 标签）+ 协作保存（stateless → 网关 → Git commit 全员广播）+ **断线本地编辑保留**（CRDT 重连收敛，3.6 方案 B 天然解决）；**邀请链接（2026-09-16，M2）**：工具栏「分享协作」生成会话级临时权限链接（仅成员），`?invite=` 经 JSON token 透传网关；**会话 TTL 延迟销毁（2026-09-17）**：最后一人离开后保留内存 Y.Doc 至多 10 分钟（`PERSEUS_COLLAB_SESSION_TTL_MS`），TTL 到期卸载，下次 join 重新播种；**双态徽标（2026-09-14 web / 09-18）**：状态栏「会话已同步/同步中」轮询 `hasUnsyncedChanges` + 「Git 已提交 {short-SHA}」由 `onSaved` 收 `collab-saved` 的 `commit_id` 填充；**「版本 N」✅ 2026-09-18**：「会话已同步 · v{N}」由广播 `version` 驱动（网关 `collab-gateway/versionCounter.mjs`，Redis INCR 持久计数 / 无 Redis 回退内存） | 不支持离线合并（页面关闭即丢，与旧版一致） | P2 |
-| Discussions 面板 | 空状态占位（mock 已移除） | 后端已就绪（2026-09-17）：`FileComment`（文件+行号/分支/提交锚定）+ `/api/v1/repositories/{repo_id}/discussions`（创建/列表/回复/解决/删除） | P3 |
+| Discussions 面板 | ✅ 已接线（2026-09-18，F-602）：web `discussions.ts` + 标签文件/回复/解决/重开/删除/跳转行/未读数徽标；desktop `DiscussionsPanel.tsx` 右侧面板（文件级线程/回复/解决/删除/跳行） | 后端已就绪（2026-09-17）：`FileComment`（文件+行号/分支/提交锚定）+ `/api/v1/repositories/{repo_id}/discussions`（创建/列表/回复/解决/删除） | ✅ P3 完成 |
 | 协作者 "viewing" 状态 | ✅ 已接 WS presence：在线协作者列表即 Editors tab 内容（批次 D）；本文件会话参与者经 `collab_init`/peer 事件展示（F-204） | — | P3 |
 | "Online" 绿点 | ✅ 已接房间 presence（在线人数 > 0 亮绿）（批次 D） | — | P2 |
 | 面包屑点击 | cursor:pointer 无跳转 | ✅ 已接线（批次 E）：目录段点击加载该目录并钉出浮动面板（对齐文件树点位），根段点击回根文件树（清选中与面板链） | ✅ P2 完成 |
 | 文件删除入口 | ✅ 已加文件树 hover 删除按钮 + 确认弹窗，调用 `deleteFileContent`，删除后刷新树并关闭对应标签 | — | P1 |
-| 文件重命名/移动 | 无 | ✅ 后端 move 端点已就绪（2026-09-16，`POST /{repo_id}/contents/move` 单次提交 copy+delete）；前端重命名/移动 UI 待接 | P3 |
+| 文件重命名/移动 | ✅ 已接线（2026-09-18，F-604）：web 文件树 hover 移动/重命名（主树+浮动面板）→ `POST /contents/move`；desktop 本地工作区 `POST /api/local/workspaces/{id}/rename` + ExplorerPanel Modal | ✅ 后端 move 端点已就绪（2026-09-16，`POST /{repo_id}/contents/move` 单次提交 copy+delete） | ✅ P3 完成 |
 
 ### 3.5 Pull Requests
 
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
 | Filter 按钮 | 无 onClick | ✅ 已移除装饰按钮（批次 E），筛选由状态按钮组完成，unused i18n key 一并清理 | ✅ P4 完成 |
-| 审阅者头像堆叠 | 恒只显示作者 | PR 详情已加 Review 提交区（Approve/Request changes/Comment） | P2 |
+| 审阅者头像堆叠 | ✅ 已接线（2026-09-18）：后端列表响应新增 `reviewers`（`build_pr_response(include_reviewers=True)`，预加载 reviews.reviewer）；web/desktop PR 列表头像堆叠显示 作者+审阅者（去重、最多 4） | PR 详情 Review 提交区（Approve/Request changes/Comment） | ✅ P2 完成 |
 | PR 编辑 | ✅ 已加标题/描述编辑入口 | — | P2 |
 | PR 标签 UI | ✅ 已加标签管理下拉（拉取/添加/移除） | — | P1 |
 
@@ -130,7 +130,7 @@
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
 | 统计兜底假数字 | 已改为 `--`（本批） | — | 完成 |
-| "Docs" 导航链接 | `<a>` 无 href | 需文档站或移除 | P4 |
+| "Docs" 导航链接 | ✅ 已不存在：landing 导航项改为 功能/协作/进入控制台（锚点或路由），无空 `<a>` | — | ✅ 失效 |
 | 页脚 About/Privacy/Terms/GitHub | 均无 href | 补静态页或外链 | P4 |
 | "协作"区可视化 | 纯装饰（假窗口/假代码条/假头像） | 营销视觉，可保留 | P4 |
 

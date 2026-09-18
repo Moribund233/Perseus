@@ -5,7 +5,7 @@
 > desktop 待 `y-monaco` 接入。下文现状描述保留为迁移前记录，供追溯。
 > **2026-09-14 更新**: desktop T9 y-monaco 接入完成，两端同 Yjs 底座；**M1 短期项全部落地**——
 > 3.3 双态徽标（会话已同步/Git 已提交）与 3.2 短期「未保存离开提示」（`beforeunload` × `hasPendingChanges()`）两端实现，
-> 详见 `docs/desktop-port-sync.md` 同步批次记录。M2+（邀请链接/TTL/跟随模式）仍待排期。
+> 详见 `docs/desktop-port-sync.md` 同步批次记录。**2026-09-18 更新**：M2+（邀请链接 + 会话级临时权限、会话 TTL 延迟销毁、Redis 多副本/会话持久化、跟随模式、受限视图、会话级角色覆盖层、邀请 token 撤销）均已落地，web/desktop 双端接线完成。
 > **状态**: 规划参考文档（非实施承诺）
 > **定位**: 以 JetBrains Code with Me（下称 CwM）为直接参照，梳理 F-204 协作文本编辑的功能差异，按"影响用户体验 → web 端取舍 → desktop 端深化"三层组织，供后续里程碑规划使用。
 > **关联**: [`docs/api/websocket/README.md`](api/websocket/README.md) 第 7 节（协议）、[`docs/roadmap.md`](roadmap.md)（阶段三）、[`docs/superpowers/specs/2026-08-03-desktop-app-design.md`](superpowers/specs/2026-08-03-desktop-app-design.md)（desktop 基线）、[`docs/frontend-placeholders.md`](frontend-placeholders.md)（已知限制）

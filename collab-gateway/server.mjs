@@ -126,11 +126,22 @@ function sanitizeFollow(state) {
   }
 }
 
+/** 未提交标记: 仅接受布尔值, 否则移除该字段 (参与者列表徽标用) */
+function sanitizeUnsaved(state) {
+  const unsaved = state.unsaved;
+  if (unsaved === undefined) return;
+  if (typeof unsaved === "boolean") {
+    state.unsaved = unsaved;
+  } else {
+    delete state.unsaved;
+  }
+}
+
 /**
  * 服务端 awareness 策略 (beforeHandleAwareness):
  *   - 用连接上下文 (onAuthenticate 已校验的身份) 盖章 user, 防客户端冒名;
  *     保留客户端自带的 color 等展示字段。
- *   - 校验/归一化跟随模式扩展字段 viewport / follow。
+ *   - 校验/归一化扩展字段 viewport / follow / unsaved。
  *   - 单条状态超过 maxBytes 时先剔除可选字段, 再剔除白名单 (user/cursor) 外的
  *     其余字段; 仍超限则收敛为最小身份, 防止感知通道被滥用。
  * 仅对客户端来源 (context 存在) 盖章; Redis 对端同步 (context 为 undefined) 直接跳过。
@@ -151,10 +162,12 @@ export function applyAwarenessPolicy(states, context, maxBytes = MAX_AWARENESS_B
     }
     sanitizeViewport(state);
     sanitizeFollow(state);
+    sanitizeUnsaved(state);
     if (awarenessBytes(state) <= maxBytes) continue;
-    // 超限: 先剔除跟随模式可选字段, 再剔除白名单外的其余字段 (保留 user/cursor)
+    // 超限: 先剔除可选扩展字段, 再剔除白名单外的其余字段 (保留 user/cursor)
     delete state.viewport;
     delete state.follow;
+    delete state.unsaved;
     for (const key of Object.keys(state)) {
       if (key !== "user" && key !== "cursor") delete state[key];
     }

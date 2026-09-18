@@ -172,6 +172,7 @@ export default function ChatPage() {
   const [searchResults, setSearchResults] = useState<MessageSearchHit[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [searchScope, setSearchScope] = useState<'all' | 'room'>('all');
   const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [sendError, setSendError] = useState<string | null>(null);
@@ -456,8 +457,8 @@ export default function ChatPage() {
     }
   }, [room, myMuted, refreshUnread, t]);
 
-  // 全局消息检索 (F-603): GET /api/v1/messages/search
-  const doSearch = useCallback((q: string) => {
+  // 消息检索 (F-603): 跨会话 GET /api/v1/messages/search；本会话 GET /rooms/{id}/messages?q=
+  const doSearch = useCallback((q: string, scopeOverride?: 'all' | 'room') => {
     if (searchDebounceRef.current) {
       clearTimeout(searchDebounceRef.current);
       searchDebounceRef.current = null;
@@ -469,12 +470,31 @@ export default function ChatPage() {
       setSearchLoading(false);
       return;
     }
+    const scope = scopeOverride ?? searchScope;
     searchDebounceRef.current = setTimeout(async () => {
       searchDebounceRef.current = null;
       setSearchLoading(true);
       try {
-        const res = await chatApi.searchMessages(trimmed, 20);
-        setSearchResults(res.messages);
+        if (scope === 'room' && room) {
+          const res = await chatApi.searchRoomMessages(room.id, trimmed, 20);
+          setSearchResults(res.messages.map((m) => ({
+            id: m.id,
+            room_id: m.room_id,
+            room_name: room.name,
+            room_type: room.room_type,
+            repository_id: room.repository_id,
+            sender_id: m.sender_id,
+            sender_username: m.sender_username,
+            message_type: m.message_type,
+            content: m.content,
+            reply_to: m.reply_to,
+            created_at: m.created_at,
+            reactions: m.reactions,
+          })));
+        } else {
+          const res = await chatApi.searchMessages(trimmed, 20);
+          setSearchResults(res.messages);
+        }
         setSearchOpen(true);
       } catch {
         setSearchResults([]);
@@ -483,7 +503,7 @@ export default function ChatPage() {
         setSearchLoading(false);
       }
     }, 300);
-  }, []);
+  }, [room, searchScope]);
 
   const handleSearchChange = useCallback((value: string) => {
     setSearchQ(value);
@@ -717,6 +737,33 @@ export default function ChatPage() {
               size="small"
             />
           </div>
+          {searchQ.trim() && room && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              {(['all', 'room'] as const).map((scope) => {
+                const active = searchScope === scope;
+                return (
+                  <button
+                    key={scope}
+                    onClick={() => { setSearchScope(scope); doSearch(searchQ, scope); }}
+                    style={{
+                      flex: 1,
+                      padding: '3px 8px',
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      borderRadius: 6,
+                      border: `1px solid ${active ? bluePrimary : borderColor}`,
+                      background: active ? 'rgba(31,111,235,0.15)' : 'transparent',
+                      color: active ? bluePrimary : textSecondary,
+                    }}
+                  >
+                    {scope === 'all'
+                      ? t('app.teamChat.searchScopeAll', { defaultValue: '全部会话' })
+                      : t('app.teamChat.searchScopeRoom', { defaultValue: '本会话' })}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {searchOpen && (
             <div
               style={{

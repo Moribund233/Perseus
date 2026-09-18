@@ -151,7 +151,38 @@ Response (200):
 ```
 
 Raises:
-- 401: 刷新令牌无效或过期
+- 401: 刷新令牌无效或过期（含被撤销黑名单拒绝）
+
+### 登出（撤销 Token）
+
+```
+POST /api/v1/auth/logout
+```
+
+认证：✅ 需要（`Authorization: Bearer <access_token>`）
+
+将当前访问令牌加入撤销黑名单（`revoked_tokens` 表，按 JWT `jti`），登出后该令牌立即失效；
+可选在请求体携带 `refresh_token` 一并撤销。撤销校验叠加在 HTTP（`get_current_user`）、
+WebSocket（`api/websocket/auth.verify_token`）与刷新（`/auth/refresh`）三处。
+
+Request Body（可选）:
+```json
+{
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+Response (200):
+```json
+{
+  "success": true,
+  "access_revoked": true,
+  "refresh_revoked": false
+}
+```
+
+Raises:
+- 401: 未认证（缺少或无效的访问令牌）
 
 ---
 

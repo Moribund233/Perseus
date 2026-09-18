@@ -8,6 +8,7 @@
 - 代码对比
 """
 import os
+import re
 from typing import List, Dict, Any, Optional, cast
 from datetime import datetime
 
@@ -779,6 +780,132 @@ async def get_readme_content(
 
 # ============ F-024: 文件符号提取 ============
 
+# 各语言符号提取正则（作用于去除首尾空白后的行）
+# 每项: (编译后的正则, 符号类型)；按顺序匹配，命中即止。
+# 覆盖语言与 LANGUAGE_MAP 的标识符一致；未收录语言返回空符号表。
+_SYMBOL_PATTERNS: Dict[str, List[tuple]] = {
+    "python": [
+        (re.compile(r"^async\s+def\s+(\w+)\s*\("), "function"),
+        (re.compile(r"^def\s+(\w+)\s*\("), "function"),
+        (re.compile(r"^class\s+(\w+)"), "class"),
+    ],
+    "javascript": [
+        (re.compile(r"^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+(\w+)\s*\("), "function"),
+        (re.compile(r"^(?:export\s+)?(?:default\s+)?class\s+(\w+)"), "class"),
+        (re.compile(r"^(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>"), "function"),
+        (re.compile(r"^(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?function\b"), "function"),
+    ],
+    "typescript": [
+        (re.compile(r"^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+(\w+)\s*[<(]"), "function"),
+        (re.compile(r"^(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+(\w+)"), "class"),
+        (re.compile(r"^(?:export\s+)?interface\s+(\w+)"), "interface"),
+        (re.compile(r"^(?:export\s+)?type\s+(\w+)\s*[<=]"), "type"),
+        (re.compile(r"^(?:export\s+)?enum\s+(\w+)"), "enum"),
+        (re.compile(r"^(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>"), "function"),
+    ],
+    "go": [
+        (re.compile(r"^func\s+(?:\([^)]*\)\s*)?(\w+)\s*\("), "function"),
+        (re.compile(r"^type\s+(\w+)\s+struct\b"), "class"),
+        (re.compile(r"^type\s+(\w+)\s+interface\b"), "interface"),
+    ],
+    "rust": [
+        (re.compile(r"^(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?(?:unsafe\s+)?fn\s+(\w+)"), "function"),
+        (re.compile(r"^(?:pub(?:\([^)]*\))?\s+)?struct\s+(\w+)"), "class"),
+        (re.compile(r"^(?:pub(?:\([^)]*\))?\s+)?enum\s+(\w+)"), "enum"),
+        (re.compile(r"^(?:pub(?:\([^)]*\))?\s+)?trait\s+(\w+)"), "interface"),
+        (re.compile(r"^impl(?:<[^>]*>)?\s+(\w+)"), "class"),
+    ],
+    "java": [
+        (re.compile(r"^(?:public\s+|private\s+|protected\s+)?(?:static\s+)?(?:final\s+)?(?:abstract\s+)?class\s+(\w+)"), "class"),
+        (re.compile(r"^(?:public\s+|private\s+|protected\s+)?(?:abstract\s+)?interface\s+(\w+)"), "interface"),
+        (re.compile(r"^(?:public\s+|private\s+|protected\s+)?enum\s+(\w+)"), "enum"),
+        (re.compile(r"^(?:public|private|protected)\s+(?:static\s+)?(?:final\s+)?[\w<>\[\],.\s]+\s+(\w+)\s*\([^;]*\)\s*\{"), "function"),
+    ],
+    "c": [
+        (re.compile(r"^(?:typedef\s+)?(?:struct|union)\s+(\w+)"), "class"),
+        (re.compile(r"^(?:typedef\s+)?enum\s+(\w+)"), "enum"),
+        (re.compile(r"^(?:static\s+)?(?:inline\s+)?[\w\*]+\s+(\w+)\s*\([^;]*\)\s*\{"), "function"),
+    ],
+    "cpp": [
+        (re.compile(r"^(?:template\s*<[^>]*>\s*)?(?:class|struct)\s+(\w+)"), "class"),
+        (re.compile(r"^namespace\s+(\w+)"), "namespace"),
+        (re.compile(r"^(?:typedef\s+)?enum(?:\s+class)?\s+(\w+)"), "enum"),
+        (re.compile(r"^(?:[\w:<>,\*&\s]+)\s+(\w+)\s*\([^;]*\)\s*(?:const\s*)?\{" ), "function"),
+    ],
+    "csharp": [
+        (re.compile(r"^(?:public\s+|private\s+|protected\s+|internal\s+)?(?:static\s+|abstract\s+|sealed\s+|partial\s+)*(?:class|struct)\s+(\w+)"), "class"),
+        (re.compile(r"^(?:public\s+|private\s+|protected\s+|internal\s+)?interface\s+(\w+)"), "interface"),
+        (re.compile(r"^(?:public\s+|private\s+|protected\s+|internal\s+)?enum\s+(\w+)"), "enum"),
+        (re.compile(r"^(?:public|private|protected|internal)\s+(?:static\s+|virtual\s+|override\s+|async\s+)*[\w<>\[\],.?]+\s+(\w+)\s*\([^;]*\)\s*\{"), "function"),
+    ],
+    "ruby": [
+        (re.compile(r"^def\s+(\w+)"), "function"),
+        (re.compile(r"^class\s+(\w+)"), "class"),
+        (re.compile(r"^module\s+(\w+)"), "class"),
+    ],
+    "php": [
+        (re.compile(r"^(?:public\s+|private\s+|protected\s+)?(?:static\s+)?function\s+(\w+)"), "function"),
+        (re.compile(r"^(?:final\s+|abstract\s+)?class\s+(\w+)"), "class"),
+        (re.compile(r"^interface\s+(\w+)"), "interface"),
+        (re.compile(r"^trait\s+(\w+)"), "class"),
+    ],
+    "swift": [
+        (re.compile(r"^(?:public\s+|private\s+|internal\s+|open\s+|fileprivate\s+)?(?:static\s+|class\s+)?func\s+(\w+)"), "function"),
+        (re.compile(r"^(?:public\s+|private\s+|internal\s+|open\s+)?(?:final\s+)?(?:class|struct)\s+(\w+)"), "class"),
+        (re.compile(r"^(?:public\s+|private\s+|internal\s+)?enum\s+(\w+)"), "enum"),
+        (re.compile(r"^(?:public\s+|private\s+|internal\s+)?protocol\s+(\w+)"), "interface"),
+    ],
+    "kotlin": [
+        (re.compile(r"^(?:public\s+|private\s+|internal\s+|protected\s+)?(?:suspend\s+)?fun\s+(\w+)"), "function"),
+        (re.compile(r"^(?:public\s+|private\s+|internal\s+|open\s+|data\s+|sealed\s+|abstract\s+)*(?:class|object)\s+(\w+)"), "class"),
+        (re.compile(r"^interface\s+(\w+)"), "interface"),
+        (re.compile(r"^enum\s+class\s+(\w+)"), "enum"),
+    ],
+    "scala": [
+        (re.compile(r"^(?:private\s+|protected\s+|override\s+|final\s+)?def\s+(\w+)"), "function"),
+        (re.compile(r"^(?:private\s+|protected\s+|final\s+|abstract\s+|sealed\s+)?(?:case\s+)?(?:class|object)\s+(\w+)"), "class"),
+        (re.compile(r"^trait\s+(\w+)"), "interface"),
+    ],
+}
+
+# 解析时需跳过的注释行前缀
+_COMMENT_PREFIXES = ("#", "//", "/*", "*", "*/")
+
+
+def _extract_symbols(content: str, language: str) -> List[Dict[str, Any]]:
+    """
+    从源码内容中提取符号（函数/类/接口等）。
+
+    基于各语言正则（见 `_SYMBOL_PATTERNS`）做轻量级提取；未收录语言返回空列表。
+
+    Args:
+        content: 文件文本内容
+        language: 语言标识符（同 LANGUAGE_MAP 的值）
+
+    Returns:
+        list: [{"name": str, "type": str, "line": int}, ...]
+    """
+    patterns = _SYMBOL_PATTERNS.get(language)
+    if not patterns:
+        return []
+
+    symbols: List[Dict[str, Any]] = []
+    for line_no, line in enumerate(content.split("\n"), 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith(_COMMENT_PREFIXES):
+            continue
+        for pattern, symbol_type in patterns:
+            match = pattern.match(stripped)
+            if match:
+                symbols.append({
+                    "name": match.group(1),
+                    "type": symbol_type,
+                    "line": line_no,
+                })
+                break
+    return symbols
+
+
 async def get_file_symbols(
     repo_path: str,
     ref: str = "HEAD",
@@ -823,8 +950,6 @@ async def get_file_symbols(
     content = blob_info.get("content", "")
     is_binary = blob_info.get("is_binary", False)
 
-    symbols = []
-
     # 二进制文件不解析
     if is_binary or language == "binary":
         return {
@@ -833,48 +958,8 @@ async def get_file_symbols(
             "symbols": []
         }
 
-    # Python 简单符号提取（基于正则）
-    if language == "python" and not is_binary:
-        import re
-
-        lines = content.split('\n')
-
-        # 匹配函数定义：def function_name(
-        func_pattern = re.compile(r'^def\s+(\w+)\s*\(')
-        # 匹配类定义：class ClassName(
-        class_pattern = re.compile(r'^class\s+(\w+)\s*[\(:\(]')
-        # 匹配变量赋值（顶级）
-        var_pattern = re.compile(r'^(\w+)\s*=')
-
-        for line_no, line in enumerate(lines, 1):
-            stripped = line.strip()
-
-            # 跳过注释和空行
-            if not stripped or stripped.startswith('#'):
-                continue
-
-            # 检查函数定义
-            func_match = func_pattern.match(stripped)
-            if func_match:
-                symbols.append({
-                    "name": func_match.group(1),
-                    "type": "function",
-                    "line": line_no
-                })
-                continue
-
-            # 检查类定义
-            class_match = class_pattern.match(stripped)
-            if class_match:
-                symbols.append({
-                    "name": class_match.group(1),
-                    "type": "class",
-                    "line": line_no
-                })
-                continue
-
-    # TODO: 支持更多语言（JavaScript, Go, Rust, Java 等）
-    # 未来可使用 Tree-sitter 实现更精确的解析
+    # 多语言符号提取（基于正则，见 _extract_symbols / _SYMBOL_PATTERNS）
+    symbols = _extract_symbols(content, language)
 
     return {
         "path": path,

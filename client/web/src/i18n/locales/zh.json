@@ -444,6 +444,8 @@
       "spotlightStart": "跟我来",
       "spotlightStop": "结束跟我来",
       "spotlightHint": "邀请协作者跟随你的视口",
+      "unsavedBadge": "未保存",
+      "savedBadge": "已提交",
       "noDiscussions": "暂无代码讨论",
       "noDiscussionsHint": "在下方输入框评论当前文件与行号",
       "commentPlaceholder": "评论 L{{line}}...",
@@ -497,7 +499,9 @@
       "muteDesc": "静音后不再累计未读",
       "mutedShort": "静音",
       "unmutedShort": "响铃",
-      "searchMessages": "搜索消息"
+      "searchMessages": "搜索消息",
+      "searchScopeAll": "全部会话",
+      "searchScopeRoom": "本会话"
     },
     "settings": {
       "title": "设置",

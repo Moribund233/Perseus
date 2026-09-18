@@ -78,6 +78,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: () => {
+    // 尽力将当前令牌加入服务端撤销黑名单（失败不阻塞本地登出）
+    const refreshToken = get().refreshToken;
+    if (get().accessToken) {
+      void authApi.logout(refreshToken ? { refresh_token: refreshToken } : undefined).catch(() => {});
+    }
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     set({

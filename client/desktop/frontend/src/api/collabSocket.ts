@@ -14,6 +14,8 @@ export interface CollabParticipant {
   color: string;
   /** 该参与者正在跟随的 clientID (follow.target), 未跟随时为 null */
   following: string | null;
+  /** 该参与者是否有尚未提交到 Git 的本地编辑 (awareness unsaved) */
+  unsaved: boolean;
   /** 是否为本地客户端 */
   isSelf: boolean;
 }
@@ -87,6 +89,10 @@ export class CollabSession {
   private viewportTimer: ReturnType<typeof setTimeout> | null = null;
   private scrollCleanup: (() => void) | null = null;
 
+  // 未提交到 Git 的本地编辑标记 (广播 awareness unsaved, 供参与者列表徽标)
+  private unsaved = false;
+  private docObserver: ((update: Uint8Array, origin: unknown) => void) | null = null;
+
   constructor(opts: CollabSessionOptions) {
     this.opts = opts;
   }
@@ -128,6 +134,14 @@ export class CollabSession {
           new Set([editor]),
           awareness,
         );
+        // 本地编辑 (非 provider 来源) → 置未提交标记; 远端更新不改变本地标记
+        const onDocUpdate = (_update: Uint8Array, origin: unknown) => {
+          if (origin === provider || this.unsaved) return;
+          this.unsaved = true;
+          awareness.setLocalStateField('unsaved', true);
+        };
+        provider.document.on('update', onDocUpdate);
+        this.docObserver = onDocUpdate;
         this.opts.onStatus?.('connected');
       },
       onStateless: ({ payload }) => this.handleStateless(payload),
@@ -140,6 +154,7 @@ export class CollabSession {
       color: peerColor(username),
       user_id: userId,
     });
+    provider.awareness?.setLocalStateField('unsaved', false);
     provider.awareness?.on('update', () => this.emitParticipants());
 
     // 用户主动滚动/点击/键盘输入即退出跟随；程序化滚动 (reveal) 不触发这些事件
@@ -175,6 +190,11 @@ export class CollabSession {
     }
     this.scrollCleanup?.();
     this.scrollCleanup = null;
+    if (this.docObserver && this.provider) {
+      this.provider.document.off('update', this.docObserver);
+    }
+    this.docObserver = null;
+    this.unsaved = false;
     this.editor = null;
     this.provider?.destroy();
     this.provider = null;
@@ -219,7 +239,10 @@ export class CollabSession {
       return;
     }
     if (msg.type === 'collab-saved') {
-      if (msg.docKey === this.opts.docKey) this.opts.onSaved?.(msg as unknown as CollabSavedMsg);
+      if (msg.docKey === this.opts.docKey) {
+        this.markSaved();
+        this.opts.onSaved?.(msg as unknown as CollabSavedMsg);
+      }
     } else if (msg.type === 'collab-save-error') {
       if (msg.docKey === this.opts.docKey) this.opts.onError?.(msg.error || '保存失败');
     } else if (msg.type === 'collab-spotlight') {
@@ -247,6 +270,13 @@ export class CollabSession {
       if (targetId && this.followTarget === targetId) this.follow(null);
       else this.emitParticipants();
     }
+  }
+
+  /** 保存成功后清除本地未提交标记 (参与者列表徽标回"已提交") */
+  private markSaved(): void {
+    if (!this.unsaved) return;
+    this.unsaved = false;
+    this.provider?.awareness?.setLocalStateField('unsaved', false);
   }
 
   private findClientByUserId(userId?: string): string | null {
@@ -337,6 +367,7 @@ export class CollabSession {
         username: user?.name ?? '',
         color: user?.color ?? peerColor(user?.name ?? '?'),
         following,
+        unsaved: state.unsaved === true,
         isSelf,
       });
     }

@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.user import User
+from models.revoked_token import RevokedToken
 from core.config import get_config
 from utils.password_utils import verify_password, get_password_hash
 
@@ -28,11 +29,12 @@ def _get_security_config():
 
 class TokenData:
     """Token 数据类"""
-    def __init__(self, user_id: uuid.UUID, username: str, scopes: list | None = None, oauth_provider: Optional[str] = None):
+    def __init__(self, user_id: uuid.UUID, username: str, scopes: list | None = None, oauth_provider: Optional[str] = None, jti: Optional[str] = None):
         self.user_id = user_id
         self.username = username
         self.scopes = scopes or []
         self.oauth_provider = oauth_provider
+        self.jti = jti
 
 
 def create_access_token(
@@ -60,7 +62,8 @@ def create_access_token(
     to_encode.update({
         "exp": expire,
         "iat": datetime.now(timezone.utc),
-        "type": "access"
+        "type": "access",
+        "jti": to_encode.get("jti") or uuid.uuid4().hex
     })
 
     encoded_jwt = jwt.encode(to_encode, security_config.secret_key, algorithm=security_config.algorithm)
@@ -92,7 +95,8 @@ def create_refresh_token(
     to_encode.update({
         "exp": expire,
         "iat": datetime.now(timezone.utc),
-        "type": "refresh"
+        "type": "refresh",
+        "jti": to_encode.get("jti") or uuid.uuid4().hex
     })
 
     encoded_jwt = jwt.encode(to_encode, security_config.secret_key, algorithm=security_config.algorithm)
@@ -204,6 +208,7 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
             user_id=user_id,
             username=username,
             oauth_provider=oauth_provider,
+            jti=payload.get("jti"),
         )
 
     except JWTError as e:
@@ -235,21 +240,84 @@ async def refresh_access_token(refresh_token: str, db: AsyncSession) -> Optional
     return create_token_pair(user)
 
 
-def revoke_token(token: str) -> bool:
-    """
-    撤销令牌
+async def is_token_revoked(db: AsyncSession, jti: Optional[str]) -> bool:
+    """该 jti 是否已被撤销（命中黑名单）。"""
+    if not jti:
+        return False
+    result = await db.execute(
+        select(RevokedToken.id).filter(RevokedToken.jti == jti)
+    )
+    return result.scalar_one_or_none() is not None
 
-    将令牌加入黑名单（实际实现需要 Redis 或数据库支持）
+
+async def revoke_token(
+    db: AsyncSession,
+    token: str,
+    token_type: str = "access",
+    revoked_by: Optional[uuid.UUID] = None,
+) -> bool:
+    """
+    撤销令牌（按 jti 记入黑名单，幂等）
 
     Args:
-        token: 要撤销的令牌
+        db: 异步数据库会话
+        token: 要撤销的 JWT（access 或 refresh）
+        token_type: 令牌类型，须与 token 的 type 声明一致
+        revoked_by: 执行撤销的用户ID（可选，通常为 token 本人）
 
     Returns:
-        bool: 是否成功撤销
+        bool: 是否成功撤销；token 非法、类型不符或缺少 jti 时返回 False
     """
-    # TODO: 实现令牌黑名单（需要 Redis 或数据库）
-    # 这里仅作示例
-    logger.info(f"Token revoked: {token[:10]}...")
+    token_data = verify_token(token, token_type=token_type)
+    if token_data is None or not token_data.jti:
+        logger.warning("revoke_token: invalid token or missing jti")
+        return False
+
+    existing = await db.execute(
+        select(RevokedToken).filter(RevokedToken.jti == token_data.jti)
+    )
+    if existing.scalar_one_or_none() is not None:
+        return True
+
+    payload = jwt.decode(
+        token,
+        _get_security_config().secret_key,
+        algorithms=[_get_security_config().algorithm],
+    )
+    exp = payload.get("exp")
+    expires_at = (
+        datetime.fromtimestamp(exp, tz=timezone.utc)
+        if isinstance(exp, (int, float))
+        else None
+    )
+
+    db.add(
+        RevokedToken(
+            jti=token_data.jti,
+            user_id=revoked_by or token_data.user_id,
+            token_type=token_type,
+            expires_at=expires_at,
+        )
+    )
+    await db.commit()
+    logger.info(f"Token revoked: jti={token_data.jti} type={token_type}")
     return True
+
+
+async def verify_token_active(
+    db: AsyncSession, token: str, token_type: str = "access"
+) -> Optional[TokenData]:
+    """
+    校验令牌且未被撤销。
+
+    在纯签名/时效校验（verify_token）基础上叠加撤销黑名单检查；
+    被撤销的 token 一律视为失效（返回 None）。
+    """
+    token_data = verify_token(token, token_type=token_type)
+    if token_data is None:
+        return None
+    if await is_token_revoked(db, token_data.jti):
+        return None
+    return token_data
 
 

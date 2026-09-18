@@ -3,13 +3,18 @@
 
 处理用户认证相关的 HTTP 请求，包括登录、登出、Token 刷新等
 """
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Request
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.dependencies import get_current_user, security
 from api.routes_prefix import get_route_prefix
 from core.exception import AuthenticationException
 from models.async_db import get_async_db
+from models.user import User
 from services.user_service import login_user as service_login_user
 from services import token_service
 
@@ -26,6 +31,11 @@ class LoginRequest(BaseModel):
 class RefreshTokenRequest(BaseModel):
     """刷新令牌请求体"""
     refresh_token: str = Field(..., description="刷新令牌")
+
+
+class LogoutRequest(BaseModel):
+    """登出请求体"""
+    refresh_token: Optional[str] = Field(None, description="可选的刷新令牌，一并撤销")
 
 
 @router.post("/login")
@@ -96,14 +106,13 @@ async def refresh_token(
         }
         ```
     """
-    # 验证刷新令牌
-    token_data = token_service.verify_token(request.refresh_token, token_type="refresh")
+    # 验证刷新令牌（含撤销黑名单检查）
+    token_data = await token_service.verify_token_active(db, request.refresh_token, token_type="refresh")
     if not token_data:
         raise AuthenticationException(detail="Invalid or expired refresh token", error_code="invalid_refresh_token")
 
     # 获取用户信息
     from sqlalchemy import select
-    from models.user import User
     result = await db.execute(select(User).filter(User.id == token_data.user_id))
     user = result.scalar_one_or_none()
 
@@ -117,4 +126,43 @@ async def refresh_token(
         "access_token": tokens["access_token"],
         "refresh_token": tokens["refresh_token"],
         "token_type": "bearer"
+    }
+
+
+@router.post("/logout")
+async def logout(
+    body: Optional[LogoutRequest] = None,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db),
+):
+    """
+    登出：将当前访问令牌（及可选刷新令牌）加入撤销黑名单，立即失效。
+
+    Args:
+        body: 可选请求体，携带 refresh_token 时一并撤销
+        credentials: Authorization 头中的访问令牌
+        current_user: 当前认证用户
+        db: 数据库会话
+
+    Returns:
+        dict: {"success": True, "access_revoked": bool, "refresh_revoked": bool}
+    """
+    access_revoked = False
+    refresh_revoked = False
+
+    if credentials and credentials.credentials:
+        access_revoked = await token_service.revoke_token(
+            db, credentials.credentials, token_type="access", revoked_by=current_user.id
+        )
+
+    if body and body.refresh_token:
+        refresh_revoked = await token_service.revoke_token(
+            db, body.refresh_token, token_type="refresh", revoked_by=current_user.id
+        )
+
+    return {
+        "success": True,
+        "access_revoked": access_revoked,
+        "refresh_revoked": refresh_revoked,
     }

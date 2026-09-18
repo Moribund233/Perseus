@@ -66,6 +66,7 @@ async def list_pull_requests(
             selectinload(PullRequest.author),
             selectinload(PullRequest.merger),
             selectinload(PullRequest.pr_labels),
+            selectinload(PullRequest.reviews).selectinload(PRReview.reviewer),
         )
         .filter(PullRequest.repository_id == repository_id)
     )
@@ -80,7 +81,7 @@ async def list_pull_requests(
     prs, total = await paginate(db, stmt, page, limit)
 
     return build_pagination_response(
-        items=[build_pr_response(pr) for pr in prs],
+        items=[build_pr_response(pr, include_reviewers=True) for pr in prs],
         total=total,
         page=page,
         limit=limit
@@ -121,6 +122,7 @@ async def list_pull_requests_for_user(
             selectinload(PullRequest.repository),
             selectinload(PullRequest.merger),
             selectinload(PullRequest.pr_labels),
+            selectinload(PullRequest.reviews).selectinload(PRReview.reviewer),
         )
         .filter(PullRequest.repository_id.in_(accessible_ids))
         .filter(PullRequest.author_id == user_id)
@@ -133,7 +135,7 @@ async def list_pull_requests_for_user(
     prs, total = await paginate(db, stmt, page, limit)
 
     return build_pagination_response(
-        items=[build_pr_response(pr) for pr in prs],
+        items=[build_pr_response(pr, include_reviewers=True) for pr in prs],
         total=total,
         page=page,
         limit=limit
