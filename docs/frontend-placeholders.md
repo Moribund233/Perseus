@@ -71,7 +71,7 @@
 
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
-| 全局搜索框 | ✅ 已接线：受控输入 + 350ms 防抖 → 下拉结果（按仓库分组、可点击进 Editor 对应文件/行）+ Enter 进入 `/search` 结果页 | 复用了后端跨仓库代码搜索 `/api/v1/search/code`（已存在聚合端点）。仓库/Issue/PR 聚合搜索后端端点已于 2026-09-10 新增（`GET /api/v1/search/global`，desktop T3 先行接入），web 端可复用增强为三类分组 | P2 |
+| 全局搜索框 ✅ | ✅ 已接线（2026-09-14 对齐 desktop T3）：受控输入 + 350ms 防抖 → **并行 `searchCode` + `searchGlobal` 聚合**（`/api/v1/search/global`，仓库/Issue/PR 三类分组）——下拉与 `/search` 结果页均为聚合视图；Enter 进 `/search` 结果页 | — | ✅ P2 完成 |
 | 通知点击跳转 | ✅ 已按 `target_type` 映射路由（PR→pulls / Issue→issues / 其余→仓库），解析 repository_id→path | — | P1 |
 | 侧边栏未读徽标 ✅ | 已移除假数字（本批） | **已恢复（2026-09-18）**：复用既有无读聚合端点 `GET /api/v1/rooms/unread`（频道）+ `GET /api/v1/dm`（私聊 unread_count）求和，`AppLayout` 每 60s 轮询 + 路由变化刷新，「团队聊天」nav 项显示聚合徽标；静音会话由后端排除，不参与聚合 | ✅ P3 完成 |
 
@@ -101,7 +101,7 @@
 
 | 占位点 | 现状 | 缺口 | 级别 |
 |---|---|---|---|
-| 协同编辑 | ✅ 已实现并迁移 **Yjs 底座**（2026-09-08，D1）：`components/editor/collabController.ts` 接入 `collab-gateway`（Hocuspocus）+ `y-codemirror.next`；远端光标/选区（awareness 标签）+ 协作保存（stateless → 网关 → Git commit 全员广播）+ **断线本地编辑保留**（CRDT 重连收敛，3.6 方案 B 天然解决）；**邀请链接（2026-09-16，M2）**：工具栏「分享协作」生成会话级临时权限链接（仅成员），`?invite=` 经 JSON token 透传网关 | 会话 TTL/空闲卸载未做（Y.Doc 驻留内存至网关重启）；"会话已同步/Git 已提交"双态徽标待接 `hasUnsyncedChanges`/`collab-saved`（原 3.3 项）；不支持离线合并（页面关闭即丢，与旧版一致） | P2 |
+| 协同编辑 | ✅ 已实现并迁移 **Yjs 底座**（2026-09-08，D1）：`components/editor/collabController.ts` 接入 `collab-gateway`（Hocuspocus）+ `y-codemirror.next`；远端光标/选区（awareness 标签）+ 协作保存（stateless → 网关 → Git commit 全员广播）+ **断线本地编辑保留**（CRDT 重连收敛，3.6 方案 B 天然解决）；**邀请链接（2026-09-16，M2）**：工具栏「分享协作」生成会话级临时权限链接（仅成员），`?invite=` 经 JSON token 透传网关；**会话 TTL 延迟销毁（2026-09-17）**：最后一人离开后保留内存 Y.Doc 至多 10 分钟（`PERSEUS_COLLAB_SESSION_TTL_MS`），TTL 到期卸载，下次 join 重新播种；**双态徽标（2026-09-14 web / 09-18）**：状态栏「会话已同步/同步中」轮询 `hasUnsyncedChanges` + 「Git 已提交 {short-SHA}」由 `onSaved` 收 `collab-saved` 的 `commit_id` 填充；**「版本 N」✅ 2026-09-18**：「会话已同步 · v{N}」由广播 `version` 驱动（网关 `collab-gateway/versionCounter.mjs`，Redis INCR 持久计数 / 无 Redis 回退内存） | 不支持离线合并（页面关闭即丢，与旧版一致） | P2 |
 | Discussions 面板 | 空状态占位（mock 已移除） | 后端已就绪（2026-09-17）：`FileComment`（文件+行号/分支/提交锚定）+ `/api/v1/repositories/{repo_id}/discussions`（创建/列表/回复/解决/删除） | P3 |
 | 协作者 "viewing" 状态 | ✅ 已接 WS presence：在线协作者列表即 Editors tab 内容（批次 D）；本文件会话参与者经 `collab_init`/peer 事件展示（F-204） | — | P3 |
 | "Online" 绿点 | ✅ 已接房间 presence（在线人数 > 0 亮绿）（批次 D） | — | P2 |

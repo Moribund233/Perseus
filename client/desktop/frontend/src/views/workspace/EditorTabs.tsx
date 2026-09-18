@@ -57,6 +57,8 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
   const [followState, setFollowState] = useState<FollowState>({ following: null, followingName: null, followerCount: 0, spotlightOn: false });
   const [pending, setPending] = useState(false);
   const [savedCommits, setSavedCommits] = useState<Record<string, string>>({});
+  // 协作版本号 N per path (collab-saved 广播), 供状态栏「会话已同步 · v{N}」
+  const [savedVersions, setSavedVersions] = useState<Record<string, number>>({});
   const sessionsRef = useRef<Record<string, CollabSession>>({});
 
   const diagnostics = useProblemsStore((s) => s.diagnostics);
@@ -229,6 +231,9 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
       onSaved: (msg) => {
         message.success(t('desktop.collab.saved', { commit: (msg.commit_id || '').slice(0, 7) }));
         setSavedCommits((prev) => ({ ...prev, [path]: (msg.commit_id || '').slice(0, 7) }));
+        if (typeof msg.version === 'number') {
+          setSavedVersions((prev) => ({ ...prev, [path]: msg.version as number }));
+        }
       },
       onError: (err) => message.error(`${t('desktop.collab.saveFailed')}: ${err}`),
     });
@@ -255,8 +260,9 @@ export default function EditorTabs({ workspaceId, workspacePath, workspace, open
       collabActive: enabledPath,
       collabSynced: enabledPath && collabStatus === 'connected' && !pending,
       lastSavedCommit: active ? savedCommits[active] ?? null : null,
+      collabVersion: active ? savedVersions[active] ?? null : null,
     });
-  }, [active, collabEnabled, collabStatus, pending, savedCommits]);
+  }, [active, collabEnabled, collabStatus, pending, savedCommits, savedVersions]);
 
   const toggleCollab = () => {
     const path = active;

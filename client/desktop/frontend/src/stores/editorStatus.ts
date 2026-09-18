@@ -6,7 +6,9 @@ interface EditorStatusState {
   collabActive: boolean;
   collabSynced: boolean;
   lastSavedCommit: string | null;
-  update: (patch: Partial<Pick<EditorStatusState, 'collabActive' | 'collabSynced' | 'lastSavedCommit'>>) => void;
+  /** 协作版本号 N (StatusBar 渲染「会话已同步 · v{N}」) */
+  collabVersion: number | null;
+  update: (patch: Partial<Pick<EditorStatusState, 'collabActive' | 'collabSynced' | 'lastSavedCommit' | 'collabVersion'>>) => void;
   reset: () => void;
 }
 
@@ -14,6 +16,7 @@ export const useEditorStatusStore = create<EditorStatusState>((set) => ({
   collabActive: false,
   collabSynced: false,
   lastSavedCommit: null,
+  collabVersion: null,
   update: (patch) => set(patch),
-  reset: () => set({ collabActive: false, collabSynced: false, lastSavedCommit: null }),
+  reset: () => set({ collabActive: false, collabSynced: false, lastSavedCommit: null, collabVersion: null }),
 }));

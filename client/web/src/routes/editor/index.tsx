@@ -525,6 +525,8 @@ export default function EditorPage() {
   // 双态徽标: 会话同步状态(轮询 Yjs 未同步变更) + 最近一次保存产生的 Git 提交
   const [collabPending, setCollabPending] = useState(false);
   const [lastCommitSha, setLastCommitSha] = useState<string | null>(null);
+  // 协作版本号 N (「会话已同步 · v{N}」): 由 collab-saved 广播的 version 填充
+  const [collabVersion, setCollabVersion] = useState<number | null>(null);
   // 行内评论 (F-602): 当前文件评论 + 新建/回复/解决/删除
   const [discussions, setDiscussions] = useState<DiscussionComment[]>([]);
   const [discussionsLoading, setDiscussionsLoading] = useState(false);
@@ -940,6 +942,7 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
     setDocParticipants([]);
     setFollowState({ following: null, followingName: null, followers: [], spotlightOn: false });
     setLastCommitSha(null);
+    setCollabVersion(null);
     const lang = activeTab ? getLanguageExtension(activeTab) : undefined;
     const extensions = [
       basicSetup(() => handleSaveRef.current()),
@@ -952,6 +955,8 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
           setIsDirty(dirty);
           // 内容再次偏离保存基线后, Git 已提交徽标失效
           if (dirty) setLastCommitSha(null);
+          // 协作版本号同样只在当前快照有效
+          if (dirty) setCollabVersion(null);
           // F-606 空闲计时基础: 最近一次用户编辑时刻
           lastEditAtRef.current = Date.now();
         }
@@ -993,6 +998,7 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
           }
           setSaving(false);
           setLastCommitSha(msg.commit_id.slice(0, 7));
+          if (typeof msg.version === 'number') setCollabVersion(msg.version);
           antdMessage.success(
             t('app.codeEditor.collabSaved', { defaultValue: '协作编辑已提交' }) +
               ` ${msg.commit_id.slice(0, 7)}`
@@ -1806,6 +1812,9 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
               <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: green, display: 'inline-block' }} />
                 {t('app.codeEditor.collabSynced', { defaultValue: '会话已同步' })}
+                {collabVersion != null && (
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5 }}>{`v${collabVersion}`}</span>
+                )}
               </span>
             )}
             {collabStatus === 'connected' && collabPending && (

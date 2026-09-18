@@ -80,7 +80,7 @@ F-204 是以**服务端会话 + Git 提交为权威**的**轻协作能力**（�
 - **UX 影响**：当前编辑器仅有 `isDirty` 标记，用户无法得知"当前内容是否已被某人提交过"。CwM 用架构回避了这个问题，F-204 必须用 UI 交代清楚。
 - **规划建议**：编辑器状态区显示双态徽标："会话已同步 ✓（版本 N）" / "Git 已提交（短 SHA）"；`collab_saved` 广播已具备全部所需信息。
   - 涉及：`client/web/src/routes/editor/index.tsx`（状态栏）、`collabController.ts`（版本透出）。
-  → **✅ 2026-09-14 双态徽标已落地（两端）**：web 编辑器状态栏 + desktop StatusBar（`stores/editorStatus.ts`）；"会话已同步"= connected 且无未同步变更（Yjs `hasUnsyncedChanges` 轮询），"Git 已提交"= 最近一次协作保存 short-SHA（内容再编辑即失效）。「版本 N」未透出，与规划略有出入。
+  → **✅ 2026-09-14 双态徽标已落地（两端）**：web 编辑器状态栏 + desktop StatusBar（`stores/editorStatus.ts`）；"会话已同步"= connected 且无未同步变更（Yjs `hasUnsyncedChanges` 轮询），"Git 已提交"= 最近一次协作保存 short-SHA（内容再编辑即失效）。「版本 N」✅ **2026-09-18 透出**：网关 `versionCounter.mjs`（`collab-gateway/versionCounter.mjs`，Redis INCR 持久计数 / 无 Redis 回退进程内计数）随 `collab-saved` 广播 `version`，两端状态栏显示「会话已同步 · v{N}」；`v{N}` 与短 SHA 一样在内容再编辑后失效。
 
 ### 3.4 跟随模式（Follow me / Spotlight） — **P1**
 

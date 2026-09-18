@@ -99,7 +99,8 @@ describe("collab-gateway", () => {
     const saved = await savedPromise;
     expect(saved.commit_id).toBe("abc1234");
     expect(saved.docKey).toBe(DOC);
-    // 收紧后广播仅含提交标识, 不泄漏 saved_by/message/branch/path
+    expect(saved.version).toBe(1);
+    // 收紧后广播仅含提交标识 + 版本号, 不泄漏 saved_by/message/branch/path
     expect(saved.saved_by).toBeUndefined();
 
     const saveCall = appMock.calls.find((c) => c.path === "/api/v1/collab/save");
@@ -112,6 +113,15 @@ describe("collab-gateway", () => {
     // 内部密钥头随调用传递
     const authHeader = vi.mocked(fetch).mock.calls.at(-1)[1].headers["X-Collab-Internal-Secret"];
     expect(authHeader).toBe(SECRET);
+
+    // 再次保存 → 版本单调递增 (内存计数模式)
+    const savedAgainPromise = new Promise((resolve) => a.on("stateless", ({ payload }) => {
+      const msg = JSON.parse(payload);
+      if (msg.type === "collab-saved") resolve(msg);
+    }));
+    a.sendStateless(JSON.stringify({ type: "collab-save", message: "second save" }));
+    const savedAgain = await savedAgainPromise;
+    expect(savedAgain.version).toBe(2);
     a.destroy();
   });
 

@@ -100,6 +100,40 @@ describe.skipIf(!REDIS_URL)("collab-gateway + Redis", () => {
     reader.destroy();
   }, 20000);
 
+  redisIt("协作版本号跨副本持久递增: 两次保存 version=1,2 (Redis INCR)", async () => {
+    const gw1 = await startRedisGateway();
+    const gw2 = await startRedisGateway();
+    gateways.push(gw1, gw2);
+
+    const a = makeProvider(gw1.port, DOC, "writer-token", { name: "alice" });
+    await waitFor(() => a.document?.getText("content").toString() === "hello", "synced");
+
+    const savedOn = (provider, port) =>
+      new Promise((resolve) => {
+        const handler = ({ payload }) => {
+          const msg = JSON.parse(payload);
+          if (msg.type === "collab-saved") {
+            provider.off("stateless", handler);
+            resolve(msg);
+          }
+        };
+        provider.on("stateless", handler);
+        provider.sendStateless(JSON.stringify({ type: "collab-save", message: `save@${port}` }));
+      });
+
+    const first = await savedOn(a, gw1.port);
+    expect(first.version).toBe(1);
+
+    // 第二个副本上的客户端保存 → INCR 延续 (跨副本共享计数)
+    const b = makeProvider(gw2.port, DOC, "writer-token", { name: "bob" });
+    await waitFor(() => b.document?.getText("content").toString() === "hello", "b synced");
+    const second = await savedOn(b, gw2.port);
+    expect(second.version).toBe(2);
+
+    a.destroy();
+    b.destroy();
+  }, 20000);
+
   redisIt("会话快照持久化: 网关重启后从 Redis 恢复未提交编辑, 不回源 Git", async () => {
     const gw1 = await startRedisGateway();
     gateways.push(gw1);

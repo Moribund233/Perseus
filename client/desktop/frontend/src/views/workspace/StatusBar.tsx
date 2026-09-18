@@ -31,7 +31,7 @@ export default function StatusBar({ workspace, file, lang, cursor, onOpenBottom 
   const lsp = useLspStore();
   const servers = useServersStore((s) => s.servers);
   const currentServerId = useServersStore((s) => s.currentServerId);
-  const { collabActive, collabSynced, lastSavedCommit } = useEditorStatusStore();
+  const { collabActive, collabSynced, lastSavedCommit, collabVersion } = useEditorStatusStore();
 
   const server = servers.find((s) => s.id === (currentServerId ?? workspace.server_id));
   const serverName = server?.name ?? (workspace.server_id ? String(workspace.server_id) : 'local');
@@ -79,6 +79,7 @@ export default function StatusBar({ workspace, file, lang, cursor, onOpenBottom 
           {collabSynced
             ? t('desktop.status.collabSynced', { defaultValue: '会话已同步' })
             : t('desktop.status.collabSyncing', { defaultValue: '会话同步中' })}
+          {collabVersion != null && <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5 }}>{`v${collabVersion}`}</span>}
         </span>
       )}
       {lastSavedCommit && (

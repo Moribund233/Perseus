@@ -30,10 +30,12 @@ export interface FollowState {
   spotlightOn: boolean;
 }
 
-/** 网关广播的协作保存结果; 私密性收紧后仅含提交标识 */
+/** 网关广播的协作保存结果; 私密性收紧后仅含提交标识 + 协作版本号 */
 export interface CollabSavedMsg {
   docKey: string;
   commit_id: string;
+  /** 协作版本号 (「会话已同步 · v{N}」的 N): 网关持久计数, 递增广播 */
+  version?: number;
 }
 
 export interface CollabSessionOptions {

@@ -36,6 +36,7 @@ import { Server } from "@hocuspocus/server";
 
 import { createRedisPersistence, resolveRedisUrl } from "./redisPersistence.mjs";
 import { createSessionTtlExtension, DEFAULT_SESSION_TTL_MS } from "./sessionTtl.mjs";
+import { createVersionCounter } from "./versionCounter.mjs";
 
 export const APP_URL = process.env.PERSEUS_APP_URL || "http://app:8000";
 export const INTERNAL_SECRET = process.env.PERSEUS_COLLAB_INTERNAL_SECRET || "";
@@ -233,9 +234,12 @@ export function buildGateway({
   };
 
   let redisPersistence = null;
+  // 协作版本号: 启用 Redis 时持久递增 (跨副本/重启延续), 否则回退进程内计数
+  let versionCounter = createVersionCounter({ log });
   if (redisUrl) {
     const factory = createRedisClient ?? (() => new RedisClient(redisUrl));
     redisPersistence = createRedisPersistence({ url: redisUrl, log, createClient: factory });
+    versionCounter = redisPersistence.versionCounter;
     extensions.push(...redisPersistence.extensions);
   }
 
@@ -436,14 +440,16 @@ export function buildGateway({
         return;
       }
 
-      log(`saved doc=${documentName} user=${data.saved_by} commit=${data.commit_id}`);
-      // 全员广播 (含提交者), 客户端据此更新 "Git 已提交" 徽标。
-      // 私密性收紧: 仅广播提交标识, 不泄漏 saved_by/message/branch/path 等元数据。
+      const version = await versionCounter.next(documentName);
+      log(`saved doc=${documentName} user=${data.saved_by} commit=${data.commit_id} version=${version}`);
+      // 全员广播 (含提交者), 客户端据此更新 "Git 已提交" 徽标与 "会话已同步 (版本 N)"。
+      // 私密性收紧: 仅广播提交标识 + 版本号, 不泄漏 saved_by/message/branch/path 等元数据。
       document.broadcastStateless(
         JSON.stringify({
           type: "collab-saved",
           docKey: documentName,
           commit_id: data.commit_id,
+          version,
         })
       );
     },

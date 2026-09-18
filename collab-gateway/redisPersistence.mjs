@@ -17,6 +17,8 @@ import { randomUUID } from "node:crypto";
 import { Database } from "@hocuspocus/extension-database";
 import { Redis } from "@hocuspocus/extension-redis";
 
+import { createVersionCounter } from "./versionCounter.mjs";
+
 export const DEFAULT_KEY_PREFIX = "perseus:collab:doc:";
 
 /** 解析 Redis 连接串: 显式参数 > PERSEUS_COLLAB_REDIS_URL > REDIS_URL > null */
@@ -81,12 +83,15 @@ export function createRedisPersistence({ url, log = () => {}, createClient, iden
   const snapshotClient = createClient();
   const storage = createRedisStorage(snapshotClient);
   const databaseExt = new Database({ fetch: storage.fetch, store: storage.store });
+  // 协作版本号: 与快照共用长连客户端, Redis INCR 持久计数 (跨副本/重启一致)
+  const versionCounter = createVersionCounter({ redis: snapshotClient, log });
 
   log(`redis enabled url=${url}`);
   return {
     extensions: [redisExt, databaseExt],
     storage,
     seedGuard: createSeedGuard(snapshotClient),
+    versionCounter,
     async close() {
       try {
         await snapshotClient.quit();

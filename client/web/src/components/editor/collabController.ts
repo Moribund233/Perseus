@@ -31,10 +31,12 @@ export interface FollowState {
 }
 
 /** 网关广播的协作保存结果 (collab-gateway onStateless)
- *  私密性收紧: 仅含提交标识, 不携带 saved_by/branch/path/message 等元数据 */
+ *  私密性收紧: 仅含提交标识 + 协作版本号, 不携带 saved_by/branch/path/message 等元数据 */
 export interface CollabSavedMsg {
   docKey: string;
   commit_id: string;
+  /** 协作版本号 (「会话已同步 ✓ v{N}」的 N): 网关持久计数, 递增广播 */
+  version?: number;
 }
 
 export interface CollabControllerOptions {

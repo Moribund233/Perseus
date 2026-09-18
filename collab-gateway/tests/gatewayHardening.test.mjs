@@ -2,7 +2,7 @@
  * collab-gateway 收紧 (multi-replica bugfix) 集成测试
  *
  * 三个安全/容量缺口:
- *   2a  collab-saved 广播私密性: 只向订阅者确认 commit_id+docKey,
+ *   2a  collab-saved 广播私密性: 只向订阅者确认 commit_id + docKey + version,
  *       不泄漏 saved_by/branch/path/message 等保存元数据。
  *   2b  容量上限: 种子内容超过 maxContentChars 拒绝文档加载 (413);
  *       保存内容超过 maxContentChars 不得调用 app (collab-save-error);
@@ -85,9 +85,9 @@ describe("collab-gateway 收紧", () => {
     a.sendStateless(JSON.stringify({ type: "collab-save", message: "collab save" }));
     const saved = await savedPromise;
 
-    expect(saved.docKey).toBe(DOC);
+expect(saved.docKey).toBe(DOC);
     expect(saved.commit_id).toBe("abc1234");
-    // 私密性: 以下元数据不得广播给文档全部订阅者
+    expect(saved.version).toBe(1);
     expect(saved.saved_by).toBeUndefined();
     expect(saved.branch).toBeUndefined();
     expect(saved.path).toBeUndefined();

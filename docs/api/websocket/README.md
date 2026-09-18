@@ -408,7 +408,7 @@ compose 由 `scripts/generate_env.py` 生成并注入 app 与 collab 两容器�
 | 消息 | 方向 | 说明 |
 |------|------|------|
 | `collab-save` | C→S | `{message}` → 网关回调 app 提交 Git（需写权限） |
-| `collab-saved` | S→C 广播 | `{docKey, commit_id, saved_by, message, branch, path}` 全员广播（含提交者），驱动"Git 已提交"徽标 |
+| `collab-saved` | S→C 广播 | `{docKey, commit_id, version}` 全员广播（含提交者），驱动"Git 已提交"与"会话已同步 · v{N}"徽标（私密性收紧：不含 saved_by/branch/path/message） |
 | `collab-save-error` | S→C（点对点） | `{error}` 保存失败原因 |
 
 - `onStoreDocument`（debounce/断开自动触发）：**Git 提交仅由显式 `collab-save` 触发**，防止高频自动 commit。
