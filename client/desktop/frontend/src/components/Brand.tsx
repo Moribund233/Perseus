@@ -1,18 +1,6 @@
-import { NodeIndexOutlined } from '@ant-design/icons';
+import Logo from './Logo';
 
-// Perseus 品牌标记：渐变圆角底 + 节点图标。
+// Perseus 品牌标记：英仙座流星雨（深色底反白版）。
 export default function Brand({ size = 20 }: { size?: number }) {
-  return (
-    <span
-      className="brand-mark"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size * 0.28,
-        fontSize: size * 0.6,
-      }}
-    >
-      <NodeIndexOutlined />
-    </span>
-  );
+  return <Logo size={size} variant="reverse" style={{ display: 'block' }} />;
 }

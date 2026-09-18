@@ -21,6 +21,7 @@ import { notificationSocket } from '../../api/notificationSocket';
 import { repositoriesApi, type Repository } from '../../api/repositories';
 import { chatApi, dmApi, type DMSession } from '../../api/chat';
 import type { Notification } from '../../api/notifications';
+import Logo from '../brand/Logo';
 import GlobalSearch from './GlobalSearch';
 
 const { Header, Sider, Content } = Layout;
@@ -239,7 +240,7 @@ export default function AppLayout() {
             onClick={() => setCollapsed(!collapsed)}
             title="Perseus"
           >
-            <img src="/logo-orbit-compact.svg" width="100%" height="100%" alt="Perseus" />
+            <Logo size="100%" />
           </div>
 
           {/* Main Nav */}

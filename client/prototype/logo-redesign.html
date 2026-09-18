@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Perseus · 方案03 定稿交付(单色相修订版)</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Inter','Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+    color:#DCE6F5;background:#060A13;padding:48px 5vw 80px;
+    background-image:
+      radial-gradient(1200px 600px at 75% -10%,rgba(38,73,224,.16),transparent 60%),
+      radial-gradient(900px 500px at 5% 110%,rgba(168,194,255,.05),transparent 60%);
+  }
+  header,.card{max-width:1200px;margin:0 auto}
+  header{margin-bottom:44px}
+  .tag{display:inline-block;font-size:11px;letter-spacing:3px;color:#A8C2FF;
+    border:1px solid rgba(168,194,255,.4);border-radius:999px;padding:5px 14px;margin-bottom:18px}
+  h1{font-size:30px;letter-spacing:.5px;color:#F2F7FF}
+  header p{color:#8FA3C0;margin-top:12px;line-height:1.9;max-width:900px;font-size:14px}
+  .card{background:#0C1422;border:1px solid #1C2A44;border-radius:18px;padding:28px 30px;margin-bottom:34px}
+  .ctop{display:flex;align-items:center;gap:14px;border-bottom:1px dashed #22314E;padding-bottom:16px;margin-bottom:22px;flex-wrap:wrap}
+  .badge{background:#2649E0;color:#fff;font-size:12px;padding:4px 12px;border-radius:999px;font-weight:600}
+  h2{font-size:20px;color:#F0F6FF}
+  .kw{color:#7E93B4;font-size:13px}
+  .desc h3{font-size:12px;color:#8FA6FF;letter-spacing:2.5px;margin-bottom:10px}
+  .cmp{width:100%;border-collapse:collapse;font-size:13px}
+  .cmp th{color:#8FA6FF;font-size:11px;letter-spacing:2px;text-align:left;padding:10px 12px;border-bottom:1px solid #22314E;font-weight:600}
+  .cmp td{padding:11px 12px;border-bottom:1px dashed #1C2A44;color:#A9BAD4;line-height:1.7;vertical-align:top}
+  .cmp td:first-child{color:#6C81A0;white-space:nowrap;width:96px}
+  .cmp td.old{color:#5B7095;text-decoration:line-through;text-decoration-color:rgba(143,166,255,.5)}
+  .cmp td.new{color:#E3ECF9}
+  .hero{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:920px){.hero{grid-template-columns:1fr}}
+  .pv{position:relative;border-radius:14px;padding:44px 24px;display:flex;align-items:center;justify-content:center}
+  .pv.light{background:#F7F9FC;border:1px solid #DDE5EF}
+  .pv.dark{background:#0B1526;border:1px solid #1E2C48}
+  .lab{position:absolute;top:10px;left:14px;font-size:9.5px;letter-spacing:1.6px;color:#94A5BC}
+  .pv.dark .lab{color:#5B7095}
+  svg.lu{width:min(100%,420px);height:auto}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:920px){.grid4{grid-template-columns:repeat(2,1fr)}.grid3{grid-template-columns:1fr}}
+  .tile{border-radius:14px;padding:26px 16px 18px;display:flex;flex-direction:column;align-items:center;gap:14px}
+  .tile.light{background:#F7F9FC;border:1px solid #DDE5EF}
+  .tile.dark{background:#0B1526;border:1px solid #1E2C48}
+  .tile svg{width:72px;height:72px}
+  .cap{font-size:10px;letter-spacing:1.4px;color:#94A5BC;text-align:center;line-height:1.6}
+  .tile.dark .cap{color:#5B7095}
+  .cap b{display:block;color:#2649E0;font-size:10px}
+  .tile.dark .cap b{color:#A8C2FF}
+  .sizestrip{margin-top:14px;border-radius:14px;background:#F7F9FC;border:1px solid #DDE5EF;
+    padding:24px;position:relative;display:flex;align-items:flex-end;justify-content:center;gap:22px}
+  .sizestrip .lab{color:#94A5BC}
+  .spec{display:grid;grid-template-columns:minmax(260px,1fr) minmax(320px,1.2fr);gap:30px}
+  @media(max-width:920px){.spec{grid-template-columns:1fr}}
+  .palette{display:flex;gap:16px;flex-wrap:wrap}
+  .pal{display:flex;flex-direction:column;gap:7px;align-items:center;width:74px}
+  .sw{width:56px;height:56px;border-radius:12px;border:1px solid rgba(255,255,255,.14)}
+  .pal b{font-size:11px;color:#E3ECF9;font-weight:600;text-align:center}
+  .pal span{font-size:10px;color:#6C81A0}
+  .rules{list-style:none;font-size:13.5px;line-height:2;color:#A9BAD4}
+  .rules li::before{content:"→ ";color:#8FA6FF}
+  .rules b{color:#EAF2FF}
+  footer{max-width:1200px;margin:0 auto;color:#5B7095;font-size:12px;line-height:1.9}
+</style>
+</head>
+<body>
+
+<!-- ============ 图形符号定义(单色相体系 / 纯实色 / 静态) ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- 流星本体(不含头部)· 三套色 -->
+    <g id="mb-light" fill="#2649E0">
+      <g opacity=".4">
+        <path d="M58 21 L50.4 30.4 L48.6 28.6 Z"/>
+        <circle cx="49.5" cy="29.5" r="1.9"/>
+      </g>
+      <g opacity=".55">
+        <path d="M53.5 33.5 Q44 42 36.4 53.4 L33.6 50.6 Q45 40.5 53.5 33.5 Z"/>
+        <circle cx="35" cy="52" r="2.6"/>
+      </g>
+      <!-- 主尾迹:锥形实色,尾端与流星头留 1.8u 负空间断开 -->
+      <path d="M50.5 11.5 Q32 27.5 22.7 45 L18.5 41 Q34.5 23.5 50.5 11.5 Z"/>
+      <circle cx="11.5" cy="14.5" r="1.6" opacity=".9"/>
+      <circle cx="29" cy="7.5" r="1.15" opacity=".5"/>
+      <circle cx="56.5" cy="53.5" r="1.35" opacity=".65"/>
+      <circle cx="7.5" cy="35" r="1" opacity=".35"/>
+    </g>
+    <g id="mb-rev" fill="#FFFFFF">
+      <g opacity=".4">
+        <path d="M58 21 L50.4 30.4 L48.6 28.6 Z"/>
+        <circle cx="49.5" cy="29.5" r="1.9"/>
+      </g>
+      <g opacity=".55">
+        <path d="M53.5 33.5 Q44 42 36.4 53.4 L33.6 50.6 Q45 40.5 53.5 33.5 Z"/>
+        <circle cx="35" cy="52" r="2.6"/>
+      </g>
+      <path d="M50.5 11.5 Q32 27.5 22.7 45 L18.5 41 Q34.5 23.5 50.5 11.5 Z"/>
+      <circle cx="11.5" cy="14.5" r="1.6" opacity=".9"/>
+      <circle cx="29" cy="7.5" r="1.15" opacity=".5"/>
+      <circle cx="56.5" cy="53.5" r="1.35" opacity=".65"/>
+      <circle cx="7.5" cy="35" r="1" opacity=".35"/>
+    </g>
+    <g id="mb-mono" fill="currentColor">
+      <g opacity=".4">
+        <path d="M58 21 L50.4 30.4 L48.6 28.6 Z"/>
+        <circle cx="49.5" cy="29.5" r="1.9"/>
+      </g>
+      <g opacity=".55">
+        <path d="M53.5 33.5 Q44 42 36.4 53.4 L33.6 50.6 Q45 40.5 53.5 33.5 Z"/>
+        <circle cx="35" cy="52" r="2.6"/>
+      </g>
+      <path d="M50.5 11.5 Q32 27.5 22.7 45 L18.5 41 Q34.5 23.5 50.5 11.5 Z"/>
+      <circle cx="11.5" cy="14.5" r="1.6" opacity=".9"/>
+      <circle cx="29" cy="7.5" r="1.15" opacity=".5"/>
+      <circle cx="56.5" cy="53.5" r="1.35" opacity=".65"/>
+      <circle cx="7.5" cy="35" r="1" opacity=".35"/>
+    </g>
+
+    <!-- 主图标 · 浅色底:头部 Deep Navy(同色相深化层) -->
+    <symbol id="i-meteor" viewBox="0 0 64 64">
+      <use href="#mb-light"/>
+      <circle cx="16.2" cy="47.6" r="4.6" fill="#101C3D"/>
+    </symbol>
+    <!-- 备选 B · 纯单色:头部与本体同色,仅靠负空间断开 -->
+    <symbol id="i-meteor-b" viewBox="0 0 64 64">
+      <use href="#mb-light"/>
+      <circle cx="16.2" cy="47.6" r="4.6" fill="#2649E0"/>
+    </symbol>
+    <!-- 备选 C · 镂空环头 -->
+    <symbol id="i-meteor-c" viewBox="0 0 64 64">
+      <use href="#mb-light"/>
+      <circle cx="16.2" cy="47.6" r="3.5" fill="none" stroke="#2649E0" stroke-width="2.2"/>
+    </symbol>
+    <!-- 反白图标 · 深色底:头部 Ice Blue(同色相提亮层) -->
+    <symbol id="i-meteor-rev" viewBox="0 0 64 64">
+      <use href="#mb-rev"/>
+      <circle cx="16.2" cy="47.6" r="4.6" fill="#A8C2FF"/>
+    </symbol>
+    <!-- 单色图标 · currentColor -->
+    <symbol id="i-meteor-mono" viewBox="0 0 64 64">
+      <use href="#mb-mono"/>
+      <circle cx="16.2" cy="47.6" r="4.6" fill="currentColor"/>
+    </symbol>
+
+    <!-- 横版组合锁定 -->
+    <symbol id="lk-meteor" viewBox="0 0 300 64">
+      <use href="#i-meteor" width="64" height="64"/>
+      <text x="82" y="36" font-family="Inter,'Segoe UI',sans-serif" font-size="27" font-weight="700" letter-spacing="1.2" fill="#101C3D">Perseus</text>
+      <text x="84" y="52" font-family="Inter,'Segoe UI',sans-serif" font-size="8.5" letter-spacing="3" fill="#5A6B8C">CODE HOSTING · REVIEW</text>
+    </symbol>
+    <symbol id="lk-meteor-rev" viewBox="0 0 300 64">
+      <use href="#i-meteor-rev" width="64" height="64"/>
+      <text x="82" y="36" font-family="Inter,'Segoe UI',sans-serif" font-size="27" font-weight="700" letter-spacing="1.2" fill="#FFFFFF">Perseus</text>
+      <text x="84" y="52" font-family="Inter,'Segoe UI',sans-serif" font-size="8.5" letter-spacing="3" fill="#8FA3C0">CODE HOSTING · REVIEW</text>
+    </symbol>
+  </defs>
+</svg>
+
+<header>
+  <span class="tag">FINAL · 方案 03 定稿交付 V2</span>
+  <h1>Perseus · 英仙座流星雨(单色相修订版)</h1>
+  <p>应反馈移除琥珀色强调:全图回归<b>单一色相(Perseus Blue)及其明度层</b>,不再引入第二色相。
+     唯一焦点改由两个同色系手段表达——浅色底流星头使用 <b>Deep Navy #101C3D</b>(品牌蓝深化层),
+     深色底使用 <b>Ice Blue #A8C2FF</b>(品牌蓝提亮层);同时主尾迹与流星头之间留出 <b>1.8u 负空间断开</b>,
+     以形态语言替代色彩对比完成"评审焦点"的视觉强调。构图、几何规范与上一版完全一致。</p>
+</header>
+
+<!-- ============ 修订对照 ============ -->
+<article class="card">
+  <div class="ctop"><span class="badge">修订说明</span><h2>V2 改动 · 逐项对照</h2>
+    <span class="kw">移除琥珀 / 焦点转为同色相明度层</span></div>
+  <table class="cmp">
+    <tr><th>维度</th><th>V1(本次废弃)</th><th>V2(当前定稿)</th></tr>
+    <tr><td>强调色</td><td class="old">琥珀 #F5A524(第二色相,与蓝色系统割裂)</td>
+        <td class="new">零第二色相:浅色底头部 <b>Deep Navy #101C3D</b>,深色底头部 <b>Ice Blue #A8C2FF</b>,均为品牌蓝同色相明度层</td></tr>
+    <tr><td>焦点表达</td><td class="old">依赖暖/冷色相对比</td>
+        <td class="new">依赖明度对比 + <b>头尾 1.8u 负空间断开</b>,焦点语义(评审中的 PR)不变</td></tr>
+    <tr><td>色彩模式</td><td colspan="1" class="new">单色相实色 + 透明度阶梯(100% / 55% / 40%)—— 沿用 V1,未改动</td>
+        <td class="new">尾迹锥形裁切、45° 平行几何、纯静态矢量 —— 沿用 V1,未改动</td></tr>
+  </table>
+</article>
+
+<!-- ============ 主视觉 ============ -->
+<article class="card">
+  <div class="ctop"><span class="badge">主视觉</span><h2>横版组合锁定</h2>
+    <span class="kw">浅色底主版 / 深色底反白版</span></div>
+  <div class="hero">
+    <div class="pv light"><span class="lab">PRIMARY / LIGHT</span>
+      <svg class="lu" viewBox="0 0 300 64"><use href="#lk-meteor"/></svg></div>
+    <div class="pv dark"><span class="lab">REVERSE / DARK</span>
+      <svg class="lu" viewBox="0 0 300 64"><use href="#lk-meteor-rev"/></svg></div>
+  </div>
+</article>
+
+<!-- ============ 图标系统 ============ -->
+<article class="card">
+  <div class="ctop"><span class="badge">图标系统</span><h2>独立图标 · 四态</h2>
+    <span class="kw">彩版 / 反白 / 单色深 / 单色白</span></div>
+  <div class="grid4">
+    <div class="tile light"><svg viewBox="0 0 64 64"><use href="#i-meteor"/></svg><span class="cap">COLOR / LIGHT</span></div>
+    <div class="tile dark"><svg viewBox="0 0 64 64"><use href="#i-meteor-rev"/></svg><span class="cap">REVERSE / DARK</span></div>
+    <div class="tile light"><svg viewBox="0 0 64 64" style="color:#101C3D"><use href="#i-meteor-mono"/></svg><span class="cap">MONO / NAVY</span></div>
+    <div class="tile dark"><svg viewBox="0 0 64 64" style="color:#FFFFFF"><use href="#i-meteor-mono"/></svg><span class="cap">MONO / WHITE</span></div>
+  </div>
+  <div class="sizestrip"><span class="lab">SMALL SIZE TEST · 44 / 28 / 16px</span>
+    <svg viewBox="0 0 64 64" style="width:44px;height:44px"><use href="#i-meteor"/></svg>
+    <svg viewBox="0 0 64 64" style="width:28px;height:28px"><use href="#i-meteor"/></svg>
+    <svg viewBox="0 0 64 64" style="width:16px;height:16px"><use href="#i-meteor"/></svg>
+  </div>
+</article>
+
+<!-- ============ 流星头处理备选 ============ -->
+<article class="card">
+  <div class="ctop"><span class="badge">细节比选</span><h2>流星头三种处理</h2>
+    <span class="kw">默认交付 A,如需切换告知编号即可</span></div>
+  <div class="grid3">
+    <div class="tile light"><svg viewBox="0 0 64 64"><use href="#i-meteor"/></svg>
+      <span class="cap"><b>A · 明度焦点(推荐)</b>Deep Navy 头 + 负空间断开,焦点最清晰</span></div>
+    <div class="tile light"><svg viewBox="0 0 64 64"><use href="#i-meteor-b"/></svg>
+      <span class="cap"><b>B · 纯单色</b>头与本体同色,仅靠断开区分,极致克制</span></div>
+    <div class="tile light"><svg viewBox="0 0 64 64"><use href="#i-meteor-c"/></svg>
+      <span class="cap"><b>C · 镂空环头</b>空心环呼应"评审通过"节点,单色复制性最佳</span></div>
+  </div>
+</article>
+
+<!-- ============ 色彩与使用规范 ============ -->
+<article class="card">
+  <div class="ctop"><span class="badge">规范</span><h2>色彩系统 · 使用规则</h2></div>
+  <div class="spec">
+    <div>
+      <div class="desc"><h3>PALETTE</h3></div>
+      <div class="palette">
+        <div class="pal"><div class="sw" style="background:#2649E0"></div><b>Perseus Blue</b><span>#2649E0</span></div>
+        <div class="pal"><div class="sw" style="background:#101C3D"></div><b>Deep Navy</b><span>#101C3D</span></div>
+        <div class="pal"><div class="sw" style="background:#A8C2FF"></div><b>Ice Blue</b><span>#A8C2FF</span></div>
+        <div class="pal"><div class="sw" style="background:#5A6B8C"></div><b>Slate Mist</b><span>#5A6B8C</span></div>
+        <div class="pal"><div class="sw" style="background:#FFFFFF"></div><b>Reverse</b><span>#FFFFFF</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="desc"><h3>RULES</h3></div>
+      <ul class="rules">
+        <li>全图<b>仅允许单一色相</b>(Perseus Blue)及其明度层(Deep Navy / Ice Blue / White),禁止引入任何第二色相。</li>
+        <li>焦点仅由「明度流星头 + 头尾负空间断开」表达;断开间距固定为 1.8u(图标宽度的 ~2.8%),不得缩放或取消。</li>
+        <li>≤16px 的极小尺寸(favicon)允许使用<b>无断开版</b>(头尾相接),避免渲染糊并;其余尺寸一律带断开。</li>
+        <li>标志禁止添加渐变、辉光、投影或动画;远近层级只用透明度阶梯(100% / 55% / 40%)。</li>
+        <li>单色场景(水印 / 蚀刻 / 传真)使用 <b>MONO 版</b>(currentColor),头部与本体同色。</li>
+        <li>最小尺寸:横版组合高度 ≥ 24px;独立图标 ≥ 16px。安全间距 ≥ 图标宽度的 1/4。</li>
+      </ul>
+    </div>
+  </div>
+</article>
+
+<footer>
+  交付资产:i-meteor(彩版 A)/ i-meteor-b(备选 B)/ i-meteor-c(备选 C)/ i-meteor-rev(反白)/ i-meteor-mono(单色)/
+  lk-meteor、lk-meteor-rev(横版组合)。所有 symbol 节点可直接复制封装为 React / Vue 组件,或经 Figma、Inkscape 导入后导出 .ico / .icns / PNG 多倍图。
+</footer>
+
+</body>
+</html>

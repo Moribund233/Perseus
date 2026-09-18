@@ -6,6 +6,7 @@ import {
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/auth';
+import Logo from '../../components/brand/Logo';
 import { useNavigate } from 'react-router-dom';
 
 interface AuthModalProps {
@@ -84,7 +85,7 @@ export default function AuthModal({ open, defaultTab = 'login', onClose }: AuthM
       styles={{ body: { padding: '24px 0 0' } }}
     >
       <div style={{ textAlign: 'center', marginBottom: 24 }}>
-        <img src="/logo-orbit-compact.svg" width={28} height={28} alt="Perseus" style={{ verticalAlign: 'middle' }} />
+        <Logo size={28} style={{ verticalAlign: 'middle' }} />
         <span style={{ fontSize: 20, fontWeight: 700, color: '#e6edf3', marginLeft: 8, verticalAlign: 'middle' }}>
           Perseus
         </span>

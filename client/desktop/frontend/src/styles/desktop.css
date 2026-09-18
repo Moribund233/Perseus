@@ -70,9 +70,6 @@ button { font-family: inherit; }
 .portal-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #8b949e; font-size: 13px; }
 .portal-empty > .anticon { font-size: 40px; color: #6e7681; }
 
-.brand-mark { background: linear-gradient(135deg, #1f6feb, #bc8cff); color: #fff; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.brand-mark svg { display: block; }
-
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #6e7681; flex-shrink: 0; }
 .dot.on { background: #3fb950; box-shadow: 0 0 0 3px rgba(63,185,80,0.15); }
 .dot.off { background: #6e7681; }

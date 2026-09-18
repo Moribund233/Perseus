@@ -12,6 +12,7 @@ import {
 import { useTranslation, Trans } from 'react-i18next';
 import { useAuthStore } from '../../stores/auth';
 import { statsApi, type PlatformStats } from '../../api/stats';
+import Logo from '../../components/brand/Logo';
 import AuthModal from './AuthModal';
 import './landing.css';
 
@@ -114,7 +115,7 @@ export default function LandingPage() {
     <div className="landing">
       <nav className="l-nav">
         <a className="l-nav-logo" href="/">
-          <img src="/logo-orbit-compact.svg" width={28} height={28} alt="Perseus" />
+          <Logo size={28} />
           Perseus
         </a>
         <div className="l-nav-links">
