@@ -1,8 +1,10 @@
 # Admin 控制台开发规划
 
-> 更新日期：2026-09-18
+> 更新日期：2026-09-20
 > 范围：应用管理层（admin/app）端点的前端控制台实现规划。
 > 原型：`client/prototype/admin-console.html`（总控台）、`client/prototype/admin-components.html`（组件健康）。
+
+> **2026-09-20（A/B 批次落地）**：A. 控制台骨架 + 只读概览、B. 组件健康已按第六节实施并验收——`AdminRoute`、`/admin` 壳、`OverviewSection`、`ComponentsSection`（`ComponentRow`/`StatusDot`）、`api/admin.ts`、i18n `app.admin.*`；网关侧新增 `PERSEUS_ADMIN_ALLOWED_SOURCES` 来源白名单（生产 OpenResty Lua + dev `geo`，留空=拒绝 admin API），`docker-socket-proxy`（只读）已纳入 prod/dev 编排。验证：`pnpm lint` + `pnpm build` ✅；dev 栈实测 `/api/app/status`、`/api/app/components` 200（`available:true`），prod 网关实测 `/api/app/*` 403（白名单留空 → deny-by-default）。C–F 批次（配置/日志/运维/调试/打磨）仍为待办。
 
 ---
 
@@ -46,7 +48,7 @@ Perseus 后端已具备一组应用管理端点（配置、日志、运维、调
 |---|---|---|---|---|
 | `/` | GET | 公开 | ✅ | 欢迎信息（title/version/status） |
 | `/health` | GET | 公开 | ✅ | 健康检查（网关/容器 healthcheck 亦用） |
-| `/api/app/status` | GET | 公开 | ⚠️ | 进程/请求/Git/schema；**当前无鉴权**，含进程与内存信息，建议评估是否收紧 |
+| `/api/app/status` | GET | 公开 | ✅ | 进程/请求/Git/schema；生产出口由网关 `PERSEUS_ADMIN_ALLOWED_SOURCES` 来源白名单门控（空=拒绝），白名单实现见 `docker/gateway/nginx.conf`（Lua）与 `docker/dev/nginx.dev.conf`（geo） |
 | `/api/v1/stats/platform` | GET | 公开 | ✅ | 仓库/提交/用户数 + 运行时长 |
 
 ### 3.2 配置管理（admin 或 debug）
@@ -173,8 +175,8 @@ client/web/src/
 
 | 批次 | 内容 | 依赖 | 验收 |
 |---|---|---|---|
-| **A. 控制台骨架 + 只读概览** | `AdminRoute`、`/admin` 壳、`OverviewSection`（status+platform）、`api/admin.ts` 基础、i18n 骨架 | 无 | 管理员可进入；非管理员被挡；概览数据真实、5s 刷新 |
-| **B. 组件健康** | `ComponentsSection` + `ComponentRow`/`StatusDot`、10s 轮询、异常过滤、降级态 | 部署 `docker-socket-proxy` | 组件状态/健康/重启真实；proxy 停掉显示降级而非报错 |
+| **A. 控制台骨架 + 只读概览** ✅（2026-09-20） | `AdminRoute`、`/admin` 壳、`OverviewSection`（status+platform）、`api/admin.ts` 基础、i18n 骨架 | 无 | 管理员可进入；非管理员被挡；概览数据真实、5s 刷新 |
+| **B. 组件健康** ✅（2026-09-20） | `ComponentsSection` + `ComponentRow`/`StatusDot`、10s 轮询、异常过滤、降级态 | 部署 `docker-socket-proxy` | 组件状态/健康/重启真实；proxy 停掉显示降级而非报错 |
 | **C. 配置管理** | `ConfigSection`：分节表单、只读节、脏值、validate、reset、重启提示 | 无 | 受保护节不可改；校验/重置正确；只读挂载提示 |
 | **D. 日志查看器** | `LogsSection`：日期/文件/行数/级别、跟随、清理 | 无 | 过滤正确；清理需确认；大日志不卡顿 |
 | **E. 运维 + 调试** | `OperationsSection`、`DebugSection`、`ConfirmDangerModal` | 无 | 危险操作需输入确认词；debug 门控正确 |

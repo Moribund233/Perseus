@@ -73,6 +73,22 @@ require_env() {
   fi
 }
 
+# 补充升级后新增的「可选」配置字段（仅当键不存在时追加，保留用户已有的值）
+# 用法: ensure_env_keys KEY1=default1 KEY2=default2 ...（来自 generate_env.py 的可选默认值）
+ensure_env_keys() {
+  local key value entry
+  for entry in "$@"; do
+    key="${entry%%=*}"
+    value="${entry#*=}"
+    if [[ ! -f "$ENV_FILE" ]]; then
+      die ".env 不存在, 请先运行 scripts/generate_env.py"
+    fi
+    if ! grep -qE "^${key}=" "$ENV_FILE"; then
+      set_env_key "$key" "$value"
+    fi
+  done
+}
+
 # ---------- compose 封装 ----------
 # 生产编排默认使用仓库根目录 docker-compose.yml（其 include 基础设施层）
 compose() { docker compose "$@"; }

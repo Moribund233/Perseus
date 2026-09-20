@@ -68,6 +68,8 @@ services:
       PERSEUS_ADMIN_EMAIL: ${PERSEUS_ADMIN_EMAIL:-admin@example.com}
       # 协作内部端点密钥 (与 collab 服务共享; 未设置时用开发默认值)
       PERSEUS_COLLAB_INTERNAL_SECRET: ${PERSEUS_COLLAB_INTERNAL_SECRET:-dev-collab-internal-secret}
+      # 编排组件状态（admin 控制台）：经只读 docker-socket-proxy 查询容器
+      PERSEUS_DOCKER_HOST: "http://docker-socket-proxy:2375"
     volumes:
       # 代码挂载（支持热重载）
       - .:/app
@@ -78,8 +80,9 @@ services:
       # 日志目录
       - ./logs:/app/logs
     ports:
-      # 暴露后端端口（供外部 Nginx 反向代理）
-      - "127.0.0.1:8000:8000"
+      # 暴露后端端口（供外部 Nginx 反向代理 / 前端直连）
+      # 宿主 8002 避免与生产网关 8000 冲突
+      - "127.0.0.1:8002:8000"
     # 使用 unless-stopped 而非 "no"，确保 reloader 崩溃后自动重启
     restart: unless-stopped
     # 资源限制
@@ -121,6 +124,26 @@ services:
       resources:
         limits:
           memory: 512M
+
+  # =============================================
+  # 只读 Docker socket 代理 — 供 app 查询编排组件状态（admin 控制台）
+  # 仅暴露 /containers* 的 GET，禁止一切写操作（POST=0）
+  # =============================================
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.2.0
+    container_name: perseus-docker-proxy-dev
+    environment:
+      CONTAINERS: "1"   # 允许 GET /containers/*
+      POST: "0"         # 禁止写操作
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+        reservations:
+          memory: 16M
 
   # =============================================
   # 一次性测试容器（运行后自动退出）
@@ -169,7 +192,8 @@ services:
       GIT_HTTP_EXPORT_ALL: "1"
     ports:
       # 暴露 FCGI 端口（供外部 Nginx 连接）
-      - "127.0.0.1:9000:9000"
+      # 宿主 9001 避免与生产 git-cgi 9000 冲突
+      - "127.0.0.1:9001:9000"
     restart: unless-stopped
     deploy:
       resources:

@@ -29,7 +29,7 @@ interface ChatSocketHandlers {
 }
 
 function resolveWsUrl(): string {
-  const base = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000';
+  const base = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8002';
   // VITE_API_URL 为空字符串 = 与页面同源 (走网关)
   if (base === '') {
     if (typeof location === 'undefined') return '';

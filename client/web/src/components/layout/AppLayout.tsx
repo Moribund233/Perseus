@@ -9,6 +9,7 @@ import {
   EditOutlined,
   MessageOutlined,
   SettingOutlined,
+  ControlOutlined,
   BellOutlined,
   PlusOutlined,
   UserOutlined,
@@ -185,6 +186,11 @@ export default function AppLayout() {
     { key: 'editor', path: '/editor', icon: <EditOutlined />, label: t('app.nav.codeEditor') },
     { key: 'chat', path: '/chat', icon: <MessageOutlined />, label: t('app.nav.teamChat'), badge: chatUnread || undefined },
   ];
+
+  // 管理控制台入口：仅管理员可见（后端另有 is_admin + 网关来源白名单双重校验）
+  if (user?.is_admin) {
+    navItems.push({ key: 'admin', path: '/admin', icon: <ControlOutlined />, label: t('app.nav.admin') });
+  }
 
   const activeKey = navItems.find((item) => location.pathname.startsWith(item.path))?.key || 'dashboard';
   const activeLabel = navItems.find((item) => item.key === activeKey)?.label || t('app.nav.dashboard');

@@ -75,7 +75,126 @@
       "codeEditor": "Code Editor",
       "teamChat": "Team Chat",
       "theme": "Theme",
-      "settings": "Settings"
+      "settings": "Settings",
+      "admin": "Admin Console"
+    },
+    "admin": {
+      "railTitle": "System Index",
+      "soon": "SOON",
+      "sections": {
+        "overview": "Overview",
+        "components": "Components",
+        "config": "Configuration",
+        "logs": "Log Viewer",
+        "operations": "Maintenance",
+        "debug": "Debug Tools"
+      },
+      "overview": {
+        "title": "Overview",
+        "subtitle": "Live process, request and platform status",
+        "debugMode": "Debug mode",
+        "updatedAt": "Updated {{time}}",
+        "refresh": "Refresh",
+        "loadFailed": "Failed to load status",
+        "vitals": {
+          "uptime": "Uptime",
+          "memory": "Memory",
+          "cpu": "CPU",
+          "threads": "Threads",
+          "connections": "Connections"
+        },
+        "process": {
+          "title": "Process",
+          "pid": "PID",
+          "memory": "Memory",
+          "cpu": "CPU",
+          "threads": "Threads",
+          "connections": "Connections",
+          "version": "Version",
+          "serverTime": "Server time",
+          "schema": "Schema"
+        },
+        "requests": {
+          "title": "Request Metrics",
+          "total": "Total requests",
+          "active": "Active requests",
+          "rate": "Request rate",
+          "avgTime": "Avg response"
+        },
+        "git": {
+          "title": "Git Queue",
+          "activeClones": "Active clones",
+          "activePushes": "Active pushes",
+          "queue": "Queued"
+        },
+        "platform": {
+          "title": "Platform Stats",
+          "repositories": "Repositories",
+          "commits": "Commits",
+          "users": "Users",
+          "uptime": "Uptime"
+        }
+      },
+      "components": {
+        "title": "Components",
+        "subtitle": "Service component state and health",
+        "filterAll": "All",
+        "filterProblems": "Problems",
+        "updatedAt": "Updated {{time}}",
+        "refresh": "Refresh",
+        "loadFailed": "Failed to load components",
+        "errorHint": "Ensure the gateway source allowlist permits this origin and the account is an admin",
+        "degraded": {
+          "title": "Component status unavailable",
+          "desc": "docker-socket-proxy is not deployed or not responding; component status is degraded."
+        },
+        "summary": {
+          "total": "Total",
+          "running": "Running",
+          "stopped": "Stopped",
+          "healthy": "Healthy",
+          "unhealthy": "Unhealthy",
+          "starting": "Starting"
+        },
+        "groups": {
+          "ingress": "Ingress",
+          "application": "Application",
+          "git": "Git Services",
+          "data": "Data Layer",
+          "tasks": "Tasks",
+          "other": "Other"
+        },
+        "inspector": {
+          "title": "Details",
+          "hint": "Select a component to inspect",
+          "name": "Container",
+          "state": "State",
+          "health": "Health",
+          "running": "Running",
+          "startedAt": "Started at",
+          "uptime": "Uptime",
+          "restarts": "Restarts",
+          "exitCode": "Exit code",
+          "statusText": "Status"
+        },
+        "empty": "No components",
+        "historyTitle": "Recent check history",
+        "problem": "problem",
+        "health": {
+          "healthy": "healthy",
+          "unhealthy": "unhealthy",
+          "starting": "starting",
+          "stopped": "stopped",
+          "exited": "exited",
+          "running": "running",
+          "restarting": "restarting",
+          "created": "created",
+          "dead": "dead",
+          "paused": "paused",
+          "unknown": "unknown",
+          "none": "no-check"
+        }
+      }
     },
     "userMenu": {
       "profile": "Profile",

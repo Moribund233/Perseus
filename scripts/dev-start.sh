@@ -75,15 +75,15 @@ start() {
     fi
 
     # 构建并启动服务
-    docker compose -f $COMPOSE_FILE up -d --build
+    docker compose -p perseus-dev -f $COMPOSE_FILE up -d --build
 
     success "服务启动成功！"
     echo ""
     echo "访问地址:"
     echo "  - 前端:       http://localhost:5173 (请在 client/web 目录运行 pnpm dev)"
-    echo "  - API 文档:   http://localhost:8080/docs"
-    echo "  - API:        http://localhost:8080/api"
-    echo "  - 数据库:     localhost:5432"
+    echo "  - 后端直连:   http://localhost:8002 (API 文档 /docs)"
+    echo "  - 网关:       http://localhost:8080"
+    echo "  - git-cgi:    localhost:9001"
     echo ""
     echo "常用命令:"
     echo "  - 查看日志:   ./scripts/dev-start.sh logs"
@@ -91,23 +91,23 @@ start() {
     echo "  - 停止服务:   ./scripts/dev-start.sh stop"
     echo ""
     info "正在显示日志..."
-    docker compose -f $COMPOSE_FILE logs -f
+    docker compose -p perseus-dev -f $COMPOSE_FILE logs -f
 }
 
 stop() {
     info "停止 Perseus 开发环境..."
-    docker compose -f $COMPOSE_FILE down
+    docker compose -p perseus-dev -f $COMPOSE_FILE down
     success "服务已停止"
 }
 
 logs() {
     info "显示服务日志..."
-    docker compose -f $COMPOSE_FILE logs -f
+    docker compose -p perseus-dev -f $COMPOSE_FILE logs -f
 }
 
 shell() {
     info "进入后端容器..."
-    docker compose -f $COMPOSE_FILE exec app bash
+    docker compose -p perseus-dev -f $COMPOSE_FILE exec app bash
 }
 
 clean() {
@@ -115,7 +115,7 @@ clean() {
     read -p "确认继续? (y/N) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        docker compose -f $COMPOSE_FILE down -v
+        docker compose -p perseus-dev -f $COMPOSE_FILE down -v
         success "环境已清理"
     else
         info "已取消"
@@ -124,7 +124,7 @@ clean() {
 
 rebuild() {
     info "强制重新构建镜像..."
-    docker compose -f $COMPOSE_FILE build --no-cache
+    docker compose -p perseus-dev -f $COMPOSE_FILE build --no-cache
     success "镜像构建完成"
     start
 }

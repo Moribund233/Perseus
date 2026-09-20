@@ -240,6 +240,9 @@ cmd_upgrade() {
 
   require_docker; require_compose_v2; require_env
 
+  # 补充升级后新增的可选配置字段（旧版 .env 可能缺失; 缺失才追加, 默认空=管理员控制台拒绝）
+  ensure_env_keys PERSEUS_ADMIN_ALLOWED_SOURCES=
+
   log_warn "升级流程: 自动备份 → 构建/拉取 → 迁移 → 重启。"
   confirm "开始升级 Perseus ?" || die "已取消"
 

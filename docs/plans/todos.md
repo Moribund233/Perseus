@@ -167,6 +167,15 @@
 | P1 | 会话 TTL 延迟销毁 ✅ | **已完成（2026-09-17）**：网关 `sessionTtl.mjs`（`PERSEUS_COLLAB_SESSION_TTL_MS`，默认 10 分钟），最后一人离开后保留内存现场，窗口内重 join 复用；TTL 到期卸载 | 第二节 P0 表 |
 | P2 | Redis pub/sub 多副本 ✅ | **已完成（2026-09-17）**：`@hocuspocus/extension-redis` pub/sub 跨副本广播 + `extension-database` Redis 快照会话持久化（`redisPersistence.mjs`），解除 `workers=1`/单副本约束；compose 已接线 `REDIS_URL` | 第二节 P2 表 |
 
+### 6.4 Admin 控制台（应用管理 A/B）闭环
+
+**现状**: 后端 admin/app 端点齐备（管理控制台规划见 `docs/plans/admin-console.md`）；exposed 入口已收紧——`/api/app/*` 由网关来源白名单门控（生产 OpenResty Lua + dev `geo`，`PERSEUS_ADMIN_ALLOWED_SOURCES` 空=拒绝），`docker-socket-proxy`（只读）已纳入 prod/dev 编排。
+
+| 批次 | 落地要点 | 验证 | 涉及文件 |
+|------|----------|------|----------|
+| A. 控制台骨架 + 只读概览 ✅（2026-09-20） | `AdminRoute` 守卫、`/admin` 壳、`OverviewSection`（status+platform，5s 轮询）、`api/admin.ts`、i18n `app.admin.*` | `pnpm lint`+`pnpm build` ✅；dev 栈 `/api/app/status` 200 | `client/web/src/routes/admin/`、`components/admin/`、`api/admin.ts` |
+| B. 组件健康 ✅（2026-09-20） | `ComponentsSection` + `ComponentRow`/`StatusDot`、10s 轮询、异常过滤、`available:false` 降级；网关白名单门控 | dev `/api/app/components` 200 `available:true`；prod `/api/app/*` 403（白名单留空） | 同上 + `docker/gateway/nginx.conf`、`docker/dev/nginx.dev.conf` |
+
 ---
 
 ## 七、需产品决策项

@@ -82,16 +82,16 @@ function Start-DevEnvironment {
     }
 
     # 构建并启动服务
-    docker compose -f $ComposeFile up -d --build
+    docker compose -p perseus-dev -f $ComposeFile up -d --build
 
     if ($LASTEXITCODE -eq 0) {
         Write-Success "服务启动成功！"
         Write-Host ""
         Write-Host "访问地址:"
         Write-Host "  - 前端:       http://localhost:5173 (请在 client/web 目录运行 pnpm dev)"
-        Write-Host "  - API 文档:   http://localhost:8080/docs"
-        Write-Host "  - API:        http://localhost:8080/api"
-        Write-Host "  - 数据库:     localhost:5432"
+        Write-Host "  - 后端直连:   http://localhost:8002 (API 文档 /docs)"
+        Write-Host "  - 网关:       http://localhost:8080"
+        Write-Host "  - git-cgi:    localhost:9001"
         Write-Host ""
         Write-Host "常用命令:"
         Write-Host "  - 查看日志:   .\scripts\dev-start.ps1 logs"
@@ -99,7 +99,7 @@ function Start-DevEnvironment {
         Write-Host "  - 停止服务:   .\scripts\dev-start.ps1 stop"
         Write-Host ""
         Write-Info "正在显示日志..."
-        docker compose -f $ComposeFile logs -f
+        docker compose -p perseus-dev -f $ComposeFile logs -f
     }
     else {
         Write-Error "服务启动失败"
@@ -109,25 +109,25 @@ function Start-DevEnvironment {
 
 function Stop-DevEnvironment {
     Write-Info "停止 Perseus 开发环境..."
-    docker compose -f $ComposeFile down
+    docker compose -p perseus-dev -f $ComposeFile down
     Write-Success "服务已停止"
 }
 
 function Show-Logs {
     Write-Info "显示服务日志..."
-    docker compose -f $ComposeFile logs -f
+    docker compose -p perseus-dev -f $ComposeFile logs -f
 }
 
 function Enter-Shell {
     Write-Info "进入后端容器..."
-    docker compose -f $ComposeFile exec app bash
+    docker compose -p perseus-dev -f $ComposeFile exec app bash
 }
 
 function Clear-Environment {
     Write-Warning "这将停止服务并删除所有数据卷！"
     $confirm = Read-Host "确认继续? (y/N)"
     if ($confirm -eq "y" -or $confirm -eq "Y") {
-        docker compose -f $ComposeFile down -v
+        docker compose -p perseus-dev -f $ComposeFile down -v
         Write-Success "环境已清理"
     }
     else {
@@ -137,7 +137,7 @@ function Clear-Environment {
 
 function Rebuild-Images {
     Write-Info "强制重新构建镜像..."
-    docker compose -f $ComposeFile build --no-cache
+    docker compose -p perseus-dev -f $ComposeFile build --no-cache
     Write-Success "镜像构建完成"
     Start-DevEnvironment
 }

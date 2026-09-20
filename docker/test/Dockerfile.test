@@ -24,9 +24,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
-# 阿里云 PyPI 镜像
-ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
-ENV PIP_TRUSTED_HOST=mirrors.aliyun.com
+# 清华 PyPI 镜像 (阿里云 CDN 会导致容器内 pip 下载长连接卡死)
+ENV PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/
+ENV PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
 
 # pytest 及测试栈依赖 (对应 pyproject [project.optional-dependencies].dev)
 # 注意: tests/ 被 .dockerignore 排除, 测试代码通过 compose 卷挂载 ./tests:/app/tests
@@ -36,7 +36,7 @@ RUN pip install --no-cache-dir \
     respx \
     httpx \
     aiosqlite \
-    -i https://mirrors.aliyun.com/pypi/simple/
+    -i https://pypi.tuna.tsinghua.edu.cn/simple/
 
 USER perseus
 

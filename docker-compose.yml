@@ -158,6 +158,10 @@ services:
       - ./docker/gateway/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
       - /var/www/perseus-web:/var/www/perseus-web:ro
       - /etc/localtime:/etc/localtime:ro
+    environment:
+      # Admin 控制台来源白名单 (IP / IPv4 CIDR，逗号分号或空格分隔)。
+      # 由 scripts/generate_env.py 写入 .env；留空 = 网关拒绝一切 admin API。
+      PERSEUS_ADMIN_ALLOWED_SOURCES: "${PERSEUS_ADMIN_ALLOWED_SOURCES:-}"
     networks:
       - default
     restart: unless-stopped

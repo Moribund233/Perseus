@@ -25,6 +25,7 @@ Perseus .env 生成脚本
     PERSEUS_ADMIN_EMAIL             初始管理员邮箱（默认 admin@perseus.local）
     PERSEUS_APP_DEBUG               调试模式（固定 false，可手动改）
     LOG_LEVEL                       日志级别（固定 info，可手动改）
+    PERSEUS_ADMIN_ALLOWED_SOURCES   Admin 控制台来源白名单（IP/CIDR；留空=网关拒绝）
 """
 from __future__ import annotations
 
@@ -86,6 +87,9 @@ DEFAULT_VARS: dict[str, str] = {
     "PERSEUS_GATEWAY_PORT": "8000",
     "PERSEUS_ADMIN_USERNAME": "admin",
     "PERSEUS_ADMIN_EMAIL": "admin@perseus.local",
+    # Admin 控制台来源白名单：网关按此放行 /api/app/*（IP 或 IPv4 CIDR，
+    # 逗号/分号/空格分隔）；留空则网关拒绝一切 admin API 访问。
+    "PERSEUS_ADMIN_ALLOWED_SOURCES": "",
 }
 
 
@@ -156,6 +160,12 @@ def main() -> int:
 
     for key, value in DEFAULT_VARS.items():
         env[key] = existing.get(key, value)
+
+    # 非密钥项的 .env 注释
+    comments["PERSEUS_ADMIN_ALLOWED_SOURCES"] = (
+        "Admin 控制台来源白名单 (IP / IPv4 CIDR, 逗号/分号/空格分隔; "
+        "留空=网关拒绝 admin API, 生产部署请显式填写, 如 203.0.113.10, 10.0.0.0/8)"
+    )
 
     if args.prod:
         env["PERSEUS_APP_DEBUG"] = "false"

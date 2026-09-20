@@ -36,7 +36,7 @@
 ```
 
 - **对外入口**：Nginx 仅暴露 8000 端口，统一处理 TLS、CORS 白名单、WebSocket 代理与 Git HTTP。
-- **后端**：本机端口 8001（生产）或 8000（开发），不直接对外。
+- **后端**：本机端口 8001（生产）或 8002（开发），不直接对外。
 - **HTTPS 与 CORS 由 Nginx 收敛**，应用层不配置 CORS。
 
 ## 3. 开发环境部署
@@ -269,7 +269,7 @@ docker compose exec postgres pg_dump -U perseus perseus > backup.sql
 
 - **`chown: changing ownership of '/app/config.toml': Read-only file system`**
   测试 profile 的 config.toml 为只读挂载，属预期现象；改用开发容器执行测试。
-- **514 端口冲突**：开发与生产同时运行时网关端口（8000）冲突，先 `down` 其一。
+- **端口分配**：生产网关占 `8000`、app `8001`、git-cgi `9000`；开发后端 `8002`、git-cgi `9001`、网关 `8080`，两套可同时在宿主机运行（容器内部端口各自保持 8000/9000/80 不变）。
 - **Sentry 未生效**：检查是否配置了 `PERSEUS_SENTRY_DSN`；未配置时接入层自动跳过。
 - **初始化管理员密码遗忘**：`bash scripts/mgt.sh reset-admin '新密码'` 直接重设；
   或重建容器时通过 `PERSEUS_ADMIN_PASSWORD` 重新指定（仅首启无管理员时生效）。

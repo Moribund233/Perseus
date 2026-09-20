@@ -400,8 +400,8 @@ cd scripts && bash dev-start.sh
 ```
 
 开发环境会启动：
-- **FastAPI 后端** (`:8000`) — 带热重载
-- **git-cgi 服务** (`:9000`) — Git HTTP Smart Protocol
+- **FastAPI 后端** (`:8002`) — 带热重载
+- **git-cgi 服务** (`:9001`) — Git HTTP Smart Protocol
 - **测试容器** — 运行 `pytest`
 - **前端** — 宿主机执行 `pnpm dev` (`:5173`)
 

@@ -41,13 +41,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# 配置阿里云 PyPI 镜像
-ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
-ENV PIP_TRUSTED_HOST=mirrors.aliyun.com
-ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+# 配置清华 PyPI 镜像 (阿里云 CDN 会导致容器内 pip 下载长连接卡死)
+ENV PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/
+ENV PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
+ENV UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/
 
 # 安装 UV
-RUN pip install --no-cache-dir uv -i https://mirrors.aliyun.com/pypi/simple/
+RUN pip install --no-cache-dir uv -i https://pypi.tuna.tsinghua.edu.cn/simple/
 
 # 复制依赖定义文件
 COPY pyproject.toml README.md ./

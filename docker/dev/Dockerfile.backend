@@ -39,9 +39,9 @@ RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.li
     sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list 2>/dev/null || \
     echo "deb http://mirrors.tuna.tsinghua.edu.cn/debian trixie main contrib non-free" > /etc/apt/sources.list
 
-# 配置阿里云 PyPI 镜像
-ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
-ENV PIP_TRUSTED_HOST=mirrors.aliyun.com
+# 配置清华 PyPI 镜像 (阿里云 CDN 会导致容器内 pip 下载长连接卡死)
+ENV PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/
+ENV PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
 
 # 安装系统依赖
 # git: Git 操作必需
@@ -68,11 +68,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # =============================================================================
 
 # 使用国内镜像安装 UV
-RUN pip install uv -i https://mirrors.aliyun.com/pypi/simple/ \
+RUN pip install uv -i https://pypi.tuna.tsinghua.edu.cn/simple/ \
     && uv --version
 
 # 配置 UV 使用国内镜像
-ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+ENV UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/
 
 # 设置工作目录
 WORKDIR /app

@@ -17,6 +17,10 @@ import EditorPage from './routes/editor';
 import ChatPage from './routes/chat';
 import SettingsPage from './routes/settings';
 import GlobalSearchPage from './routes/search';
+import AdminRoute from './components/admin/AdminRoute';
+import AdminConsolePage from './routes/admin';
+import OverviewSection from './routes/admin/sections/OverviewSection';
+import ComponentsSection from './routes/admin/sections/ComponentsSection';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -87,6 +91,19 @@ function AppRoutes() {
         <Route path="/chat" element={<PageTransition><ChatPage /></PageTransition>} />
         <Route path="/settings" element={<PageTransition><SettingsPage /></PageTransition>} />
         <Route path="/search" element={<PageTransition><GlobalSearchPage /></PageTransition>} />
+        <Route
+          path="/admin"
+          element={
+            <PageTransition>
+              <AdminRoute>
+                <AdminConsolePage />
+              </AdminRoute>
+            </PageTransition>
+          }
+        >
+          <Route index element={<OverviewSection />} />
+          <Route path="components" element={<ComponentsSection />} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

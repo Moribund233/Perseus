@@ -75,7 +75,126 @@
       "codeEditor": "代码编辑器",
       "teamChat": "团队聊天",
       "theme": "主题",
-      "settings": "设置"
+      "settings": "设置",
+      "admin": "管理控制台"
+    },
+    "admin": {
+      "railTitle": "系统索引",
+      "soon": "SOON",
+      "sections": {
+        "overview": "状态概览",
+        "components": "组件健康",
+        "config": "配置管理",
+        "logs": "日志查看器",
+        "operations": "运维操作",
+        "debug": "调试工具"
+      },
+      "overview": {
+        "title": "状态概览",
+        "subtitle": "应用进程、请求与平台实时状态",
+        "debugMode": "调试模式",
+        "updatedAt": "更新于 {{time}}",
+        "refresh": "刷新",
+        "loadFailed": "加载状态失败",
+        "vitals": {
+          "uptime": "运行时长",
+          "memory": "内存",
+          "cpu": "CPU",
+          "threads": "线程",
+          "connections": "连接数"
+        },
+        "process": {
+          "title": "进程",
+          "pid": "PID",
+          "memory": "内存",
+          "cpu": "CPU",
+          "threads": "线程",
+          "connections": "连接数",
+          "version": "版本",
+          "serverTime": "服务端时间",
+          "schema": "Schema"
+        },
+        "requests": {
+          "title": "请求指标",
+          "total": "累计请求",
+          "active": "活跃请求",
+          "rate": "请求速率",
+          "avgTime": "平均响应"
+        },
+        "git": {
+          "title": "Git 队列",
+          "activeClones": "进行中克隆",
+          "activePushes": "进行中推送",
+          "queue": "队列积压"
+        },
+        "platform": {
+          "title": "平台统计",
+          "repositories": "仓库数",
+          "commits": "提交数",
+          "users": "用户数",
+          "uptime": "运行时长"
+        }
+      },
+      "components": {
+        "title": "组件健康",
+        "subtitle": "编排组件状态与健康检查",
+        "filterAll": "全部",
+        "filterProblems": "异常",
+        "updatedAt": "更新于 {{time}}",
+        "refresh": "刷新",
+        "loadFailed": "加载组件状态失败",
+        "errorHint": "请确认已通过网关来源白名单放行，且当前账号为管理员",
+        "degraded": {
+          "title": "编排组件状态不可用",
+          "desc": "docker-socket-proxy 未部署或未响应，组件状态降级。"
+        },
+        "summary": {
+          "total": "组件总数",
+          "running": "运行中",
+          "stopped": "已停止",
+          "healthy": "健康",
+          "unhealthy": "异常",
+          "starting": "启动中"
+        },
+        "groups": {
+          "ingress": "接入层",
+          "application": "应用层",
+          "git": "Git 服务",
+          "data": "数据层",
+          "tasks": "任务",
+          "other": "其他"
+        },
+        "inspector": {
+          "title": "详情",
+          "hint": "点击左侧组件查看详情",
+          "name": "容器名",
+          "state": "状态",
+          "health": "健康",
+          "running": "运行中",
+          "startedAt": "启动时间",
+          "uptime": "运行时长",
+          "restarts": "重启次数",
+          "exitCode": "退出码",
+          "statusText": "状态描述"
+        },
+        "empty": "暂无组件",
+        "historyTitle": "最近检查历史",
+        "problem": "异常",
+        "health": {
+          "healthy": "healthy",
+          "unhealthy": "unhealthy",
+          "starting": "starting",
+          "stopped": "stopped",
+          "exited": "exited",
+          "running": "running",
+          "restarting": "restarting",
+          "created": "created",
+          "dead": "dead",
+          "paused": "paused",
+          "unknown": "unknown",
+          "none": "no-check"
+        }
+      }
     },
     "userMenu": {
       "profile": "个人资料",

@@ -13,6 +13,7 @@
 #
 # 交互式配置项（直接回车取方括号默认值）:
 #   网关对外端口 / 管理员用户名 / 管理员邮箱 / 镜像 tag
+#   Admin 控制台来源白名单（IP/CIDR, 逗号分隔; 留空=网关拒绝）
 #   是否启用监控栈 / 是否安装全局 perseus 命令
 #
 # 流程（内部状态机, 失败即中断）:
@@ -113,6 +114,9 @@ interactive_config() {
   user="$(prompt_value "管理员用户名" "$cur_user")"
   email="$(prompt_value "管理员邮箱" "$cur_email")"
   tag="$(prompt_value "镜像 tag" "$cur_tag")"
+  local sources cur_sources
+  cur_sources="$(env_get PERSEUS_ADMIN_ALLOWED_SOURCES)"
+  sources="$(prompt_value "Admin 控制台允许来源 (IP/CIDR, 逗号分隔; 留空=网关拒绝)" "$cur_sources")"
 
   [[ "$port" =~ ^[0-9]+$ ]] || die "网关端口必须为数字: $port"
   [[ -n "$user" ]] || die "管理员用户名不能为空"
@@ -122,6 +126,7 @@ interactive_config() {
   set_env_key "PERSEUS_ADMIN_USERNAME" "$user"
   set_env_key "PERSEUS_ADMIN_EMAIL" "$email"
   set_env_key "PERSEUS_IMAGE_TAG" "$tag"
+  set_env_key "PERSEUS_ADMIN_ALLOWED_SOURCES" "$sources"
 
   if prompt_yes_no "部署后启用监控栈 (Prometheus/Grafana)?" "n"; then
     ENABLE_MONITORING=true
@@ -160,6 +165,9 @@ main() {
     log_info ".env 已存在, 校验必需变量..."
     require_env
   fi
+
+  # 补充升级后新增的可选配置字段（旧版 .env 可能缺失; 缺失才追加, 默认空=管理员控制台拒绝）
+  ensure_env_keys PERSEUS_ADMIN_ALLOWED_SOURCES=
 
   if [[ -n "$TAG" ]]; then
     set_env_key "PERSEUS_IMAGE_TAG" "$TAG"
