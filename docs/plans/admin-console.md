@@ -4,7 +4,17 @@
 > 范围：应用管理层（admin/app）端点的前端控制台实现规划。
 > 原型：`client/prototype/admin-console.html`（总控台）、`client/prototype/admin-components.html`（组件健康）。
 
-> **2026-09-20（A/B 批次落地）**：A. 控制台骨架 + 只读概览、B. 组件健康已按第六节实施并验收——`AdminRoute`、`/admin` 壳、`OverviewSection`、`ComponentsSection`（`ComponentRow`/`StatusDot`）、`api/admin.ts`、i18n `app.admin.*`；网关侧新增 `PERSEUS_ADMIN_ALLOWED_SOURCES` 来源白名单（生产 OpenResty Lua + dev `geo`，留空=拒绝 admin API），`docker-socket-proxy`（只读）已纳入 prod/dev 编排。验证：`pnpm lint` + `pnpm build` ✅；dev 栈实测 `/api/app/status`、`/api/app/components` 200（`available:true`），prod 网关实测 `/api/app/*` 403（白名单留空 → deny-by-default）。C–F 批次（配置/日志/运维/调试/打磨）仍为待办。
+> **2026-09-20（独立入口 + 门禁）**：`/admin` 提升为**顶层路由**，不再挂在 `ProtectedRoute`/`AppLayout` 下——未认证访问不再回落到 landing，控制台也不再套主应用外壳（全屏 `.admin-console`）。新增进入前**来源预检**：`AdminRoute` 先探测 `GET /api/app/status`，`403`→「此终端未授权」拒绝页（网关 `PERSEUS_ADMIN_ALLOWED_SOURCES` 白名单），`401`→独立登录门禁 `AdminGate`（`app.admin.gate.*`），放行后已登录非管理员→「无管理员权限」拒绝页（`app.admin.denied.*`）。新增 `components/admin/{AdminGate.tsx,AdminDenied.tsx,gate.ts}` 与 `gate.test.ts`（预检归类单测）；i18n zh/en 各 731 键对齐。同时修复网关镜像构建的**同源**问题：`docker/gateway/Dockerfile` 构建时置 `VITE_API_URL=`（空=走网关同源，避免产物指向 `127.0.0.1:8002` 造成跨域）。验证：`pnpm lint` + `pnpm build` + `pnpm test`（23 用例）✅。
+
+> **2026-09-20（四项待决落地）**：① `/api/app/status` 收紧为登录可见（匿名 401，`/health` 仍公开）；② 引入 vitest（`pnpm test`，19 用例覆盖 `api/client.ts` 错误映射/401 刷新重试 + `api/admin.ts` 请求构造）；③ 日志查看器接入 `@tanstack/react-virtual` 虚拟滚动（动态测量、兼容折行），后端取行上限 1000→5000；④ 组件健康历史维持前端本地 14 次，不后端持久化。后端验证：`test` 容器 181 passed；前端验证：`pnpm lint` + `pnpm build` + `pnpm test` ✅。
+
+> **2026-09-20（F 批次打磨落地 · Admin 控制台收官）**：A–F 批次全部完成。新增 `AdminSkeleton`（ac 面板 + antd Skeleton）并在 Overview/Components/Config/Logs/Debug 首次加载时展示骨架屏；Overview 改为 status 主数据源 + platform 可选（平台统计失败时降级隐藏面板而非整页报错）；响应式补强（`ac-page-head`/`ac-op-row` 换行、`ac-env-wrap` 横向滚动、≤720px 操作按钮满宽/日志筛选换行）；无障碍键盘焦点可见（`.admin-console :focus-visible` 统一描边 + 组件行/筛选 chip 高亮）；i18n 全量复核 zh/en 各 712 键完全对齐，清理失效键 `app.admin.debug.loading`。验证：`pnpm lint` + `pnpm build` ✅。
+
+> **2026-09-20（D/E 批次落地）**：日志查看器与运维/调试已完成——`LogsSection`（日期/文件/行数/级别筛选 + 实时跟随 + 清理确认 + 级别着色终端）、`OperationsSection`（restart/shutdown 危险确认，复用 `ConfirmDangerModal`）、`DebugSection`（`/api/v1/debug/status` 账本 + PERSEUS_* 环境变量脱敏表 + admin∧debug 门控卡片 + initdb/initconf 确认）；`api/admin.ts` 新增 `logsApi`/`operationsApi`/`debugApi`，`ConfirmDangerModal` 新增 `extra` 插槽（日志清理保留天数）；`/admin/logs`、`/admin/operations`、`/admin/debug` 路由与侧栏索引全部启用；i18n `app.admin.{logs,operations,debug}.*`。仅剩 F（打磨）批次。验证：`pnpm lint` + `pnpm build` ✅。
+
+> **2026-09-20（A/B 批次落地）**：A. 控制台骨架 + 只读概览、B. 组件健康已按第六节实施并验收——`AdminRoute`、`/admin` 壳、`OverviewSection`、`ComponentsSection`（`ComponentRow`/`StatusDot`）、`api/admin.ts`、i18n `app.admin.*`；网关侧新增 `PERSEUS_ADMIN_ALLOWED_SOURCES` 来源白名单（生产 OpenResty Lua + dev `geo`，留空=拒绝 admin API），`docker-socket-proxy`（只读）已纳入 prod/dev 编排。验证：`pnpm lint` + `pnpm build` ✅；dev 栈实测 `/api/app/status`、`/api/app/components` 200（`available:true`），prod 网关实测 `/api/app/*` 403（白名单留空 → deny-by-default）。C–F 批次（配置/日志/运维/调试/打磨）后续落地（见 D/E 注）。
+
+> **2026-09-20（C 批次落地）**：配置管理已按第六节实施并验收——`ConfigSection` + `ConfigFieldEditor`（按类型推断 bool/int/list/enum 控件）+ `configField.ts`（可编辑节 / 受保护节 / 只读字段清单）、`ConfirmDangerModal`（危险操作确认词）、`api/admin.ts` 新增 `configApi`（get/update/validate/reset）、`/admin/config` 路由、i18n `app.admin.config.*`。受保护节渲染为只读账本，可编辑节中 `database.url`、`server.reload` 等只读字段标注「只读」。验证：`pnpm lint` + `pnpm build` ✅；dev 栈网关实测 `GET /api/app/config`、`validate`、`update`（no-op 返回重启 `hints`）、受保护节/只读字段负路径 ✅；Playwright 冒烟（经网关登录 → `/admin/config`：section 索引、只读标注、脏值计数「N 处修改」、校验横幅「配置校验通过」、reset 需输入 `RESET` 确认词方可继续）✅；只读挂载下的 reset 失败提示依赖后端错误透传（未在 dev 实测）。D–F 批次（日志/运维/调试/打磨）于 D/E 落地（见首注），仅剩 F（打磨）待办。
 
 ---
 
@@ -26,7 +36,8 @@ Perseus 后端已具备一组应用管理端点（配置、日志、运维、调
 
 | 档位 | 判定 | 可访问 |
 |---|---|---|
-| 公开 | 无需认证 | `/`、`/health`、`/api/app/status`、`/api/v1/stats/platform` |
+| 公开 | 无需认证 | `/`、`/health`、`/api/v1/stats/platform` |
+| 登录可见 | 任意已认证用户 | `/api/app/status`（状态/进程/请求/Git/schema；2026-09-20 由公开收紧） |
 | 管理员 或 调试模式 | `current_user.is_admin` 或 `config.app.debug` | 配置读写/校验/重置、日志读取/清理、关机/重启 |
 | 管理员 且 调试模式 | `is_admin && app.debug` | 调试工具：`/api/v1/debug/status`、`initdb`、`initconf` |
 | 仅管理员 | `is_admin` | 编排组件状态 `/api/app/components` |
@@ -42,13 +53,13 @@ Perseus 后端已具备一组应用管理端点（配置、日志、运维、调
 
 图例：✅ 后端就绪且已验证 · ⚠️ 就绪但有前置/语义注意 · ⛔ 存在缺口。
 
-### 3.1 状态与统计（公开）
+### 3.1 状态与统计（公开 / 登录可见）
 
 | 端点 | 方法 | 权限 | 状态 | 备注 |
 |---|---|---|---|---|
 | `/` | GET | 公开 | ✅ | 欢迎信息（title/version/status） |
 | `/health` | GET | 公开 | ✅ | 健康检查（网关/容器 healthcheck 亦用） |
-| `/api/app/status` | GET | 公开 | ✅ | 进程/请求/Git/schema；生产出口由网关 `PERSEUS_ADMIN_ALLOWED_SOURCES` 来源白名单门控（空=拒绝），白名单实现见 `docker/gateway/nginx.conf`（Lua）与 `docker/dev/nginx.dev.conf`（geo） |
+| `/api/app/status` | GET | 登录可见 | ✅ | 进程/请求/Git/schema；**2026-09-20 收紧为登录可见**（`Depends(get_current_user)`，匿名 401），直连后端亦不可匿名读取；生产出口仍叠加网关 `PERSEUS_ADMIN_ALLOWED_SOURCES` 来源白名单（空=拒绝），白名单实现见 `docker/gateway/nginx.conf`（Lua）与 `docker/dev/nginx.dev.conf`（geo） |
 | `/api/v1/stats/platform` | GET | 公开 | ✅ | 仓库/提交/用户数 + 运行时长 |
 
 ### 3.2 配置管理（admin 或 debug）
@@ -97,15 +108,15 @@ Perseus 后端已具备一组应用管理端点（配置、日志、运维、调
 
 ## 四、已知缺口与待决问题
 
-| 项 | 说明 | 建议 |
-|---|---|---|
-| `/api/app/status` 公开 | 暴露 pid/内存/线程/连接数 | 评估收紧为登录可见；或保留但前端不展示敏感字段 |
-| shutdown 语义 | `unless-stopped` 下自动拉起 | UI 文案明确"重启/停止将触发编排重启"；真正停机引导到运维脚本 |
-| config 只读节/字段 | 受保护节、`database.url`、`server.reload` 不可改 | 前端只读展示并标注原因 |
-| logs 无分页 | 仅按行数取末尾 | 大日志场景用虚拟滚动 + 级别过滤 |
-| 组件健康无历史 | 端点只给当前快照 | 前端本地维护最近 N 次检查做迷你历史条；如需持久化另开需求 |
-| debug 工具环境变量脱敏 | 敏感值 `***masked***` | 前端原样展示，不缓存 |
-| 前端无单测框架 | 仅 `eslint` + `tsc -b` + 手动 | 本期靠类型/lint；后续可引入 vitest 覆盖 api 封装 |
+| 项 | 说明 | 建议 | 决策（2026-09-20） |
+|---|---|---|---|
+| `/api/app/status` 公开 | 暴露 pid/内存/线程/连接数 | 评估收紧为登录可见；或保留但前端不展示敏感字段 | ✅ **收紧为登录可见**：后端加 `Depends(get_current_user)`（匿名 401），`/health` 仍公开探活；前端仅 admin 已登录场景调用，无影响 |
+| shutdown 语义 | `unless-stopped` 下自动拉起 | UI 文案明确"重启/停止将触发编排重启"；真正停机引导到运维脚本 | — |
+| config 只读节/字段 | ~~受保护节、`database.url`、`server.reload` 不可改~~ | ✅ 已落地（C）：受保护节只读账本；可编辑节内只读字段标注「只读」并禁用编辑 | ✅ C 批次已落地 |
+| logs 无分页 | 仅按行数取末尾 | 大日志场景用虚拟滚动 + 级别过滤 | ✅ **已落地**：`@tanstack/react-virtual` 虚拟滚动（动态测量行高、兼容折行），后端取行上限 1000→5000，前端行数档位加 2000/5000 |
+| 组件健康无历史 | 端点只给当前快照 | 前端本地维护最近 N 次检查做迷你历史条；如需持久化另开需求 | ✅ **维持前端本地**（14 次），不后端持久化 |
+| debug 工具环境变量脱敏 | 敏感值 `***masked***` | 前端原样展示，不缓存 | — |
+| 前端无单测框架 | 仅 `eslint` + `tsc -b` + 手动 | 本期靠类型/lint；后续可引入 vitest 覆盖 api 封装 | ✅ **引入 vitest**：覆盖 `api/client.ts` 错误映射/401 刷新重试 + `api/admin.ts` 请求构造（19 用例） |
 
 ---
 
@@ -147,8 +158,10 @@ client/web/src/
     AdminRoute.tsx                  # 管理员守卫
     ComponentRow.tsx                # 组件行 + 迷你历史
     StatusDot.tsx / HealthChip.tsx
-    ConfirmDangerModal.tsx          # 输入确认词的危险操作弹窗
+    ConfirmDangerModal.tsx          # 输入确认词的危险操作弹窗（C 批次已落地）
     KeyValueLedger.tsx
+    ConfigFieldEditor.tsx           # 配置字段编辑器（类型推断：bool/int/list/enum）
+    configField.ts                  # 可编辑节 / 受保护节 / 只读字段 / 控件类型映射
   api/admin.ts                      # 端点封装（类型化）
   stores/admin.ts                   # 轮询与选择状态（zustand）
   i18n/locales/{zh,en}.json         # app.admin.* 文案
@@ -157,6 +170,8 @@ client/web/src/
 ### 5.4 API 客户端（`api/admin.ts`）
 
 封装：`getStatus`、`getPlatformStats`、`getComponents`、`getConfig(section?)`、`updateConfig`、`validateConfig`、`resetConfig`、`getLogInfo`、`getLogContent`、`cleanupLogs`、`restart`、`shutdown`、`getDebugStatus`、`initdb`、`initconf`。
+
+> 现状：`configApi`（get/update/validate/reset）已于 C 批次实现；`logsApi`/`operationsApi`/`debugApi` 已于 D/E 批次补齐。
 
 约定：
 - 复用 `api/client.ts` 的 `apiRequest`（带 Bearer）。
@@ -177,10 +192,10 @@ client/web/src/
 |---|---|---|---|
 | **A. 控制台骨架 + 只读概览** ✅（2026-09-20） | `AdminRoute`、`/admin` 壳、`OverviewSection`（status+platform）、`api/admin.ts` 基础、i18n 骨架 | 无 | 管理员可进入；非管理员被挡；概览数据真实、5s 刷新 |
 | **B. 组件健康** ✅（2026-09-20） | `ComponentsSection` + `ComponentRow`/`StatusDot`、10s 轮询、异常过滤、降级态 | 部署 `docker-socket-proxy` | 组件状态/健康/重启真实；proxy 停掉显示降级而非报错 |
-| **C. 配置管理** | `ConfigSection`：分节表单、只读节、脏值、validate、reset、重启提示 | 无 | 受保护节不可改；校验/重置正确；只读挂载提示 |
-| **D. 日志查看器** | `LogsSection`：日期/文件/行数/级别、跟随、清理 | 无 | 过滤正确；清理需确认；大日志不卡顿 |
-| **E. 运维 + 调试** | `OperationsSection`、`DebugSection`、`ConfirmDangerModal` | 无 | 危险操作需输入确认词；debug 门控正确 |
-| **F. 打磨** | 骨架屏、空/错/降级态、响应式、i18n 全量、lint/类型 | A–E | `pnpm lint` + `pnpm build` 通过；无障碍焦点可见 |
+| **C. 配置管理** ✅（2026-09-20） | `ConfigSection`：分节表单、只读节、脏值、validate、reset、重启提示 | 无 | 受保护节不可改；校验/重置正确；只读挂载提示 |
+| **D. 日志查看器** ✅（2026-09-20） | `LogsSection`：日期/文件/行数/级别、跟随、清理；**虚拟滚动**（`@tanstack/react-virtual`，收口 2026-09-20，取行上限 5000） | 无 | 过滤正确；清理需确认；大日志不卡顿 |
+| **E. 运维 + 调试** ✅（2026-09-20） | `OperationsSection`、`DebugSection`（危险操作复用 C 批次 `ConfirmDangerModal`） | C（弹窗） | 危险操作需输入确认词；debug 门控正确 |
+| **F. 打磨** ✅（2026-09-20） | 骨架屏、空/错/降级态、响应式、i18n 全量、lint/类型 | A–E | `pnpm lint` + `pnpm build` 通过；无障碍焦点可见 |
 
 ---
 
@@ -192,10 +207,10 @@ client/web/src/
 - `tests/test_app_service.py`：重启命令构建、日志清理删除。
 - `tests/api/test_api_contract.py`：admin/debug 路由契约。
 
-**前端**（无单测框架，当前靠静态检查 + 手动）：
-- `pnpm lint`、`pnpm build`（`tsc -b && vite build`）。
+**前端**（已引入 vitest，见下）：
+- `pnpm lint`、`pnpm build`（`tsc -b && vite build`）、`pnpm test`（`vitest run`）。
 - 手动验收矩阵：管理员/非管理员 × debug 开/关 × proxy 可用/不可用。
-- 建议后续引入 vitest 覆盖 `api/admin.ts` 的错误映射与门控逻辑。
+- ✅ `src/api/client.test.ts`：错误映射（`detail`/`error.message`/纯文本）、204、请求头、401 刷新重试与认证端点豁免；`src/api/admin.test.ts`：各 api 封装的路径/方法/查询串构造。
 
 ---
 

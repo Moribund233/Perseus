@@ -127,10 +127,10 @@ images_are_remote() { [[ -n "$(image_prefix)" ]]; }
 build_images() {
   if images_are_remote; then
     log_info "使用私有仓库镜像 ($(image_prefix)/*:$(env_get PERSEUS_IMAGE_TAG)), 执行 pull..."
-    compose pull app collab git-cgi sshd init
+    compose pull app collab git-cgi gateway sshd init
   else
     log_info "本地源码构建业务镜像 (perseus-*:$(env_get PERSEUS_IMAGE_TAG))..."
-    compose build app collab git-cgi sshd init
+    compose build app collab git-cgi gateway sshd init
   fi
 }
 

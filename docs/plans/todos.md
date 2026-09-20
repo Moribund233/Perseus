@@ -2,7 +2,11 @@
 
 > **创建日期**: 2026-09-15
 > **用途**: 汇总 2026-09-15 文档盘点发现的待迭代任务与文档滞后项，作为后续排期与迭代输入。
-> **最近更新**: 2026-09-18（批次 H 收尾：JWT 撤销黑名单 + `POST /auth/logout`、多语言符号解析、PR 审阅者列表、测试补齐 `test_app_service`/`test_database_manager`、参与者未保存徽标、聊天单会话检索；文档滞后项二次回填：F-602 Discussions / F-604 文件移动 / 自动落盘草稿分支 / desktop y-monaco / M2+ 待排期均已过期标注为完成）；
+> **最近更新**: 2026-09-20（Admin 概览页可视化：vitals 迷你趋势（`Tiny.Line/Area`）+ 运行趋势（请求速率面积图 / 平均响应折线 / 成功失败环图）+ 最近日志面板，历史走前端 60 点滚动缓冲；引入 `@ant-design/charts` 并按路由懒加载（charts chunk 仅访问 /admin 时加载）；移除主应用侧边栏 admin 入口（主应用面向用户、不做 admin 鉴权，控制台仅 `/admin` 独立入口）；i18n 全量审计并补齐 23 个缺失键（editor/chat/settings/repositories/releases），zh/en 各 770 键对齐）；
+> 2026-09-20（Admin 控制台**独立入口 + 门禁**：`/admin` 提为顶层路由（不再经 `ProtectedRoute`/`AppLayout`），未认证不再回落 landing；进入前 `GET /api/app/status` 来源预检（403=网关白名单拒绝页 / 401=独立登录门禁 `AdminGate`），已登录非管理员=拒绝页；修复 Overview 请求指标与后端 `{total,success,failed,avg_response_time_ms,requests_per_minute}` 不一致导致的渲染崩溃；网关镜像构建置 `VITE_API_URL=` 实现同源）；
+> 2026-09-20（DevOps：Web 前端改为**网关镜像内多阶段构建**——`docker/gateway/Dockerfile` 在 Node 阶段构建 `client/web`，产物内嵌 OpenResty 镜像，`install.sh`/`perseus update` 经 `build_images` 自动产出，宿主机无需 Node/pnpm；修复同步脚本 `repositories`/`data`/`logs` 过度排除导致嵌套源码漏同步）；
+> 2026-09-20（Admin 控制台 A–F 批次全部完成收官，见 6.4；D 日志查看器 + E 运维/调试 + F 打磨落地）；
+> 2026-09-18（批次 H 收尾：JWT 撤销黑名单 + `POST /auth/logout`、多语言符号解析、PR 审阅者列表、测试补齐 `test_app_service`/`test_database_manager`、参与者未保存徽标、聊天单会话检索；文档滞后项二次回填：F-602 Discussions / F-604 文件移动 / 自动落盘草稿分支 / desktop y-monaco / M2+ 待排期均已过期标注为完成）；
 > 2026-09-17（批次 0/1/3/5/7 完成；会话 TTL 延迟销毁 + Redis 多副本/会话持久化落地；collab 网关多副本收紧：广播私密性/容量上限/403 即时吊销；构建日志流式、自动落盘草稿分支、协作会话级角色覆盖层落地；后端闭环补齐：邀请 token 撤销体系 + push 路径增量索引；test 服务补挂载 alembic）；
 > 2026-09-16（批次 2 邀请链接后端+网关+web 完成）
 > **关联**: `docs/api/roadmap.md`、`docs/plans/frontend-placeholders.md`、`docs/plans/collab-f204-vs-cwm.md`、`docs/plans/desktop-port-sync.md`
@@ -175,6 +179,12 @@
 |------|----------|------|----------|
 | A. 控制台骨架 + 只读概览 ✅（2026-09-20） | `AdminRoute` 守卫、`/admin` 壳、`OverviewSection`（status+platform，5s 轮询）、`api/admin.ts`、i18n `app.admin.*` | `pnpm lint`+`pnpm build` ✅；dev 栈 `/api/app/status` 200 | `client/web/src/routes/admin/`、`components/admin/`、`api/admin.ts` |
 | B. 组件健康 ✅（2026-09-20） | `ComponentsSection` + `ComponentRow`/`StatusDot`、10s 轮询、异常过滤、`available:false` 降级；网关白名单门控 | dev `/api/app/components` 200 `available:true`；prod `/api/app/*` 403（白名单留空） | 同上 + `docker/gateway/nginx.conf`、`docker/dev/nginx.dev.conf` |
+| C. 配置管理 ✅（2026-09-20） | `ConfigSection` 分节表单（受保护节只读账本 + 可编辑节只读字段标注）、`ConfigFieldEditor`、`configField.ts`（可编辑节/只读字段/控件类型映射）；脏值计数、validate、reset（`ConfirmDangerModal` 确认词）、重启提示；i18n `app.admin.config.*` | `pnpm lint`+`pnpm build` ✅；dev 网关实测 get/validate/update(noop→重启 hints)/受保护负路径 ✅；Playwright 冒烟：只读标注、脏值计数、校验横幅、reset 校验词门控 ✅ | `api/admin.ts`（configApi）、`components/admin/{configField.ts,ConfigFieldEditor.tsx,ConfirmDangerModal.tsx}`、`routes/admin/sections/ConfigSection.tsx` |
+| D. 日志查看器 ✅（2026-09-20） | `LogsSection` 日志终端（日期/文件/行数/级别筛选、级别着色、实时跟随 5s 轮询自动滚底、计数）＋ `confirmWord=CLEANUP` 清理确认（`ConfirmDangerModal` 新增 `extra` 插槽放保留天数）；i18n `app.admin.logs.*` | `pnpm lint`+`pnpm build` ✅ | `api/admin.ts`（logsApi）、`routes/admin/sections/LogsSection.tsx`、`components/admin/{ConfirmDangerModal.tsx,admin.css}` |
+| E. 运维 + 调试 ✅（2026-09-20） | `OperationsSection`（restart/shutdown 危险确认 RESTART/SHUTDOWN）、`DebugSection`（`/api/v1/debug/status` 账本 + `PERSEUS_*` 环境变量脱敏表 + `admin∧debug` 门控卡片 + initdb/initconf 确认 `RESET DATABASE`/`RESET CONFIG`）；i18n `app.admin.{operations,debug}.*` | `pnpm lint`+`pnpm build` ✅；debug 门控在未开 `app.debug` 时显示置灰说明（不请求 403 端点） | `api/admin.ts`（operationsApi/debugApi）、`routes/admin/sections/{OperationsSection,DebugSection}.tsx`、`App.tsx`、`routes/admin/index.tsx`（侧栏全启用） |
+| F. 打磨 ✅（2026-09-20） | `AdminSkeleton` 统一骨架屏（Overview/Components/Config/Logs/Debug 首屏）；Overview 平台统计降级隐藏；响应式补强（页面头/运维行换行、环境表横向滚动、≤720px 适配）；键盘焦点可见（`.admin-console :focus-visible`）；i18n zh/en 各 712 键对齐 | `pnpm lint`+`pnpm build` ✅ | `components/admin/AdminSkeleton.tsx`、`routes/admin/sections/*`、`components/admin/admin.css`、i18n `{zh,en}.json` |
+
+> **收尾决策（2026-09-20，见 admin-console 四）：** `/api/app/status` 由公开**收紧为登录可见**（后端 `get_current_user`，匿名 401，`/health` 仍公开；对应 `tests/test_app_admin_api.py::TestStatusEndpoint`、`test_controller_coverage::test_app_status`）；日志查看器**虚拟滚动**落地（`@tanstack/react-virtual`，后端取行上限 1000→5000，`TestLogsContentLineCap`）；引入 **vitest**（`pnpm test`，`client.test.ts` 错误映射/401 刷新重试 + `admin.test.ts` 请求构造，19 用例）；组件健康历史**维持前端本地**（14 次），不持久化。验证：`test` 容器 181 passed；前端 lint/build/test 全绿。
 
 ---
 
@@ -188,6 +198,10 @@
 | 双态徽标「版本 N」 | ✅ **已决策（2026-09-18）并落地**：网关 `versionCounter.mjs`（Redis INCR 持久计数、无 Redis 回退内存）随 `collab-saved` 广播 `version`；web 状态栏 / desktop StatusBar 显示「会话已同步 · v{N}」 | 同上 3.3 |
 | 邀请链接默认存在 | ✅ **已决策（2026-09-16）：仅成员可分享**（非任意文档可分享），被邀请人凭 token 获会话级临时权限 | M2 设计时明确 |
 | **CI 执行器形态** | ✅ **已决策（2026-09-16）：仅外部回调（GHA 式）**，push 触发 build 即可排期 | 6.2 分析（2026-09-15） |
+| `/api/app/status` 公开 | ✅ **已决策（2026-09-20）：收紧为登录可见**（后端 `get_current_user`，匿名 401；`/health` 仍公开） | `admin-console.md` 四 |
+| 前端 vitest | ✅ **已决策（2026-09-20）：引入 vitest**（`pnpm test`，覆盖 `api/client.ts` 错误映射/401 刷新重试 + `api/admin.ts` 请求构造） | `admin-console.md` 四 |
+| 日志大文件虚拟滚动 | ✅ **已决策（2026-09-20）：落地**（`@tanstack/react-virtual`，后端取行上限 5000） | `admin-console.md` 四 |
+| 组件健康持久化 | ✅ **已决策（2026-09-20）：维持前端本地 14 次**，不后端持久化 | `admin-console.md` 四 |
 
 ---
 

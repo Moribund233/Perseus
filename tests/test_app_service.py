@@ -50,20 +50,20 @@ def test_get_status_shape(service):
     assert status["status"] == "running"
     assert status["version"] == "1.0.0"
     assert status["uptime_seconds"] >= 0
-    assert status["requests"]["total_requests"] == 0
+    assert status["requests"]["total"] == 0
     assert "git_operations" in status
     assert "process" in status
 
 
 def test_get_status_accepts_requests_info(service):
     """调用方传入的请求统计应原样透出"""
-    status = service.get_status(requests_info={"total_requests": 7})
-    assert status["requests"]["total_requests"] == 7
+    status = service.get_status(requests_info={"total": 7})
+    assert status["requests"]["total"] == 7
 
 
 def test_default_info_helpers(service):
     """默认请求/Git 统计字段"""
-    assert service._get_default_requests_info()["total_requests"] == 0
+    assert service._get_default_requests_info()["total"] == 0
     assert service._get_git_operations_info()["queue_size"] == 0
 
 

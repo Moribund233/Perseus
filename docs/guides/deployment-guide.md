@@ -11,7 +11,7 @@
 |------|---------|------|
 | Docker | 20.10+（含 Compose V2） | 生产部署要求 Docker Compose v2 |
 | Python | 3.12.x | 仅后端独立运行需要 |
-| Node.js | 20+（pnpm 10+） | 仅前端构建需要（可选） |
+| Node.js | 20+（pnpm 10+） | 仅本地前端开发需要；部署时在容器内构建，无需安装 |
 | 内存 | 后端 2G / 数据库 1G | 生产推荐 8G+ |
 
 ## 2. 部署架构
@@ -143,13 +143,19 @@ docker compose up -d
 | app | 127.0.0.1:8001 | 业务 | FastAPI 主服务，健康检查 `/health` |
 | collab | 内网 | 业务 | 协作 Yjs/Hocuspocus 网关 |
 | git-cgi | 127.0.0.1:9000 | 业务 | Git HTTP Smart Protocol |
-| gateway | 8000 | 业务 | OpenResty 统一入口 |
+| gateway | 8000 | 业务 | OpenResty 统一入口（镜像内嵌 Web 构建产物） |
 | sshd | 127.0.0.1:2222 | 业务 | Git over SSH（可选） |
 | init | 一次性 profile | 业务 | 数据库初始化任务（迁移 + 管理员引导） |
 
 版本控制：`PERSEUS_IMAGE_TAG`（默认 `latest`）贯穿全部业务镜像；推送私有仓库时设置
 `PERSEUS_IMAGE_PREFIX=registry.example.com/perseus`，`install.sh`/`mgt.sh` 将改用
 `docker compose pull`。
+
+> **前端静态资源**：Web 前端在网关镜像内构建（`docker/gateway/Dockerfile` 多阶段：
+> Node 构建 `client/web` → 产物复制到 OpenResty 的 `/var/www/perseus-web`），
+> 因此一键部署/升级无需宿主机安装 Node/pnpm，`perseus-gateway` 镜像自带最新 UI。
+> 修改前端后重建该镜像即可生效（`perseus update`，或 `docker compose build gateway
+> && docker compose up -d gateway`）。
 
 > **初始化与运行解耦**：schema 迁移/管理员引导由一次性 `init` 任务负责，
 > `app` 启动时仅做只读就绪校验（`PERSEUS_INIT_DATABASE=false`），schema 未就绪会拒绝启动

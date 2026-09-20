@@ -148,15 +148,18 @@ services:
           cpus: '0.1'
           memory: 32M
 
-  # OpenResty 网关
+  # OpenResty 网关（镜像内嵌 Web 构建产物，见 docker/gateway/Dockerfile）
   gateway:
-    image: openresty/openresty:1.31.1.1-0-bookworm-fat
+    image: ${PERSEUS_IMAGE_PREFIX:-perseus}-gateway:${PERSEUS_IMAGE_TAG:-latest}
+    build:
+      # 上下文为 client/web：容器内完成 pnpm build，宿主机无需 Node/pnpm
+      context: ./client/web
+      dockerfile: ../../docker/gateway/Dockerfile
     container_name: perseus-gateway
     ports:
       - "${PERSEUS_GATEWAY_PORT:-8000}:8000"
     volumes:
       - ./docker/gateway/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
-      - /var/www/perseus-web:/var/www/perseus-web:ro
       - /etc/localtime:/etc/localtime:ro
     environment:
       # Admin 控制台来源白名单 (IP / IPv4 CIDR，逗号分号或空格分隔)。

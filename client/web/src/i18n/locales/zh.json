@@ -75,12 +75,34 @@
       "codeEditor": "代码编辑器",
       "teamChat": "团队聊天",
       "theme": "主题",
-      "settings": "设置",
-      "admin": "管理控制台"
+      "settings": "设置"
     },
     "admin": {
       "railTitle": "系统索引",
       "soon": "SOON",
+      "gate": {
+        "title": "管理控制台",
+        "subtitle": "请输入管理员账号以继续",
+        "username": "用户名",
+        "password": "密码",
+        "usernameRequired": "请输入用户名",
+        "passwordRequired": "请输入密码",
+        "submit": "进入控制台",
+        "loginFailed": "登录失败，请检查用户名与密码",
+        "notAdmin": "该账号不是管理员，无法访问控制台",
+        "backHome": "返回首页"
+      },
+      "denied": {
+        "sourceTitle": "此终端未授权访问控制台",
+        "sourceDesc": "网关来源白名单拒绝了当前地址。请从已授权的终端访问，或将你的来源 IP 加入 PERSEUS_ADMIN_ALLOWED_SOURCES。",
+        "networkTitle": "无法连接控制台服务",
+        "networkDesc": "访问校验请求失败，请确认服务可用后重试。",
+        "notAdminTitle": "无管理员权限",
+        "notAdminDesc": "当前账号已登录，但不是管理员，无法访问控制台。",
+        "retry": "重试",
+        "backHome": "返回首页",
+        "logout": "退出登录"
+      },
       "sections": {
         "overview": "状态概览",
         "components": "组件健康",
@@ -101,7 +123,26 @@
           "memory": "内存",
           "cpu": "CPU",
           "threads": "线程",
-          "connections": "连接数"
+          "connections": "连接数",
+          "requestRateNote": "请求速率",
+          "windowNote": "近 60 次采样"
+        },
+        "trends": {
+          "title": "运行趋势",
+          "window": "近 {{count}} 次采样",
+          "collecting": "正在采集数据…",
+          "requestRate": "请求速率",
+          "avgResponse": "平均响应",
+          "outcome": "请求结果",
+          "success": "成功",
+          "failed": "失败",
+          "noOutcome": "暂无请求"
+        },
+        "recentLogs": {
+          "title": "最近日志",
+          "hint": "最后 {{count}} 行",
+          "open": "打开日志",
+          "empty": "暂无日志"
         },
         "process": {
           "title": "进程",
@@ -117,7 +158,8 @@
         "requests": {
           "title": "请求指标",
           "total": "累计请求",
-          "active": "活跃请求",
+          "success": "成功",
+          "failed": "失败",
           "rate": "请求速率",
           "avgTime": "平均响应"
         },
@@ -194,6 +236,136 @@
           "unknown": "unknown",
           "none": "no-check"
         }
+      },
+      "config": {
+        "title": "配置管理",
+        "subtitle": "应用配置编辑、校验与重置（修改需重启的项目会给出提示）",
+        "dirty": "{{count}} 处修改",
+        "refresh": "刷新",
+        "runValidate": "校验",
+        "loadFailed": "加载配置失败",
+        "loadEmpty": "配置为空或响应异常",
+        "editable": "可编辑",
+        "protected": "受保护",
+        "readonly": "只读",
+        "field": {
+          "listHint": "每行一个取值，或回车分隔"
+        },
+        "validate": {
+          "ok": "配置校验通过",
+          "bad": "配置校验未通过"
+        },
+        "save": {
+          "button": "保存",
+          "saved": "配置已保存",
+          "failed": "保存配置失败",
+          "restartHint": "以下配置项修改后需要重启服务才能生效"
+        },
+        "reset": {
+          "button": "重置配置",
+          "title": "重置配置",
+          "desc": "将配置文件恢复为 config.example.toml 的默认值。若配置文件为只读挂载，重置将失败并提示（不会损坏现有配置）。",
+          "confirmAction": "确认重置",
+          "done": "配置已重置为默认值",
+          "failed": "重置配置失败"
+        }
+      },
+      "logs": {
+        "title": "日志查看器",
+        "subtitle": "按日期、文件与级别检索运行日志；支持实时跟随与清理",
+        "date": "日期",
+        "file": "文件",
+        "lines": "行数",
+        "all": "ALL",
+        "follow": "实时跟随",
+        "followOn": "停止跟随",
+        "following": "FOLLOW",
+        "paused": "PAUSED",
+        "refresh": "刷新",
+        "updatedAt": "更新于 {{time}}",
+        "loadFailed": "加载日志失败",
+        "loading": "加载中…",
+        "empty": "当前条件无日志",
+        "count": "{{shown}} / {{total}} 行",
+        "cleanup": {
+          "button": "清理旧日志",
+          "title": "清理旧日志",
+          "desc": "删除保留天数之外的日志目录与文件。默认保留最近 30 天（1–365）。",
+          "confirmAction": "清理日志",
+          "keepDays": "保留天数",
+          "done": "已清理 {{count}} 个旧日志目录（保留最近 {{days}} 天）",
+          "failed": "日志清理失败"
+        }
+      },
+      "operations": {
+        "title": "运维操作",
+        "subtitle": "应用级关机与重启；危险操作需输入确认词",
+        "failed": "操作执行失败",
+        "restart": {
+          "title": "重启服务",
+          "flag": "短暂中断",
+          "desc": "触发优雅关闭并按当前运行方式重新拉起进程。调试模式下由 Uvicorn 接管，生产模式下重新执行启动命令。进行中的请求可能被中断。",
+          "endpoint": "POST /api/app/restart · 需要 is_admin 或 app.debug",
+          "action": "重启服务",
+          "confirmWord": "RESTART",
+          "done": "重启已触发"
+        },
+        "shutdown": {
+          "title": "关闭服务",
+          "flag": "服务停止",
+          "desc": "广播关闭消息、断开全部 WebSocket 连接、释放数据库连接池，然后终止进程。关闭后需人工重新启动。",
+          "endpoint": "POST /api/app/shutdown · 需要 is_admin 或 app.debug",
+          "action": "关闭服务",
+          "confirmWord": "SHUTDOWN",
+          "done": "关闭已触发"
+        }
+      },
+      "debug": {
+        "title": "调试工具",
+        "subtitle": "破坏性调试接口，仅调试模式下对管理员开放",
+        "gate": "需要调试模式",
+        "gateDesc": "调试工具接口要求同时满足 is_admin 与 app.debug。当前服务未开启调试模式（app.debug=false），无法访问。",
+        "loadFailed": "加载调试状态失败",
+        "done": "操作已执行",
+        "failed": "操作执行失败",
+        "status": {
+          "title": "调试状态",
+          "debugMode": "调试模式",
+          "configPath": "配置文件",
+          "databaseType": "数据库类型",
+          "databaseUrl": "数据库 URL",
+          "stressTest": "压力测试模式",
+          "yes": "存在",
+          "no": "不存在"
+        },
+        "env": {
+          "title": "环境变量",
+          "hint": "PERSEUS_* · 敏感值已脱敏",
+          "key": "KEY",
+          "value": "VALUE",
+          "empty": "无 PERSEUS_* 环境变量"
+        },
+        "initdb": {
+          "title": "重置数据库",
+          "flag": "数据销毁",
+          "desc": "删除全部数据表并重新创建，启动时重新引导管理员账号。所有仓库元数据、用户、Issue、PR 将永久丢失。",
+          "endpoint": "POST /api/v1/debug/initdb · 需要 is_admin 且 app.debug",
+          "action": "重置数据库",
+          "confirmWord": "RESET DATABASE",
+          "done": "数据库已重置"
+        },
+        "initconf": {
+          "title": "重置配置文件",
+          "flag": "配置销毁",
+          "desc": "删除当前 config.toml，从 config.example.toml 重新生成默认配置。原文件会带时间戳备份。",
+          "endpoint": "POST /api/v1/debug/initconf · 需要 is_admin 且 app.debug",
+          "action": "重置配置",
+          "confirmWord": "RESET CONFIG",
+          "done": "配置文件已重置"
+        }
+      },
+      "danger": {
+        "typeToConfirm": "输入「{{word}}」以继续"
       }
     },
     "userMenu": {
@@ -227,6 +399,7 @@
     },
     "repositories": {
       "title": "仓库",
+      "noRepos": "暂无仓库",
       "explorer": "资源管理器",
       "filter": {
         "mine": "我的仓库",
@@ -242,11 +415,13 @@
         "watch": "关注",
         "unwatch": "取消关注",
         "star": "星标",
+        "unstar": "取消星标",
         "fork": "派生"
       },
       "watchFailed": "更新关注状态失败",
       "forkSuccess": "已派生仓库 {{name}}",
       "forkFailed": "派生仓库失败",
+      "notFound": "未找到仓库",
       "visibility": {
         "public": "公开",
         "private": "私有"
@@ -267,6 +442,7 @@
         "save": "保存",
         "cancel": "取消",
         "empty": "暂无发行版，创建一个吧",
+        "required": "此项为必填",
         "badgeDraft": "草稿",
         "badgePrerelease": "预发布",
         "by": "发布者",
@@ -584,7 +760,23 @@
       "moveFileTitle": "移动文件",
       "movePathPlaceholder": "目标路径（可含目录），如 src/utils.ts",
       "moveMessagePlaceholder": "提交信息",
-      "fileMoved": "已移动 {{to}}"
+      "fileMoved": "已移动 {{to}}",
+      "saved": "已提交 {{id}}",
+      "fileCreated": "已创建 {{name}}",
+      "selectRepository": "请从仓库列表选择一个仓库以浏览代码",
+      "newFile": "新建文件",
+      "unsaved": "有未保存的更改",
+      "commit": "Commit",
+      "edit": "Edit",
+      "preview": "Preview",
+      "lnCol": "Ln {{line}}, Col {{col}}",
+      "unsavedShort": "● 未保存",
+      "commitTitle": "提交更改 — {{tab}}",
+      "commitOk": "提交到 {{branch}}",
+      "commitHint": "更改将作为一次 Git 提交推送到默认分支",
+      "newFileTitle": "新建文件",
+      "create": "创建",
+      "newFilePlaceholder": "例如 src/utils/helpers.ts 或 README.md"
     },
     "teamChat": {
       "title": "团队聊天",
@@ -620,7 +812,8 @@
       "unmutedShort": "响铃",
       "searchMessages": "搜索消息",
       "searchScopeAll": "全部会话",
-      "searchScopeRoom": "本会话"
+      "searchScopeRoom": "本会话",
+      "attach": "上传附件"
     },
     "settings": {
       "title": "设置",
@@ -630,6 +823,9 @@
       "notifications": "通知",
       "preferences": "偏好设置",
       "save": "保存",
+      "saveSuccess": "保存成功",
+      "saveError": "保存失败",
+      "passwordMismatch": "两次输入的密码不一致",
       "saveChanges": "保存更改",
       "cancel": "取消",
       "changeAvatar": "更换头像",

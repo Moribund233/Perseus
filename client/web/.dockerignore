@@ -1,0 +1,9 @@
+# 网关镜像构建上下文 = client/web，仅发送构建所需文件
+node_modules
+dist
+.vite
+coverage
+*.local
+.env
+.env.*
+.DS_Store

@@ -75,12 +75,34 @@
       "codeEditor": "Code Editor",
       "teamChat": "Team Chat",
       "theme": "Theme",
-      "settings": "Settings",
-      "admin": "Admin Console"
+      "settings": "Settings"
     },
     "admin": {
       "railTitle": "System Index",
       "soon": "SOON",
+      "gate": {
+        "title": "Admin Console",
+        "subtitle": "Sign in with an administrator account to continue",
+        "username": "Username",
+        "password": "Password",
+        "usernameRequired": "Username is required",
+        "passwordRequired": "Password is required",
+        "submit": "Enter console",
+        "loginFailed": "Sign-in failed. Check your username and password.",
+        "notAdmin": "This account is not an administrator.",
+        "backHome": "Back to home"
+      },
+      "denied": {
+        "sourceTitle": "This terminal is not authorized",
+        "sourceDesc": "The gateway source allowlist rejected this address. Access from an authorized terminal, or ask an admin to add your source IP to PERSEUS_ADMIN_ALLOWED_SOURCES.",
+        "networkTitle": "Cannot reach the console service",
+        "networkDesc": "The access check failed. Confirm the service is up and retry.",
+        "notAdminTitle": "Administrator access required",
+        "notAdminDesc": "You are signed in, but this account is not an administrator.",
+        "retry": "Retry",
+        "backHome": "Back to home",
+        "logout": "Sign out"
+      },
       "sections": {
         "overview": "Overview",
         "components": "Components",
@@ -101,7 +123,26 @@
           "memory": "Memory",
           "cpu": "CPU",
           "threads": "Threads",
-          "connections": "Connections"
+          "connections": "Connections",
+          "requestRateNote": "Request rate",
+          "windowNote": "Last 60 samples"
+        },
+        "trends": {
+          "title": "Runtime Trends",
+          "window": "{{count}} samples",
+          "collecting": "Collecting samples…",
+          "requestRate": "Request rate",
+          "avgResponse": "Avg response",
+          "outcome": "Request outcome",
+          "success": "Succeeded",
+          "failed": "Failed",
+          "noOutcome": "No requests yet"
+        },
+        "recentLogs": {
+          "title": "Recent Logs",
+          "hint": "Last {{count}} lines",
+          "open": "Open logs",
+          "empty": "No logs"
         },
         "process": {
           "title": "Process",
@@ -117,7 +158,8 @@
         "requests": {
           "title": "Request Metrics",
           "total": "Total requests",
-          "active": "Active requests",
+          "success": "Succeeded",
+          "failed": "Failed",
           "rate": "Request rate",
           "avgTime": "Avg response"
         },
@@ -194,6 +236,136 @@
           "unknown": "unknown",
           "none": "no-check"
         }
+      },
+      "config": {
+        "title": "Configuration",
+        "subtitle": "Edit, validate and reset application config (items needing a restart are flagged)",
+        "dirty": "{{count}} changed",
+        "refresh": "Reload",
+        "runValidate": "Validate",
+        "loadFailed": "Failed to load config",
+        "loadEmpty": "Config is empty or the response is malformed",
+        "editable": "Editable",
+        "protected": "Protected",
+        "readonly": "read-only",
+        "field": {
+          "listHint": "One value per line"
+        },
+        "validate": {
+          "ok": "Configuration is valid",
+          "bad": "Configuration failed validation"
+        },
+        "save": {
+          "button": "Save",
+          "saved": "Configuration saved",
+          "failed": "Failed to save config",
+          "restartHint": "The following changes require a service restart to take effect"
+        },
+        "reset": {
+          "button": "Reset config",
+          "title": "Reset configuration",
+          "desc": "Restore config to the defaults from config.example.toml. If the config file is a read-only mount, the reset fails gracefully with a hint (current config is left intact).",
+          "confirmAction": "Reset",
+          "done": "Configuration reset to defaults",
+          "failed": "Failed to reset config"
+        }
+      },
+      "logs": {
+        "title": "Log Viewer",
+        "subtitle": "Retrieve runtime logs by date, file and level; follow and cleanup supported",
+        "date": "Date",
+        "file": "File",
+        "lines": "Lines",
+        "all": "ALL",
+        "follow": "Follow",
+        "followOn": "Stop follow",
+        "following": "FOLLOW",
+        "paused": "PAUSED",
+        "refresh": "Refresh",
+        "updatedAt": "Updated {{time}}",
+        "loadFailed": "Failed to load logs",
+        "loading": "Loading…",
+        "empty": "No logs match the current filters",
+        "count": "{{shown}} / {{total}} lines",
+        "cleanup": {
+          "button": "Cleanup old logs",
+          "title": "Cleanup old logs",
+          "desc": "Delete log directories and files older than the retention period. Defaults to keeping the last 30 days (1–365).",
+          "confirmAction": "Cleanup logs",
+          "keepDays": "Retention days",
+          "done": "Removed {{count}} old log directories (keeping the last {{days}} days)",
+          "failed": "Log cleanup failed"
+        }
+      },
+      "operations": {
+        "title": "Maintenance",
+        "subtitle": "App-level shutdown and restart; dangerous actions require a confirmation word",
+        "failed": "Operation failed",
+        "restart": {
+          "title": "Restart service",
+          "flag": "brief outage",
+          "desc": "Trigger a graceful shutdown and relaunch the process using the current run mode. Under debug mode Uvicorn takes over; in production the startup command is re-executed. In-flight requests may be interrupted.",
+          "endpoint": "POST /api/app/restart · requires is_admin or app.debug",
+          "action": "Restart service",
+          "confirmWord": "RESTART",
+          "done": "Restart triggered"
+        },
+        "shutdown": {
+          "title": "Shutdown service",
+          "flag": "service stopped",
+          "desc": "Broadcast the shutdown notice, disconnect all WebSocket connections, release the database pool, then terminate the process. Service must be started manually afterwards.",
+          "endpoint": "POST /api/app/shutdown · requires is_admin or app.debug",
+          "action": "Shutdown service",
+          "confirmWord": "SHUTDOWN",
+          "done": "Shutdown triggered"
+        }
+      },
+      "debug": {
+        "title": "Debug Tools",
+        "subtitle": "Destructive debug endpoints, available only to admins in debug mode",
+        "gate": "Debug mode required",
+        "gateDesc": "Debug tools require both is_admin and app.debug. The service is not running in debug mode (app.debug=false), so they cannot be accessed.",
+        "loadFailed": "Failed to load debug status",
+        "done": "Operation executed",
+        "failed": "Operation failed",
+        "status": {
+          "title": "Debug Status",
+          "debugMode": "Debug mode",
+          "configPath": "Config file",
+          "databaseType": "Database type",
+          "databaseUrl": "Database URL",
+          "stressTest": "Stress test mode",
+          "yes": "present",
+          "no": "missing"
+        },
+        "env": {
+          "title": "Environment",
+          "hint": "PERSEUS_* · sensitive values masked",
+          "key": "KEY",
+          "value": "VALUE",
+          "empty": "No PERSEUS_* environment variables"
+        },
+        "initdb": {
+          "title": "Reset database",
+          "flag": "data destroyed",
+          "desc": "Drop and recreate every table, then bootstrap the admin account on startup. All repository metadata, users, issues and PRs will be permanently lost.",
+          "endpoint": "POST /api/v1/debug/initdb · requires is_admin and app.debug",
+          "action": "Reset database",
+          "confirmWord": "RESET DATABASE",
+          "done": "Database reset"
+        },
+        "initconf": {
+          "title": "Reset config file",
+          "flag": "config destroyed",
+          "desc": "Delete the current config.toml and regenerate it from config.example.toml. The original is backed up with a timestamp.",
+          "endpoint": "POST /api/v1/debug/initconf · requires is_admin and app.debug",
+          "action": "Reset config",
+          "confirmWord": "RESET CONFIG",
+          "done": "Config file reset"
+        }
+      },
+      "danger": {
+        "typeToConfirm": "Type {{word}} to continue"
       }
     },
     "userMenu": {
@@ -227,6 +399,7 @@
     },
     "repositories": {
       "title": "Repositories",
+      "noRepos": "No repositories yet",
       "explorer": "Explorer",
       "filter": {
         "mine": "My Repositories",
@@ -242,11 +415,13 @@
         "watch": "Watch",
         "unwatch": "Unwatch",
         "star": "Star",
+        "unstar": "Unstar",
         "fork": "Fork"
       },
       "watchFailed": "Failed to update watch",
       "forkSuccess": "Repository {{name}} forked",
       "forkFailed": "Failed to fork repository",
+      "notFound": "Repository not found",
       "visibility": {
         "public": "Public",
         "private": "Private"
@@ -267,6 +442,7 @@
         "save": "Save",
         "cancel": "Cancel",
         "empty": "No releases yet. Create one to get started.",
+        "required": "This field is required",
         "badgeDraft": "Draft",
         "badgePrerelease": "Prerelease",
         "by": "by",
@@ -584,7 +760,23 @@
       "moveFileTitle": "Move file",
       "movePathPlaceholder": "Target path (may include dirs), e.g. src/utils.ts",
       "moveMessagePlaceholder": "Commit message",
-      "fileMoved": "Moved {{to}}"
+      "fileMoved": "Moved {{to}}",
+      "saved": "Committed {{id}}",
+      "fileCreated": "Created {{name}}",
+      "selectRepository": "Select a repository from the list to browse code",
+      "newFile": "New file",
+      "unsaved": "You have unsaved changes",
+      "commit": "Commit",
+      "edit": "Edit",
+      "preview": "Preview",
+      "lnCol": "Ln {{line}}, Col {{col}}",
+      "unsavedShort": "● Unsaved",
+      "commitTitle": "Commit changes — {{tab}}",
+      "commitOk": "Commit to {{branch}}",
+      "commitHint": "Changes will be pushed as a single Git commit to the default branch",
+      "newFileTitle": "New file",
+      "create": "Create",
+      "newFilePlaceholder": "e.g. src/utils/helpers.ts or README.md"
     },
     "teamChat": {
       "title": "Team Chat",
@@ -620,7 +812,8 @@
       "unmutedShort": "Unmute",
       "searchMessages": "Search messages",
       "searchScopeAll": "All conversations",
-      "searchScopeRoom": "This conversation"
+      "searchScopeRoom": "This conversation",
+      "attach": "Upload attachment"
     },
     "settings": {
       "title": "Settings",
@@ -630,6 +823,9 @@
       "notifications": "Notifications",
       "preferences": "Preferences",
       "save": "Save",
+      "saveSuccess": "Saved successfully",
+      "saveError": "Failed to save",
+      "passwordMismatch": "Passwords do not match",
       "saveChanges": "Save Changes",
       "cancel": "Cancel",
       "changeAvatar": "Change Avatar",

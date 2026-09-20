@@ -865,8 +865,11 @@ class TestAppDebugCoverage:
     def test_health(self, test_client):
         assert test_client.get("/health").status_code == 200
 
-    def test_app_status(self, test_client):
-        assert test_client.get("/api/app/status").status_code == 200
+    def test_app_status(self, test_client, auth_headers):
+        # 状态端点已收紧为登录可见：匿名 401，登录 200
+        assert test_client.get("/api/app/status").status_code == 401
+        assert test_client.get("/api/app/status",
+                               headers=auth_headers).status_code == 200
 
     def test_app_config_get(self, test_client, admin_headers):
         assert test_client.get("/api/app/config",

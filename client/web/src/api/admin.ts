@@ -9,10 +9,11 @@ export interface ProcessInfo {
 }
 
 export interface RequestMetrics {
-  total_requests: number;
-  active_requests: number;
-  requests_per_second: number;
-  average_response_time: number;
+  total: number;
+  success: number;
+  failed: number;
+  avg_response_time_ms: number;
+  requests_per_minute: number;
 }
 
 export interface GitOperationMetrics {
@@ -75,7 +76,139 @@ export interface ComponentsResponse {
   summary: ComponentsSummary;
 }
 
+export type ConfigSectionData = Record<string, unknown>;
+
+/** GET /api/app/config 响应：data 为全量或单节配置 */
+export interface ConfigData {
+  [section: string]: ConfigSectionData;
+}
+
+/** 配置管理端点统一响应（success/errors/hints） */
+export interface ConfigResponse {
+  success: boolean;
+  data: ConfigData | null;
+  errors: string[];
+  hints?: string[];
+}
+
+export const configApi = {
+  getConfig: (section?: string) => {
+    const qs = section ? `?section=${encodeURIComponent(section)}` : '';
+    return apiRequest<ConfigResponse>(`/api/app/config${qs}`);
+  },
+  updateConfig: (config: ConfigData) =>
+    apiRequest<ConfigResponse>('/api/app/config', {
+      method: 'POST',
+      body: JSON.stringify({ config }),
+    }),
+  validateConfig: (config?: ConfigData) =>
+    apiRequest<ConfigResponse>('/api/app/config/validate', {
+      method: 'POST',
+      body: JSON.stringify(config ?? {}),
+    }),
+  resetConfig: () =>
+    apiRequest<ConfigResponse>('/api/app/config/reset', {
+      method: 'POST',
+    }),
+};
+
 export const adminApi = {
   getStatus: () => apiRequest<AppStatus>('/api/app/status'),
   getComponents: () => apiRequest<ComponentsResponse>('/api/app/components'),
+};
+
+// ---------- 日志 ----------
+
+export interface LogFileInfo {
+  name: string;
+  size: number;
+  size_formatted: string;
+  modified: string;
+}
+
+/** GET /api/app/logs 响应 */
+export interface LogInfo {
+  log_dir: string;
+  today_dir: string;
+  today_files: LogFileInfo[];
+  available_dates: string[];
+}
+
+/** GET /api/app/logs/content 响应 */
+export interface LogContent {
+  date: string;
+  log_name: string;
+  lines: number;
+  total_lines: number;
+  content: string;
+  exists: boolean;
+}
+
+/** POST /api/app/logs/cleanup 响应 */
+export interface LogCleanupResponse {
+  success: boolean;
+  deleted_count: number;
+  keep_days: number;
+}
+
+export const logsApi = {
+  getInfo: () => apiRequest<LogInfo>('/api/app/logs'),
+  getContent: (params: { date?: string; log_name?: string; lines?: number; level?: string }) => {
+    const qs = new URLSearchParams();
+    if (params.date) qs.set('date', params.date);
+    if (params.log_name) qs.set('log_name', params.log_name);
+    if (params.lines) qs.set('lines', String(params.lines));
+    if (params.level) qs.set('level', params.level);
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return apiRequest<LogContent>(`/api/app/logs/content${suffix}`);
+  },
+  cleanup: (keepDays: number) =>
+    apiRequest<LogCleanupResponse>(`/api/app/logs/cleanup?keep_days=${keepDays}`, { method: 'POST' }),
+};
+
+// ---------- 运维操作 ----------
+
+/** POST /api/app/restart · POST /api/app/shutdown 响应 */
+export interface ActionResponse {
+  success: boolean;
+  message: string;
+}
+
+export const operationsApi = {
+  restart: () => apiRequest<ActionResponse>('/api/app/restart', { method: 'POST' }),
+  shutdown: () => apiRequest<ActionResponse>('/api/app/shutdown', { method: 'POST' }),
+};
+
+// ---------- 调试工具 ----------
+
+/** GET /api/v1/debug/status 响应 */
+export interface DebugStatus {
+  debug_mode: boolean;
+  config_path: string;
+  config_exists: boolean;
+  database_url: string;
+  database_type: string;
+  environment: Record<string, string>;
+  stress_test_mode: boolean;
+}
+
+/** POST /api/v1/debug/initdb 响应 */
+export interface InitDbResponse {
+  success: boolean;
+  message: string;
+  details: Record<string, unknown>;
+}
+
+/** POST /api/v1/debug/initconf 响应 */
+export interface InitConfResponse {
+  success: boolean;
+  message: string;
+  config_path: string;
+  backup_path: string | null;
+}
+
+export const debugApi = {
+  getStatus: () => apiRequest<DebugStatus>('/api/v1/debug/status'),
+  initDb: () => apiRequest<InitDbResponse>('/api/v1/debug/initdb', { method: 'POST' }),
+  initConf: () => apiRequest<InitConfResponse>('/api/v1/debug/initconf', { method: 'POST' }),
 };

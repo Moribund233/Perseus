@@ -5,6 +5,7 @@ import { ReloadOutlined } from '@ant-design/icons';
 import { adminApi, type ComponentInfo, type ComponentsResponse } from '../../../api/admin';
 import ComponentRow from '../../../components/admin/ComponentRow';
 import KeyValueLedger from '../../../components/admin/KeyValueLedger';
+import AdminSkeleton from '../../../components/admin/AdminSkeleton';
 import {
   componentTone,
   formatDuration,
@@ -144,6 +145,8 @@ export default function ComponentsSection() {
           style={{ marginBottom: 18 }}
         />
       )}
+
+      {!data && !dataError && <AdminSkeleton heading={t('app.admin.components.summary.total')} rows={6} />}
 
       {data && !data.available && (
         <div className="ac-banner warn">

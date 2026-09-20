@@ -62,6 +62,34 @@ class TestAppAdminGating:
         assert r.status_code == 403, (method, path, r.status_code, r.text)
 
 
+class TestStatusEndpoint:
+    """状态端点已收紧为「登录可见」：匿名 401，任意登录用户 200"""
+
+    def test_status_requires_auth(self, test_client):
+        assert test_client.get("/api/app/status").status_code == 401
+
+    def test_status_ok_for_authenticated(self, test_client, auth_headers):
+        r = test_client.get("/api/app/status", headers=auth_headers)
+        assert r.status_code == 200
+        assert "status" in r.json()
+
+
+class TestLogsContentLineCap:
+    """日志行数上限：>5000 拒绝、=5000 允许（配合前端虚拟滚动扩大取行）"""
+
+    def test_lines_over_cap_rejected(self, test_client, admin_headers):
+        r = test_client.get(
+            "/api/app/logs/content", params={"lines": 5001}, headers=admin_headers
+        )
+        assert r.status_code == 422
+
+    def test_lines_at_cap_ok(self, test_client, admin_headers):
+        r = test_client.get(
+            "/api/app/logs/content", params={"lines": 5000}, headers=admin_headers
+        )
+        assert r.status_code == 200
+
+
 class TestAppAdminActions:
     """管理员成功路径（服务层以桩替换，避免副作用）"""
 

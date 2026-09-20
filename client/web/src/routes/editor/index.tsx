@@ -804,7 +804,7 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
       savedContentRef.current = content;
       setIsDirty(false);
       setLastCommitSha(result.commit_id.slice(0, 7));
-      antdMessage.success(t('app.codeEditor.saved', { defaultValue: `已提交 ${result.commit_id.slice(0, 7)}` }));
+      antdMessage.success(t('app.codeEditor.saved', { id: result.commit_id.slice(0, 7) }));
       // 后台刷新提交历史等派生数据
       fetchTree(repoId, currentRepo?.default_branch).catch(() => {});
     } catch (e) {
@@ -856,7 +856,7 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
       setIsDirty(false);
       setNewFileModalOpen(false);
       setNewFileName('');
-      antdMessage.success(t('app.codeEditor.fileCreated', { defaultValue: `已创建 ${name}` }));
+      antdMessage.success(t('app.codeEditor.fileCreated', { name }));
     } catch (e) {
       antdMessage.error((e as Error).message || 'Create file failed');
     } finally {
@@ -1815,7 +1815,7 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
             {t('app.codeEditor.online')}
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 16 }}>
-            <span>{t('app.codeEditor.lnCol', { defaultValue: `Ln ${cursor.line}, Col ${cursor.col}` })}</span>
+            <span>{t('app.codeEditor.lnCol', { line: cursor.line, col: cursor.col })}</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><TeamOutlined style={{ fontSize: 12 }} /> {onlinePresence.length} online</span>
             {followState.following && (
               <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#58a6ff' }}>
@@ -1848,7 +1848,7 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
 
       {/* 提交保存弹窗 */}
       <Modal
-        title={t('app.codeEditor.commitTitle', { defaultValue: `提交更改 — ${activeTab || ''}` })}
+        title={t('app.codeEditor.commitTitle', { tab: activeTab || '' })}
         open={saveModalOpen}
         onCancel={() => setSaveModalOpen(false)}
         onOk={() => {
@@ -1857,7 +1857,7 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
             setCommitMessage('');
           });
         }}
-        okText={t('app.codeEditor.commitOk', { defaultValue: `提交到 ${currentRepo?.default_branch || 'main'}` })}
+        okText={t('app.codeEditor.commitOk', { branch: currentRepo?.default_branch || 'main' })}
         confirmLoading={saving}
         okButtonProps={{ style: { background: bluePrimary } }}
       >

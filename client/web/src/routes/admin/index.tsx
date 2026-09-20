@@ -15,10 +15,10 @@ export default function AdminConsolePage() {
   const sections: SectionDef[] = [
     { num: '01', key: 'overview', path: '/admin', enabled: true },
     { num: '02', key: 'components', path: '/admin/components', enabled: true },
-    { num: '03', key: 'config', path: '/admin/config', enabled: false },
-    { num: '04', key: 'logs', path: '/admin/logs', enabled: false },
-    { num: '05', key: 'operations', path: '/admin/operations', enabled: false },
-    { num: '06', key: 'debug', path: '/admin/debug', enabled: false },
+    { num: '03', key: 'config', path: '/admin/config', enabled: true },
+    { num: '04', key: 'logs', path: '/admin/logs', enabled: true },
+    { num: '05', key: 'operations', path: '/admin/operations', enabled: true },
+    { num: '06', key: 'debug', path: '/admin/debug', enabled: true },
   ];
 
   return (

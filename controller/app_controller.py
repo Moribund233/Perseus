@@ -270,9 +270,14 @@ async def validate_config_endpoint(
 
 
 @router.get("/api/app/status", response_model=StatusResponse)
-async def get_status_endpoint():
+async def get_status_endpoint(
+    current_user: User = Depends(get_current_user),
+):
     """
-    获取应用状态
+    获取应用状态（登录可见）
+
+    Args:
+        current_user: 当前认证用户
 
     Returns:
         StatusResponse: 应用状态信息
@@ -408,7 +413,7 @@ async def get_log_info_endpoint(
 async def get_log_content_endpoint(
     date: Optional[str] = Query(None, description="日期 (YYYY-MM-DD)，默认为今天"),
     log_name: str = Query("app", description="日志文件名，如 app, error"),
-    lines: int = Query(100, ge=1, le=1000, description="返回行数（1-1000）"),
+    lines: int = Query(100, ge=1, le=5000, description="返回行数（1-5000）"),
     level: Optional[str] = Query(None, description="过滤级别 (debug/info/warning/error/critical)"),
     permission: tuple = Depends(check_app_permission)
 ):

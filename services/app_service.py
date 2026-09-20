@@ -355,10 +355,11 @@ class AppService:
             Dict[str, Any]: 空请求统计信息
         """
         return {
-            "total_requests": 0,
-            "active_requests": 0,
-            "requests_per_second": 0,
-            "average_response_time": 0,
+            "total": 0,
+            "success": 0,
+            "failed": 0,
+            "avg_response_time_ms": 0,
+            "requests_per_minute": 0,
         }
 
     def _get_git_operations_info(self) -> Dict[str, Any]:

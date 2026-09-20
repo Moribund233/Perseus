@@ -18,6 +18,13 @@ export default defineConfig({
           if (id.includes('node_modules/@codemirror')) {
             return 'editor'
           }
+          if (
+            id.includes('node_modules/@ant-design/charts') ||
+            id.includes('node_modules/@ant-design/plots') ||
+            id.includes('node_modules/@antv')
+          ) {
+            return 'charts'
+          }
           if (id.includes('node_modules/i18next') || id.includes('node_modules/react-i18next') || id.includes('node_modules/i18next-browser-languagedetector')) {
             return 'i18n'
           }
