@@ -349,11 +349,11 @@ pytest -v -m e2e
 | ID | 任务 | 说明 |
 |----|------|------|
 | F-051 | Docker Compose 完善 | PostgreSQL + Nginx + git-cgi + Redis 一键部署 |
-| F-052 | 性能压测 | 使用 `tests/stress_test.py` + locust/wrk | ✅ 完成（2026-09-15）：dev 容器内直连压测 normal（并发50×500）/ extreme（并发200×2000）全绿 100%；脚本新增墙钟耗时 + 真实 QPS；修复 `/api/app/status` `cpu_percent(interval=0.1)` 阻塞（5.4s→4ms，QPS 0.19→214）；报告见 `docs/stress-test-report.md` |
+| F-052 | 性能压测 | 使用 `tests/stress_test.py` + locust/wrk | ✅ 完成（2026-09-15）：dev 容器内直连压测 normal（并发50×500）/ extreme（并发200×2000）全绿 100%；脚本新增墙钟耗时 + 真实 QPS；修复 `/api/app/status` `cpu_percent(interval=0.1)` 阻塞（5.4s→4ms，QPS 0.19→214）；报告见 `docs/archive/reports/stress-test-report.md` |
 | F-053 | 监控集成 | Prometheus metrics + Sentry 错误追踪 | ✅ 完成（2026-09-15）：`middleware/prometheus_metrics.py` + `/metrics` 端点 + `docker-compose.monitoring.yml`（Prometheus v3 + Grafana 11）+ `docker/prometheus/{prometheus,alerts}.yml`；**Sentry 已集成**：`core/sentry.py` `init_sentry`（延迟导入 sentry-sdk，未配置 `PERSEUS_SENTRY_DSN` 时零开销跳过；`PERSEUS_SENTRY_*` 环境变量/`[sentry]` 配置段，含 traces_sample_rate/environment/release），app 最外层 `SentryAsgiMiddleware` 包装；`tests/test_sentry_integration.py` 12 用例全绿 |
-| F-054 | 文档完善 | Swagger/Redoc + 部署文档 + 用户手册 | ✅ 完成（2026-09-15）：Swagger `/docs` / Redoc `/redoc` / `/openapi.json` 已验证可用（8000/8080）；部署文档 `docs/deployment-guide.md`（开发/生产编排、监控告警、配置参考、运维命令）；用户手册 `docs/user-guide.md`（登录/仓库/PR/Issue/搜索/协作/通知/WebHook/设置） |
+| F-054 | 文档完善 | Swagger/Redoc + 部署文档 + 用户手册 | ✅ 完成（2026-09-15）：Swagger `/docs` / Redoc `/redoc` / `/openapi.json` 已验证可用（8000/8080）；部署文档 `docs/guides/deployment-guide.md`（开发/生产编排、监控告警、配置参考、运维命令）；用户手册 `docs/guides/user-guide.md`（登录/仓库/PR/Issue/搜索/协作/通知/WebHook/设置） |
 | F-055 | 单元测试覆盖率 | Controller 层测试，目标 >80% | ✅ 2026-09-15 达成 **81%**：`tests/test_controller_coverage.py` 138 用例全绿；全量套件 **1032 passed / 3 skipped**（含 Sentry `tests/test_sentry_integration.py` 12 例）；git_auth 65%→96% |
-| F-056 | 安全审计 | 依赖扫描 + CORS/CSRF/SSRF 防护检查 | ✅ 完成（2026-09-15）：SSRF 防护 `utils/url_validation.py`（协议白名单 + 禁内网/回环/保留地址 + DNS 解析校验，`tests/test_url_validation.py` 15 例）已接入 `webhook_service.create/update`；审计脚本 `scripts/security_audit.py`（CORS/CSRF/SSRF/依赖扫描四类检查，`tests/test_security_audit.py` 12 例）+ 报告 `docs/security-audit-report.md` |
+| F-056 | 安全审计 | 依赖扫描 + CORS/CSRF/SSRF 防护检查 | ✅ 完成（2026-09-15）：SSRF 防护 `utils/url_validation.py`（协议白名单 + 禁内网/回环/保留地址 + DNS 解析校验，`tests/test_url_validation.py` 15 例）已接入 `webhook_service.create/update`；审计脚本 `scripts/security_audit.py`（CORS/CSRF/SSRF/依赖扫描四类检查，`tests/test_security_audit.py` 12 例）+ 报告 `docs/archive/reports/security-audit-report.md` |
 | F-057 | 日志告警 | 错误日志告警规则（Error Rate > 1%）| ✅ 2026-09-15：`docker/prometheus/alerts.yml` 已实现 `PerseusErrorRateHigh`（>1% 持续 5min）+ `PerseusRequestLatencyHigh`（P95>2s 持续 10min），规则引用 `perseus_http_*` 指标 |
 
 ---
@@ -372,11 +372,11 @@ pytest -v -m e2e
 | **P0** | F-039 | 搜索索引自动维护 | ✅ 已实现 | PR merge 后自动调用 `SearchService.rebuild_index` | 已补充 PR merge 后索引重建测试 |
 | **P0** | F-046 | CI/CD 触发闭环 | ✅ 已实现 | PR merge 后自动创建 `Build` 记录 | 已补充 `test_merge_pr_creates_build_record` |
 | **P1** | F-031 | Webhook 重试机制 | ✅ 已实现 | `_deliver_webhook` 支持最多 3 次指数退避重试 | 已补充重试与最终失败测试 |
-| **P1** | F-204 | 协作文本编辑 | ✅ 已实现 | `/ws/collab` 专用端点 + `services/realtime/collab_service.py`（CM6 collab OT authority，乐观并发 + 光标 presence + 协作保存落 Git；写权限会话内缓存，重连自动 rejoin） | 双连接冒烟通过；`tests/test_collab_ws.py` 29 例覆盖 join/push/reject/pull/cursor/save/权限缓存/GC；与 Code with Me 差距分析与演进规划见 `docs/collab-f204-vs-cwm.md` |
+| **P1** | F-204 | 协作文本编辑 | ✅ 已实现 | `/ws/collab` 专用端点 + `services/realtime/collab_service.py`（CM6 collab OT authority，乐观并发 + 光标 presence + 协作保存落 Git；写权限会话内缓存，重连自动 rejoin） | 双连接冒烟通过；`tests/test_collab_ws.py` 29 例覆盖 join/push/reject/pull/cursor/save/权限缓存/GC；与 Code with Me 差距分析与演进规划见 `docs/plans/collab-f204-vs-cwm.md` |
 | **P1** | F-205 | 实时通知推送 | ✅ 已实现 | 通知落库即经 `notify_user` → `manager.send_to_user` 推送 `user_notification` 消息（含完整通知对象与 `unread_count`）；`/ws/notifications` 专用端点常驻订阅。web（AppLayout）与 desktop（PortalShell，经网关 WS 透传）2026-09-14 接入，REST 轮询降级为对账兜底 | `tests/test_notification_service.py` 推送链路 3 例 |
 | **P2** | F-047 | 构建状态展示 | ✅ 已实现 | Builds 列表/日志 UI（批次 B）+ `GET /builds` 支持 `branch`/`status` 过滤（2026-09-14），PR 详情展示源/目标分支最近构建状态（web+desktop） | `test_list_builds_filters_by_branch` 等 3 例 |
 | **P2** | F-048~050 | 国际化 | ✅ 已实现 2026-09-14~15 | 后端 150 错误码双语映射（`error_code` + `Accept-Language`）+ 前端 web/desktop i18next 双语词库与切换 UI | `tests/test_i18n.py` 14 用例全绿；`test_error_catalog_has_both_languages` 校验双语齐全 |
-| **P2** | F-051~057 | 生产准备 | ✅ 全部完成（2026-09-15） | Docker Compose（PostgreSQL+Redis+sshd+git-cgi+gateway+test）✅；**F-053 监控（Prometheus+Sentry）✅、F-055 覆盖率 81% ✅、F-057 告警 ✅、F-052 压测报告 ✅、F-056 安全审计 ✅、F-054 文档 ✅** | 阶段四 P2 收官：压测报告 `docs/stress-test-report.md`、安全审计 `docs/security-audit-report.md`、部署 `docs/deployment-guide.md`、用户手册 `docs/user-guide.md` |
+| **P2** | F-051~057 | 生产准备 | ✅ 全部完成（2026-09-15） | Docker Compose（PostgreSQL+Redis+sshd+git-cgi+gateway+test）✅；**F-053 监控（Prometheus+Sentry）✅、F-055 覆盖率 81% ✅、F-057 告警 ✅、F-052 压测报告 ✅、F-056 安全审计 ✅、F-054 文档 ✅** | 阶段四 P2 收官：压测报告 `docs/archive/reports/stress-test-report.md`、安全审计 `docs/archive/reports/security-audit-report.md`、部署 `docs/guides/deployment-guide.md`、用户手册 `docs/guides/user-guide.md` |
 
 ### 7.3 建议迭代节奏
 

@@ -1,8 +1,6 @@
 # Phase 2B Issues/PR 实现计划
 
-> **✅ 状态（2026-09-07 回填）**：本计划全部任务已完成（以代码为准，checkbox 不再逐项回填）；遗留小项（PR 创建 Modal 等）见 [`../../desktop-port-sync.md`](../../desktop-port-sync.md)。
-
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **✅ 状态（2026-09-07 回填，2026-09-18 归档）**：本计划全部任务已完成（以代码为准，checkbox 不再逐项回填）；遗留小项（PR 创建 Modal 等）见 [`../../plans/desktop-port-sync.md`](../../plans/desktop-port-sync.md)。**已归档，不再更新。**
 
 **Goal:** 先在 web 端补全 issues/PR 完整页面（列表/详情/评论/操作），再忠实移植到 desktop 的 `RepositoriesView` tabs，并新增当前用户 identity。
 

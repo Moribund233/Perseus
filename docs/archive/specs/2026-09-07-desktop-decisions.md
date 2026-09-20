@@ -11,7 +11,7 @@
 | # | 决策项 | 结论 | 影响 |
 |---|--------|------|------|
 | **D1** | 编辑器内核与协同协议 | **Monaco + 现在冻结 Yjs 统一协同层** | web（CM6）与 desktop（Monaco）未来协作统一迁移 Yjs 底座；LSP 桥按 spec §8 继续走 WS JSON-RPC（与协同层正交） |
-| **D2** | 前端复用策略 | **维持拷贝移植 + 移植同步清单** | 不做 monorepo/共享包改造；以 [`desktop-port-sync.md`](../../desktop-port-sync.md) 跟踪两端差异，移植时对照 |
+| **D2** | 前端复用策略 | **维持拷贝移植 + 移植同步清单** | 不做 monorepo/共享包改造；以 [`desktop-port-sync.md`](../../plans/desktop-port-sync.md) 跟踪两端差异，移植时对照 |
 | **D3** | 2A/2B 收尾批次 | **5 项全做**：push/pull UI、clone 凭据输入 UI、多标签编辑器（Ctrl+S/关闭保护）、Settings 实做、servers.update 死路由修复 | 下一批开发内容，均为小体量；push/pull 的服务器端依赖（git-http-auth）已就绪 |
 | **D4** | Phase 2C（聊天/通知移植） | **推后，聚焦 IDE 能力** | LSP/多标签/Git 面板增强优先级高于聊天移植；web 端已覆盖协作沟通场景；2C 重排期待定 |
 | **D5** | 平台范围 | **维持 Windows-only**（NSIS 收尾期） | keychain 维持 Windows Credential Manager；macOS/Linux 架构已预留，不提前投入 |

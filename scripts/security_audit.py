@@ -8,7 +8,7 @@ Perseus 安全审计脚本（F-056）
 4. SSRF 防护检查（WebHook URL 是否经过 validate_outbound_url 校验）
 
 用法:
-    python scripts/security_audit.py [--skip-dep-scan] [--out docs/security-audit-report.md]
+    python scripts/security_audit.py [--skip-dep-scan] [--out docs/archive/reports/security-audit-report.md]
 
 退出码: 0=通过（或仅警告），1=发现高危项，2=内部错误
 """
@@ -230,7 +230,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Perseus 安全审计（F-056）")
     parser.add_argument("--skip-dep-scan", action="store_true", help="跳过依赖扫描")
     parser.add_argument("--production", action="store_true", help="按生产环境准则审计")
-    parser.add_argument("--out", default=str(REPO_ROOT / "docs" / "security-audit-report.md"), help="输出报告路径")
+    parser.add_argument("--out", default=str(REPO_ROOT / "docs" / "archive" / "reports" / "security-audit-report.md"), help="输出报告路径")
     args = parser.parse_args()
 
     very_overall, findings = run_audit(production=args.production)

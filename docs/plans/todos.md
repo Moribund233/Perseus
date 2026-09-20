@@ -5,7 +5,7 @@
 > **最近更新**: 2026-09-18（批次 H 收尾：JWT 撤销黑名单 + `POST /auth/logout`、多语言符号解析、PR 审阅者列表、测试补齐 `test_app_service`/`test_database_manager`、参与者未保存徽标、聊天单会话检索；文档滞后项二次回填：F-602 Discussions / F-604 文件移动 / 自动落盘草稿分支 / desktop y-monaco / M2+ 待排期均已过期标注为完成）；
 > 2026-09-17（批次 0/1/3/5/7 完成；会话 TTL 延迟销毁 + Redis 多副本/会话持久化落地；collab 网关多副本收紧：广播私密性/容量上限/403 即时吊销；构建日志流式、自动落盘草稿分支、协作会话级角色覆盖层落地；后端闭环补齐：邀请 token 撤销体系 + push 路径增量索引；test 服务补挂载 alembic）；
 > 2026-09-16（批次 2 邀请链接后端+网关+web 完成）
-> **关联**: `docs/api/roadmap.md`、`docs/frontend-placeholders.md`、`docs/collab-f204-vs-cwm.md`、`docs/desktop-port-sync.md`
+> **关联**: `docs/api/roadmap.md`、`docs/plans/frontend-placeholders.md`、`docs/plans/collab-f204-vs-cwm.md`、`docs/plans/desktop-port-sync.md`
 > **开发方针**: 所有新功能必须采用 TDD（测试驱动开发）；新文案同步补 `{zh,en}.json`；禁止硬编码兜底假数据。
 
 ---
@@ -24,16 +24,16 @@
 
 ## 一、文档滞后项（先修正，供后续排期失真最小化）
 
-> 这些在 `docs/frontend-placeholders.md` 中标记为「缺后端能力」，但**后端已实现未回填**。应先更新该文档，避免后续重复规划。
+> 这些在 `docs/plans/frontend-placeholders.md` 中标记为「缺后端能力」，但**后端已实现未回填**。应先更新该文档，避免后续重复规划。
 
 | 占位点 | 原标记 | 实际现状 | 待办 |
 |--------|--------|----------|------|
-| 消息 reactions（chat 3.3） | P3「无后端存储」 | ✅ API 已实现：`chat_controller.py:62-83` POST/DELETE + `chat_service.py:228 add_reaction`；`get_messages` 已透出 reactions | ✅ 已回填 `frontend-placeholders.md`；前端接线确认已实现（批次 E） |
-| 文件树 last-commit 列（repo 3.2） | P3「需后端聚合端点」 | ✅ `repository_browser_service.py` 支持 `last_commit=True` 逐文件附带最近提交 | ✅ 已回填 `frontend-placeholders.md`；前端全层级接线完成（批次 E） |
+| 消息 reactions（chat 3.3） | P3「无后端存储」 | ✅ API 已实现：`chat_controller.py:62-83` POST/DELETE + `chat_service.py:228 add_reaction`；`get_messages` 已透出 reactions | ✅ 已回填 `plans/frontend-placeholders.md`；前端接线确认已实现（批次 E） |
+| 文件树 last-commit 列（repo 3.2） | P3「需后端聚合端点」 | ✅ `repository_browser_service.py` 支持 `last_commit=True` 逐文件附带最近提交 | ✅ 已回填 `plans/frontend-placeholders.md`；前端全层级接线完成（批次 E） |
 
 ---
 
-## 二、协作增强（来自 `docs/collab-f204-vs-cwm.md` 待排期项）
+## 二、协作增强（来自 `docs/plans/collab-f204-vs-cwm.md` 待排期项）
 
 ### P0 — 会话邀请链接 + 会话级临时权限（M2）
 
@@ -64,7 +64,7 @@
 
 | 任务 | 说明 | 涉及文件 |
 |------|------|----------|
-| 按方案 B 落地 ✅ | **已被 Yjs 底座天然覆盖（2026-09-18 实测核实）**：`collabController.ts` 的 `updateHandler`/离线缓冲（updates 队列）在重连后整体放进 Yjs 更新流，由 CRDT 收敛合并而非整篇覆盖——`docs/collab-f204-vs-cwm.md` 3.6 决策即此实现；无需再重构 `handleInit`。 | `collabController.ts:71`（离线缓冲 + 自动重连 rebase 注释） |
+| 按方案 B 落地 ✅ | **已被 Yjs 底座天然覆盖（2026-09-18 实测核实）**：`collabController.ts` 的 `updateHandler`/离线缓冲（updates 队列）在重连后整体放进 Yjs 更新流，由 CRDT 收敛合并而非整篇覆盖——`docs/plans/collab-f204-vs-cwm.md` 3.6 决策即此实现；无需再重构 `handleInit`。 | `collabController.ts:71`（离线缓冲 + 自动重连 rebase 注释） |
 
 ### P1 — 受限视图（M3，依赖邀请 token scope）
 
@@ -118,7 +118,7 @@
 
 ## 五、desktop 跟进项
 
-> 2026-09-14 起移植债务已清零；2026-09-18 web 协作增强（M2/M3 + 批次 F/G）已全部在 `docs/desktop-port-sync.md` 第 3 节登记并移植完毕；参与者未保存徽标亦已双端落地。
+> 2026-09-14 起移植债务已清零；2026-09-18 web 协作增强（M2/M3 + 批次 F/G）已全部在 `docs/plans/desktop-port-sync.md` 第 3 节登记并移植完毕；参与者未保存徽标亦已双端落地。
 
 | 触发项 | 预期 desktop 跟进 | 状态 |
 |--------|------------------|------|
@@ -175,7 +175,7 @@
 
 | 项 | 决策点 | 出处 |
 |----|--------|------|
-| F-204 断线策略 | ✅ **已决策（2026-09-16）：方案 B rebase 保留**（保留未确认变更，重连 CRDT 收敛） | `docs/collab-f204-vs-cwm.md` 3.6 |
+| F-204 断线策略 | ✅ **已决策（2026-09-16）：方案 B rebase 保留**（保留未确认变更，重连 CRDT 收敛） | `docs/plans/collab-f204-vs-cwm.md` 3.6 |
 | 双态徽标「版本 N」 | ✅ **已决策（2026-09-18）并落地**：网关 `versionCounter.mjs`（Redis INCR 持久计数、无 Redis 回退内存）随 `collab-saved` 广播 `version`；web 状态栏 / desktop StatusBar 显示「会话已同步 · v{N}」 | 同上 3.3 |
 | 邀请链接默认存在 | ✅ **已决策（2026-09-16）：仅成员可分享**（非任意文档可分享），被邀请人凭 token 获会话级临时权限 | M2 设计时明确 |
 | **CI 执行器形态** | ✅ **已决策（2026-09-16）：仅外部回调（GHA 式）**，push 触发 build 即可排期 | 6.2 分析（2026-09-15） |
@@ -186,7 +186,7 @@
 
 | 批次 | 内容 | 预估 | 前置依赖 |
 |------|------|------|----------|
-| **批次 0（文档回填）** ✅ | 修正 `frontend-placeholders.md`（reactions / last-commit 已就绪） + `roadmap.md`/`README.md` 控制器计数 — **已完成** | 0.5 天 | — |
+| **批次 0（文档回填）** ✅ | 修正 `plans/frontend-placeholders.md`（reactions / last-commit 已就绪） + `roadmap.md`/`README.md` 控制器计数 — **已完成** | 0.5 天 | — |
 | **批次 1（搜索保鲜）** ✅ | 增量索引接入、push 异步化、collab save 进索引、索引生命周期清理 — **已完成（pytest 1082 passed, 3 skipped, 无回归）** | 2~3 天 | 无决策依赖，最快收益 |
 | **批次 2（协作 P0）** ✅ | 邀请链接 + 会话级临时权限（M2）+ 会话 TTL 延迟销毁 **均已完成**（后端 + 网关透传 + web 分享按钮） | 1~2 周 | ✅ 邀请链接决策已定（仅成员可分享，2026-09-16） |
 | **批次 3（前端轻量）** ✅ | reactions 前端（确认已实现）、last-commit 列全层级、日期分组、面包屑、`/search/global` 分组（确认已实现）、PR Filter 移除 — **已完成（web tsc+eslint+build 通过）** | 3~5 天 | 批次 0 回填 |

@@ -1,10 +1,12 @@
 # Desktop UI 补全 + y-monaco 协作接入计划
 
-> **状态（2026-09-08 建）**：桌面 UI 重构（Phase 1 门户 + Phase 2 IDE 工作区）已完成骨架，但对照原型 `client/prototype/desktop-ui/` 仍有多处**结构性缺口**（聊天整页、通知面板、门户全局搜索、PR 创建 Modal、仓库设置 Tab、IDE 协作辅助栏）。逻辑层（Go 网关 + TS API + Zustand stores + WS socket）经盘点几乎全部就绪，缺口集中在 **UI 层（tsx）接线与渲染**。
+> **✅ 状态（2026-09-18 归档回填）**：本计划全部落地（T1–T7、T9–T10；预留的 Task 8 亦于 2026-09-14 以 T8 补齐 Builds/Releases）。原「状态（2026-09-08 建）」为创建时基线语境；实施结果与后续登记见 [`desktop-port-sync.md`](../../plans/desktop-port-sync.md)。**已归档，不再更新。**
+>
+> <details><summary>创建时语境（2026-09-08，历史基线）</summary>
+> 桌面 UI 重构（Phase 1 门户 + Phase 2 IDE 工作区）已完成骨架，但对照原型 `client/prototype/desktop-ui/` 仍有多处**结构性缺口**（聊天整页、通知面板、门户全局搜索、PR 创建 Modal、仓库设置 Tab、IDE 协作辅助栏）。逻辑层（Go 网关 + TS API + Zustand stores + WS socket）经盘点几乎全部就绪，缺口集中在 **UI 层（tsx）接线与渲染**。
+> </details>
 >
 > 另：协作编辑（F-204）已在服务端通过 **Hocuspocus collab-gateway 独立容器**落地（commit `d9f3981`），web 端已迁移 y-codemirror.next；desktop 的 Monaco **并行尝试 y-monaco 接入**（D1 决策延续）。
-
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 补齐 desktop 对照原型缺失的 UI（依赖排序：PR 创建 → 仓库设置 → 门户搜索 → 聊天全屏页 → 通知面板），并行推进 y-monaco 协作接入（走本地网关代理 collab）。优先接线**已就绪的逻辑层**，仅在确需处新增逻辑层代码。
 
@@ -208,9 +210,9 @@
 
 ---
 
-### Task 8: （预留）仓库详情 Releases/Builds
+### Task 8: 仓库详情 Releases/Builds — ✅ 已落地（2026-09-14，port-sync T8）
 
-> 依赖后端既有端点；因而 port-sync 仍计为待排期项，不在本批强制范围。若仓库设置 Tab 复用结构可直接扩展。
+> 原预留：依赖后端既有端点，不在本批强制范围。后续 2026-09-14 已补齐：Builds 列表 + 日志 Modal、Releases 列表/创建/编辑/删除，仓库详情新增「构建/发布」两 Tab（见 `docs/plans/desktop-port-sync.md` §1 T8 ✅）。
 
 ---
 
@@ -264,7 +266,7 @@
 ### Task 10: 全量验证 + README/同步清单回填
 
 **Files:**
-- Modify: `client/desktop/README.md`、`docs/desktop-port-sync.md`、`docs/superpowers/plans/2026-09-07-desktop-decisions.md`（如适用）
+- Modify: `client/desktop/README.md`、`docs/plans/desktop-port-sync.md`、`docs/archive/specs/2026-09-07-desktop-decisions.md`（如适用）
 
 **Interfaces:**
 - Consumes: Task 1-9 全部产物.

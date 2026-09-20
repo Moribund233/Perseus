@@ -1,8 +1,6 @@
 # Desktop Phase 1 — 骨架打通（本地优先）实现计划
 
-> **✅ 状态（2026-09-07 回填）**：本计划全部任务已完成（以代码为准，checkbox 不再逐项回填）；现状核对与后续决策见 [`specs/2026-09-07-desktop-decisions.md`](../specs/2026-09-07-desktop-decisions.md)。
-
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **✅ 状态（2026-09-07 回填，2026-09-18 归档）**：本计划全部任务已完成（以代码为准，checkbox 不再逐项回填）；现状核对与后续决策见 [`specs/2026-09-07-desktop-decisions.md`](../specs/2026-09-07-desktop-decisions.md)。**已归档，不再更新。**
 
 **Goal:** 打通 desktop 本地骨架：Go 本地网关（动态端口 + CORS 白名单 + 会话 token）、SQLite store、Wails 原生绑定、工作区（添加本地目录 / clone 单仓库）、文件树与文件读写、Monaco 编辑器、git 基础操作（status/diff/add/commit/push/pull）、IdeShell 前端布局。
 

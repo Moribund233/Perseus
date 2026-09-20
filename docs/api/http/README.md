@@ -3,7 +3,8 @@
 > **基础路径**: `/api/v1`（除非另行注明）
 > **认证方式**: JWT Bearer Token（通过 `Authorization: Bearer <token>` 请求头传递）
 > **响应格式**: JSON
-> **更新日期**: 2026-06-14
+> **更新日期**: 2026-09-18（本目录以 `docs/api/README.md` 功能点总览为最新索引；新端点自 2026-09 起以 `docs/api/README.md` 与 `docs/api/roadmap.md` 为准）
+> **说明**: 本文件为存量 HTTP 端点参考，部分 2026-09 后的新端点（搜索聚合、Watch、DM 私聊、行内评论 Discussions、协作邀请、文件移动等）未逐条收录于此，请以 `docs/api/README.md`（功能点 + 路由）为准。
 
 ---
 

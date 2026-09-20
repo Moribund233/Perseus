@@ -5,10 +5,10 @@
 > desktop 待 `y-monaco` 接入。下文现状描述保留为迁移前记录，供追溯。
 > **2026-09-14 更新**: desktop T9 y-monaco 接入完成，两端同 Yjs 底座；**M1 短期项全部落地**——
 > 3.3 双态徽标（会话已同步/Git 已提交）与 3.2 短期「未保存离开提示」（`beforeunload` × `hasPendingChanges()`）两端实现，
-> 详见 `docs/desktop-port-sync.md` 同步批次记录。**2026-09-18 更新**：M2+（邀请链接 + 会话级临时权限、会话 TTL 延迟销毁、Redis 多副本/会话持久化、跟随模式、受限视图、会话级角色覆盖层、邀请 token 撤销）均已落地，web/desktop 双端接线完成。
+> 详见 `docs/plans/desktop-port-sync.md` 同步批次记录。**2026-09-18 更新**：M2+（邀请链接 + 会话级临时权限、会话 TTL 延迟销毁、Redis 多副本/会话持久化、跟随模式、受限视图、会话级角色覆盖层、邀请 token 撤销）均已落地，web/desktop 双端接线完成。
 > **状态**: 规划参考文档（非实施承诺）
 > **定位**: 以 JetBrains Code with Me（下称 CwM）为直接参照，梳理 F-204 协作文本编辑的功能差异，按"影响用户体验 → web 端取舍 → desktop 端深化"三层组织，供后续里程碑规划使用。
-> **关联**: [`docs/api/websocket/README.md`](api/websocket/README.md) 第 7 节（协议）、[`docs/roadmap.md`](roadmap.md)（阶段三）、[`docs/superpowers/specs/2026-08-03-desktop-app-design.md`](superpowers/specs/2026-08-03-desktop-app-design.md)（desktop 基线）、[`docs/frontend-placeholders.md`](frontend-placeholders.md)（已知限制）
+> **关联**: [`docs/api/websocket/README.md`](../api/websocket/README.md) 第 7 节（协议）、[`docs/plans/roadmap.md`](roadmap.md)（阶段三）、[`docs/archive/specs/2026-08-03-desktop-app-design.md`](../archive/specs/2026-08-03-desktop-app-design.md)（desktop 基线）、[`docs/plans/frontend-placeholders.md`](frontend-placeholders.md)（已知限制）
 
 ---
 
@@ -136,7 +136,7 @@ F-204 是以**服务端会话 + Git 提交为权威**的**轻协作能力**（�
 | 单文件会话（`repo:branch:path`） | 多文件项目级会话 | 浏览器场景以"打开一个文件共编"为主；多文件留给 desktop（见 5.3） |
 | 无终端/运行/调试/重构 | guest 可用有限 IDE 能力 | web 编辑器职责边界；desktop 端以 LSP 补齐（desktop spec 既定） |
 | 服务端权威 + 单变更日志（5000 条环形，超出即 `collab_resync`） | IntelliJ 双端 OT + undo 协同 | 实现简单、可测（26 例覆盖）；undo 协同（跨用户 undo 语义）暂不支持，属已知取舍 |
-| 光标位置在本地有未确认变更时短暂偏移（自校正） | 精确映射 | 已记录于 `docs/frontend-placeholders.md`；显示层问题，不影响数据 |
+| 光标位置在本地有未确认变更时短暂偏移（自校正） | 精确映射 | 已记录于 `docs/plans/frontend-placeholders.md`；显示层问题，不影响数据 |
 | 无离线合并 | 同样受限（CwM 断线即不可编辑） | 见 3.6 方案决策 |
 | 消息上限 2MB（UTF-8 字节）/ 文档 2M 字符 | — | 防御性上限，超大文件协作不在场景内 |
 | **进程内单例会话注册表** | CwM 专用 relay 基础设施 | **部署约束**：仅支持 `workers=1` / 单副本；多副本需 Redis pub/sub 改造（见 5.6），上线规模化前必须处理 |
@@ -156,7 +156,7 @@ F-204 是以**服务端会话 + Git 提交为权威**的**轻协作能力**（�
   - **A. desktop 嵌入 CM6**（编辑器区域用 CM6，其余 IDE 布局不变）：零协议适配直接复用 `/ws/collab` 全栈，但与 Monaco/LSP 生态割裂，编辑器内核双轨。
   - **B. 统一协同层 Yjs**：web/desktop 均迁 Yjs（y-codemirror.next + y-monaco），服务端 y-websocket/Y 网关；CRDT 天然支持离线合并（连带解决 3.6 方案 B），但需重写 F-204 服务端与前端同步层，Git 快照落盘逻辑需重接。
   - **C. F-204 协议 + Monaco 适配层**：在 Monaco 上实现 ChangeSet 协议客户端（自维护 OT 映射），成本最高，不建议。
-- **✅ 决策：方案 B**——两端统一 Yjs 协同底座，现在冻结并作为独立里程碑（Y 网关基建 + web 端先行迁移，desktop `y-monaco` 随后接入）；LSP 桥（spec §8）与 Yjs 正交，Phase 3 不受阻塞。落地依赖与排期见 [`superpowers/specs/2026-09-07-desktop-decisions.md`](superpowers/specs/2026-09-07-desktop-decisions.md) D1。
+- **✅ 决策：方案 B**——两端统一 Yjs 协同底座，现在冻结并作为独立里程碑（Y 网关基建 + web 端先行迁移，desktop `y-monaco` 随后接入）；LSP 桥（spec §8）与 Yjs 正交，Phase 3 不受阻塞。落地依赖与排期见 [`archive/specs/2026-09-07-desktop-decisions.md`](../archive/specs/2026-09-07-desktop-decisions.md) D1。
 
 ### 5.2 Host 会话模型（desktop 独有能力）
 

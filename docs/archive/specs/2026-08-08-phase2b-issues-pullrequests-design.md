@@ -1,7 +1,7 @@
 # Perseus Desktop Phase 2B 设计（Spec）
 
 > 日期：2026-08-08
-> 状态：待评审
+> 状态：✅ 已交付（2026-09-07 回填，以代码为准）；本 spec 对应的实现计划见归档 [`../plans/2026-08-08-phase2b-issues-pullrequests.md`](../plans/2026-08-08-phase2b-issues-pullrequests.md)
 > 前置：Phase 2A 已交付（服务器注册表/登录/反向代理/WS 透传/离线语义/Repo 列表+代码详情/Clone）
 > 范围：`client/web` + `client/desktop` — issues/PR 页面补齐（web）+ 忠实移植（desktop）；聊天与通知不在本期
 

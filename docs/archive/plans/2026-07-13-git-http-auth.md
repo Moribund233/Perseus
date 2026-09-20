@@ -1,6 +1,6 @@
 # Git HTTP 认证实现计划
 
-> **✅ 状态（2026-09-07 回填）**：已实现——`controller/git_auth_controller.py` + 生产 `docker/gateway/nginx.conf` `auth_request` 均已在库中；desktop push/pull 依赖就此满足。
+> **✅ 状态（2026-09-07 回填，2026-09-18 归档）**：已实现——`controller/git_auth_controller.py` + 生产 `docker/gateway/nginx.conf` `auth_request` 均已在库中；desktop push/pull 依赖就此满足。**已归档，不再更新。**
 
 **Goal:** 为 Git Smart HTTP 协议添加 JWT 认证，防止未经授权的 clone/push
 

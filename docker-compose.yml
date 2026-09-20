@@ -85,7 +85,7 @@ services:
   # 协作编辑 Yjs 网关 (Hocuspocus 哑管道: CRDT 同步 + app 回调)
   # 多副本就绪: 移除 container_name 以允许 --scale collab=N;
   # 同一文档落在不同副本时经 Redis pub/sub 收敛 (m4)。默认仍单副本,
-  # nginx 动态解析与负载均衡留待真正扩容时处理 (见 docs/collab-f204-vs-cwm.md 5.6)。
+  # nginx 动态解析与负载均衡留待真正扩容时处理 (见 docs/plans/collab-f204-vs-cwm.md 5.6)。
   collab:
     image: ${PERSEUS_IMAGE_PREFIX:-perseus}-collab:${PERSEUS_IMAGE_TAG:-latest}
     build:

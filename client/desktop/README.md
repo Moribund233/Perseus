@@ -87,5 +87,5 @@ cd frontend && npm run build
 
 - 网关会话 token 仅存内存，随进程退出失效
 - 数据目录持久化在 `%APPDATA%\perseus\app.db`
-- Releases/Builds tab、Dashboard 贡献图/活动流、用户中心（SSH Keys/OAuth）尚未移植，两端差异以 [`docs/desktop-port-sync.md`](../docs/desktop-port-sync.md) 清单跟踪
-- Clone to workspace 走 Git CLI；SSH 推送、mDNS、托盘/单实例/NSIS 属 Phase 4（见 `docs/superpowers/specs/2026-08-03-desktop-app-design.md`）
+- Releases/Builds tab、Dashboard 贡献图/活动流、用户中心（SSH Keys/OAuth）尚未移植，两端差异以 [`docs/plans/desktop-port-sync.md`](../docs/plans/desktop-port-sync.md) 清单跟踪
+- Clone to workspace 走 Git CLI；SSH 推送、mDNS、托盘/单实例/NSIS 属 Phase 4（见 `docs/archive/specs/2026-08-03-desktop-app-design.md`）

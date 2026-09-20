@@ -413,7 +413,7 @@ compose 由 `scripts/generate_env.py` 生成并注入 app 与 collab 两容器�
 
 - `onStoreDocument`（debounce/断开自动触发）：**Git 提交仅由显式 `collab-save` 触发**，防止高频自动 commit。
   配置 `REDIS_URL` 时，另将 Y.Doc 全量状态快照写入 Redis（会话持久化，非 Git commit）。
-- ✅ 自动保存到 Git（草稿分支）已落地（2026-09-17 后端 + 2026-09-18 web 计时）：会话空闲 N 分钟经协作会话触发 `collab-save` 携带 `draft=true`，落 `collab/draft-{branch}` 草稿分支，不触碰工作分支；网关转发 `draft` 标志。见 `docs/collab-f204-vs-cwm.md` 3.2 长期方案。
+- ✅ 自动保存到 Git（草稿分支）已落地（2026-09-17 后端 + 2026-09-18 web 计时）：会话空闲 N 分钟经协作会话触发 `collab-save` 携带 `draft=true`，落 `collab/draft-{branch}` 草稿分支，不触碰工作分支；网关转发 `draft` 标志。见 `docs/plans/collab-f204-vs-cwm.md` 3.2 长期方案。
 
 ### 跟随模式（Follow me，2026-09-17 后端就绪）
 

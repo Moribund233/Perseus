@@ -1,6 +1,6 @@
 """自动落盘草稿分支 (批次7) — TDD 红灯
 
-todo docs/todos.md:110: 会话空闲 N 分钟自动 collab_save 到 `collab/draft-...`。
+todo docs/plans/todos.md:110: 会话空闲 N 分钟自动 collab_save 到 `collab/draft-...`。
 当前缺口:
   - `CollabSaveRequest` (collab_internal_controller.py:60-65) 只有 token/docKey/
     content/message/invite_token, 无 "draft" 语义;

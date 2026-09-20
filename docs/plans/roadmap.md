@@ -165,7 +165,7 @@ Nginx/OpenResty (反向代理)
 
 ## 现有后端进度参考
 
-后端 API/功能点交付进度详见 [`docs/api/roadmap.md`](api/roadmap.md)，当前状态：
+后端 API/功能点交付进度详见 [`docs/api/roadmap.md`](../api/roadmap.md)，当前状态：
 
 - **阶段一（基础功能）**：物理仓库创建、配置系统、PR 合并、JWT 刷新 — **全部完成** ✅
 - **阶段二（核心协作）**：SSH Key、代码查看器、Issue、Code Review、Webhook — **后端全部完成** ✅
@@ -176,7 +176,7 @@ Nginx/OpenResty (反向代理)
     Hocuspocus 哑管道网关（`collab-gateway/`，独立容器）+ app 内部回调端点（鉴权/文档加载/Git 保存），
     web 端 `y-codemirror.next`；断线本地编辑保留（CRDT 重连收敛）、只读连接服务端强制、
     显式保存落 Git 语义保留。协议详见 `docs/api/websocket/README.md` 第 7 节；
-    与 Code with Me 的差距分析与演进规划见 `docs/collab-f204-vs-cwm.md`
+    与 Code with Me 的差距分析与演进规划见 `docs/plans/collab-f204-vs-cwm.md`
   - **已完成** ✅：独立实时通知推送（F-205）— **2026-09-14 落地**：通知落库即经 `/ws/notifications` 推送
     `user_notification` 消息（含完整通知对象 + `unread_count`）；web（AppLayout 常驻订阅）与 desktop
     （PortalShell 订阅，经网关 WS 透传）均已接入，REST 轮询降级为对账兜底。协议见 `docs/api/websocket/README.md` 第 4 节

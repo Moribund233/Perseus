@@ -1,6 +1,6 @@
 # Desktop 前端移植同步清单（web → desktop）
 
-> **背景**: 2026-09-07 决策 D2（见 [`specs/2026-09-07-desktop-decisions.md`](specs/2026-09-07-desktop-decisions.md)）——维持"拷贝移植"策略，以本清单跟踪两端功能差异，替代共享包改造。
+> **背景**: 2026-09-07 决策 D2（见 [`archive/specs/2026-09-07-desktop-decisions.md`](../archive/specs/2026-09-07-desktop-decisions.md)）——维持"拷贝移植"策略，以本清单跟踪两端功能差异，替代共享包改造。
 > **用法**: web 端新功能合入时在此登记（状态 ⬜）；移植 desktop 时更新状态与移植批次列；两端结构性分叉时在"备注"记录原因。
 > **2026-09-10**: UI 补全批次（T1-T7、T9）完成，主表全面回填；剩余欠项集中在 Builds/Releases、Dashboard 贡献图/活动流、用户中心。
 > **2026-09-10（原型还原度）**: 逐屏对照 `client/prototype/desktop-ui/` 审计并按 F0-F3 批次修复：Monaco 主题/etab 色块/crumbs hint（F0）、Issue 新建按钮/readme Markdown/last-commit 列/branch pill/复刻按钮/Tab 计数（F1）、Issue 详情侧栏与列表行标签（F2）、仓库树 `.fc` 芯片/StatusBar Ln/Col（F3）；**后端新增 `languages` 聚合**（`services/language_service.py`，卡片主语言，web 可复用，见 §4）。
