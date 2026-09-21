@@ -523,7 +523,12 @@
       "contextOverview": "Repository overview",
       "contextIssues": "Issues",
       "recentProjects": "Recent projects",
-      "recentEmpty": "No recently opened projects"
+      "recentEmpty": "No recently opened projects",
+      "unsavedSwitchTitle": "Unsaved changes",
+      "unsavedSwitchMessage": "You are leaving the editor for {{path}} with unsaved changes. Continuing will discard them (cancel to save first).",
+      "unsavedSwitchPending": "The collaboration session still has unsynced changes. Leaving may discard them.",
+      "unsavedSwitchStay": "Stay here",
+      "unsavedSwitchDiscard": "Discard and leave"
     },
     "notifications": {
       "title": "Notifications",
@@ -950,7 +955,26 @@
       "searchMessages": "Search messages",
       "searchScopeAll": "All conversations",
       "searchScopeRoom": "This conversation",
-      "attach": "Upload attachment"
+      "attach": "Upload attachment",
+      "noMessages": "No messages yet. Start the conversation!",
+      "bold": "Bold",
+      "italic": "Italic",
+      "boldText": "bold",
+      "italicText": "italic",
+      "insertCode": "Insert repository code snippet",
+      "insertFile": "Insert repository file",
+      "repoOnly": "Available in repository channels only",
+      "pickCodeTitle": "Pick a repository code snippet",
+      "pickFileTitle": "Pick a repository file",
+      "insert": "Insert",
+      "cancel": "Cancel",
+      "clear": "Clear",
+      "noRepo": "This conversation is not linked to a repository",
+      "filterFiles": "Filter by name (loaded levels only)",
+      "pickCodeHint": "Pick a file on the left, then click a line (Shift-click for a range)",
+      "pickCodeEmpty": "Select a file",
+      "pickCodeBinary": "Preview unavailable",
+      "pickCodeRange": "Selected L{{start}}–L{{end}}"
     },
     "settings": {
       "title": "Settings",
@@ -1082,6 +1106,8 @@
     "english": "English",
     "chinese": "中文",
     "confirm": "OK",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "expand": "Expand",
+    "collapse": "Collapse"
   }
 }

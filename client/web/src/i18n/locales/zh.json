@@ -523,7 +523,12 @@
       "contextOverview": "仓库概览",
       "contextIssues": "Issues",
       "recentProjects": "最近项目",
-      "recentEmpty": "暂无最近打开的项目"
+      "recentEmpty": "暂无最近打开的项目",
+      "unsavedSwitchTitle": "有未保存的更改",
+      "unsavedSwitchMessage": "即将离开编辑器前往 {{path}}，当前文件有未保存的更改，继续将丢失这些修改（可先取消并保存）。",
+      "unsavedSwitchPending": "协作会话仍有未同步的更改，离开可能丢失这些修改。",
+      "unsavedSwitchStay": "留在此页",
+      "unsavedSwitchDiscard": "放弃更改并离开"
     },
     "notifications": {
       "title": "通知",
@@ -950,7 +955,26 @@
       "searchMessages": "搜索消息",
       "searchScopeAll": "全部会话",
       "searchScopeRoom": "本会话",
-      "attach": "上传附件"
+      "attach": "上传附件",
+      "noMessages": "还没有消息，开始对话吧",
+      "bold": "粗体",
+      "italic": "斜体",
+      "boldText": "粗体",
+      "italicText": "斜体",
+      "insertCode": "插入仓库代码片段",
+      "insertFile": "插入仓库文件",
+      "repoOnly": "仅仓库频道可用",
+      "pickCodeTitle": "选择仓库代码片段",
+      "pickFileTitle": "选择仓库文件",
+      "insert": "插入",
+      "cancel": "取消",
+      "clear": "清除",
+      "noRepo": "当前会话未关联仓库",
+      "filterFiles": "按名称过滤（仅当前已加载层）",
+      "pickCodeHint": "在左侧选择文件，然后点击行选择片段（Shift 点选区间）",
+      "pickCodeEmpty": "请选择文件",
+      "pickCodeBinary": "无法预览该文件",
+      "pickCodeRange": "已选 L{{start}}–L{{end}}"
     },
     "settings": {
       "title": "设置",
@@ -1082,6 +1106,8 @@
     "english": "English",
     "chinese": "中文",
     "confirm": "确定",
-    "cancel": "取消"
+    "cancel": "取消",
+    "expand": "展开",
+    "collapse": "收起"
   }
 }

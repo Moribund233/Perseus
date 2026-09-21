@@ -81,6 +81,9 @@ body {
 .cm-floating-panel .cm-floating-item:hover .cm-tree-delete-btn {
   opacity: 1 !important;
 }
+.cm-file-tree-row:hover .cm-tree-delete-btn {
+  opacity: 1 !important;
+}
 @keyframes cm-float-enter {
   from { opacity: 0; transform: translateX(-6px); }
   to { opacity: 1; transform: translateX(0); }

@@ -27,18 +27,18 @@ import Markdown from '../../components/Markdown';
 import ReleasesTab from '../../components/repo/ReleasesTab';
 import BuildsTab from '../../components/repo/BuildsTab';
 import RepoSettingsTab from '../../components/repo/RepoSettingsTab';
+import Explorer from '../../components/explorer/Explorer';
 import { useRepositoriesStore } from '../../stores/repositories';
 import { useIssuesStore } from '../../stores/issues';
 import { usePullRequestsStore } from '../../stores/pullRequests';
 import { useAuthStore } from '../../stores/auth';
 import { repositoriesApi } from '../../api/repositories';
-import type { RepoFile, RepoBlob } from '../../api/repositories';
+import type { RepoBlob } from '../../api/repositories';
 
 const { Sider, Content } = Layout;
 
 const borderColor = '#21262d';
 const hoverBg = '#1c2333';
-const activeBg = '#1a2332';
 const textSecondary = '#8b949e';
 const textPrimary = '#e6edf3';
 const textTertiary = '#6e7681';
@@ -48,72 +48,6 @@ const bgSecondary = '#161b22';
 const bgTertiary = '#1c2128';
 const green = '#3fb950';
 const purple = '#bc8cff';
-
-interface TreeNode {
-  key: string;
-  name: string;
-  type: 'folder' | 'file';
-  iconColor?: string;
-  children?: TreeNode[];
-}
-
-function buildTree(files: RepoFile[]): TreeNode[] {
-  const treeMap = new Map<string, TreeNode>();
-  const roots: TreeNode[] = [];
-
-  const sorted = [...files].sort((a, b) => {
-    const aDepth = a.path.split('/').length;
-    const bDepth = b.path.split('/').length;
-    if (aDepth !== bDepth) return aDepth - bDepth;
-    if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
-
-  for (const file of sorted) {
-    const parts = file.path.split('/');
-    for (let i = 0; i < parts.length; i++) {
-      const accumulatedPath = parts.slice(0, i + 1).join('/');
-      const isLast = i === parts.length - 1;
-
-      if (!treeMap.has(accumulatedPath)) {
-        const node: TreeNode = {
-          key: accumulatedPath,
-          name: parts[i],
-          type: isLast ? (file.type === 'directory' ? 'folder' : 'file') : 'folder',
-        };
-        if (!isLast) {
-          node.children = [];
-        }
-        treeMap.set(accumulatedPath, node);
-      }
-    }
-  }
-
-  for (const file of sorted) {
-    const parts = file.path.split('/');
-    for (let i = 0; i < parts.length; i++) {
-      const accumulatedPath = parts.slice(0, i + 1).join('/');
-      const node = treeMap.get(accumulatedPath)!;
-
-      if (i === 0) {
-        if (!roots.find((r) => r.key === node.key)) {
-          roots.push(node);
-        }
-      } else {
-        const parentPath = parts.slice(0, i).join('/');
-        const parent = treeMap.get(parentPath);
-        if (parent) {
-          if (!parent.children) parent.children = [];
-          if (!parent.children.find((c) => c.key === node.key)) {
-            parent.children.push(node);
-          }
-        }
-      }
-    }
-  }
-
-  return roots;
-}
 
 /** "src/utils/a.ts" → "src/utils"；根级返回 "" */
 function parentPath(path: string): string {
@@ -180,110 +114,6 @@ function ActionButton({ icon, children, onClick }: { icon: ReactNode; children: 
   );
 }
 
-function TreeIcon({ type, iconColor }: { type: 'folder' | 'file'; iconColor?: string }) {
-  const color = type === 'folder' ? blueLight : iconColor || textSecondary;
-  return (
-    <span style={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16, color }}>
-      {type === 'folder' ? <FolderOutlined /> : <FileOutlined />}
-    </span>
-  );
-}
-
-function TreeNodeView({
-  node,
-  depth,
-  selectedKey,
-  onSelect,
-  branchName,
-  repoId,
-  branchRef,
-}: {
-  node: TreeNode;
-  depth: number;
-  selectedKey: string;
-  onSelect: (key: string, type: 'folder' | 'file') => void;
-  branchName?: string;
-  repoId?: string;
-  branchRef?: string;
-}) {
-  const isSelected = selectedKey === node.key;
-  const hasChildren = node.children && node.children.length > 0;
-  const [expanded, setExpanded] = useState(hasChildren);
-  const [loading, setLoading] = useState(false);
-  const fetchTree = useRepositoriesStore((s) => s.fetchTree);
-
-  const handleClick = async () => {
-    onSelect(node.key, node.type);
-    if (node.type !== 'folder') return;
-    if (!hasChildren && !loading && repoId) {
-      setLoading(true);
-      await fetchTree(repoId, branchRef, node.key);
-      setLoading(false);
-    }
-    setExpanded((v) => !v);
-  };
-
-  return (
-    <div>
-      <div
-        onClick={handleClick}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '6px 10px',
-          borderRadius: 6,
-          cursor: 'pointer',
-          fontSize: 13,
-          color: isSelected ? blueLight : textSecondary,
-          background: isSelected ? activeBg : 'transparent',
-          marginLeft: depth * 16,
-          transition: 'all 0.15s',
-        }}
-        onMouseEnter={(e) => {
-          if (!isSelected) {
-            e.currentTarget.style.background = hoverBg;
-            e.currentTarget.style.color = textPrimary;
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!isSelected) {
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color = textSecondary;
-          }
-        }}
-      >
-        {(loading && node.type === 'folder') ? (
-          <Spin size="small" style={{ width: 16, height: 16, flexShrink: 0 }} />
-        ) : (
-          <TreeIcon type={node.type} iconColor={node.iconColor} />
-        )}
-        <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{node.name}</span>
-        {depth === 0 && branchName && (
-          <span
-            style={{
-              fontSize: 10,
-              color: textTertiary,
-              background: '#0d1117',
-              padding: '1px 6px',
-              borderRadius: 8,
-            }}
-          >
-            {branchName}
-          </span>
-        )}
-      </div>
-      {expanded && hasChildren && (
-        <div>
-          {node.children!.map((child) => (
-            <TreeNodeView key={child.key} node={child} depth={depth + 1} selectedKey={selectedKey} onSelect={onSelect} branchName={branchName} repoId={repoId} branchRef={branchRef} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function RepositoriesPage() {
   const { owner, repo } = useParams<{ owner?: string; repo?: string }>();
   const { t } = useTranslation();
@@ -318,7 +148,6 @@ export default function RepositoriesPage() {
   const [fileLoading, setFileLoading] = useState(false);
   const [currentDir, setCurrentDir] = useState('');
   const [dirLoading, setDirLoading] = useState(false);
-  const [activeFilter, setActiveFilter] = useState('all');
   const [isStarred, setIsStarred] = useState(false);
   const [isWatching, setIsWatching] = useState(false);
   const [repoFilter, setRepoFilter] = useState<'mine' | 'all'>('mine');
@@ -385,24 +214,11 @@ export default function RepositoriesPage() {
     }
   }, [currentRepo, fetchTree, fetchReadme, fetchBranches, fetchCommits, fetchIssues, fetchPullRequests]);
 
-  const repoTree = useMemo(() => buildTree(storeFiles), [storeFiles]);
-
   // 当前目录下的条目（目录 + 文件）
   const dirEntries = useMemo(
     () => storeFiles.filter((f) => parentPath(f.path) === currentDir),
     [storeFiles, currentDir]
   );
-
-  const displayFiles = useMemo(() => {
-    if (activeFilter === 'all') return dirEntries;
-    return dirEntries.filter((f) => {
-      if (f.type === 'directory') return true; // 目录始终显示
-      if (activeFilter === 'source') return /\.(ts|tsx|js|jsx|rs|go|py)$/i.test(f.name);
-      if (activeFilter === 'config') return /\.(json|ya?ml|toml)$/i.test(f.name) || f.name === '.gitignore';
-      if (activeFilter === 'tests') return f.path.includes('test') || f.path.includes('__tests__') || /\.(test|spec)\./i.test(f.name);
-      return true;
-    });
-  }, [dirEntries, activeFilter]);
 
   /** 进入目录：清空文件选择并把列表切到该目录 */
   const goToDir = useCallback((path: string) => {
@@ -425,6 +241,12 @@ export default function RepositoriesPage() {
       }
     }
   }, [currentRepo, storeFiles, fetchTree, goToDir]);
+
+  /** Explorer 目录按需加载 */
+  const handleLoadDir = useCallback((key: string) => {
+    if (!currentRepo) return;
+    fetchTree(currentRepo.id, currentRepo.default_branch, key).catch(() => {});
+  }, [currentRepo, fetchTree]);
 
   const closeViewer = useCallback(() => {
     setSelectedTreeKey('');
@@ -678,8 +500,6 @@ export default function RepositoriesPage() {
     );
   }
 
-  const filters = ['all', 'source', 'config', 'tests'] as const;
-
   const tabItems: TabsProps['items'] = [
     { key: 'code', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><FileTextOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.code')}</span> },
     { key: 'pullRequests', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={() => navigate(`/repositories/${owner}/${repo}/pulls`)}><PullRequestOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.pullRequests')}<span className="tab-count">{pullRequests.length}</span></span> },
@@ -704,7 +524,7 @@ export default function RepositoriesPage() {
   }
 
   return (
-    <Layout style={{ height: '100%', background: 'transparent' }}>
+    <Layout style={{ height: '100%', background: 'transparent', overflow: 'hidden' }}>
       <style>{`
         .repo-tabs .ant-tabs-nav {
           margin-bottom: 20px !important;
@@ -762,74 +582,22 @@ export default function RepositoriesPage() {
         style={{
           background: bgSecondary,
           borderRight: `1px solid ${borderColor}`,
-          display: 'flex',
-          flexDirection: 'column',
           flexShrink: 0,
+          height: '100%',
+          overflow: 'hidden',
         }}
+        styles={{ body: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden' } }}
       >
-        <div style={{ padding: 16, borderBottom: `1px solid ${borderColor}` }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: textPrimary }}>{t('app.repositories.explorer')}</h3>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {filters.map((f) => {
-              const isActive = activeFilter === f;
-              return (
-                <span
-                  key={f}
-                  onClick={() => setActiveFilter(f)}
-                  style={{
-                    padding: '3px 10px',
-                    borderRadius: 12,
-                    fontSize: 11,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    background: isActive ? 'rgba(31,111,235,0.15)' : '#0d1117',
-                    border: `1px solid ${isActive ? bluePrimary : borderColor}`,
-                    color: isActive ? blueLight : textSecondary,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.background = 'rgba(31,111,235,0.15)';
-                      e.currentTarget.style.borderColor = bluePrimary;
-                      e.currentTarget.style.color = blueLight;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.background = '#0d1117';
-                      e.currentTarget.style.borderColor = borderColor;
-                      e.currentTarget.style.color = textSecondary;
-                    }
-                  }}
-                >
-                  {t(`app.repositories.filters.${f}`)}
-                </span>
-              );
-            })}
-          </div>
+        <div style={{ padding: '10px 12px', borderBottom: `1px solid ${borderColor}` }}>
+          <h3 style={{ fontSize: 13, fontWeight: 600, margin: 0, color: textPrimary }}>{t('app.repositories.explorer')}</h3>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
-          {repoTree.length > 0 ? (
-            repoTree.map((node) => (
-              <TreeNodeView
-                key={node.key}
-                node={node}
-                depth={0}
-                selectedKey={selectedTreeKey}
-                onSelect={(key, type) => {
-                  if (type === 'folder') goToDir(key);
-                  else setSelectedTreeKey(key);
-                }}
-                branchName={currentRepo.default_branch}
-                repoId={currentRepo.id}
-                branchRef={currentRepo.default_branch}
-              />
-            ))
-          ) : (
-            <div style={{ padding: 16, color: textTertiary, fontSize: 13, textAlign: 'center' }}>
-              {t('app.repositories.empty.noFiles')}
-            </div>
-          )}
-        </div>
+        <Explorer
+          files={storeFiles}
+          selectedKey={selectedTreeKey}
+          onSelectFile={setSelectedTreeKey}
+          onLoadDir={handleLoadDir}
+          emptyText={t('app.repositories.empty.noFiles')}
+        />
       </Sider>
       )}
 
@@ -1004,7 +772,7 @@ export default function RepositoriesPage() {
             </span>
           </div>
 
-          {displayFiles.map((file, index) => (
+          {dirEntries.map((file, index) => (
             <div
               key={file.path}
               onClick={() => {
@@ -1019,7 +787,7 @@ export default function RepositoriesPage() {
                 alignItems: 'center',
                 gap: 12,
                 padding: '8px 16px',
-                borderBottom: index === displayFiles.length - 1 ? 'none' : `1px solid ${borderColor}`,
+                borderBottom: index === dirEntries.length - 1 ? 'none' : `1px solid ${borderColor}`,
                 fontSize: 13,
                 cursor: 'pointer',
                 transition: 'background 0.15s',
@@ -1069,7 +837,7 @@ export default function RepositoriesPage() {
               </span>
             </div>
           ))}
-          {displayFiles.length === 0 && (
+          {dirEntries.length === 0 && (
             <div style={{ padding: 16, color: textTertiary, fontSize: 13, textAlign: 'center' }}>
               {t('app.repositories.empty.noFiles')}
             </div>

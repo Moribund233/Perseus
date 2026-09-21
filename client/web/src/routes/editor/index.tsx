@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback, type CSSProperties } from 'react';
 import { Layout, Avatar, Button, Input, Modal, Tooltip, message as antdMessage } from 'antd';
 import {
-  FolderOutlined,
-  FileOutlined,
   FileTextOutlined,
   PlusOutlined,
   MessageOutlined,
@@ -11,7 +9,6 @@ import {
   SaveOutlined,
   EyeOutlined,
   EditOutlined,
-  DeleteOutlined,
   ShareAltOutlined,
   AimOutlined,
   StopOutlined,
@@ -32,23 +29,24 @@ import { html } from '@codemirror/lang-html';
 import { css } from '@codemirror/lang-css';
 import { markdown } from '@codemirror/lang-markdown';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useParams, Navigate } from 'react-router-dom';
 import EditorSkeleton from '../../components/skeleton/EditorSkeleton';
 import Markdown from '../../components/Markdown';
 import { CollabController, type CollabParticipant, type FollowState } from '../../components/editor/collabController';
 import { useRepositoriesStore } from '../../stores/repositories';
+import { useEditorStateStore } from '../../stores/editorState';
 import { useAuthStore } from '../../stores/auth';
 import { chatApi } from '../../api/chat';
 import { chatSocket, type PresenceUser } from '../../api/chatSocket';
-import { repositoriesApi, type RepoFile } from '../../api/repositories';
+import { repositoriesApi } from '../../api/repositories';
 import { discussionsApi, type DiscussionComment } from '../../api/discussions';
-import { FloatingTreePanel } from '../../components/FloatingTreePanel';
+import Explorer from '../../components/explorer/Explorer';
+import { buildTree, findFileByKey, findFirstFile, type TreeNode } from '../../components/explorer/tree';
+import { getLastEditorRepo, recordEditorRepo } from './lastProject';
 
 const { Sider, Content } = Layout;
 
 const borderColor = '#21262d';
-const hoverBg = '#1c2333';
-const activeBg = '#1a2332';
 const textSecondary = '#8b949e';
 const textPrimary = '#e6edf3';
 const textTertiary = '#6e7681';
@@ -60,20 +58,6 @@ const bgSecondary = '#161b22';
 const bgTertiary = '#1c2128';
 const green = '#3fb950';
 const yellow = '#d29922';
-
-export interface TreeNode {
-  title: string;
-  key: string;
-  type: 'folder' | 'file';
-  fileType?: 'ts' | 'json' | 'md' | 'css' | 'py' | 'html';
-  children?: TreeNode[];
-}
-
-interface FloatPanelPos {
-  key: string;
-  left: number;
-  top: number;
-}
 
 const avatarColors = ['#1f6feb', '#3fb950', '#58a6ff', '#bc8cff', '#d29922', '#f85149', '#f0883e', '#7956d9'];
 
@@ -87,17 +71,6 @@ function getAvatarColor(initials: string): string {
     hash = initials.charCodeAt(i) + ((hash << 5) - hash);
   }
   return avatarColors[Math.abs(hash) % avatarColors.length];
-}
-
-function getFileType(filename: string): TreeNode['fileType'] | undefined {
-  const ext = filename.split('.').pop()?.toLowerCase();
-  if (ext === 'ts' || ext === 'tsx') return 'ts';
-  if (ext === 'json') return 'json';
-  if (ext === 'md' || ext === 'markdown') return 'md';
-  if (ext === 'css' || ext === 'scss' || ext === 'less') return 'css';
-  if (ext === 'py') return 'py';
-  if (ext === 'html' || ext === 'htm') return 'html';
-  return undefined;
 }
 
 function getLanguageExtension(path: string) {
@@ -127,56 +100,6 @@ function getLanguageExtension(path: string) {
     default:
       return undefined;
   }
-}
-
-function buildTree(files: RepoFile[]): TreeNode[] {
-  const root: TreeNode = { title: 'root', key: 'root', type: 'folder', children: [] };
-  for (const file of files) {
-    const parts = file.path.split('/');
-    let current = root;
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      const isLast = i === parts.length - 1;
-      const key = parts.slice(0, i + 1).join('/');
-      const existing = current.children?.find((c) => c.key === key);
-      if (existing) {
-        current = existing;
-        continue;
-      }
-      const node: TreeNode = {
-        title: part,
-        key,
-        type: isLast ? (file.type === 'directory' ? 'folder' : 'file') : 'folder',
-        fileType: isLast ? getFileType(part) : undefined,
-        children: isLast ? undefined : [],
-      };
-      current.children!.push(node);
-      current = node;
-    }
-  }
-  return root.children || [];
-}
-
-function findFirstFile(nodes: TreeNode[]): TreeNode | null {
-  for (const node of nodes) {
-    if (node.type === 'file') return node;
-    if (node.children) {
-      const found = findFirstFile(node.children);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-function findFileByKey(nodes: TreeNode[], key: string): TreeNode | null {
-  for (const node of nodes) {
-    if (node.key === key) return node;
-    if (node.children) {
-      const found = findFileByKey(node.children, key);
-      if (found) return found;
-    }
-  }
-  return null;
 }
 
 const sampleCode = `// Select a file from the explorer to view repository contents.`;
@@ -348,142 +271,6 @@ function DiscussionRow({
   );
 }
 
-function FileIcon({ type, fileType }: { type: 'folder' | 'file'; fileType?: string }) {
-  let color = blueLight;
-  if (type === 'file') {
-    switch (fileType) {
-      case 'ts': color = '#3178c6'; break;
-      case 'json': color = '#d29922'; break;
-      case 'md': color = blueLight; break;
-      case 'css': color = '#563d7c'; break;
-      case 'py': color = '#3572A5'; break;
-      case 'html': color = '#e34c26'; break;
-      default: color = textSecondary;
-    }
-  }
-  return (
-    <span style={{ width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14, color }}>
-      {type === 'folder' ? <FolderOutlined /> : <FileOutlined />}
-    </span>
-  );
-}
-
-function TreeNodeView({
-  node,
-  selectedKey,
-  onSelect,
-  onDelete,
-  onMove,
-  onDirPin,
-}: {
-  node: TreeNode;
-  selectedKey: string;
-  onSelect: (key: string) => void;
-  onDelete?: (node: TreeNode) => void;
-  onMove?: (node: TreeNode) => void;
-  onDirPin?: (key: string, element: HTMLElement) => void;
-}) {
-  const isSelected = selectedKey === node.key;
-  const hasChildren = node.children && node.children.length > 0;
-  const { t } = useTranslation();
-
-  return (
-    <div>
-      <div
-        data-dir-path={node.type === 'folder' ? node.key : undefined}
-        onClick={(e) => {
-          if (node.type === 'folder') {
-            if (hasChildren && onDirPin) onDirPin(node.key, e.currentTarget);
-            return;
-          }
-          onSelect(node.key);
-        }}
-        className="cm-file-tree-row"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '4px 12px',
-          fontSize: 13,
-          cursor: 'pointer',
-          color: isSelected ? textPrimary : textSecondary,
-          background: isSelected ? activeBg : 'transparent',
-          transition: 'all 0.15s',
-          fontFamily: "'JetBrains Mono', monospace",
-          position: 'relative',
-        }}
-        onMouseEnter={(e) => {
-          if (!isSelected) {
-            e.currentTarget.style.background = hoverBg;
-            e.currentTarget.style.color = textPrimary;
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!isSelected) {
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color = textSecondary;
-          }
-        }}
-      >
-        <FileIcon type={node.type} fileType={node.fileType} />
-        <span>{node.title}</span>
-        {(onDelete || onMove) && node.type === 'file' && (
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, opacity: 0, transition: 'opacity 0.15s' }} className="cm-tree-delete-btn">
-            {onMove && (
-              <Tooltip title={t('app.codeEditor.moveFile', { defaultValue: '移动/重命名' })}>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMove(node);
-                  }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: textTertiary,
-                    cursor: 'pointer',
-                    padding: '0 2px',
-                    fontSize: 13,
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = blueLight; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = textTertiary; }}
-                >
-                  <EditOutlined />
-                </button>
-              </Tooltip>
-            )}
-            {onDelete && (
-              <Tooltip title={t('app.codeEditor.deleteFile', { defaultValue: '删除文件' })}>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(node);
-                  }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: textTertiary,
-                    cursor: 'pointer',
-                    padding: '0 2px',
-                    fontSize: 13,
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = '#f85149'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = textTertiary; }}
-                >
-                  <DeleteOutlined />
-                </button>
-              </Tooltip>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function EditorPage() {
   const { owner, repo } = useParams<{ owner?: string; repo?: string }>();
   const [loading, setLoading] = useState(true);
@@ -491,7 +278,6 @@ export default function EditorPage() {
   const [openTabs, setOpenTabs] = useState<string[]>([]);
   const [panelTab, setPanelTab] = useState('discussions');
   const [selectedTreeKey, setSelectedTreeKey] = useState<string>('');
-  const [pinnedChain, setPinnedChain] = useState<FloatPanelPos[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -540,7 +326,7 @@ export default function EditorPage() {
   const savedContentRef = useRef<string>('');
   const handleSaveRef = useRef<() => void>(() => {});
   // 全局搜索结果跳转携带 ?line= 时, 编辑器就绪后滚动到该行
-  const pendingLineRef = useRef<number | null>(null);
+  const pendingLineRef = useRef<{ start: number; end: number } | null>(null);
   // F-606 空闲计时: 最近一次用户编辑时刻 (docChanged 时刷新);
   // 初始取极大值, 保证挂载后的首个周期不会误判为空闲
   const lastEditAtRef = useRef<number>(Number.MAX_SAFE_INTEGER);
@@ -561,6 +347,20 @@ export default function EditorPage() {
     deleteFileContent,
     clearCurrent,
   } = useRepositoriesStore();
+
+  // 未保存状态外抛：供顶栏等全局导航在离开编辑器前提示，避免静默丢失编辑
+  const setEditorDirty = useEditorStateStore((s) => s.setDirty);
+  const setEditorPending = useEditorStateStore((s) => s.setPending);
+  const resetEditorState = useEditorStateStore((s) => s.reset);
+
+  useEffect(() => { setEditorDirty(isDirty); }, [isDirty, setEditorDirty]);
+  useEffect(() => { setEditorPending(collabPending); }, [collabPending, setEditorPending]);
+  useEffect(() => () => { resetEditorState(); }, [resetEditorState]);
+
+  // 记录「当前项目」: 退出编辑器后再从 /editor 进入时自动回到该项目
+  useEffect(() => {
+    if (owner && repo) recordEditorRepo(owner, repo);
+  }, [owner, repo]);
 
   const currentUserId = useAuthStore((s) => s.user?.id);
   // 邀请链接访客: ?invite=<token> 随连接透传给协作网关
@@ -612,15 +412,31 @@ export default function EditorPage() {
         const loc = new URLSearchParams(window.location.search);
         const requestedFile = loc.get('file');
         const lineParam = loc.get('line');
-        pendingLineRef.current = lineParam && Number(lineParam) > 0 ? Number(lineParam) : null;
-        const requestedNode = requestedFile ? findFileByKey(built, requestedFile) : undefined;
-        const readme = findFileByKey(built, 'README.md') || findFileByKey(built, 'readme.md');
-        const defaultFile = requestedNode || readme || findFirstFile(built);
-        if (defaultFile) {
-          setActiveTab(defaultFile.key);
-          setSelectedTreeKey(defaultFile.key);
-          setOpenTabs([defaultFile.key]);
-          await fetchBlob(repoId, defaultFile.key);
+        const endParam = loc.get('end');
+        const lineStart = lineParam && Number(lineParam) > 0 ? Number(lineParam) : null;
+        const lineEnd = endParam && Number(endParam) > 0 ? Number(endParam) : lineStart;
+        pendingLineRef.current = lineStart ? { start: lineStart, end: lineEnd ?? lineStart } : null;
+        if (requestedFile) {
+          // 深链 / 搜索结果跳转: 直接打开指定文件, 不要求它已在当前(根层)文件树中
+          const ref = useRepositoriesStore.getState().currentRepo?.default_branch;
+          const parent = requestedFile.includes('/')
+            ? requestedFile.slice(0, requestedFile.lastIndexOf('/'))
+            : '';
+          // 加载父目录条目, 使该文件在 Explorer 中可见/可定位
+          if (parent && ref) fetchTree(repoId, ref, parent).catch(() => {});
+          setActiveTab(requestedFile);
+          setSelectedTreeKey(requestedFile);
+          setOpenTabs([requestedFile]);
+          await fetchBlob(repoId, requestedFile);
+        } else {
+          const readme = findFileByKey(built, 'README.md') || findFileByKey(built, 'readme.md');
+          const defaultFile = readme || findFirstFile(built);
+          if (defaultFile) {
+            setActiveTab(defaultFile.key);
+            setSelectedTreeKey(defaultFile.key);
+            setOpenTabs([defaultFile.key]);
+            await fetchBlob(repoId, defaultFile.key);
+          }
         }
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
@@ -698,7 +514,6 @@ export default function EditorPage() {
 
   const handleSelectFile = useCallback(async (key: string) => {
     setSelectedTreeKey(key);
-    setPinnedChain([]);
     const node = findFileByKey(fileTree, key);
     if (!node || node.type !== 'file') return;
     setActiveTab(key);
@@ -713,49 +528,23 @@ export default function EditorPage() {
     }
   }, [fileTree, currentRepo?.id, fetchBlob]);
 
-const handleTreePin = useCallback((key: string, el: HTMLElement) => {
-    const rect = el.getBoundingClientRect();
-    setPinnedChain((prev) => {
-      if (prev.length === 1 && prev[0].key === key) return [];
-      return [{ key, left: rect.right + 4, top: rect.top }];
-    });
-  }, []);
-
-  const handlePanelPin = useCallback((level: number, key: string, el: HTMLElement) => {
-    const rect = el.getBoundingClientRect();
-    setPinnedChain((prev) => {
-      const base = prev.slice(0, level + 1);
-      const reaching = prev.length === level + 2 && prev[level + 1]?.key === key;
-      if (reaching) return base;
-      return [...base, { key, left: rect.right + 4, top: rect.top }];
-    });
-  }, []);
-
-  // 面包屑点击: 根段回到根文件树, 目录段加载该目录并钉出浮动面板
-  const handleBreadcrumbRoot = useCallback(() => {
-    setSelectedTreeKey('');
-    setPinnedChain([]);
-  }, []);
-
-  const handleBreadcrumbDir = useCallback((level: number, path: string, el: HTMLElement) => {
-    setSelectedTreeKey(path);
+  // Explorer 目录按需加载: 浮动面板依赖 node.children, 未加载时先拉取
+  const handleLoadDir = useCallback((key: string) => {
     const repoId = currentRepo?.id;
     const ref = currentRepo?.default_branch;
-    if (repoId && ref) fetchTree(repoId, ref, path).catch(() => {});
-    handlePanelPin(level, path, el);
-  }, [currentRepo, fetchTree, handlePanelPin]);
+    if (repoId && ref) fetchTree(repoId, ref, key).catch(() => {});
+  }, [currentRepo, fetchTree]);
 
-  useEffect(() => {
-    if (!pinnedChain.length) return;
-    const handle = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.cm-floating-panel') && !target.closest('[data-dir-path]')) {
-        setPinnedChain([]);
-      }
-    };
-    document.addEventListener('mousedown', handle);
-    return () => document.removeEventListener('mousedown', handle);
-  }, [pinnedChain.length]);
+  // 面包屑点击: 根段回到根文件树, 目录段加载该目录
+  const handleBreadcrumbRoot = useCallback(() => {
+    setSelectedTreeKey('');
+  }, []);
+
+  const handleBreadcrumbDir = useCallback((path: string) => {
+    setSelectedTreeKey(path);
+    handleLoadDir(path);
+  }, [handleLoadDir]);
+
 
   const closeTab = useCallback((key: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1013,13 +802,19 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
       collabRef.current = controller;
     }
 
-    const pendingLine = pendingLineRef.current;
-    if (pendingLine && pendingLine > 0) {
+    const pending = pendingLineRef.current;
+    if (pending) {
       pendingLineRef.current = null;
       const view = viewRef.current;
-      const docLine = view?.state.doc.line(Math.min(pendingLine, view.state.doc.lines));
-      if (docLine) {
-        view.dispatch({ selection: { anchor: docLine.from }, scrollIntoView: true });
+      if (view) {
+        const maxLine = view.state.doc.lines;
+        const startNo = Math.min(Math.max(pending.start, 1), maxLine);
+        const endNo = Math.min(Math.max(pending.end, startNo), maxLine);
+        const startLine = view.state.doc.line(startNo);
+        const endLine = view.state.doc.line(endNo);
+        // 选中片段区间, 形成高亮 (跳转自代码片段链接)
+        view.dispatch({ selection: { anchor: startLine.from, head: endLine.to }, scrollIntoView: true });
+        view.focus();
       }
     }
     return () => {
@@ -1180,12 +975,23 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
     view.focus();
   }, []);
 
-  if (loading) return <EditorSkeleton />;
-
-  if (error || !owner || !repo) {
+  if (!owner || !repo) {
+    // 无项目参数时回到「当前项目」; 无记录才提示选择
+    const last = getLastEditorRepo();
+    if (last) return <Navigate to={`/editor/${last}`} replace />;
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: textSecondary }}>
-        {error || t('app.codeEditor.selectRepository', { defaultValue: '请从仓库列表选择一个仓库以浏览代码' })}
+        {t('app.codeEditor.selectRepository', { defaultValue: '请从仓库列表选择一个仓库以浏览代码' })}
+      </div>
+    );
+  }
+
+  if (loading) return <EditorSkeleton />;
+
+  if (error) {
+    return (
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: textSecondary }}>
+        {error}
       </div>
     );
   }
@@ -1203,22 +1009,18 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
     isCommentAdmin || (!!currentUserId && c.author_id === currentUserId);
 
   return (
-    <Layout style={{ height: '100%', background: 'transparent' }}>
-      <style>{`
-        .cm-file-tree-row:hover .cm-tree-delete-btn {
-          opacity: 1 !important;
-        }
-      `}</style>
+    <Layout style={{ height: '100%', background: 'transparent', overflow: 'hidden' }}>
       {/* Left Sidebar */}
       <Sider
         width={260}
         style={{
           background: bgSecondary,
           borderRight: `1px solid ${borderColor}`,
-          display: 'flex',
-          flexDirection: 'column',
           flexShrink: 0,
+          height: '100%',
+          overflow: 'hidden',
         }}
+        styles={{ body: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden' } }}
       >
         <div
           style={{
@@ -1260,54 +1062,18 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
             </button>
           </Tooltip>
         </div>
-        <div style={{ flex: 1, overflow: 'auto', padding: '4px 0', position: 'relative' }}>
-          {fileTree.map((node) => (
-            <TreeNodeView
-              key={node.key}
-              node={node}
-              selectedKey={selectedTreeKey}
-              onSelect={handleSelectFile}
-              onDelete={setDeleteTarget}
-              onMove={handleMoveRequest}
-              onDirPin={handleTreePin}
-            />
-          ))}
-        </div>
+        <Explorer
+          files={files}
+          selectedKey={selectedTreeKey}
+          onSelectFile={handleSelectFile}
+          onLoadDir={handleLoadDir}
+          onDelete={setDeleteTarget}
+          onMove={handleMoveRequest}
+        />
       </Sider>
 
-      {(() => {
-        const displayChain = pinnedChain;
-        if (!displayChain.length) return null;
-        const activeKeys = new Set(displayChain.slice(1).map((p) => p.key));
-        return (
-          <>
-            {displayChain.map((pos, i) => {
-              const node = findFileByKey(fileTree, pos.key);
-              if (!node || node.type !== 'folder' || !node.children?.length) return null;
-              return (
-                <div
-                  key={pos.key}
-                  className="floating-tree-anchor"
-                  style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 200 }}
-                >
-                  <FloatingTreePanel
-                    node={node}
-                    level={i}
-                    activeKeys={activeKeys}
-                    onItemClick={handlePanelPin}
-                    onSelectFile={handleSelectFile}
-                    onDelete={setDeleteTarget}
-                    onMove={handleMoveRequest}
-                  />
-                </div>
-              );
-            })}
-          </>
-        );
-      })()}
-
       {/* Main Editor Area */}
-      <Layout style={{ background: 'transparent' }}>
+      <Layout style={{ background: 'transparent', minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
         {/* Tabs */}
         <div style={{ display: 'flex', background: bgSecondary, borderBottom: `1px solid ${borderColor}`, overflowX: 'auto', flexShrink: 0 }}>
           {openTabs.map((tab) => {
@@ -1426,7 +1192,7 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
                   onClick={
                     isFileSegment
                       ? undefined
-                      : (e) => handleBreadcrumbDir(idx, partialKey, e.currentTarget)
+                      : () => handleBreadcrumbDir(partialKey)
                   }
                 >
                   {part}
@@ -1572,14 +1338,14 @@ const handleTreePin = useCallback((key: string, el: HTMLElement) => {
         </div>
 
         {/* Code Editor */}
-        <Content style={{ display: 'flex', overflow: 'hidden', background: bgPrimary, flex: 1 }}>
+        <Content style={{ display: 'flex', overflow: 'hidden', background: bgPrimary, flex: 1, minHeight: 0 }}>
           {previewMode && activeNode?.fileType === 'md' && (
             <div style={{ flex: 1, overflow: 'auto', padding: '16px 24px' }}>
               <Markdown>{previewContent || (currentBlob?.content ?? '')}</Markdown>
             </div>
           )}
           {/* 预览时仅隐藏编辑器, 保持 CodeMirror DOM 挂载以免丢失文档状态 */}
-          <div ref={editorRef} style={{ flex: 1, overflow: 'auto', display: previewMode ? 'none' : undefined }} />
+          <div ref={editorRef} style={{ flex: 1, minHeight: 0, overflow: 'auto', display: previewMode ? 'none' : undefined }} />
         </Content>
 
         {/* Collab Panel */}

@@ -290,7 +290,7 @@ export default function GlobalSearchPage() {
                       >
                         <FileTextOutlined style={{ color: textTertiary, marginTop: 3, fontSize: 13 }} />
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontSize: 13, color: textPrimary, fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div style={{ fontSize: 13, color: textPrimary, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {hit.file}
                             <span style={{ color: textTertiary }}>:{hit.line}</span>
                           </div>
@@ -301,7 +301,7 @@ export default function GlobalSearchPage() {
                               marginTop: 2,
                               whiteSpace: 'pre-wrap',
                               wordBreak: 'break-word',
-                              fontFamily: 'monospace',
+                              fontFamily: 'var(--font-mono)',
                               background: 'rgba(0,0,0,0.2)',
                               padding: '6px 10px',
                               borderRadius: 4,

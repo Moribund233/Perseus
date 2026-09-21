@@ -10,7 +10,7 @@ import {
   BoldOutlined,
   ItalicOutlined,
   CodeOutlined,
-  LinkOutlined,
+  FileAddOutlined,
   SearchOutlined,
   EyeOutlined,
   MoreOutlined,
@@ -24,6 +24,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import ChatSkeleton from '../../components/skeleton/ChatSkeleton';
 import Markdown from '../../components/Markdown';
+import RepoResourcePicker, { type RepoResourcePick } from '../../components/chat/RepoResourcePicker';
 import { useRepositoriesStore } from '../../stores/repositories';
 import { useAuthStore } from '../../stores/auth';
 import {
@@ -163,6 +164,7 @@ export default function ChatPage() {
   const [activeDmId, setActiveDmId] = useState<string | null>(null);
   const [activeKind, setActiveKind] = useState<'channel' | 'dm' | null>(null);
   const [activeRepoId, setActiveRepoId] = useState<string | null>(null);
+  const [resourcePicker, setResourcePicker] = useState<'file' | 'code' | null>(null);
   const [room, setRoom] = useState<RealtimeRoom | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -205,6 +207,12 @@ export default function ChatPage() {
       unread: unreadByRepo[r.id] ?? 0,
     })),
     [repositories, unreadByRepo]
+  );
+
+  // 当前频道所属仓库（频道即仓库；私聊无仓库）
+  const activeRepo = useMemo(
+    () => repositories.find((r) => r.id === activeRepoId) ?? null,
+    [repositories, activeRepoId],
   );
 
   const refreshUnread = useCallback(async () => {
@@ -602,27 +610,29 @@ export default function ChatPage() {
     });
   }, [input]);
 
-  const insertLink = useCallback(() => {
-    const el = getTextAreaEl();
-    const start = el?.selectionStart ?? input.length;
-    const end = el?.selectionEnd ?? input.length;
-    const selected = input.slice(start, end);
-    // 选中内容形似 URL 时作为链接地址, 否则作为链接文本
-    const isUrl = /^https?:\/\//.test(selected);
-    const inserted = isUrl
-      ? `[文本](${selected})`
-      : `[${selected || '文本'}](https://)`;
-    const next = input.slice(0, start) + inserted + input.slice(end);
-    setInput(next);
-    requestAnimationFrame(() => {
-      if (!el) return;
-      el.focus();
-      const caret = isUrl
-        ? start + inserted.length
-        : start + inserted.length - 'https://)'.length - (selected ? 0 : 1);
-      el.setSelectionRange(caret, caret);
-    });
-  }, [input]);
+  // 仓库资源插入: 文件链接 / 代码片段引用 (频道即仓库)
+  const handleResourceInsert = useCallback((pick: RepoResourcePick) => {
+    const repoPath = activeRepo?.path;
+    if (!repoPath) return;
+    const base = `/editor/${repoPath}?file=${encodeURIComponent(pick.path)}`;
+    let markdown: string;
+    if (pick.startLine == null || pick.endLine == null || pick.snippet == null) {
+      markdown = `[${pick.path}](${base})`;
+    } else {
+      // 片段始终以围栏代码块呈现内容预览 (含单行) + 可跳转并高亮区间的链接
+      const ext = pick.path.split('.').pop()?.toLowerCase() ?? '';
+      const langMap: Record<string, string> = {
+        ts: 'ts', tsx: 'tsx', js: 'js', jsx: 'jsx', py: 'python', json: 'json',
+        md: 'markdown', css: 'css', scss: 'scss', html: 'html', yml: 'yaml',
+        yaml: 'yaml', sh: 'bash', go: 'go', rs: 'rust', java: 'java', sql: 'sql', toml: 'toml',
+      };
+      const fence = '```' + (langMap[ext] ?? '');
+      const range = pick.startLine === pick.endLine ? `${pick.startLine}` : `${pick.startLine}-${pick.endLine}`;
+      markdown = `${fence}\n${pick.snippet}\n\`\`\`\n[\`${pick.path}:${range}\`](${base}&line=${pick.startLine}&end=${pick.endLine})`;
+    }
+    insertAtCursor(markdown);
+    setResourcePicker(null);
+  }, [activeRepo?.path, insertAtCursor]);
 
   const handleFileSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1026,7 +1036,7 @@ export default function ChatPage() {
         <Content style={{ overflowY: 'auto', padding: '16px 20px' }}>
           {messages.length === 0 && !loading && (
             <div style={{ textAlign: 'center', color: textTertiary, fontSize: 13, marginTop: 32 }}>
-              No messages yet. Start the conversation!
+              {t('app.teamChat.noMessages', { defaultValue: '还没有消息，开始对话吧' })}
             </div>
           )}
           {messages.map((msg, idx) => {
@@ -1132,7 +1142,7 @@ export default function ChatPage() {
                     wordWrap: 'break-word',
                   }}
                 >
-                  <Markdown>{msg.text}</Markdown>
+                  <Markdown collapsibleCode>{msg.text}</Markdown>
                 </div>
                 <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
                     {msg.reactions && msg.reactions.map((r, idx) => (
@@ -1292,17 +1302,41 @@ export default function ChatPage() {
               >
                 <Button type="text" icon={<SmileOutlined style={{ fontSize: 14, color: textTertiary }} />} size="small" />
               </Popover>
-              <Tooltip title="**粗体**">
-                <Button type="text" size="small" onClick={() => insertAtCursor('粗体', '**')} icon={<BoldOutlined style={{ fontSize: 14, color: textTertiary }} />} />
+              <Tooltip title={t('app.teamChat.bold', { defaultValue: '粗体' })}>
+                <Button
+                  type="text"
+                  size="small"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => insertAtCursor(t('app.teamChat.boldText', { defaultValue: '粗体' }), '**')}
+                  icon={<BoldOutlined style={{ fontSize: 14, color: textTertiary }} />}
+                />
               </Tooltip>
-              <Tooltip title="*斜体*">
-                <Button type="text" size="small" onClick={() => insertAtCursor('斜体', '*')} icon={<ItalicOutlined style={{ fontSize: 14, color: textTertiary }} />} />
+              <Tooltip title={t('app.teamChat.italic', { defaultValue: '斜体' })}>
+                <Button
+                  type="text"
+                  size="small"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => insertAtCursor(t('app.teamChat.italicText', { defaultValue: '斜体' }), '*')}
+                  icon={<ItalicOutlined style={{ fontSize: 14, color: textTertiary }} />}
+                />
               </Tooltip>
-              <Tooltip title="`行内代码`">
-                <Button type="text" size="small" onClick={() => insertAtCursor('code', '`')} icon={<CodeOutlined style={{ fontSize: 14, color: textTertiary }} />} />
+              <Tooltip title={activeRepo ? t('app.teamChat.insertCode', { defaultValue: '插入仓库代码片段' }) : t('app.teamChat.repoOnly', { defaultValue: '仅仓库频道可用' })}>
+                <Button
+                  type="text"
+                  size="small"
+                  disabled={!activeRepo}
+                  onClick={() => setResourcePicker('code')}
+                  icon={<CodeOutlined style={{ fontSize: 14, color: textTertiary }} />}
+                />
               </Tooltip>
-              <Tooltip title="[文本](url)">
-                <Button type="text" size="small" onClick={insertLink} icon={<LinkOutlined style={{ fontSize: 14, color: textTertiary }} />} />
+              <Tooltip title={activeRepo ? t('app.teamChat.insertFile', { defaultValue: '插入仓库文件' }) : t('app.teamChat.repoOnly', { defaultValue: '仅仓库频道可用' })}>
+                <Button
+                  type="text"
+                  size="small"
+                  disabled={!activeRepo}
+                  onClick={() => setResourcePicker('file')}
+                  icon={<FileAddOutlined style={{ fontSize: 14, color: textTertiary }} />}
+                />
               </Tooltip>
               <Tooltip title={wsStatus !== 'connected' ? t('app.teamChat.disconnected') : 'Enter'}>
                 <Button
@@ -1534,6 +1568,19 @@ export default function ChatPage() {
           </div>
         </div>
       </Drawer>
+
+      {/* 仓库资源选择器: 插入仓库文件 / 代码片段 (打开时挂载以重置状态) */}
+      {resourcePicker !== null && (
+        <RepoResourcePicker
+          open
+          mode={resourcePicker}
+          repoId={activeRepoId}
+          repoPath={activeRepo?.path ?? null}
+          defaultBranch={activeRepo?.default_branch}
+          onCancel={() => setResourcePicker(null)}
+          onInsert={handleResourceInsert}
+        />
+      )}
     </Layout>
   );
 }

@@ -254,11 +254,11 @@ export default function GlobalSearch() {
                       >
                         <FileTextOutlined style={{ color: textTertiary, marginTop: 1, fontSize: 12 }} />
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 12, color: textPrimary, fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div style={{ fontSize: 12, color: textPrimary, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {hit.file}
                             <span style={{ color: textTertiary }}>:{hit.line}</span>
                           </div>
-                          <div style={{ fontSize: 12, color: textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }}>
+                          <div style={{ fontSize: 12, color: textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1, fontFamily: 'var(--font-mono)' }}>
                             {hit.content.trim() || '…'}
                           </div>
                         </div>

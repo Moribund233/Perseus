@@ -92,15 +92,12 @@ export function FloatingTreePanel({
       <div className="cm-floating-panel-inner">
         {sorted.map((child) => {
           if (child.type === 'folder') {
-            const hasKids = child.children && child.children.length > 0;
             const active = activeKeys.has(child.key);
             return (
               <div key={child.key} className="cm-floating-item-wrap">
                 <div
                   className={`cm-floating-item${active ? ' active' : ''}`}
-                  onClick={(e) => {
-                    if (hasKids) onItemClick(level, child.key, e.currentTarget);
-                  }}
+                  onClick={(e) => onItemClick(level, child.key, e.currentTarget)}
                   style={{
                     ...itemStyle,
                     background: active ? hoverBg : 'transparent',

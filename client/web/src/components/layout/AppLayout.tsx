@@ -21,6 +21,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/auth';
 import { useNotificationsStore } from '../../stores/notifications';
+import { useEditorStateStore } from '../../stores/editorState';
 import { notificationSocket } from '../../api/notificationSocket';
 import { repositoriesApi, type Repository } from '../../api/repositories';
 import { chatApi, dmApi, type DMSession } from '../../api/chat';
@@ -78,6 +79,17 @@ interface NavItemDef {
   icon: React.ReactNode;
   label: string;
   badge?: number;
+}
+
+/** 按当前页面类型构造切换仓库后的目标路径：编辑器 / PR / Issue 保持同类页面。
+ *  PR、Issue 详情页因编号与仓库绑定，切换到列表页。 */
+function projectSwitchTarget(pathname: string, repoPath: string): string {
+  if (pathname === '/editor' || pathname.startsWith('/editor/')) {
+    return `/editor/${repoPath}`;
+  }
+  const section = pathname.match(/^\/repositories\/[^/]+\/[^/]+\/(issues|pulls)(?:\/|$)/);
+  if (section) return `/repositories/${repoPath}/${section[1]}`;
+  return `/repositories/${repoPath}`;
 }
 
 export default function AppLayout() {
@@ -227,16 +239,31 @@ export default function AppLayout() {
     if (repoOwner && repoName) recordRecentRepo(repoOwner, repoName);
   }, [repoOwner, repoName]);
 
+  // 编辑器未保存状态：离开编辑器前提示，避免切换项目时静默丢失编辑
+  const editorDirty = useEditorStateStore((s) => s.dirty);
+  const editorPending = useEditorStateStore((s) => s.pending);
+  const [leaveConfirm, setLeaveConfirm] = useState<{ target: string; label: string } | null>(null);
+  const onEditorRoute = location.pathname === '/editor' || location.pathname.startsWith('/editor/');
+
+  const guardedNavigate = (target: string, label: string) => {
+    if (target === location.pathname) return;
+    if (onEditorRoute && (editorDirty || editorPending)) {
+      setLeaveConfirm({ target, label });
+      return;
+    }
+    navigate(target);
+  };
+
   const contextItems: MenuProps['items'] = currentRepo
     ? [
         { key: 'path', label: currentRepo.path, disabled: true },
         { type: 'divider' },
-        { key: 'repo-overview', label: t('app.topBar.contextOverview'), icon: <BookOutlined />, onClick: () => navigate(`/repositories/${currentRepo.path}`) },
-        { key: 'repo-pulls', label: t('app.nav.pullRequests'), icon: <PullRequestOutlined />, onClick: () => navigate(`/repositories/${currentRepo.path}/pulls`) },
-        { key: 'repo-issues', label: t('app.topBar.contextIssues'), icon: <ExclamationCircleOutlined />, onClick: () => navigate(`/repositories/${currentRepo.path}/issues`) },
-        { key: 'repo-editor', label: t('app.nav.codeEditor'), icon: <EditOutlined />, onClick: () => navigate(`/editor/${currentRepo.path}`) },
+        { key: 'repo-overview', label: t('app.topBar.contextOverview'), icon: <BookOutlined />, onClick: () => guardedNavigate(`/repositories/${currentRepo.path}`, currentRepo.path) },
+        { key: 'repo-pulls', label: t('app.nav.pullRequests'), icon: <PullRequestOutlined />, onClick: () => guardedNavigate(`/repositories/${currentRepo.path}/pulls`, currentRepo.path) },
+        { key: 'repo-issues', label: t('app.topBar.contextIssues'), icon: <ExclamationCircleOutlined />, onClick: () => guardedNavigate(`/repositories/${currentRepo.path}/issues`, currentRepo.path) },
+        { key: 'repo-editor', label: t('app.nav.codeEditor'), icon: <EditOutlined />, onClick: () => guardedNavigate(`/editor/${currentRepo.path}`, currentRepo.path) },
       ]
-    : navItems.map((item) => ({ key: item.key, label: item.label, icon: item.icon, onClick: () => navigate(item.path) }));
+    : navItems.map((item) => ({ key: item.key, label: item.label, icon: item.icon, onClick: () => guardedNavigate(item.path, item.label) }));
 
   const recentItems: MenuProps['items'] = recentRepos.length
     ? recentRepos.map((r) => ({
@@ -247,7 +274,8 @@ export default function AppLayout() {
             {r.path === currentRepo?.path && <span style={{ color: blueLight, fontSize: 11 }}>•</span>}
           </span>
         ),
-        onClick: () => navigate(`/repositories/${r.path}`),
+        // 保持当前页面类型（仓库概览 / PR / Issue / 编辑器），不总是回到仓库详情页
+        onClick: () => guardedNavigate(projectSwitchTarget(location.pathname, r.path), r.path),
       }))
     : [{ key: 'empty', label: t('app.topBar.recentEmpty'), disabled: true }];
 
@@ -341,7 +369,7 @@ export default function AppLayout() {
               return (
                 <div
                   key={item.key}
-                  onClick={() => navigate(item.path)}
+                  onClick={() => guardedNavigate(item.path, item.label)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -509,7 +537,7 @@ export default function AppLayout() {
         </div>
       </Sider>
 
-      <Layout>
+      <Layout style={{ minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
         <Header
           style={{
             display: 'flex',
@@ -745,7 +773,7 @@ export default function AppLayout() {
             </Button>
           </Space>
         </Header>
-        <Content style={{ padding: 0, overflow: 'hidden' }}>
+        <Content style={{ padding: 0, overflow: 'hidden', minHeight: 0 }}>
           <Outlet />
         </Content>
 
@@ -776,6 +804,35 @@ export default function AppLayout() {
               <Switch checkedChildren="Public" unCheckedChildren="Private" />
             </Form.Item>
           </Form>
+        </Modal>
+
+        <Modal
+          title={t('app.topBar.unsavedSwitchTitle')}
+          open={!!leaveConfirm}
+          onCancel={() => setLeaveConfirm(null)}
+          footer={[
+            <Button key="stay" onClick={() => setLeaveConfirm(null)}>
+              {t('app.topBar.unsavedSwitchStay')}
+            </Button>,
+            <Button
+              key="leave"
+              danger
+              type="primary"
+              onClick={() => {
+                const target = leaveConfirm?.target;
+                setLeaveConfirm(null);
+                if (target) navigate(target);
+              }}
+            >
+              {t('app.topBar.unsavedSwitchDiscard')}
+            </Button>,
+          ]}
+        >
+          <div style={{ color: textSecondary, fontSize: 13 }}>
+            {editorDirty
+              ? t('app.topBar.unsavedSwitchMessage', { path: leaveConfirm?.label ?? '' })
+              : t('app.topBar.unsavedSwitchPending')}
+          </div>
         </Modal>
       </Layout>
     </Layout>
