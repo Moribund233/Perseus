@@ -3,7 +3,6 @@ import { Layout, Button, Avatar, Tabs, Tag, Spin, Empty, message, App as AntApp,
 import type { TabsProps } from 'antd';
 import {
   FolderOutlined,
-  FileOutlined,
   FileTextOutlined,
   StarOutlined,
   ForkOutlined,
@@ -22,7 +21,7 @@ import {
   useRepositoriesStore,
 } from '../../stores/repositories';
 import { useServersStore } from '../../stores/servers';
-import { repositoriesApi, type RepoFile, type RepoBlob, type Repository } from '../../api/repositories';
+import { repositoriesApi, type RepoBlob, type Repository } from '../../api/repositories';
 import { createWorkspace, listWorkspaces } from '../../api/workspaces';
 import { useWorkspaceStore } from '../../stores/workspace';
 import IssuesView from './IssuesView';
@@ -33,6 +32,7 @@ import RepositorySettings from './RepositorySettings';
 import BuildsPanel from './BuildsPanel';
 import ReleasesPanel from './ReleasesPanel';
 import Markdown from '../../components/Markdown';
+import RepoExplorer from '../../components/RepoExplorer';
 import { fileBadge } from '../workspace/ExplorerPanel';
 import { issuesApi } from '../../api/issues';
 import { pullRequestsApi } from '../../api/pullRequests';
@@ -44,83 +44,12 @@ const { Sider, Content } = Layout;
 
 const borderColor = '#21262d';
 const hoverBg = '#1c2333';
-const activeBg = '#1a2332';
 const textSecondary = '#8b949e';
 const textPrimary = '#e6edf3';
 const textTertiary = '#6e7681';
 const blueLight = '#58a6ff';
-const bluePrimary = '#1f6feb';
 const bgSecondary = '#161b22';
 const bgTertiary = '#1c2128';
-
-interface TreeNode {
-  key: string;
-  name: string;
-  type: 'folder' | 'file';
-  iconColor?: string;
-  children?: TreeNode[];
-}
-
-function buildTree(files: RepoFile[]): TreeNode[] {
-  const treeMap = new Map<string, TreeNode>();
-  const roots: TreeNode[] = [];
-  const sorted = [...files].sort((a, b) => {
-    const aDepth = a.path.split('/').length;
-    const bDepth = b.path.split('/').length;
-    if (aDepth !== bDepth) return aDepth - bDepth;
-    if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
-  for (const file of sorted) {
-    const parts = file.path.split('/');
-    for (let i = 0; i < parts.length; i++) {
-      const accumulatedPath = parts.slice(0, i + 1).join('/');
-      const isLast = i === parts.length - 1;
-      if (!treeMap.has(accumulatedPath)) {
-        const node: TreeNode = {
-          key: accumulatedPath,
-          name: parts[i],
-          type: isLast ? (file.type === 'directory' ? 'folder' : 'file') : 'folder',
-        };
-        if (!isLast) node.children = [];
-        treeMap.set(accumulatedPath, node);
-      }
-    }
-  }
-  for (const file of sorted) {
-    const parts = file.path.split('/');
-    for (let i = 0; i < parts.length; i++) {
-      const accumulatedPath = parts.slice(0, i + 1).join('/');
-      const node = treeMap.get(accumulatedPath)!;
-      if (i === 0) {
-        if (!roots.find((r) => r.key === node.key)) roots.push(node);
-      } else {
-        const parent = treeMap.get(parts.slice(0, i).join('/'));
-        if (parent) {
-          if (!parent.children) parent.children = [];
-          if (!parent.children.find((c) => c.key === node.key)) parent.children.push(node);
-        }
-      }
-    }
-  }
-  return roots;
-}
-
-function getIconColor(name: string): string | undefined {
-  const ext = name.split('.').pop();
-  switch (ext) {
-    case 'ts': case 'tsx': return '#3178c6';
-    case 'js': case 'jsx': return '#f1e05a';
-    case 'json': case 'yaml': case 'yml': return '#f1e05a';
-    case 'md': return textSecondary;
-    case 'rs': return '#dea584';
-    case 'go': return '#00add8';
-    case 'py': return '#3572a5';
-    case 'css': case 'scss': case 'less': return '#563d7c';
-    case 'html': return '#e34c26';
-    default: return undefined;
-  }
-}
 
 // 语言标识 → GitHub 风格品牌色（与后端 detect_file_language 标识对应）。
 const LANG_COLORS: Record<string, string> = {
@@ -156,76 +85,6 @@ function repoPrimaryLang(repo: Repository): { name: string; color: string } | nu
   return top ? langLabel(top[0]) : null;
 }
 
-function TreeIcon({ type, iconColor, name }: { type: 'folder' | 'file'; iconColor?: string; name?: string }) {
-  if (type === 'file' && name) {
-    const badge = fileBadge(name);
-    return <span className={badge.cls}>{badge.label}</span>;
-  }
-  return (
-    <span style={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16, color: type === 'folder' ? blueLight : iconColor || textSecondary }}>
-      {type === 'folder' ? <FolderOutlined /> : <FileOutlined />}
-    </span>
-  );
-}
-
-function TreeNodeView({
-  node, depth, selectedKey, onSelect, branchName, repoId, branchRef,
-}: {
-  node: TreeNode; depth: number; selectedKey: string; onSelect: (key: string) => void;
-  branchName?: string; repoId?: string; branchRef?: string;
-}) {
-  const isSelected = selectedKey === node.key;
-  const hasChildren = node.children && node.children.length > 0;
-  const [expanded, setExpanded] = useState(hasChildren);
-  const [loading, setLoading] = useState(false);
-  const fetchTree = useRepositoriesStore((s) => s.fetchTree);
-
-  const handleClick = async () => {
-    onSelect(node.key);
-    if (node.type !== 'folder') return;
-    if (!hasChildren && !loading && repoId) {
-      setLoading(true);
-      await fetchTree(repoId, branchRef, node.key);
-      setLoading(false);
-    }
-    setExpanded((v) => !v);
-  };
-
-  return (
-    <div>
-      <div
-        onClick={handleClick}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6,
-          cursor: 'pointer', fontSize: 13, color: isSelected ? blueLight : textSecondary,
-          background: isSelected ? activeBg : 'transparent', marginLeft: depth * 16, transition: 'all 0.15s',
-        }}
-        onMouseEnter={(e) => { if (!isSelected) { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textPrimary; } }}
-        onMouseLeave={(e) => { if (!isSelected) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = textSecondary; } }}
-      >
-        {(loading && node.type === 'folder') ? (
-          <Spin size="small" style={{ width: 16, height: 16, flexShrink: 0 }} />
-        ) : (
-          <TreeIcon type={node.type} iconColor={node.iconColor} name={node.type === 'file' ? node.name : undefined} />
-        )}
-        <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{node.name}</span>
-        {depth === 0 && branchName && (
-          <span style={{ fontSize: 10, color: textTertiary, background: '#0d1117', padding: '1px 6px', borderRadius: 8 }}>{branchName}</span>
-        )}
-      </div>
-      {expanded && hasChildren && (
-        <div>
-          {node.children!.map((child) => (
-            <TreeNodeView key={child.key} node={child} depth={depth + 1} selectedKey={selectedKey} onSelect={onSelect} branchName={branchName} repoId={repoId} branchRef={branchRef} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-const filters = ['all', 'source', 'config', 'tests'] as const;
-
 export default function RepositoriesView() {
   const { t } = useTranslation();
   const { message } = AntApp.useApp();
@@ -253,7 +112,6 @@ export default function RepositoriesView() {
   const [selectedTreeKey, setSelectedTreeKey] = useState('');
   const [selectedFileContent, setSelectedFileContent] = useState<RepoBlob | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<(typeof filters)[number]>('all');
   const [isStarred, setIsStarred] = useState(false);
   const [cloning, setCloning] = useState(false);
   const [issueCount, setIssueCount] = useState<number | null>(null);
@@ -385,17 +243,13 @@ export default function RepositoriesView() {
     return () => { cancelled = true; };
   }, [selectedTreeKey, currentRepo, storeFiles, server?.id]);
 
-  const repoTree = useMemo(() => buildTree(storeFiles), [storeFiles]);
   const rootFiles = useMemo(() => storeFiles.filter((f) => !f.path.includes('/')), [storeFiles]);
-  const displayFiles = useMemo(() => {
-    if (activeFilter === 'all') return rootFiles;
-    return rootFiles.filter((f) => {
-      if (activeFilter === 'source') return /\.(ts|tsx|js|jsx|rs|go|py)$/i.test(f.name);
-      if (activeFilter === 'config') return /\.(json|ya?ml|toml)$/i.test(f.name) || f.name === '.gitignore';
-      if (activeFilter === 'tests') return f.path.includes('test') || f.path.includes('__tests__') || /\.(test|spec)\./i.test(f.name);
-      return true;
-    });
-  }, [rootFiles, activeFilter]);
+
+  // Explorer 目录按需加载
+  const handleLoadDir = useCallback((path: string) => {
+    if (!currentRepo) return;
+    fetchTree(currentRepo.id, currentRepo.default_branch, path).catch(() => {});
+  }, [currentRepo, fetchTree]);
 
   const latestCommit = commits.length > 0 ? commits[0] : null;
   const isRepoEmpty = !!currentRepo && !currentRepo.status?.initialized;
@@ -568,40 +422,26 @@ export default function RepositoriesView() {
   ];
 
   return (
-    <Layout style={{ height: '100%', background: 'transparent' }}>
+    <Layout style={{ height: '100%', background: 'transparent', overflow: 'hidden' }}>
       <Sider
         width={280}
-        style={{ background: bgSecondary, borderRight: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', flexShrink: 0 }}
+        style={{ background: bgSecondary, borderRight: `1px solid ${borderColor}`, flexShrink: 0, height: '100%', overflow: 'hidden' }}
+        styles={{ body: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden' } }}
       >
         <div style={{ padding: 16, borderBottom: `1px solid ${borderColor}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h3 style={{ fontSize: 13, fontWeight: 600, margin: 0, color: textPrimary }}>{t('app.repositories.explorer')}</h3>
             <Button size="small" type="text" onClick={goBack}>{t('desktop.serverShell.back')}</Button>
           </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {filters.map((f) => {
-              const isActive = activeFilter === f;
-              return (
-                <span key={f} onClick={() => setActiveFilter(f)}
-                  style={{ padding: '3px 10px', borderRadius: 12, fontSize: 11, cursor: 'pointer', transition: 'all 0.2s',
-                    background: isActive ? 'rgba(31,111,235,0.15)' : '#0d1117', border: `1px solid ${isActive ? bluePrimary : borderColor}`, color: isActive ? blueLight : textSecondary }}
-                  onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.background = 'rgba(31,111,235,0.15)'; e.currentTarget.style.borderColor = bluePrimary; e.currentTarget.style.color = blueLight; } }}
-                  onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.background = '#0d1117'; e.currentTarget.style.borderColor = borderColor; e.currentTarget.style.color = textSecondary; } }}>
-                  {t(`app.repositories.filters.${f}`)}
-                </span>
-              );
-            })}
-          </div>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
-          {repoTree.length > 0 ? (
-            repoTree.map((node) => (
-              <TreeNodeView key={node.key} node={node} depth={0} selectedKey={selectedTreeKey}
-                onSelect={setSelectedTreeKey} branchName={currentRepo.default_branch} repoId={currentRepo.id} branchRef={currentRepo.default_branch} />
-            ))
-          ) : (
-            <div style={{ padding: 16, color: textTertiary, fontSize: 13, textAlign: 'center' }}>{t('app.repositories.empty.noFiles')}</div>
-          )}
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 8 }}>
+          <RepoExplorer
+            files={storeFiles}
+            selectedKey={selectedTreeKey}
+            onSelectFile={setSelectedTreeKey}
+            onLoadDir={handleLoadDir}
+            emptyText={t('app.repositories.empty.noFiles')}
+          />
         </div>
       </Sider>
 
@@ -689,10 +529,10 @@ export default function RepositoriesView() {
                 </span>
                 <span style={{ color: textTertiary, fontSize: 12, whiteSpace: 'nowrap' }}>{latestCommit ? latestCommit.hash.slice(0, 7) : ''}</span>
               </div>
-              {displayFiles.map((file, index) => (
+              {rootFiles.map((file, index) => (
                 <div key={file.path}
                   onClick={() => { if (file.type === 'directory') { /* 目录：折叠树由左栏负责 */ return; } setSelectedTreeKey(file.path); }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', borderBottom: index === displayFiles.length - 1 ? 'none' : `1px solid ${borderColor}`, fontSize: 13, cursor: 'pointer', transition: 'background 0.15s' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', borderBottom: index === rootFiles.length - 1 ? 'none' : `1px solid ${borderColor}`, fontSize: 13, cursor: 'pointer', transition: 'background 0.15s' }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
                   {file.type === 'directory' ? (
@@ -716,7 +556,7 @@ export default function RepositoriesView() {
                   )}
                 </div>
               ))}
-              {displayFiles.length === 0 && (
+              {rootFiles.length === 0 && (
                 <div style={{ padding: 16, color: textTertiary, fontSize: 13, textAlign: 'center' }}>{t('app.repositories.empty.noFiles')}</div>
               )}
             </div>

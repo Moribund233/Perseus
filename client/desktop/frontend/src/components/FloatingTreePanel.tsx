@@ -58,9 +58,7 @@ export function FloatingTreePanel({
               <div key={child.path} className="floating-item-wrap">
                 <div
                   className={`frow dir-row floating-item${active ? ' active' : ''}`}
-                  onClick={(e) => {
-                    if (hasKids) onItemClick(level, child.path, e.currentTarget);
-                  }}
+                  onClick={(e) => onItemClick(level, child.path, e.currentTarget)}
                 >
                   {hasKids ? (
                     <RightOutlined className="chev" />

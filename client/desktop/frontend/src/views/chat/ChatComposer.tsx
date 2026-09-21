@@ -3,14 +3,16 @@ import { Button, Input, Popover, Tooltip } from 'antd';
 import {
   BoldOutlined,
   CodeOutlined,
+  FileAddOutlined,
   ItalicOutlined,
-  LinkOutlined,
   PaperClipOutlined,
   SendOutlined,
   SmileOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { chatApi } from '../../api/chat';
+import { repositoriesApi } from '../../api/repositories';
+import RepoResourcePicker, { type RepoResourcePick } from '../../components/chat/RepoResourcePicker';
 import { useChatStore } from '../../stores/chat';
 import { useServersStore } from '../../stores/servers';
 
@@ -32,12 +34,17 @@ const TYPING_INTERVAL_MS = 2000;
 export default function ChatComposer({ roomId, roomName, compact = false }: { roomId: string; roomName: string; compact?: boolean }) {
   const { t } = useTranslation();
   const serverId = useServersStore((s) => s.currentServerId);
+  const baseUrl = useServersStore((s) => s.servers.find((x) => x.id === s.currentServerId)?.base_url ?? null);
   const status = useChatStore((s) => s.status);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const sendTyping = useChatStore((s) => s.sendTyping);
+  // 频道即仓库：房间的 repository_id 决定仓库资源选择器是否可用（私聊为 null）
+  const repoId = useChatStore((s) => s.rooms.find((r) => r.id === roomId)?.repository_id ?? null);
 
   const [input, setInput] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [picker, setPicker] = useState<'file' | 'code' | null>(null);
+  const [repoMeta, setRepoMeta] = useState<{ path: string; defaultBranch: string } | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastTypingRef = useRef(0);
@@ -63,21 +70,45 @@ export default function ChatComposer({ roomId, roomName, compact = false }: { ro
     });
   }, [input]);
 
-  const insertLink = useCallback(() => {
-    const el = getTextAreaEl();
-    const start = el?.selectionStart ?? input.length;
-    const end = el?.selectionEnd ?? input.length;
-    const selected = input.slice(start, end);
-    const isUrl = /^https?:\/\//.test(selected);
-    const inserted = isUrl ? `[文本](${selected})` : `[${selected || '文本'}](https://)`;
-    const next = input.slice(0, start) + inserted + input.slice(end);
-    setInput(next);
-    requestAnimationFrame(() => {
-      if (!el) return;
-      el.focus();
-      el.setSelectionRange(start + inserted.length, start + inserted.length);
-    });
-  }, [input]);
+  const openPicker = useCallback(async (mode: 'file' | 'code') => {
+    if (!serverId || !repoId) return;
+    try {
+      const repo = await repositoriesApi.get(serverId, repoId);
+      setRepoMeta({ path: repo.path, defaultBranch: repo.default_branch });
+      setPicker(mode);
+    } catch {
+      /* 拉取仓库信息失败则不打开选择器 */
+    }
+  }, [serverId, repoId]);
+
+  // 插入仓库文件 / 代码片段引用：优先链接到服务器 Web 编辑器
+  const handleResourceInsert = useCallback((pick: RepoResourcePick) => {
+    const repoPath = repoMeta?.path;
+    if (!repoPath) return;
+    const base = baseUrl
+      ? `${baseUrl.replace(/\/+$/, '')}/editor/${repoPath}?file=${encodeURIComponent(pick.path)}`
+      : null;
+    let markdown: string;
+    if (pick.startLine == null || pick.endLine == null || pick.snippet == null) {
+      markdown = base ? `[${pick.path}](${base})` : `\`${pick.path}\``;
+    } else {
+      // 片段始终以围栏代码块呈现内容预览 (含单行) + 可跳转并高亮区间的链接
+      const ext = pick.path.split('.').pop()?.toLowerCase() ?? '';
+      const langMap: Record<string, string> = {
+        ts: 'ts', tsx: 'tsx', js: 'js', jsx: 'jsx', py: 'python', json: 'json',
+        md: 'markdown', css: 'css', scss: 'scss', html: 'html', yml: 'yaml',
+        yaml: 'yaml', sh: 'bash', go: 'go', rs: 'rust', java: 'java', sql: 'sql', toml: 'toml',
+      };
+      const fence = '```' + (langMap[ext] ?? '');
+      const range = pick.startLine === pick.endLine ? `${pick.startLine}` : `${pick.startLine}-${pick.endLine}`;
+      const ref = base
+        ? `[\`${pick.path}:${range}\`](${base}&line=${pick.startLine}&end=${pick.endLine})`
+        : `\`${pick.path}:${range}\``;
+      markdown = `${fence}\n${pick.snippet}\n\`\`\`\n${ref}`;
+    }
+    insertAtCursor(markdown);
+    setPicker(null);
+  }, [repoMeta?.path, baseUrl, insertAtCursor]);
 
   const handleSend = useCallback(() => {
     const content = input.trim();
@@ -113,9 +144,16 @@ export default function ChatComposer({ roomId, roomName, compact = false }: { ro
     }
   };
 
-  const iconBtn = (title: string, node: React.ReactNode, onClick: () => void) => (
+  const canUseRepo = !!serverId && !!repoId;
+
+  const iconBtn = (
+    title: string,
+    node: React.ReactNode,
+    onClick: () => void,
+    opts?: { onMouseDown?: (e: React.MouseEvent) => void; disabled?: boolean },
+  ) => (
     <Tooltip title={title}>
-      <Button type="text" size="small" icon={node} onClick={onClick} />
+      <Button type="text" size="small" icon={node} onClick={onClick} onMouseDown={opts?.onMouseDown} disabled={opts?.disabled} />
     </Tooltip>
   );
 
@@ -160,10 +198,10 @@ export default function ChatComposer({ roomId, roomName, compact = false }: { ro
           }>
             <Button type="text" size="small" icon={<SmileOutlined style={{ fontSize: 14, color: textTertiary }} />} />
           </Popover>
-          {iconBtn(t('desktop.chat.bold'), <BoldOutlined style={{ fontSize: 14, color: textTertiary }} />, () => insertAtCursor(t('desktop.chat.boldText'), '**'))}
-          {iconBtn(t('desktop.chat.italic'), <ItalicOutlined style={{ fontSize: 14, color: textTertiary }} />, () => insertAtCursor(t('desktop.chat.italicText'), '*'))}
-          {iconBtn(t('desktop.chat.code'), <CodeOutlined style={{ fontSize: 14, color: textTertiary }} />, () => insertAtCursor('code', '`'))}
-          {iconBtn(t('desktop.chat.link'), <LinkOutlined style={{ fontSize: 14, color: textTertiary }} />, insertLink)}
+          {iconBtn(t('desktop.chat.bold'), <BoldOutlined style={{ fontSize: 14, color: textTertiary }} />, () => insertAtCursor(t('desktop.chat.boldText'), '**'), { onMouseDown: (e) => e.preventDefault() })}
+          {iconBtn(t('desktop.chat.italic'), <ItalicOutlined style={{ fontSize: 14, color: textTertiary }} />, () => insertAtCursor(t('desktop.chat.italicText'), '*'), { onMouseDown: (e) => e.preventDefault() })}
+          {iconBtn(canUseRepo ? t('desktop.chat.insertCode') : t('desktop.chat.repoOnly'), <CodeOutlined style={{ fontSize: 14, color: textTertiary }} />, () => void openPicker('code'), { disabled: !canUseRepo })}
+          {iconBtn(canUseRepo ? t('desktop.chat.insertFile') : t('desktop.chat.repoOnly'), <FileAddOutlined style={{ fontSize: 14, color: textTertiary }} />, () => void openPicker('file'), { disabled: !canUseRepo })}
           {!compact && <span style={{ fontSize: 11, color: textTertiary, marginLeft: 6 }}>{t('desktop.chat.sendHint')}</span>}
           <Tooltip title={connected ? 'Enter' : t('desktop.chat.disconnected')}>
             <Button
@@ -177,6 +215,20 @@ export default function ChatComposer({ roomId, roomName, compact = false }: { ro
           </Tooltip>
         </div>
       </div>
+
+      {/* 仓库资源选择器: 插入仓库文件 / 代码片段 (打开时挂载以重置状态) */}
+      {picker !== null && (
+        <RepoResourcePicker
+          open
+          mode={picker}
+          serverId={serverId}
+          repoId={repoId}
+          repoPath={repoMeta?.path ?? null}
+          defaultBranch={repoMeta?.defaultBranch}
+          onCancel={() => setPicker(null)}
+          onInsert={handleResourceInsert}
+        />
+      )}
     </div>
   );
 }

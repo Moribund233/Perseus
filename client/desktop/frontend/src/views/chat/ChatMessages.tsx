@@ -179,7 +179,7 @@ function ChatMessageRow({
           )}
         </div>
         <div style={{ fontSize: compact ? 13 : 14, lineHeight: 1.5, color: textSecondary, wordBreak: 'break-word' }}>
-          <Markdown>{msg.content}</Markdown>
+          <Markdown collapsibleCode>{msg.content}</Markdown>
         </div>
         <div className="chat-reactions" style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
           {(msg.reactions ?? []).map((r, idx) => (

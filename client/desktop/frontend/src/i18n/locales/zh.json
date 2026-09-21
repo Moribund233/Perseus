@@ -496,7 +496,9 @@
   "common": {
     "language": "语言",
     "english": "English",
-    "chinese": "中文"
+    "chinese": "中文",
+    "expand": "展开",
+    "collapse": "收起"
   },
   "desktop": {
     "app": {
@@ -633,6 +635,19 @@
       "italicText": "斜体",
       "code": "行内代码 `code`",
       "link": "链接 [文本](URL)",
+      "insertCode": "插入仓库代码片段",
+      "insertFile": "插入仓库文件",
+      "repoOnly": "仅仓库频道可用",
+      "pickCodeTitle": "选择仓库代码片段",
+      "pickFileTitle": "选择仓库文件",
+      "insert": "插入",
+      "clear": "清除",
+      "noRepo": "当前会话未关联仓库",
+      "filterFiles": "按名称过滤（仅当前已加载层）",
+      "pickCodeHint": "在左侧选择文件，然后点击行选择片段（Shift 点选区间）",
+      "pickCodeEmpty": "请选择文件",
+      "pickCodeBinary": "无法预览该文件",
+      "pickCodeRange": "已选 L{{start}}–L{{end}}",
       "sendHint": "Enter 发送 · Shift+Enter 换行",
       "placeholder": "给 #{{channel}} 发送消息… 支持 Markdown",
       "muteRoom": "静音会话",

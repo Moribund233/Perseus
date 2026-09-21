@@ -496,7 +496,9 @@
   "common": {
     "language": "Language",
     "english": "English",
-    "chinese": "中文"
+    "chinese": "中文",
+    "expand": "Expand",
+    "collapse": "Collapse"
   },
   "desktop": {
     "app": {
@@ -633,6 +635,19 @@
       "italicText": "italic",
       "code": "Inline code `code`",
       "link": "Link [text](URL)",
+      "insertCode": "Insert repository code snippet",
+      "insertFile": "Insert repository file",
+      "repoOnly": "Available in repository channels only",
+      "pickCodeTitle": "Pick a repository code snippet",
+      "pickFileTitle": "Pick a repository file",
+      "insert": "Insert",
+      "clear": "Clear",
+      "noRepo": "This conversation is not linked to a repository",
+      "filterFiles": "Filter by name (loaded levels only)",
+      "pickCodeHint": "Pick a file on the left, then click a line (Shift-click for a range)",
+      "pickCodeEmpty": "Select a file",
+      "pickCodeBinary": "Preview unavailable",
+      "pickCodeRange": "Selected L{{start}}–L{{end}}",
       "sendHint": "Enter to send · Shift+Enter for newline",
       "placeholder": "Message #{{channel}}… Markdown supported",
       "muteRoom": "Mute room",
