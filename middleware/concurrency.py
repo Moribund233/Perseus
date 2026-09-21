@@ -12,6 +12,8 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
+from utils.redis_client import get_redis, key as redis_key
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,6 +62,59 @@ class ConcurrencyLimiter:
         return self.semaphore._value
 
 
+class GlobalConcurrencyLimiter:
+    """
+    跨 worker 全局并发限制器（Redis 计数器）
+
+    以 Redis 原子计数（Lua）在所有 worker 间共享并发配额。Redis 不可用或
+    脚本异常时 **放行**（返回 True），由进程内信号量继续兜底，绝不因缓存层
+    故障而拒绝正常请求。计数器带 TTL，worker 崩溃导致的泄漏会自动回收。
+    """
+
+    _ACQUIRE_LUA = """
+    local c = redis.call('INCR', KEYS[1])
+    if c > tonumber(ARGV[1]) then
+        redis.call('DECR', KEYS[1])
+        return 0
+    end
+    redis.call('PEXPIRE', KEYS[1], tonumber(ARGV[2]))
+    return c
+    """
+    _RELEASE_LUA = """
+    local c = redis.call('DECR', KEYS[1])
+    if c < 0 then redis.call('SET', KEYS[1], 0) end
+    return c
+    """
+
+    def __init__(self, max_concurrent: int, ttl_ms: int = 60000):
+        self.max_concurrent = max_concurrent
+        self.ttl_ms = ttl_ms
+        self.key = redis_key("limit", "concurrent")
+
+    async def acquire(self) -> bool:
+        """获取全局配额；Redis 不可用时放行（返回 True）"""
+        client = await get_redis()
+        if client is None:
+            return True
+        try:
+            result = await client.eval(
+                self._ACQUIRE_LUA, 1, self.key, self.max_concurrent, self.ttl_ms
+            )
+            return int(result) != 0
+        except Exception as e:  # noqa: BLE001 — 降级放行，由本地信号量兜底
+            logger.warning(f"全局并发限制器获取失败（放行）: {e}")
+            return True
+
+    async def release(self) -> None:
+        client = await get_redis()
+        if client is None:
+            return
+        try:
+            await client.eval(self._RELEASE_LUA, 1, self.key)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"全局并发限制器释放失败: {e}")
+
+
 class ConcurrencyMiddleware(BaseHTTPMiddleware):
     """
     并发限制中间件
@@ -75,11 +130,18 @@ class ConcurrencyMiddleware(BaseHTTPMiddleware):
         self,
         app: ASGIApp,
         max_concurrent: int = 100,
-        max_wait_time: float = 5.0
+        max_wait_time: float = 5.0,
+        global_max_concurrent: int = 0,
     ):
         super().__init__(app)
         self.limiter = ConcurrencyLimiter(max_concurrent)
         self.max_wait_time = max_wait_time
+        # >0 时启用跨 worker 全局并发上限；0 = 关闭（仅本地信号量）
+        self.global_limiter = (
+            GlobalConcurrencyLimiter(global_max_concurrent)
+            if global_max_concurrent > 0
+            else None
+        )
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """
@@ -119,6 +181,16 @@ class ConcurrencyMiddleware(BaseHTTPMiddleware):
             logger.error(f"并发限制异常: {e}")
             return self._create_503_response(f"并发控制异常: {str(e)}")
 
+        # 全局并发配额（跨 worker）；拒绝时释放已获取的本地许可
+        global_acquired = False
+        if self.global_limiter is not None:
+            if not await self.global_limiter.acquire():
+                self.limiter.release()
+                return self._create_503_response(
+                    f"服务器繁忙，全局并发已达上限 {self.global_limiter.max_concurrent}"
+                )
+            global_acquired = True
+
         try:
             # 执行请求
             response = await call_next(request)
@@ -131,6 +203,8 @@ class ConcurrencyMiddleware(BaseHTTPMiddleware):
 
         finally:
             # 释放执行许可
+            if global_acquired:
+                await self.global_limiter.release()
             self.limiter.release()
 
     def _create_503_response(self, message: str) -> JSONResponse:
@@ -163,7 +237,8 @@ class ConcurrencyMiddleware(BaseHTTPMiddleware):
 def setup_concurrency_middleware(
     app: ASGIApp,
     max_concurrent: int = 100,
-    max_wait_time: float = 5.0
+    max_wait_time: float = 5.0,
+    global_max_concurrent: int = 0,
 ) -> ASGIApp:
     """
     配置并发限制中间件
@@ -172,6 +247,7 @@ def setup_concurrency_middleware(
         app: FastAPI 应用实例
         max_concurrent: 最大并发请求数
         max_wait_time: 最大等待时间（秒）
+        global_max_concurrent: 跨 worker 全局并发上限（0=关闭）
 
     Returns:
         ASGIApp: 配置了中间件的应用实例
@@ -182,8 +258,12 @@ def setup_concurrency_middleware(
         app.add_middleware(
             ConcurrencyMiddleware,
             max_concurrent=max_concurrent,
-            max_wait_time=max_wait_time
+            max_wait_time=max_wait_time,
+            global_max_concurrent=global_max_concurrent,
         )
-        logger.info(f"并发限制中间件已启用: max_concurrent={max_concurrent}, max_wait_time={max_wait_time}s")
+        logger.info(
+            f"并发限制中间件已启用: max_concurrent={max_concurrent}, "
+            f"max_wait_time={max_wait_time}s, global_max_concurrent={global_max_concurrent}"
+        )
 
     return app

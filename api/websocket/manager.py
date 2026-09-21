@@ -32,6 +32,7 @@ class Connection:
         self.user_id: Optional[uuid.UUID] = None
         self.username: Optional[str] = None
         self.repository_ids: Set[uuid.UUID] = set()  # 用户关注的仓库ID列表
+        self.rooms: Set[uuid.UUID] = set()  # 已加入的聊天房间ID列表
         self.connected_at: datetime = datetime.now()
         self.last_ping: datetime = datetime.now()
         self.is_alive: bool = True
@@ -139,11 +140,18 @@ class ConnectionManager:
         # 跨 worker 广播总线（None = 纯进程内，行为与旧版一致）
         self._bus = None
 
+        # 跨 worker 在线状态注册表（None = 纯本进程，行为与旧版一致）
+        self._presence = None
+
         ConnectionManager._initialized = True
 
     def set_bus(self, bus) -> None:
         """注入跨 worker 广播总线（由 lifespan 启动时调用）"""
         self._bus = bus
+
+    def set_presence(self, presence) -> None:
+        """注入跨 worker 在线状态注册表（由 lifespan 启动时调用）"""
+        self._presence = presence
 
     async def _publish(self, scope: str, target_id, message: Dict[str, Any],
                        exclude_user_id: Optional[uuid.UUID] = None) -> None:
@@ -205,21 +213,28 @@ class ConnectionManager:
                     if not self._repository_index[repo_id]:
                         del self._repository_index[repo_id]
 
-            # 捕获房间订阅（用于断开后广播）
-            subscribed_room_ids = set()
+            # 捕获房间订阅（用于断开后广播/清理）
+            subscribed_room_ids = set(connection.rooms)
             for room_id, conn_ids in list(self._room_index.items()):
                 if connection_id in conn_ids:
                     subscribed_room_ids.add(room_id)
 
             # 从房间索引中移除
             for room_id in subscribed_room_ids:
-                self._room_index[room_id].discard(connection_id)
-                if not self._room_index[room_id]:
-                    del self._room_index[room_id]
-            
+                if room_id in self._room_index:
+                    self._room_index[room_id].discard(connection_id)
+                    if not self._room_index[room_id]:
+                        del self._room_index[room_id]
+            connection.rooms.clear()
+
             # 从连接池中移除
             if connection_id in self._connections:
                 del self._connections[connection_id]
+
+        # 清理跨 worker 在线状态
+        if connection.user_id is not None and self._presence is not None:
+            for room_id in subscribed_room_ids:
+                await self._presence.remove(room_id, connection.user_id)
 
         # 广播 presence_leave 到所有订阅的房间
         if connection.user_id is not None and connection.username:
@@ -305,9 +320,15 @@ class ConnectionManager:
             room_id: 房间ID
         """
         async with self._lock:
+            newly_added = room_id not in connection.rooms
+            connection.rooms.add(room_id)
             if room_id not in self._room_index:
                 self._room_index[room_id] = set()
             self._room_index[room_id].add(connection.connection_id)
+
+        # 幂等：同一连接重复 subscribe 不重复计数（多连接/多 worker 由引用计数聚合）
+        if newly_added and connection.user_id is not None and self._presence is not None:
+            await self._presence.add(room_id, connection.user_id, connection.username)
 
     async def unsubscribe_room(self, connection: Connection, room_id: uuid.UUID) -> None:
         """
@@ -318,10 +339,15 @@ class ConnectionManager:
             room_id: 房间ID
         """
         async with self._lock:
+            was_present = room_id in connection.rooms
+            connection.rooms.discard(room_id)
             if room_id in self._room_index:
                 self._room_index[room_id].discard(connection.connection_id)
                 if not self._room_index[room_id]:
                     del self._room_index[room_id]
+
+        if was_present and connection.user_id is not None and self._presence is not None:
+            await self._presence.remove(room_id, connection.user_id)
 
     async def send_to_room(self, room_id: uuid.UUID, message: Dict[str, Any], exclude_user_id: Optional[uuid.UUID] = None) -> int:
         """发送消息到房间的所有订阅者（本地直投 + 广播到其他 worker）"""
@@ -546,10 +572,24 @@ class ConnectionManager:
             try:
                 await asyncio.sleep(30)
                 await self._cleanup_timeout_connections()
+                await self._refresh_presence()
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error(f"心跳检测任务异常: {e}")
+
+    async def _refresh_presence(self) -> None:
+        """心跳续期本进程有连接的房间的在线状态 TTL"""
+        if self._presence is None:
+            return
+        async with self._lock:
+            room_ids = list(self._room_index.keys())
+        if not room_ids:
+            return
+        try:
+            await self._presence.refresh(room_ids)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"presence 心跳续期失败: {e}")
 
     @classmethod
     def reset_instance(cls) -> None:
@@ -594,7 +634,13 @@ class ConnectionManager:
             ]
 
     async def get_room_online_users(self, room_id: uuid.UUID) -> List[Dict[str, Any]]:
-        """获取房间的在线用户列表（按用户去重）"""
+        """获取房间的在线用户列表（按用户去重，跨 worker 聚合）"""
+        if self._presence is not None:
+            try:
+                if await self._presence.enabled():
+                    return await self._presence.list_users(room_id)
+            except Exception as e:  # noqa: BLE001 — 回退本进程
+                logger.warning(f"presence 查询失败，回退本进程: {e}")
         connections = await self.get_room_connections(room_id)
         seen: Dict[uuid.UUID, Dict[str, Any]] = {}
         for conn in connections:

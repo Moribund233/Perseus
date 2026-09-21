@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import get_config
 from models.collab_invite_revocation import CollabInviteRevocation
+from services import revocation_cache
 
 INVITE_TOKEN_TYPE = "collab_invite"
 VALID_SCOPES = {"read", "write"}
@@ -115,13 +116,20 @@ def verify_invite_token(token: Optional[str], doc_key: Optional[str] = None) -> 
 
 
 async def is_invite_token_revoked(db: AsyncSession, jti: Optional[str]) -> bool:
-    """该 jti 是否已被撤销 (命中黑名单)。"""
+    """该 jti 是否已被撤销 (命中黑名单)。命中 Redis 读缓存时不查 DB。"""
     if not jti:
         return False
+
+    cached = await revocation_cache.get("collab_invite", jti)
+    if cached is not None:
+        return cached
+
     result = await db.execute(
         select(CollabInviteRevocation.id).filter(CollabInviteRevocation.jti == jti)
     )
-    return result.scalar_one_or_none() is not None
+    revoked = result.scalar_one_or_none() is not None
+    await revocation_cache.set("collab_invite", jti, revoked)
+    return revoked
 
 
 async def verify_invite_token_active(
@@ -179,6 +187,8 @@ async def revoke_invite_token(
             )
         )
         await db.commit()
+        # 立即写入正缓存，覆盖负缓存，使多 worker 即时可见
+        await revocation_cache.set("collab_invite", info["jti"], True)
 
     return {
         "jti": info["jti"],

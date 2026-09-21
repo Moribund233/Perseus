@@ -6,6 +6,7 @@ import {
   BugOutlined,
   ClusterOutlined,
   DashboardOutlined,
+  DatabaseOutlined,
   FileTextOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -59,6 +60,7 @@ export default function AdminConsolePage() {
   const sections: SectionDef[] = [
     { key: 'overview', path: '/admin', icon: <DashboardOutlined />, enabled: true },
     { key: 'components', path: '/admin/components', icon: <ClusterOutlined />, enabled: true },
+    { key: 'redis', path: '/admin/redis', icon: <DatabaseOutlined />, enabled: true },
     { key: 'config', path: '/admin/config', icon: <SettingOutlined />, enabled: true },
     { key: 'logs', path: '/admin/logs', icon: <FileTextOutlined />, enabled: true },
     { key: 'operations', path: '/admin/operations', icon: <ThunderboltOutlined />, enabled: true },

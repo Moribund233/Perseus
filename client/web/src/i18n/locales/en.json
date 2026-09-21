@@ -124,7 +124,8 @@
         "config": "Configuration",
         "logs": "Logs",
         "operations": "Maintenance",
-        "debug": "Debug Tools"
+        "debug": "Debug Tools",
+        "redis": "Redis"
       },
       "overview": {
         "title": "Overview",
@@ -420,6 +421,73 @@
       },
       "danger": {
         "typeToConfirm": "Type {{word}} to continue"
+      },
+      "redis": {
+        "title": "Redis Operations",
+        "subtitle": "From GET /api/app/redis/status (admin-only, read-only) · worker liveness & subscription health come from the Redis heartbeat registry; metrics from INFO.",
+        "updatedAt": "Updated {{time}}",
+        "refresh": "Refresh",
+        "loadFailed": "Failed to load Redis status",
+        "connected": "Connected",
+        "disconnected": "Unavailable",
+        "notConfigured": {
+          "title": "Redis not configured",
+          "desc": "PERSEUS_REDIS_URL / REDIS_URL is empty. Request stats, presence, OAuth state and cross-worker broadcast fall back to in-process — features keep working but lose cross-worker/replica consistency."
+        },
+        "unreachable": {
+          "title": "Redis unreachable (degraded)",
+          "desc": "Connection probe failed (1s timeout, 5s retry cooldown). Strong dependencies degrade explicitly; caches fall back to DB/disk."
+        },
+        "summary": {
+          "connection": "Connection",
+          "workers": "Alive workers",
+          "subscriptions": "Pattern subs",
+          "keys": "Total keys",
+          "evicted": "Evicted keys",
+          "hitRate": "Hit rate"
+        },
+        "workers": {
+          "title": "Workers & subscriptions",
+          "hint": "From heartbeat registry · each worker should hold 1 broadcast subscription",
+          "mismatch": "subscription missing",
+          "empty": "Registry empty (Redis disabled or no heartbeat yet)",
+          "age": "Heartbeat age",
+          "bus": "Broadcast bus",
+          "conns": "Conns / rooms"
+        },
+        "pubsub": {
+          "title": "Subscriptions (pub/sub)",
+          "hint": "Pattern subs {{subs}} · expected ≥ alive workers {{workers}}",
+          "numpat": "Pattern subscriptions (NUMPAT)",
+          "channels": "Active channels"
+        },
+        "keyspace": {
+          "title": "Keyspace · namespace domains",
+          "use": "Usage",
+          "policy": "Policy",
+          "persistent": "persistent",
+          "evictable": "evictable"
+        },
+        "metrics": {
+          "title": "Runtime metrics",
+          "version": "Version",
+          "mode": "Mode",
+          "uptime": "Uptime",
+          "latency": "Ping latency",
+          "memory": "Memory / limit",
+          "fragmentation": "Fragmentation",
+          "clients": "Clients",
+          "ops": "Command rate",
+          "hits": "Hits / misses",
+          "expired": "Expired / evicted"
+        },
+        "config": {
+          "title": "Config (read-only)",
+          "hint": "Injected via env/compose; no write endpoint"
+        },
+        "degradation": {
+          "title": "Degradation counters (this worker)"
+        }
       }
     },
     "userMenu": {

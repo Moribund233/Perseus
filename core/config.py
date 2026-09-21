@@ -292,8 +292,12 @@ class DatabaseSettings(BaseSettings):
 
 class ConcurrencySettings(BaseSettings):
     """并发控制配置类（派生自数据库压力测试模式）"""
-    max_concurrent: int = Field(default=100, description="最大并发请求数")
+    max_concurrent: int = Field(default=100, description="最大并发请求数（每 worker）")
     max_wait_time: float = Field(default=5.0, description="最大等待时间（秒）")
+    global_max_concurrent: int = Field(
+        default=0,
+        description="跨 worker 全局并发上限（Redis 计数；0=关闭，仅用每 worker 信号量）",
+    )
 
     @classmethod
     def from_stress_test(cls, is_stress_test: bool) -> "ConcurrencySettings":

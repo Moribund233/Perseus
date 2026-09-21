@@ -59,7 +59,8 @@ def create_app(config_path: str = "config.toml") -> FastAPI:
     app.add_middleware(
         ConcurrencyMiddleware,
         max_concurrent=conc.max_concurrent,
-        max_wait_time=conc.max_wait_time
+        max_wait_time=conc.max_wait_time,
+        global_max_concurrent=conc.global_max_concurrent,
     )
 
     # 添加请求耗时日志中间件（记录慢请求）

@@ -12,6 +12,21 @@
 > ④ **D4 部署**——`docker-compose.base.yml` redis 改 `--maxmemory 512mb --maxmemory-policy volatile-lru`（仅淘汰带 TTL 键，保护 collab 无 TTL 快照），容器内存上限 320M→640M。
 > **验证**：`test` 容器 **1331 passed / 3 skipped**；新增用例 `tests/test_redis_client.py`、`tests/test_oauth_state_store.py`、`tests/test_realtime_bus.py`。
 
+> **2026-09-21 落地（R4 + R5）**：
+> ① **R4 presence**——新增 `services/realtime/presence_service.py`：Redis 引用计数（`perseus:presence:room:<id>:n|name`），按 (room,user) 去重、心跳续期 TTL（默认 90s）、崩溃自动过期；`ConnectionManager` 新增 `connection.rooms`（幂等 subscribe）与 `set_presence`，`subscribe_room`/`unsubscribe_room`/`disconnect` 同步计数，`get_room_online_users` 优先全局聚合、Redis 不可用回退本进程；`core/lifespan.py` 绑定。
+> ② **R5-1 黑名单读缓存**——新增 `services/revocation_cache.py`：正缓存 `SET … EX 1h`（撤销时写入并覆盖）、负缓存 `SET … EX 60 NX`（`NX` 防「已撤销被读回未撤销」的复活竞态）；`token_service.is_token_revoked`/`revoke_token` 与 `collab_invite_service.is_invite_token_revoked`/`revoke_invite_token` 接入，Redis 不可用回退 DB。
+> ③ **R5-2 仓库存在缓存**——`services/repository_service.py` 增加 Redis L2（`perseus:repo:exists:<id>`，30s TTL，L1 本地→L2 Redis→磁盘），创建/删除仓库时失效 L1+L2。
+> ④ **R5-3 全局限流**——`middleware/concurrency.py` 新增 `GlobalConcurrencyLimiter`（Redis Lua 原子 INCR/EXPIRE + DECR，带 TTL 自愈）；`ConcurrencyMiddleware` 在本地信号量后叠加全局配额，拒绝即释放本地许可返回 503，Redis 异常降级放行；配置 `ConcurrencySettings.global_max_concurrent`（默认 0=关闭，`app.py` 接线）。
+> **验证**：`test` 容器 **1361 passed / 3 skipped**；新增用例 `tests/test_presence_store.py`、`tests/test_revocation_cache.py`、`tests/test_repo_exists_cache.py`、`tests/test_global_concurrency.py`。
+
+> **2026-09-21 落地（运维可视化）**：以"运维判断 worker/订阅是否正常"为目标，明确 Redis INFO 是**服务端全局**、无法区分 worker，故引入应用侧共享状态。
+> ① **worker 心跳注册表**——`services/worker_registry.py`：每 worker 写 `perseus:worker:<id>`（pid/host/started_at/last_seen/bus_running/收发计数/本地连接/房间数，TTL 45s），由 `core/lifespan.py` 每 20s 续期。
+> ② **状态服务与端点**——`services/redis_admin_service.py` + `GET /api/app/redis/status`（连接/延迟、worker 存活、`PUBSUB NUMPAT` vs 存活 worker 的 mismatch、INFO 指标、命名空间键数 SCAN 15s 缓存、降级计数）与 `GET /api/app/redis/config`（只读，URL 脱敏）；均**仅管理员**、优雅降级。
+> ③ **降级计数**——`utils/redis_client.py`（unavailable/connect/require 失败）+ `utils/realtime_bus.py`（published/received/失败/last_error）。
+> ④ **前端**——admin 新增 `RedisSection`（`/admin/redis`）+ `redisApi` + i18n zh/en；worker 表、订阅、键空间、指标、配置、降级分区。
+> ⑤ **监控**——`docker-compose.monitoring.yml` 增 `redis-exporter` sidecar + Prometheus scrape job（服务端指标交给 Grafana；应用层 worker/订阅由本端点提供，二者互补）。
+> **验证**：后端 `test` 容器 **1377 passed / 3 skipped**；前端 `pnpm lint` + `pnpm build` + `pnpm test`（41 用例）✅；新增用例 `tests/test_worker_registry.py`、`tests/test_redis_admin_service.py`、`tests/test_redis_admin_api.py`。
+
 ---
 
 ## 一、背景与动机
@@ -172,7 +187,7 @@ RealtimeBus / StateStore / Cache 抽象（utils/redis_*.py）
 | R3-2 Redis 实现 | `SETEX perseus:oauth:state:<s>` + `GETDEL` 消费 | 一次性消费、跨实例可见 |
 | R3-3 接线 | `services/oauth_service.py` 改用抽象 | 现有 OAuth 测试回归 |
 
-### R4 — presence / 在线用户全局化（1~2 天，依赖 R2）
+### R4 — presence / 在线用户全局化（1~2 天，依赖 R2）✅ 2026-09-21
 
 | 任务 | 交付 | TDD 要点 |
 |---|---|---|
@@ -180,7 +195,7 @@ RealtimeBus / StateStore / Cache 抽象（utils/redis_*.py）
 | R4-2 全局查询 | `get_room_online_users` 聚合多 worker | 双 worker 聚合去重 |
 | R4-3 降级 | 无 Redis 回退本进程（现状） | 等价性 |
 
-### R5 — 缓存与黑名单（1~2 天，可拆分）
+### R5 — 缓存与黑名单（1~2 天，可拆分）✅ 2026-09-21（R5-1/R5-2/R5-3 全部）
 
 | 任务 | 交付 | TDD 要点 |
 |---|---|---|
@@ -234,4 +249,4 @@ RealtimeBus / StateStore / Cache 抽象（utils/redis_*.py）
 1. **部署形态**：本期不依赖横向扩容——单容器 **4 worker 已足以触发**跨进程问题，测试矩阵按 4 worker 设计；`--scale app=N` 作为天然延伸。
 2. **Redis 容量/淘汰**：按 D4 调整（仅淘汰带 TTL 键 + 提升 `maxmemory`），随实现更新 `docker-compose.base.yml` 说明。
 3. **跨实例**：假定单 Redis 实例，单实例 pub/sub 即可；跨机房不在本期。
-4. **R4 / R5**：本期不纳入，完成 R1~R3 后按需再评估（presence、黑名单缓存、热缓存、全局限流）。
+4. **R4 / R5**：已全部落地（presence、黑名单缓存、仓库存在缓存 L2、全局限流）。其中 R5-3 全局并发上限默认关闭（`global_max_concurrent=0`），需按部署规模显式开启；开启前请确认 Redis 与 Nginx 限流的配合。

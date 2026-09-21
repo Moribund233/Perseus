@@ -21,9 +21,27 @@ _redis_client: Optional["Redis"] = None
 _last_attempt: float = 0.0
 _lock: Optional[asyncio.Lock] = None
 
+# 进程生命周期降级计数（供 admin Redis 状态端点观测）
+_stats: dict = {
+    "unavailable_returns": 0,  # get_redis() 返回 None 的次数
+    "connect_failures": 0,     # 建连/ping 失败次数
+    "require_failures": 0,     # require_redis() 抛错次数
+}
+
 
 class RedisUnavailableError(RuntimeError):
     """强依赖 Redis 的场景在不可用时抛出（显式降级，不静默）"""
+
+
+def get_client_stats() -> dict:
+    """获取 Redis 客户端降级计数（副本，避免外部篡改内部状态）"""
+    return dict(_stats)
+
+
+def reset_client_stats() -> None:
+    """重置降级计数（测试隔离用）"""
+    for k in _stats:
+        _stats[k] = 0
 
 
 def _redis_url() -> str:
@@ -104,16 +122,19 @@ async def get_redis() -> Optional["Redis"]:
     url = _redis_url()
     if not url:
         logger.debug("Redis 未配置，相关功能回退进程内实现")
+        _stats["unavailable_returns"] += 1
         return None
 
     cooldown = _reconnect_cooldown()
     if _last_attempt and (time.monotonic() - _last_attempt) < cooldown:
+        _stats["unavailable_returns"] += 1
         return None
 
     async with _get_lock():
         if _redis_client is not None:
             return _redis_client
         if _last_attempt and (time.monotonic() - _last_attempt) < cooldown:
+            _stats["unavailable_returns"] += 1
             return None
         _last_attempt = time.monotonic()
         try:
@@ -131,6 +152,7 @@ async def get_redis() -> Optional["Redis"]:
             logger.info("Redis 客户端已就绪")
         except Exception as exc:  # noqa: BLE001 — 失联即降级，不阻塞业务
             logger.warning("Redis 不可用，相关功能回退/降级: %s", exc)
+            _stats["connect_failures"] += 1
             _redis_client = None
     return _redis_client
 
@@ -139,6 +161,7 @@ async def require_redis() -> "Redis":
     """强依赖场景取用：不可用即抛 ``RedisUnavailableError``（显式降级，不静默）"""
     client = await get_redis()
     if client is None:
+        _stats["require_failures"] += 1
         raise RedisUnavailableError("Redis 不可用（未配置或连接失败），强依赖功能无法继续")
     return client
 

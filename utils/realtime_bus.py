@@ -42,6 +42,22 @@ class RealtimeBus:
         self._pubsub = None
         self._task: Optional[asyncio.Task] = None
         self._running = False
+        # 运维观测计数
+        self.published = 0
+        self.publish_failures = 0
+        self.received = 0
+        self.dispatch_failures = 0
+        self.last_error: Optional[str] = None
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "running": self._running,
+            "published": self.published,
+            "publish_failures": self.publish_failures,
+            "received": self.received,
+            "dispatch_failures": self.dispatch_failures,
+            "last_error": self.last_error,
+        }
 
     def bind(self, manager) -> None:
         """绑定连接管理器并注入总线引用"""
@@ -125,7 +141,10 @@ class RealtimeBus:
                 redis_client.ws_channel(scope, target_id),
                 json.dumps(payload, ensure_ascii=False, default=str),
             )
+            self.published += 1
         except Exception as exc:  # noqa: BLE001 — 发布失败不影响本地投递
+            self.publish_failures += 1
+            self.last_error = str(exc)
             logger.warning("RealtimeBus 发布失败 scope=%s: %s", scope, exc)
 
     async def _listen(self) -> None:
@@ -159,7 +178,13 @@ class RealtimeBus:
         target = _decode_target(scope, payload.get("target"))
         exclude_raw = payload.get("exclude_user_id")
         exclude = _decode_target("user", exclude_raw) if exclude_raw else None
-        await self.deliver(scope, target, message, exclude)
+        try:
+            await self.deliver(scope, target, message, exclude)
+            self.received += 1
+        except Exception as exc:  # noqa: BLE001 — 单条投递失败不影响订阅循环
+            self.dispatch_failures += 1
+            self.last_error = str(exc)
+            logger.warning("RealtimeBus 投递失败 scope=%s: %s", scope, exc)
 
     async def deliver(self, scope: str, target_id, message: Dict[str, Any],
                       exclude_user_id=None) -> int:

@@ -167,6 +167,94 @@ export const monitoringApi = {
     }),
 };
 
+// ---------- Redis 运维状态（只读） ----------
+
+export interface RedisWorkerInfo {
+  worker_id: string | null;
+  pid: number | null;
+  host: string | null;
+  started_at: number | null;
+  last_seen: number | null;
+  age_seconds: number | null;
+  alive: boolean;
+  bus_running: boolean;
+  bus_published: number;
+  bus_received: number;
+  bus_publish_failures: number;
+  local_connections: number;
+  presence_rooms: number;
+}
+
+export interface RedisPubsub {
+  pattern_subscriptions: number | null;
+  expected_workers: number;
+  mismatch: boolean;
+  channels: string[];
+}
+
+export interface RedisKeyspaceEntry {
+  namespace: string;
+  domain: string;
+  use: string;
+  ttl: string;
+  policy: string;
+  keys: number;
+}
+
+export interface RedisDegradation {
+  unavailable_returns: number;
+  connect_failures: number;
+  require_failures: number;
+  bus_running: boolean;
+  bus_published: number;
+  bus_publish_failures: number;
+  bus_received: number;
+  bus_dispatch_failures: number;
+  bus_last_error: string | null;
+}
+
+export interface RedisStatus {
+  configured: boolean;
+  reachable: boolean;
+  latency_ms: number | null;
+  server: { version?: string; mode?: string; os?: string; uptime_seconds?: number };
+  memory: {
+    used?: number;
+    used_peak?: number;
+    rss?: number;
+    maxmemory?: number;
+    maxmemory_policy?: string;
+    fragmentation_ratio?: number;
+  };
+  clients: { connected?: number; blocked?: number };
+  stats: {
+    ops_per_sec?: number;
+    keyspace_hits?: number;
+    keyspace_misses?: number;
+    hit_rate?: number | null;
+    expired_keys?: number;
+    evicted_keys?: number;
+  };
+  workers: { expected: number; alive: number; items: RedisWorkerInfo[] };
+  pubsub: RedisPubsub;
+  keyspace: RedisKeyspaceEntry[];
+  degradation: RedisDegradation;
+  generated_at: string;
+}
+
+export interface RedisConfig {
+  settings: { url: string; namespace: string; pubsub_prefix: string; reconnect_cooldown: number };
+  runtime: { maxmemory?: number; maxmemory_policy?: string };
+  editable: boolean;
+  source: string;
+  generated_at: string;
+}
+
+export const redisApi = {
+  getStatus: () => apiRequest<RedisStatus>('/api/app/redis/status'),
+  getConfig: () => apiRequest<RedisConfig>('/api/app/redis/config'),
+};
+
 // ---------- 日志 ----------
 
 export interface LogFileInfo {

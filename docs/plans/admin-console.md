@@ -2,7 +2,9 @@
 
 > 更新日期：2026-09-20
 > 范围：应用管理层（admin/app）端点的前端控制台实现规划。
-> 原型：`client/prototype/admin-console.html`（总控台）、`client/prototype/admin-components.html`（组件健康）。
+> 原型：`client/prototype/admin-console.html`（总控台）、`client/prototype/admin-components.html`（组件健康）、`client/prototype/admin-redis.html`（Redis 运维，参考稿）。
+
+> **2026-09-21（Redis 运维分节）**：新增 `/admin/redis` 分节 `RedisSection`（侧栏 `DatabaseOutlined`），对接 `GET /api/app/redis/status` 与只读 `GET /api/app/redis/config`（仅管理员）。页面分区：连接/worker 存活/订阅/键总数/淘汰/命中率摘要 + worker 心跳表（pid/host/心跳年龄/广播总线/收发/连接房间）+ pub/sub（NUMPAT vs 存活 worker，mismatch 告警）+ 键空间分域 + INFO 指标 + 只读配置 + 降级计数。数据源为 Redis 心跳注册表（`services/worker_registry.py`）与 INFO，详见 `docs/plans/redis-expansion.md`「运维可视化」；原型 `client/prototype/admin-redis.html`。验证：后端 1377 passed、前端 lint/build/test(41) ✅。
 
 > **2026-09-20（控制台顶栏 + 权限面板 + 调试开关）**：按原型补齐——新增 `AdminHeader`（品牌 logo/名称 + `// 应用控制台` + 运行状态 pulse + DEBUG/RELEASE chip + 版本 + API 端点 + 时钟 + 当前用户）；`AdminConsolePage` 改为「顶栏 + `.ac-shell`（左栏 + 主舞台）」列布局；左栏底部新增**权限面板** `PermissionPanel`：`is_admin` 只读展示，`app.debug` 可切换。新增后端 `POST /api/app/debug`（**仅管理员**）：以原始 TOML dict 读改写**仅** `app.debug`、保留文件其余键、不刷新运行态 → **重启服务后生效**（规避 `_write_config_file` 的部分写入缺陷）。前端切换后显示「已写入配置，重启服务后生效」。验证：后端 `test` 容器 1283 passed；前端 `pnpm lint` + `pnpm build` + `pnpm test`（41 用例）✅。
 

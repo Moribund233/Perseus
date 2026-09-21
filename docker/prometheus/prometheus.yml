@@ -17,3 +17,12 @@ scrape_configs:
           - app:8000
         labels:
           service: perseus-app
+
+  # Redis 服务端指标（redis_exporter sidecar，见 docker-compose.monitoring.yml）
+  # 应用层 worker/订阅健康见 /api/app/redis/status（Redis 心跳注册表）
+  - job_name: redis
+    static_configs:
+      - targets:
+          - redis-exporter:9121
+        labels:
+          service: perseus-redis

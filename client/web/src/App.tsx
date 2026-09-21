@@ -28,6 +28,7 @@ const ConfigSection = lazy(() => import('./routes/admin/sections/ConfigSection')
 const LogsSection = lazy(() => import('./routes/admin/sections/LogsSection'));
 const OperationsSection = lazy(() => import('./routes/admin/sections/OperationsSection'));
 const DebugSection = lazy(() => import('./routes/admin/sections/DebugSection'));
+const RedisSection = lazy(() => import('./routes/admin/sections/RedisSection'));
 
 function AdminFallback() {
   return (
@@ -125,6 +126,7 @@ function AppRoutes() {
         <Route path="logs" element={<LogsSection />} />
         <Route path="operations" element={<OperationsSection />} />
         <Route path="debug" element={<DebugSection />} />
+        <Route path="redis" element={<RedisSection />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

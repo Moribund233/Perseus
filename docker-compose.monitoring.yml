@@ -21,6 +21,23 @@
 # =============================================================================
 
 services:
+  # Redis 指标导出（供 Prometheus 抓取；只读，仅暴露内存/客户端/命中率/淘汰等）
+  # 应用层 worker/订阅健康由 /api/app/redis/status 提供，二者互补。
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.66.0
+    container_name: perseus-redis-exporter
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+    ports:
+      - "127.0.0.1:9121:9121"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    networks:
+      - default
+
   prometheus:
     image: prom/prometheus:v3.0.1
     container_name: perseus-prometheus

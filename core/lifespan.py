@@ -20,6 +20,8 @@ from fastapi import FastAPI
 from models.async_db import get_async_engine
 from api.websocket.manager import manager as websocket_manager
 from utils.realtime_bus import bus as realtime_bus
+from services.realtime.presence_service import presence as presence_store
+from services.worker_registry import worker_registry
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,7 @@ class AppLifecycleManager:
     def __init__(self):
         self._websocket_manager = websocket_manager
         self._realtime_bus = realtime_bus
+        self._worker_task: Optional[asyncio.Task] = None
         self._is_shutting_down = False
 
     async def startup(self) -> None:
@@ -66,6 +69,12 @@ class AppLifecycleManager:
         except Exception as e:
             logger.warning(f"实时广播总线初始化失败（退化为进程内广播）: {e}")
 
+        # 启动 worker 心跳（写入 Redis 注册表，供 admin 观测）
+        try:
+            self._init_worker_heartbeat()
+        except Exception as e:
+            logger.warning(f"worker 心跳初始化失败（admin 将看不到本 worker）: {e}")
+
     async def _init_async_database(self) -> None:
         """初始化异步数据库引擎"""
         from models.async_db import get_async_engine
@@ -84,6 +93,7 @@ class AppLifecycleManager:
 
         logger.info("开始执行关闭流程...")
 
+        await self._shutdown_worker_heartbeat()
         await self._shutdown_realtime_bus()
         await self._shutdown_websocket_connections()
         await self._dispose_database_engine()
@@ -110,11 +120,38 @@ class AppLifecycleManager:
             raise
 
     async def _init_realtime_bus(self) -> None:
-        """绑定并启动跨 worker 广播总线"""
+        """绑定跨 worker 在线状态注册表，并启动广播总线"""
+        self._websocket_manager.set_presence(presence_store)
         self._realtime_bus.bind(self._websocket_manager)
         started = await self._realtime_bus.start()
         if not started:
             logger.info("实时广播总线未启用（Redis 不可用），使用进程内广播")
+
+    def _init_worker_heartbeat(self) -> None:
+        """启动 worker 心跳后台任务（立即写一次，之后周期续期）"""
+        self._worker_task = asyncio.create_task(self._worker_heartbeat_loop())
+
+    async def _worker_heartbeat_loop(self) -> None:
+        try:
+            while True:
+                try:
+                    await worker_registry.heartbeat(
+                        self._websocket_manager, self._realtime_bus
+                    )
+                except Exception as e:  # noqa: BLE001 — 单次失败不影响循环
+                    logger.warning(f"worker 心跳写入失败: {e}")
+                await asyncio.sleep(20)
+        except asyncio.CancelledError:
+            pass
+
+    async def _shutdown_worker_heartbeat(self) -> None:
+        if self._worker_task is not None:
+            self._worker_task.cancel()
+            try:
+                await self._worker_task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
+            self._worker_task = None
 
     async def _shutdown_realtime_bus(self) -> None:
         """停止广播总线"""

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.user import User
 from models.revoked_token import RevokedToken
 from core.config import get_config
+from services import revocation_cache
 from utils.password_utils import verify_password, get_password_hash
 
 # 日志记录器
@@ -241,13 +242,20 @@ async def refresh_access_token(refresh_token: str, db: AsyncSession) -> Optional
 
 
 async def is_token_revoked(db: AsyncSession, jti: Optional[str]) -> bool:
-    """该 jti 是否已被撤销（命中黑名单）。"""
+    """该 jti 是否已被撤销（命中黑名单）。命中 Redis 读缓存时不查 DB。"""
     if not jti:
         return False
+
+    cached = await revocation_cache.get("token", jti)
+    if cached is not None:
+        return cached
+
     result = await db.execute(
         select(RevokedToken.id).filter(RevokedToken.jti == jti)
     )
-    return result.scalar_one_or_none() is not None
+    revoked = result.scalar_one_or_none() is not None
+    await revocation_cache.set("token", jti, revoked)
+    return revoked
 
 
 async def revoke_token(
@@ -300,6 +308,8 @@ async def revoke_token(
         )
     )
     await db.commit()
+    # 立即写入正缓存，覆盖可能存在的负缓存，使多 worker 即时可见
+    await revocation_cache.set("token", token_data.jti, True)
     logger.info(f"Token revoked: jti={token_data.jti} type={token_type}")
     return True
 

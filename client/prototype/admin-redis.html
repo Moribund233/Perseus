@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Perseus · Redis 控制台（原型）</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cpath d='M43.9 46.1 A24 24 0 0 1 69.9 67.9' fill='none' stroke='%233D7BFF' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M39.7 34.5 A36 36 0 0 1 81.9 73.1' fill='none' stroke='%233D7BFF' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M62.4 24.9 A48 48 0 0 1 92.4 57.6' fill='none' stroke='%2312A38B' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M37.8 92.6 A24 24 0 0 1 23.4 78.2' fill='none' stroke='%23E9F1FF' stroke-width='8' stroke-linecap='round'/%3E%3Ccircle cx='46' cy='70' r='11' fill='%233D7BFF'/%3E%3Ccircle cx='10' cy='73' r='4.5' fill='%2312A38B'/%3E%3C/svg%3E" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+  :root{
+    --bg:#0d1117; --band:#0f151d; --raised:#161b22; --panel:#111820;
+    --rule:#21262d; --rule-strong:#30363d;
+    --text:#e6edf3; --muted:#8b949e; --faint:#6e7681;
+    --accent:#1f6feb; --accent-bright:#58a6ff;
+    --ok:#3fb950; --warn:#d29922; --danger:#f85149; --violet:#bc8cff;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+    font-size:13px;line-height:1.55;-webkit-font-smoothing:antialiased;
+    display:flex;flex-direction:column;height:100vh;overflow:hidden;
+  }
+  .mono{font-family:var(--mono);font-variant-ligatures:none}
+  button{font-family:inherit;font-size:inherit;color:inherit;background:none;border:none;cursor:pointer}
+  :focus-visible{outline:2px solid var(--accent-bright);outline-offset:2px;border-radius:3px}
+  ::selection{background:rgba(31,111,235,.35)}
+
+  /* ribbon */
+  .ribbon{flex-shrink:0;height:46px;display:flex;align-items:center;gap:16px;
+    padding:0 18px;border-bottom:1px solid var(--rule);background:var(--raised);z-index:20;}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand svg{width:22px;height:22px;display:block}
+  .brand-name{font-weight:700;letter-spacing:.14em;font-size:12px}
+  .brand-sep{color:var(--rule-strong)}
+  .brand-sub{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .ribbon-right{margin-left:auto;display:flex;align-items:center;gap:16px}
+  .updated{font-size:11.5px;color:var(--faint)}
+  .live{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .live .dot{width:6px;height:6px;border-radius:50%;background:var(--ok);position:relative}
+  .live.off .dot{background:var(--faint)}
+  .live:not(.off) .dot::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid var(--ok);animation:beat 2.4s ease-out infinite}
+  @keyframes beat{0%{transform:scale(.4);opacity:.8}70%{transform:scale(1.6);opacity:0}100%{opacity:0}}
+
+  .shell{flex:1;display:flex;min-height:0}
+  .stage{flex:1;min-width:0;overflow-y:auto}
+
+  .page-head{padding:20px 26px 16px;border-bottom:1px solid var(--rule)}
+  .page-head h1{margin:0;font-size:19px;font-weight:700;letter-spacing:-.01em}
+  .page-head p{margin:5px 0 0;font-size:12.5px;color:var(--muted);max-width:82ch}
+  .page-head p code{font-family:var(--mono);font-size:11.5px;color:var(--accent-bright)}
+  .head-actions{margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .toggle{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .switch{width:32px;height:18px;border-radius:10px;background:var(--rule-strong);position:relative;transition:background .16s;flex-shrink:0}
+  .switch::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#8b949e;transition:transform .16s,background .16s}
+  .switch.on{background:rgba(31,111,235,.35)}
+  .switch.on::after{transform:translateX(14px);background:var(--accent-bright)}
+  .spacer{margin-left:auto}
+
+  /* summary ledger */
+  .summary{display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid var(--rule)}
+  .s{padding:14px 20px;border-left:1px solid var(--rule);min-width:0}
+  .s:first-child{border-left:none;padding-left:26px}
+  .s .n{font-family:var(--mono);font-size:21px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+  .s .l{font-size:11px;color:var(--faint);margin-top:3px}
+  .s.ok .n{color:var(--ok)} .s.bad .n{color:var(--danger)} .s.warn .n{color:var(--warn)} .s.acc .n{color:var(--accent-bright)}
+
+  .banner{margin:16px 26px;padding:14px 16px;border-radius:9px;display:flex;gap:12px;align-items:flex-start}
+  .banner .ic{font-size:16px;line-height:1.3}
+  .banner h3{margin:0 0 3px;font-size:13px}
+  .banner p{margin:0;font-size:12px;color:var(--muted)}
+  .banner code{font-family:var(--mono);font-size:11px}
+  .banner.warn{border:1px solid rgba(210,153,34,.4);background:rgba(210,153,34,.07)}
+  .banner.warn .ic,.banner.warn code{color:var(--warn)}
+  .banner.bad{border:1px solid rgba(248,81,73,.4);background:rgba(248,81,73,.07)}
+  .banner.bad .ic,.banner.bad code{color:var(--danger)}
+  .hidden{display:none!important}
+
+  /* sections */
+  .sect{border-bottom:1px solid var(--rule)}
+  .sect-head{display:flex;align-items:center;gap:12px;padding:13px 26px 11px}
+  .sect-head h2{margin:0;font-size:14px;font-weight:600}
+  .sect-head .desc{font-size:11.5px;color:var(--faint)}
+  .sect-head .src{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .sect-body{padding:0 26px 18px}
+
+  /* metrics */
+  .metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+  .metric{border:1px solid var(--rule);border-radius:8px;background:var(--panel);padding:11px 13px;cursor:pointer;transition:border-color .13s,background .13s}
+  .metric:hover{border-color:var(--rule-strong);background:#131b24}
+  .metric.sel{border-color:var(--accent);background:#111d2b}
+  .metric .k{font-size:11px;color:var(--faint)}
+  .metric .v{font-family:var(--mono);font-size:17px;font-weight:600;margin-top:4px;letter-spacing:-.01em}
+  .metric .u{font-size:11px;color:var(--faint);margin-left:3px}
+  .metric .sub{font-size:10.5px;color:var(--muted);margin-top:2px;font-family:var(--mono)}
+  .bar{height:5px;border-radius:3px;background:var(--rule);margin-top:8px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:3px;background:var(--accent-bright)}
+  .bar i.warn{background:var(--warn)} .bar i.bad{background:var(--danger)} .bar i.ok{background:var(--ok)}
+
+  /* table */
+  .tbl{width:100%;border-collapse:collapse;font-size:12px}
+  .tbl th{text-align:left;font-size:10.5px;letter-spacing:.06em;color:var(--faint);font-weight:500;padding:8px 12px;border-bottom:1px solid var(--rule);text-transform:uppercase}
+  .tbl td{padding:9px 12px;border-bottom:1px solid #171d24;vertical-align:top}
+  .tbl tr[data-row]{cursor:pointer;transition:background .13s}
+  .tbl tr[data-row]:hover{background:#0c1219}
+  .tbl tr.sel{background:#111d2b}
+  .tbl .mono{font-size:11.5px}
+  .tbl .ns{font-family:var(--mono);font-size:11.5px;color:var(--text)}
+  .tbl .muted{color:var(--muted)}
+  .tbl .num{text-align:right;font-family:var(--mono)}
+
+  .chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;
+    padding:2px 8px;border-radius:4px;border:1px solid var(--rule-strong);color:var(--muted);background:var(--bg);width:fit-content;white-space:nowrap}
+  .chip.ok{color:var(--ok);border-color:rgba(63,185,80,.4);background:rgba(63,185,80,.07)}
+  .chip.bad{color:var(--danger);border-color:rgba(248,81,73,.4);background:rgba(248,81,73,.07)}
+  .chip.warn{color:var(--warn);border-color:rgba(210,153,34,.4);background:rgba(210,153,34,.07)}
+  .chip.run{color:var(--accent-bright);border-color:rgba(88,166,255,.35);background:rgba(88,166,255,.07)}
+  .chip.violet{color:var(--violet);border-color:rgba(188,140,255,.35);background:rgba(188,140,255,.07)}
+  .chip.ro{color:var(--faint)}
+
+  /* actions */
+  .ops{display:flex;gap:9px;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:6px;
+    font-size:12px;font-weight:500;border:1px solid var(--rule-strong);background:var(--raised);color:var(--text)}
+  .btn:hover{background:#1c2333;border-color:#4b5563}
+  .btn.ghost{background:transparent;border-color:var(--rule-strong);color:var(--muted)}
+  .btn.ghost:hover{background:#1c2333;color:var(--text)}
+  .btn.danger{border-color:rgba(248,81,73,.45);color:var(--danger)}
+  .btn.danger:hover{background:rgba(248,81,73,.08)}
+  .btn[disabled]{opacity:.45;cursor:not-allowed}
+  .ops-note{font-size:11px;color:var(--faint);margin-top:9px}
+
+  /* inspector */
+  .inspector{width:360px;flex-shrink:0;border-left:1px solid var(--rule);background:var(--band);display:flex;flex-direction:column;overflow-y:auto}
+  .inspector .ins-head{padding:16px 18px;border-bottom:1px solid var(--rule)}
+  .inspector .ins-head .cap{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--faint)}
+  .inspector .ins-head h2{margin:6px 0 4px;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .inspector .ins-head .sub{font-family:var(--mono);font-size:11px;color:var(--muted);word-break:break-all}
+  .kv{display:grid;grid-template-columns:112px 1fr;gap:0 12px;padding:10px 18px}
+  .kv dt{font-size:11.5px;color:var(--faint);padding:4px 0}
+  .kv dd{margin:0;font-family:var(--mono);font-size:11.5px;color:var(--text);padding:4px 0;word-break:break-all}
+  .ins-cap{padding:12px 18px 6px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--faint)}
+  .raw{margin:0 18px 18px;background:#0a0e13;border:1px solid var(--rule);border-radius:7px;padding:11px 12px;
+    font-family:var(--mono);font-size:10.5px;line-height:1.7;color:#b9c3cd;overflow:auto;white-space:pre}
+  .empty-ins{padding:36px 18px;text-align:center;color:var(--faint);font-size:12px}
+
+  .foot{padding:12px 26px;color:var(--faint);font-size:11px;font-family:var(--mono);display:flex;gap:14px;flex-wrap:wrap}
+
+  @media (max-width:1180px){ .inspector{width:300px} }
+  @media (max-width:900px){
+    .shell{flex-direction:column}
+    .inspector{width:100%;border-left:none;border-top:1px solid var(--rule);max-height:44vh}
+    .summary{grid-template-columns:repeat(3,1fr)}
+    .s:nth-child(3n+1){border-left:none;padding-left:26px}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="ribbon">
+  <div class="brand">
+    <svg viewBox="0 0 120 120" aria-hidden="true">
+      <path d="M43.9 46.1 A24 24 0 0 1 69.9 67.9" fill="none" stroke="#3D7BFF" stroke-width="9" stroke-linecap="round"/>
+      <path d="M39.7 34.5 A36 36 0 0 1 81.9 73.1" fill="none" stroke="#3D7BFF" stroke-width="9" stroke-linecap="round"/>
+      <path d="M62.4 24.9 A48 48 0 0 1 92.4 57.6" fill="none" stroke="#12A38B" stroke-width="9" stroke-linecap="round"/>
+      <path d="M37.8 92.6 A24 24 0 0 1 23.4 78.2" fill="none" stroke="#E9F1FF" stroke-width="8" stroke-linecap="round"/>
+      <circle cx="46" cy="70" r="11" fill="#3D7BFF"/>
+      <circle cx="10" cy="73" r="4.5" fill="#12A38B"/>
+    </svg>
+    <span class="brand-name">PERSEUS</span>
+    <span class="brand-sep">//</span>
+    <span class="brand-sub">redis</span>
+  </div>
+  <div class="ribbon-right">
+    <span class="live" id="live"><span class="dot"></span><span id="liveText">自动刷新</span></span>
+    <span class="updated mono" id="updated">—</span>
+  </div>
+</header>
+
+<div class="shell">
+  <main class="stage">
+    <div class="page-head">
+      <h1>Redis 控制台 <span class="chip violet" style="vertical-align:middle">原型</span></h1>
+      <p>数据来源：<code>GET /api/app/redis/status</code>（连接/worker/订阅/INFO/键空间/降级）· 只读 <code>GET /api/app/redis/config</code> · 容器态复用 <code>GET /api/app/components</code>。worker 存活与订阅来自 Redis 心跳注册表 <code>perseus:worker:*</code>。</p>
+      <div class="head-actions">
+        <div class="toggle"><span>自动刷新</span><button class="switch on" id="swAuto" role="switch" aria-checked="true" aria-label="自动刷新"></button></div>
+        <div class="spacer"></div>
+        <div class="toggle"><span>模拟未配置</span><button class="switch" id="swOff" role="switch" aria-checked="false" aria-label="模拟未配置"></button></div>
+        <div class="toggle"><span>模拟降级</span><button class="switch" id="swDown" role="switch" aria-checked="false" aria-label="模拟降级"></button></div>
+      </div>
+    </div>
+
+    <div class="banner warn hidden" id="bannerOff">
+      <span class="ic" aria-hidden="true">⚠</span>
+      <div>
+        <h3>Redis 未配置</h3>
+        <p><code>PERSEUS_REDIS_URL</code> / <code>REDIS_URL</code> 为空。相关能力自动回退进程内实现：请求统计用进程内窗口、presence 仅本进程、OAuth state 用内存（多 worker 下登录可能失败）、跨 worker 广播退化为进程内。<b>功能不中断，但不具备跨 worker/跨副本一致性。</b></p>
+      </div>
+    </div>
+    <div class="banner bad hidden" id="bannerDown">
+      <span class="ic" aria-hidden="true">✕</span>
+      <div>
+        <h3>Redis 不可达（降级中）</h3>
+        <p>连接探测失败（1s 超时、冷却 5s 重试）。强依赖场景显式降级：<code>require_redis()</code> 抛错 / 广播与 presence 回退本进程；撤销黑名单与仓库存在缓存回退 DB。</p>
+      </div>
+    </div>
+
+    <section class="summary" id="summary"></section>
+
+    <section class="sect">
+      <div class="sect-head"><h2>运行指标</h2><span class="desc">INFO server / clients / memory / stats</span><span class="src">GET /api/app/redis/status</span></div>
+      <div class="sect-body"><div class="metrics" id="metrics"></div></div>
+    </section>
+
+    <section class="sect">
+      <div class="sect-head"><h2>键空间 · 命名空间分域</h2><span class="desc">统一 <span class="mono">perseus:</span> 前缀，按用途/淘汰策略分组</span><span class="src">SCAN / INFO keyspace</span></div>
+      <div class="sect-body">
+        <table class="tbl"><thead><tr>
+          <th>命名空间</th><th>用途</th><th class="num">键数</th><th>TTL</th><th>淘汰</th>
+        </tr></thead><tbody id="nsBody"></tbody></table>
+      </div>
+    </section>
+
+    <section class="sect">
+      <div class="sect-head"><h2>Worker 心跳（跨 worker）</h2><span class="desc">存活与订阅健康来自 Redis 注册表</span><span class="src">perseus:worker:*</span></div>
+      <div class="sect-body">
+        <table class="tbl"><thead><tr>
+          <th>worker</th><th>pid / host</th><th class="num">心跳年龄</th><th>广播总线</th><th class="num">pub / recv</th><th class="num">连接 / 房间</th>
+        </tr></thead><tbody id="wkBody"></tbody></table>
+      </div>
+    </section>
+
+    <section class="sect">
+      <div class="sect-head"><h2>订阅（pub/sub）</h2><span class="desc">模式订阅数 vs 存活 worker</span><span class="src">PUBSUB NUMPAT / CHANNELS</span></div>
+      <div class="sect-body">
+        <div style="margin-bottom:10px;font-size:12px;color:var(--muted)"><span class="chip ok" id="numpatChip">NUMPAT 4 / 存活 worker 4</span></div>
+        <table class="tbl"><thead><tr>
+          <th>活跃通道</th><th>用途</th>
+        </tr></thead><tbody id="psBody"></tbody></table>
+      </div>
+    </section>
+
+    <section class="sect">
+      <div class="sect-head"><h2>配置（RedisSettings）</h2><span class="desc">当前均为只读（env / compose），无修改端点</span><span class="src">GET /api/app/redis/config</span></div>
+      <div class="sect-body">
+        <table class="tbl"><thead><tr>
+          <th>配置项</th><th>当前值</th><th>来源</th><th>可改</th>
+        </tr></thead><tbody id="cfgBody"></tbody></table>
+      </div>
+    </section>
+
+    <section class="sect">
+      <div class="sect-head"><h2>运维操作</h2><span class="desc">危险操作需二次确认</span><span class="src">POST /api/app/redis/*</span></div>
+      <div class="sect-body">
+        <div class="ops">
+          <button class="btn" data-act="ping">Ping</button>
+          <button class="btn ghost" data-act="refresh">刷新</button>
+          <button class="btn ghost" data-act="clientlist" disabled>客户端列表（待新增）</button>
+          <button class="btn danger" data-act="flush">清理可淘汰键（待新增）</button>
+          <button class="btn ghost" data-act="restart" disabled>重启容器（受窄写代理限制）</button>
+        </div>
+        <div class="ops-note">说明：<b>清理</b>仅删除带 TTL 的键（FLUSHDB 不可取，会波及 collab 无 TTL 快照）；<b>重启容器</b>当前窄写代理只放行监控栈（prometheus/grafana）的 start/stop/restart，Redis 需另行授权。</div>
+      </div>
+    </section>
+
+    <section class="sect">
+      <div class="sect-head"><h2>接口就绪度</h2><span class="desc">后端现状评估</span><span class="src">audit</span></div>
+      <div class="sect-body">
+        <table class="tbl"><thead><tr>
+          <th>能力</th><th>端点</th><th>状态</th><th>说明</th>
+        </tr></thead><tbody id="apiBody"></tbody></table>
+      </div>
+    </section>
+
+    <div class="foot">
+      <span>namespace=<b id="footNs">perseus</b></span>
+      <span>policy=volatile-lru</span>
+      <span>maxmemory=512mb</span>
+      <span>source=prototype (simulated)</span>
+    </div>
+  </main>
+
+  <aside class="inspector" id="inspector"></aside>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ---------- 模拟数据 ---------- */
+  var DATA = {
+    version:'7.4.1', mode:'standalone', os:'Linux 6.6 x86_64', uptime:3*86400+4*3600+12*60,
+    clients:7, blocked:0,
+    usedMemory:41.3*1024*1024, peakMemory:52.8*1024*1024, maxMemory:512*1024*1024, fragmentation:1.18, rss:57.1*1024*1024,
+    opsPerSec:126.4, hits:184213, misses:9021, expired:412, evicted:0,
+    totalKeys:63, expiresKeys:63,
+    namespaces:[
+      {ns:'perseus:req:*',      use:'请求统计分钟桶',            keys:20, ttl:'window*120+60s', policy:'可淘汰', cls:'ok'},
+      {ns:'perseus:oauth:state:*', use:'OAuth state',           keys:3,  ttl:'600s',           policy:'可淘汰', cls:'ok'},
+      {ns:'perseus:presence:room:*', use:'在线状态引用计数 (n/name)', keys:12, ttl:'90s 心跳续期', policy:'可淘汰', cls:'ok'},
+      {ns:'perseus:revoked:{token,collab_invite}:*', use:'撤销黑名单读缓存', keys:8, ttl:'1h / 60s', policy:'可淘汰', cls:'ok'},
+      {ns:'perseus:repo:exists:*', use:'物理仓库存在缓存 L2',     keys:15, ttl:'30s',            policy:'可淘汰', cls:'ok'},
+      {ns:'perseus:limit:concurrent', use:'全局并发计数',          keys:1,  ttl:'60s 自愈',       policy:'可淘汰', cls:'ok'},
+      {ns:'perseus:collab:doc:*', use:'协作 Y.Doc 快照（网关）',   keys:4,  ttl:'无',             policy:'持久(受保护)', cls:'violet'},
+      {ns:'perseus:collab:version:*', use:'协作版本计数（网关）',  keys:2,  ttl:'无',             policy:'持久(受保护)', cls:'violet'}
+    ],
+    pubsub:{
+      numpat:4, expected:4,
+      channels:[
+        {ch:'perseus:collab:doc:*',     use:'CRDT 变更 / awareness（网关，精确订阅）'},
+        {ch:'perseus:collab:version:*', use:'协作版本计数（网关）'}
+      ]
+    },
+    workers:[
+      {id:'a1b2c3d4e5f6', pid:4821, host:'perseus-app', age:3, bus:true, pub:1284, recv:932, pubFail:0, conns:37, rooms:6},
+      {id:'f6e5d4c3b2a1', pid:4822, host:'perseus-app', age:5, bus:true, pub:1201, recv:908, pubFail:0, conns:41, rooms:7},
+      {id:'0a1b2c3d4e5f', pid:4823, host:'perseus-app', age:2, bus:true, pub:1198, recv:890, pubFail:2, conns:35, rooms:5},
+      {id:'5f4e3d2c1b0a', pid:4824, host:'perseus-app', age:4, bus:true, pub:1230, recv:915, pubFail:0, conns:39, rooms:6}
+    ],
+    config:[
+      {k:'url',               v:'redis://redis:6379/0',  src:'PERSEUS_REDIS_URL / REDIS_URL', ro:true, secret:true},
+      {k:'namespace',         v:'perseus',               src:'默认值',                        ro:true},
+      {k:'pubsub_prefix',     v:'(空) → perseus:ws',     src:'默认值',                        ro:true},
+      {k:'reconnect_cooldown',v:'5.0s',                  src:'默认值',                        ro:true},
+      {k:'maxmemory',         v:'512mb',                 src:'compose command',               ro:true},
+      {k:'maxmemory-policy',  v:'volatile-lru',          src:'compose command',               ro:true},
+      {k:'appendonly',        v:'no',                    src:'compose command',               ro:true}
+    ],
+    api:[
+      {cap:'容器运行状态',      ep:'GET /api/app/components',        st:'ok',   note:'已存在：redis 作为编排组件之一（state/health/image/uptime/restarts）'},
+      {cap:'worker 存活 / 订阅', ep:'GET /api/app/redis/status',      st:'ok',   note:'已实现：perseus:worker:* 心跳注册表 + PUBSUB NUMPAT vs 存活 worker（mismatch 告警）'},
+      {cap:'运行指标（INFO）',   ep:'GET /api/app/redis/status',      st:'ok',   note:'已实现：memory/clients/stats + 命名空间键数（SCAN 15s 缓存）+ 降级计数'},
+      {cap:'配置读取',          ep:'GET /api/app/redis/config',      st:'ok',   note:'已实现：只读，连接 URL 脱敏'},
+      {cap:'配置修改',          ep:'POST /api/app/redis/config',     st:'gap',  note:'未实现（决策：暂不提供写入，风险高、变更少）'},
+      {cap:'Ping / 清理可淘汰键', ep:'POST /api/app/redis/ping|flush', st:'gap', note:'未实现：status 已含 Ping 延迟；flush 风险高暂不做'},
+      {cap:'重启 Redis 容器',    ep:'POST /api/app/monitoring/enabled 类', st:'partial', note:'窄写代理目前仅放行监控栈；扩展需安全评估'}
+    ]
+  };
+
+  var state = { auto:true, off:false, down:false, selected:{kind:'metric', key:'usedMemory'}, updatedAt:Date.now() };
+
+  /* ---------- helpers ---------- */
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function fmtBytes(b){ if(b==null) return '—'; var u=['B','KB','MB','GB']; var i=0; while(b>=1024&&i<u.length-1){b/=1024;i++;} return b.toFixed(i?1:0)+' '+u[i]; }
+  function fmtUptime(sec){ if(sec==null) return '—'; var d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60); var p=[]; if(d)p.push(d+'d'); if(h)p.push(h+'h'); if(m)p.push(m+'m'); if(!p.length)p.push(Math.floor(sec%60)+'s'); return p.join(' '); }
+  function fmtNum(n){ return (n==null)?'—':n.toLocaleString('en-US'); }
+  function chipCls(k){ return k==='ok'?'ok':k==='gap'?'bad':k==='partial'?'warn':k==='violet'?'violet':'ro'; }
+  function chipLabel(k){ return k==='ok'?'已就绪':k==='gap'?'待新增':k==='partial'?'部分':k==='violet'?'持久':k; }
+
+  /* ---------- render ---------- */
+  function renderSummary(){
+    var d=DATA, degraded=state.off||state.down;
+    var hitRate = d.hits+d.misses ? (d.hits/(d.hits+d.misses)*100) : 0;
+    var cells=[
+      {n: state.off?'未配置':(state.down?'不可达':'已连接'), l:'连接状态', cls: state.off?'':(state.down?'bad':'ok')},
+      {n: fmtBytes(d.usedMemory), l:'内存占用', cls:'acc'},
+      {n: fmtNum(d.totalKeys), l:'键总数', cls:''},
+      {n: d.clients, l:'客户端', cls:''},
+      {n: hitRate.toFixed(1)+'%', l:'命中率', cls:'ok'},
+      {n: d.opsPerSec.toFixed(0), l:'ops/s', cls:''}
+    ];
+    if(state.off){ cells[1].n='—'; cells[2].n='—'; cells[3].n='—'; cells[4].n='—'; cells[5].n='—'; }
+    document.getElementById('summary').innerHTML = cells.map(function(c){
+      return '<div class="s '+c.cls+'"><div class="n">'+esc(c.n)+'</div><div class="l">'+esc(c.l)+'</div></div>';
+    }).join('');
+  }
+
+  function renderMetrics(){
+    var d=DATA, memPct=Math.min(100,d.usedMemory/d.maxMemory*100);
+    var fragCls = d.fragmentation>1.5?'warn':'ok';
+    var items=[
+      {key:'version', k:'Redis 版本', v:d.version, sub:d.mode+' · '+d.os},
+      {key:'uptime', k:'运行时长', v:fmtUptime(d.uptime), sub:'server uptime'},
+      {key:'usedMemory', k:'已用内存', v:fmtBytes(d.usedMemory), sub:'峰值 '+fmtBytes(d.peakMemory), bar:memPct, barCls: memPct>85?'bad':(memPct>70?'warn':'ok')},
+      {key:'fragmentation', k:'内存碎片率', v:d.fragmentation.toFixed(2), sub:'rss '+fmtBytes(d.rss), bar: Math.min(100,(d.fragmentation-1)*100), barCls:fragCls},
+      {key:'clients', k:'连接客户端', v:d.clients, sub:'blocked '+d.blocked},
+      {key:'opsPerSec', k:'命令速率', v:d.opsPerSec.toFixed(1), u:'ops/s', sub:'instantaneous_ops_per_sec'},
+      {key:'hitRate', k:'命中率', v:(d.hits/(d.hits+d.misses)*100).toFixed(2), u:'%', sub:fmtNum(d.hits)+' hit / '+fmtNum(d.misses)+' miss'},
+      {key:'expired', k:'过期 / 淘汰', v:fmtNum(d.expired), sub:'evicted '+fmtNum(d.evicted), bar: d.evicted>0?40:0, barCls:'warn'}
+    ];
+    document.getElementById('metrics').innerHTML = items.map(function(it){
+      var sel = state.selected.kind==='metric' && state.selected.key===it.key;
+      return '<div class="metric'+(sel?' sel':'')+'" data-metric="'+it.key+'" tabindex="0">'+
+        '<div class="k">'+esc(it.k)+'</div>'+
+        '<div class="v">'+esc(it.v)+(it.u?'<span class="u">'+esc(it.u)+'</span>':'')+'</div>'+
+        '<div class="sub">'+esc(it.sub)+'</div>'+
+        (it.bar!=null?'<div class="bar"><i class="'+(it.barCls||'')+'" style="width:'+Math.max(2,it.bar).toFixed(0)+'%"></i></div>':'')+
+      '</div>';
+    }).join('');
+  }
+
+  function renderNs(){
+    document.getElementById('nsBody').innerHTML = DATA.namespaces.map(function(n){
+      return '<tr data-ns="'+esc(n.ns)+'">'+
+        '<td class="ns">'+esc(n.ns)+'</td>'+
+        '<td class="muted">'+esc(n.use)+'</td>'+
+        '<td class="num">'+fmtNum(n.keys)+'</td>'+
+        '<td class="mono muted">'+esc(n.ttl)+'</td>'+
+        '<td><span class="chip '+n.cls+'">'+esc(n.policy)+'</span></td>'+
+      '</tr>';
+    }).join('');
+  }
+
+  function renderPs(){
+    document.getElementById('psBody').innerHTML = DATA.pubsub.channels.map(function(p){
+      return '<tr><td class="ns">'+esc(p.ch)+'</td><td class="muted">'+esc(p.use)+'</td></tr>';
+    }).join('');
+    var chipEl = document.getElementById('numpatChip');
+    if(chipEl){ chipEl.textContent = 'NUMPAT ' + DATA.pubsub.numpat + ' / 存活 worker ' + DATA.pubsub.expected; }
+  }
+
+  function renderWk(){
+    document.getElementById('wkBody').innerHTML = DATA.workers.map(function(w){
+      return '<tr>'+
+        '<td class="ns">'+esc(w.id.slice(0,12))+'</td>'+
+        '<td class="muted">'+w.pid+' · '+esc(w.host)+'</td>'+
+        '<td class="num">'+w.age+'s</td>'+
+        '<td><span class="chip '+(w.bus?'ok':'warn')+'">'+(w.bus?'running':'no-bus')+'</span></td>'+
+        '<td class="num">'+fmtNum(w.pub)+' / '+fmtNum(w.recv)+(w.pubFail?' <span style="color:var(--warn)">('+w.pubFail+'✗)</span>':'')+'</td>'+
+        '<td class="num">'+w.conns+' / '+w.rooms+'</td>'+
+      '</tr>';
+    }).join('');
+  }
+
+  function renderCfg(){
+    document.getElementById('cfgBody').innerHTML = DATA.config.map(function(c){
+      var val = c.secret ? '<span class="muted">redis://</span>redis:6379/0 <span class="chip ro">脱敏</span>' : esc(c.v);
+      return '<tr data-cfg="'+esc(c.k)+'">'+
+        '<td class="ns">'+esc(c.k)+'</td>'+
+        '<td class="mono">'+val+'</td>'+
+        '<td class="muted">'+esc(c.src)+'</td>'+
+        '<td><span class="chip ro">只读</span></td>'+
+      '</tr>';
+    }).join('');
+  }
+
+  function renderApi(){
+    document.getElementById('apiBody').innerHTML = DATA.api.map(function(a){
+      return '<tr data-api="'+esc(a.cap)+'">'+
+        '<td>'+esc(a.cap)+'</td>'+
+        '<td class="mono muted">'+esc(a.ep)+'</td>'+
+        '<td><span class="chip '+chipCls(a.st)+'">'+chipLabel(a.st)+'</span></td>'+
+        '<td class="muted">'+esc(a.note)+'</td>'+
+      '</tr>';
+    }).join('');
+  }
+
+  function renderInspector(){
+    var el=document.getElementById('inspector'), s=state.selected, title, sub, raw;
+    if(state.off){ el.innerHTML='<div class="empty-ins">Redis 未配置 · 无运行数据</div>'; return; }
+    if(state.down){ el.innerHTML='<div class="empty-ins">Redis 不可达 · 降级中</div>'; return; }
+    if(s.kind==='metric'){
+      var map={
+        version:{t:'Redis 版本', sub:'INFO server', r:{redis_version:DATA.version, redis_mode:DATA.mode, os:DATA.os, uptime_in_seconds:DATA.uptime}},
+        uptime:{t:'运行时长', sub:'INFO server', r:{uptime_in_seconds:DATA.uptime, uptime_human:fmtUptime(DATA.uptime)}},
+        usedMemory:{t:'已用内存', sub:'INFO memory', r:{used_memory:DATA.usedMemory, used_memory_human:fmtBytes(DATA.usedMemory), used_memory_peak:DATA.peakMemory, maxmemory:DATA.maxMemory, maxmemory_policy:'volatile-lru', mem_fragmentation_ratio:DATA.fragmentation, used_memory_rss:DATA.rss}},
+        fragmentation:{t:'内存碎片率', sub:'INFO memory', r:{mem_fragmentation_ratio:DATA.fragmentation, used_memory_rss:DATA.rss, used_memory:DATA.usedMemory}},
+        clients:{t:'连接客户端', sub:'INFO clients', r:{connected_clients:DATA.clients, blocked_clients:DATA.blocked}},
+        opsPerSec:{t:'命令速率', sub:'INFO stats', r:{instantaneous_ops_per_sec:DATA.opsPerSec, total_commands_processed:Math.round(DATA.uptime*DATA.opsPerSec)}},
+        hitRate:{t:'命中率', sub:'INFO stats', r:{keyspace_hits:DATA.hits, keyspace_misses:DATA.misses, hit_rate:+(DATA.hits/(DATA.hits+DATA.misses)).toFixed(4)}},
+        expired:{t:'过期 / 淘汰', sub:'INFO stats', r:{expired_keys:DATA.expired, evicted_keys:DATA.evicted}}
+      };
+      var m=map[s.key]||map.usedMemory; title=m.t; sub=m.sub; raw=m.r;
+    } else if(s.kind==='ns'){
+      var n=DATA.namespaces.filter(function(x){return x.ns===s.key;})[0]; title='命名空间'; sub=n.ns; raw=n;
+    } else if(s.kind==='ps'){
+      var p=DATA.pubsub.filter(function(x){return x.ch===s.key;})[0]; title='pub/sub 通道'; sub=p.ch; raw=p;
+    } else if(s.kind==='cfg'){
+      var c=DATA.config.filter(function(x){return x.k===s.key;})[0]; title='配置项'; sub=c.k; raw=c;
+    } else if(s.kind==='api'){
+      var a=DATA.api.filter(function(x){return x.cap===s.key;})[0]; title='接口'; sub=a.ep; raw=a;
+    }
+    el.innerHTML =
+      '<div class="ins-head"><div class="cap">REDIS / INSPECT</div>'+
+        '<h2>'+esc(title)+'</h2><div class="sub">'+esc(sub)+'</div></div>'+
+      '<dl class="kv">'+
+        kv('数据来源', 'GET /api/app/redis/status')+
+        kv('命名空间', 'perseus')+
+        kv('刷新', state.auto?'自动 (5s)':'已暂停')+
+      '</dl>'+
+      '<div class="ins-cap">RAW</div>'+
+      '<pre class="raw">'+esc(JSON.stringify(raw,null,2))+'</pre>';
+  }
+  function kv(k,v){ return '<dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd>'; }
+
+  function render(){
+    document.getElementById('bannerOff').classList.toggle('hidden', !state.off);
+    document.getElementById('bannerDown').classList.toggle('hidden', !(state.down && !state.off));
+    document.getElementById('live').classList.toggle('off', !state.auto);
+    document.getElementById('liveText').textContent = state.auto ? '自动刷新' : '已暂停';
+    document.getElementById('footNs').textContent = state.off ? '—' : 'perseus';
+    renderSummary(); renderMetrics(); renderNs(); renderWk(); renderPs(); renderCfg(); renderApi(); renderInspector(); updateTimestamp();
+  }
+  function updateTimestamp(){ var s=Math.floor((Date.now()-state.updatedAt)/1000); document.getElementById('updated').textContent = s<=1?'刚刚更新':(s+'s 前更新'); }
+
+  /* ---------- events ---------- */
+  document.querySelector('.head-actions').addEventListener('click', function(e){
+    var sw=e.target.closest('.switch'); if(!sw) return;
+    var on=!sw.classList.contains('on'); sw.classList.toggle('on',on); sw.setAttribute('aria-checked',String(on));
+    if(sw.id==='swAuto'){ state.auto=on; render(); }
+    if(sw.id==='swOff'){ state.off=on; if(on){ state.down=false; document.getElementById('swDown').classList.remove('on'); } render(); }
+    if(sw.id==='swDown'){ state.down=on; if(on){ state.off=false; document.getElementById('swOff').classList.remove('on'); } render(); }
+  });
+
+  function selectMetric(k){ state.selected={kind:'metric',key:k}; renderMetrics(); renderInspector(); }
+  document.getElementById('metrics').addEventListener('click', function(e){ var m=e.target.closest('[data-metric]'); if(m) selectMetric(m.getAttribute('data-metric')); });
+  document.getElementById('metrics').addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ var m=e.target.closest('[data-metric]'); if(m){e.preventDefault(); selectMetric(m.getAttribute('data-metric'));} } });
+
+  function bindRows(id, kind, attr){
+    document.getElementById(id).addEventListener('click', function(e){
+      var tr=e.target.closest('['+attr+']'); if(!tr) return;
+      state.selected={kind:kind,key:tr.getAttribute(attr)}; renderInspector();
+      document.querySelectorAll('#'+id+' tr').forEach(function(r){ r.classList.toggle('sel', r===tr); });
+    });
+  }
+  bindRows('nsBody','ns','data-ns');
+  bindRows('cfgBody','cfg','data-cfg');
+  bindRows('apiBody','api','data-api');
+
+  document.querySelector('.ops').addEventListener('click', function(e){
+    var b=e.target.closest('[data-act]'); if(!b) return;
+    if(b.disabled) return;
+    var t=b.textContent; b.textContent = b.getAttribute('data-act')==='ping' ? 'PONG ✓' : '已刷新';
+    setTimeout(function(){ b.textContent=t; }, 1200);
+  });
+
+  setInterval(function(){
+    if(!state.auto || state.off || state.down) return;
+    state.updatedAt=Date.now();
+    DATA.uptime++; DATA.opsPerSec = Math.max(20, DATA.opsPerSec + (Math.random()*20-10));
+    DATA.hits += Math.round(Math.random()*40); DATA.misses += Math.round(Math.random()*3);
+    DATA.usedMemory = Math.min(DATA.maxMemory, DATA.usedMemory + Math.random()*4096);
+    renderSummary(); renderMetrics();
+    if(state.selected.kind==='metric') renderInspector();
+    updateTimestamp();
+  }, 5000);
+  setInterval(updateTimestamp, 1000);
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -7,7 +7,7 @@ import os
 import shutil
 import asyncio
 import logging
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 import uuid
 from datetime import datetime, timedelta
 from sqlalchemy import select, asc, desc, or_
@@ -22,6 +22,7 @@ from utils.response_builder import build_repo_response, build_pagination_respons
 from utils.db_utils import exists, paginate
 from services.language_service import detect_repo_languages
 from core.constants import ROLE_PRIORITY
+from utils.redis_client import get_redis, key as redis_key
 
 # 日志记录器
 logger = logging.getLogger(__name__)
@@ -62,6 +63,53 @@ def _set_cached_repo_exists(repo_id: uuid.UUID, exists: bool) -> None:
     _repo_exists_cache[repo_id] = (exists, datetime.now())
 
 
+def _repo_exists_key(repo_id: uuid.UUID) -> str:
+    """跨 worker 共享的物理仓库存在状态键（统一命名空间）"""
+    return redis_key("repo", "exists", str(repo_id))
+
+
+async def _get_redis_repo_exists(repo_id: uuid.UUID) -> Optional[bool]:
+    """读取 Redis L2 缓存；未命中/不可用返回 None"""
+    client = await get_redis()
+    if client is None:
+        return None
+    try:
+        raw = await client.get(_repo_exists_key(repo_id))
+    except Exception as exc:  # noqa: BLE001 — 缓存失败即回退磁盘
+        logger.warning(f"仓库存在缓存读取失败: {exc}")
+        return None
+    if raw is None:
+        return None
+    return str(raw) == "1"
+
+
+async def _set_redis_repo_exists(repo_id: uuid.UUID, exists: bool) -> None:
+    """写入 Redis L2 缓存（30s TTL，与进程内缓存一致）"""
+    client = await get_redis()
+    if client is None:
+        return
+    try:
+        await client.set(
+            _repo_exists_key(repo_id),
+            "1" if exists else "0",
+            ex=_REPO_EXISTS_CACHE_TTL_SECONDS,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"仓库存在缓存写入失败: {exc}")
+
+
+async def _invalidate_repo_exists_cache(repo_id: uuid.UUID) -> None:
+    """创建/删除仓库后失效 L1 与 L2 缓存，避免 30s 内读到陈旧状态"""
+    _repo_exists_cache.pop(repo_id, None)
+    client = await get_redis()
+    if client is None:
+        return
+    try:
+        await client.delete(_repo_exists_key(repo_id))
+    except Exception as exc:  # noqa: BLE001 — 失效为尽力而为
+        logger.warning(f"仓库存在缓存失效失败: {exc}")
+
+
 async def _check_physical_repo_exists_async(repo: Repository) -> bool:
     """
     检查物理仓库是否存在（异步版本，带缓存）
@@ -75,10 +123,16 @@ async def _check_physical_repo_exists_async(repo: Repository) -> bool:
     Returns:
         bool: 物理仓库是否存在
     """
-    # 先检查缓存
+    # L1：进程内缓存
     cached_exists, cache_hit = _get_cached_repo_exists(repo.id)
     if cache_hit:
         return cached_exists
+
+    # L2：跨 worker Redis 缓存
+    redis_cached = await _get_redis_repo_exists(repo.id)
+    if redis_cached is not None:
+        _set_cached_repo_exists(repo.id, redis_cached)
+        return redis_cached
 
     # 缓存未命中，执行异步检查
     try:
@@ -86,6 +140,7 @@ async def _check_physical_repo_exists_async(repo: Repository) -> bool:
         exists = await repo_exists_async(physical_path)
         # 更新缓存
         _set_cached_repo_exists(repo.id, exists)
+        await _set_redis_repo_exists(repo.id, exists)
         return exists
     except Exception:
         return False
@@ -462,6 +517,8 @@ async def create_repository(repo_data: dict, db: AsyncSession):
         # 其他错误，记录但不阻止
         logger.warning(f"Unexpected error creating git repository: {e}")
 
+    # 物理仓库已就绪，清掉可能存在的陈旧缓存
+    await _invalidate_repo_exists_cache(db_repo.id)
     physical_exists = await _check_physical_repo_exists_async(db_repo)
 
     from services.realtime.room_service import RoomService
@@ -544,6 +601,9 @@ async def delete_repository(repo_id: uuid.UUID, db: AsyncSession):
         # 物理仓库删除失败，记录错误但不阻止数据库删除
         path_info = physical_path if physical_path else "unknown"
         logger.warning(f"Failed to delete physical repository at {path_info}: {e}")
+
+    # 失效存在状态缓存，避免删除后仍读到存在
+    await _invalidate_repo_exists_cache(repo_id)
 
     # 先清理搜索索引行（外键约束，必须在删除仓库行之前）
     try:

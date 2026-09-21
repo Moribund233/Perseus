@@ -667,4 +667,41 @@ async def grafana_sso_endpoint(
     return GrafanaSsoResponse(ok=True, entry=grafana_service.entry_path)
 
 
+# ============== Redis 运维状态（只读） ==============
+
+
+@router.get("/api/app/redis/status", tags=["app-management"])
+async def get_redis_status_endpoint(
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    获取 Redis 运维状态（仅管理员，只读）。
+
+    聚合连接探活/延迟、各 worker 存活与广播总线状态（Redis 心跳注册表）、
+    订阅模式数（PUBSUB NUMPAT）、INFO 指标、命名空间键数与降级计数。
+    Redis 不可用时返回 reachable=false 而非报错。
+
+    Returns:
+        dict: Redis 连接/worker/订阅/指标/键空间/降级
+    """
+    from services.redis_admin_service import get_redis_admin_service
+
+    return await get_redis_admin_service().get_status()
+
+
+@router.get("/api/app/redis/config", tags=["app-management"])
+async def get_redis_config_endpoint(
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    获取 Redis 配置（仅管理员，只读；连接 URL 脱敏）。
+
+    Returns:
+        dict: settings（脱敏）/runtime（INFO memory）/editable/source
+    """
+    from services.redis_admin_service import get_redis_admin_service
+
+    return await get_redis_admin_service().get_config()
+
+
 

@@ -124,7 +124,8 @@
         "config": "配置管理",
         "logs": "日志查看",
         "operations": "运维操作",
-        "debug": "调试工具"
+        "debug": "调试工具",
+        "redis": "Redis"
       },
       "overview": {
         "title": "状态概览",
@@ -420,6 +421,73 @@
       },
       "danger": {
         "typeToConfirm": "输入「{{word}}」以继续"
+      },
+      "redis": {
+        "title": "Redis 运维",
+        "subtitle": "来自 GET /api/app/redis/status（仅管理员，只读）· worker 存活与订阅健康来自 Redis 心跳注册表，指标来自 INFO。",
+        "updatedAt": "{{time}} 更新",
+        "refresh": "刷新",
+        "loadFailed": "加载 Redis 状态失败",
+        "connected": "已连接",
+        "disconnected": "不可用",
+        "notConfigured": {
+          "title": "Redis 未配置",
+          "desc": "PERSEUS_REDIS_URL / REDIS_URL 为空。请求统计、presence、OAuth state、跨 worker 广播均回退进程内实现——功能不中断，但不具备跨 worker/跨副本一致性。"
+        },
+        "unreachable": {
+          "title": "Redis 不可达（降级中）",
+          "desc": "连接探测失败（1s 超时、冷却 5s 重试）。强依赖场景显式降级，缓存类回退 DB/磁盘。"
+        },
+        "summary": {
+          "connection": "连接",
+          "workers": "存活 worker",
+          "subscriptions": "模式订阅",
+          "keys": "键总数",
+          "evicted": "已淘汰键",
+          "hitRate": "命中率"
+        },
+        "workers": {
+          "title": "Worker 与订阅",
+          "hint": "来自心跳注册表 · 每 worker 应有 1 个广播订阅",
+          "mismatch": "订阅缺失",
+          "empty": "注册表为空（Redis 未启用或尚无心跳）",
+          "age": "心跳年龄",
+          "bus": "广播总线",
+          "conns": "连接 / 房间"
+        },
+        "pubsub": {
+          "title": "订阅（pub/sub）",
+          "hint": "模式订阅 {{subs}} · 期望 ≥ 存活 worker {{workers}}",
+          "numpat": "模式订阅数 (NUMPAT)",
+          "channels": "活跃通道"
+        },
+        "keyspace": {
+          "title": "键空间 · 命名空间分域",
+          "use": "用途",
+          "policy": "淘汰",
+          "persistent": "持久",
+          "evictable": "可淘汰"
+        },
+        "metrics": {
+          "title": "运行指标",
+          "version": "版本",
+          "mode": "模式",
+          "uptime": "运行时长",
+          "latency": "Ping 延迟",
+          "memory": "内存 / 上限",
+          "fragmentation": "碎片率",
+          "clients": "客户端",
+          "ops": "命令速率",
+          "hits": "命中 / 未命中",
+          "expired": "过期 / 淘汰"
+        },
+        "config": {
+          "title": "配置（只读）",
+          "hint": "当前经 env/compose 注入，无修改端点"
+        },
+        "degradation": {
+          "title": "降级计数（本 worker）"
+        }
       }
     },
     "userMenu": {
