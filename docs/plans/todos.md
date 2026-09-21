@@ -2,7 +2,8 @@
 
 > **创建日期**: 2026-09-15
 > **用途**: 汇总 2026-09-15 文档盘点发现的待迭代任务与文档滞后项，作为后续排期与迭代输入。
-> **最近更新**: 2026-09-20（代码搜索架构重构：内容取自 Git 对象（pygit2）、索引持久化主库 `repo_search_files`/`repo_search_state`，PostgreSQL `pg_trgm` GIN 加速 `ILIKE`，支持 `ref`/`path`，进程内 Git tree 兜底；ripgrep 退役——删除 `utils/ripgrep_utils.py`、镜像不再安装；后端 1269 passed）；
+> **最近更新**: 2026-09-21（后端 Redis 能力扩展 **R1+R3+R2** 落地：`utils/redis_client.py` 冷却重试 + `require_redis()` + `create_pubsub_client()` + 统一 `perseus:` 命名空间；OAuth state 迁移 Redis（`SETEX`/`GETDEL`，内存降级告警）；新增 `utils/realtime_bus.py` 跨 worker WebSocket 广播总线（Hybrid：本地直投 + Redis pub/sub、origin 去重），manager 拆 `_deliver_*` + `_publish`，lifespan 启停；`docker-compose.base.yml` redis 改 `volatile-lru`/512mb；后端 **1331 passed / 3 skipped**；详见 `docs/plans/redis-expansion.md`）；
+> 2026-09-20（代码搜索架构重构：内容取自 Git 对象（pygit2）、索引持久化主库 `repo_search_files`/`repo_search_state`，PostgreSQL `pg_trgm` GIN 加速 `ILIKE`，支持 `ref`/`path`，进程内 Git tree 兜底；ripgrep 退役——删除 `utils/ripgrep_utils.py`、镜像不再安装；后端 1269 passed）；
 > 2026-09-20（Admin 控制台顶栏 + 权限面板：新增 `AdminHeader`（logo/状态/端点/时钟/用户）与左栏 `PermissionPanel`（`is_admin` 只读、`app.debug` 可切换）；新增后端 `POST /api/app/debug`（仅管理员，读改写 config.toml 单键、重启生效）；左栏导航加图标/logo、取消序号、支持收起展开、日志项改名「日志查看」；后端 1283 passed、前端 41 用例）；
 > 2026-09-20（Admin 日志查看器重构：拆为「文件日志」+「实时日志流」两个 tab；`/ws/logs` 收紧为仅管理员并修补通用 `/ws/` 匿名 `subscribe_logs` 旁路；文件端点跨 `X.log.1..N` 分片拼接（`window_parts`/`segment_starts`/`truncated`）、级别过滤改边界匹配；前端分片分隔行 + 丢弃提示；后端 1278 passed、前端 40 用例）；
 > 2026-09-20（Admin 概览页可视化：vitals 迷你趋势（`Tiny.Line/Area`）+ 运行趋势（请求速率面积图 / 平均响应折线 / 成功失败环图）+ 最近日志面板，历史走前端 60 点滚动缓冲；引入 `@ant-design/charts` 并按路由懒加载（charts chunk 仅访问 /admin 时加载）；移除主应用侧边栏 admin 入口（主应用面向用户、不做 admin 鉴权，控制台仅 `/admin` 独立入口）；i18n 全量审计并补齐 23 个缺失键（editor/chat/settings/repositories/releases），zh/en 各 770 键对齐）；

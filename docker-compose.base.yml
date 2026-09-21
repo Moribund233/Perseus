@@ -41,10 +41,15 @@ services:
           memory: 256M
 
   # Redis（可选缓存，为空则应用不使用）
+  #
+  # 淘汰策略：volatile-lru 仅淘汰**带 TTL 的键**，保护无 TTL 的持久键
+  # （如 collab 网关的 Y.Doc 快照 perseus:collab:doc:*）。应用侧新增键
+  # （perseus:req:* / perseus:oauth:*）均带 TTL，仍可被正常回收。
+  # 详见 docs/plans/redis-expansion.md D4。
   redis:
     image: redis:7-alpine
     container_name: perseus-redis
-    command: ["redis-server", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    command: ["redis-server", "--appendonly", "no", "--maxmemory", "512mb", "--maxmemory-policy", "volatile-lru"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -60,7 +65,7 @@ services:
       resources:
         limits:
           cpus: '0.5'
-          memory: 320M
+          memory: 640M
 
 volumes:
   postgres-data:

@@ -1,17 +1,51 @@
 """
-请求统计中间件
+请求统计类（异步安全，支持跨 worker 聚合）
 
-统计 HTTP 请求的数量、响应时间、成功率等指标
+Redis 可用时经 Redis 聚合多 worker 的请求指标，使 admin 概览的
+请求速率与成功/失败数在任意副本间保持一致；Redis 未配置或不可达时
+回退进程内实现（语义与 Redis 口径一致）。
+
+指标口径（``window_minutes`` 分钟滑动窗）：
+- ``total``: 累计总请求数（进程生命周期，跨 worker 求和）
+- ``success`` / ``failed``: 最近 ``window_minutes`` 个「完整分钟」内的成功/失败数
+- ``avg_response_time_ms``: 同一完整分钟窗口内的平均响应时间
+- ``requests_per_minute``: 完整分钟窗口的平均每分钟请求速率
+- ``window_minutes``: 本窗口长度（分钟）
+
+当前未走完的分钟不参与任何统计，避免“从 1 爬升到 59 再归零”的锯齿。
 """
 import asyncio
 import time
-from typing import Dict, Any, Optional
 from collections import deque
-from datetime import datetime, timedelta
+from typing import Any, Deque, Dict, Optional
 
-from fastapi import Request, Response
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from typing import Deque
+
+from utils.redis_client import get_redis, key as redis_key
+
+# 内存回退：单个条目
+_MinuteBucket = Dict[str, Any]
+
+
+def _key(*parts: str) -> str:
+    """统一命名空间：``perseus:req:*``"""
+    return redis_key("req", *parts)
+
+
+def _redis_minute() -> int:
+    """当前分钟桶（Unix 秒 // 60）"""
+    return int(time.time()) // 60
+
+
+def _fresh_bucket(minute: int) -> _MinuteBucket:
+    return {
+        "minute": minute,
+        "count": 0,
+        "ok": 0,
+        "fail": 0,
+        "lat_sum": 0.0,
+    }
 
 
 class RequestStats:
@@ -20,71 +54,139 @@ class RequestStats:
     def __init__(self, window_minutes: int = 5):
         self.window_minutes = window_minutes
         self._lock = asyncio.Lock()
+        self._redis = None  # None|Redis|未探测哨兵
+        self._redis_probed = False
+        # 内存回退状态
         self._total = 0
-        self._success = 0
-        self._failed = 0
-        self._response_times: Deque[float] = deque(maxlen=10000)  # 保留最近10000个响应时间
-        self._requests_per_minute: Deque[Dict[str, Any]] = deque(maxlen=window_minutes)  # 每分钟请求数
-        self._last_minute = datetime.now()
-        self._current_minute_count = 0
+        self._ok = 0
+        self._fail = 0
+        self._minutes: Deque[_MinuteBucket] = deque(maxlen=window_minutes)
+        self._current: _MinuteBucket = _fresh_bucket(_redis_minute())
+
+    async def _backend(self) -> Optional[Any]:
+        """解析 Redis 后端（惰性、失败后固定回退内存）"""
+        if not self._redis_probed:
+            self._redis_probed = True
+            self._redis = await get_redis()
+        return self._redis
 
     async def record_request(self, response_time_ms: float, success: bool):
         """记录一个请求"""
+        backend = await self._backend()
         async with self._lock:
-            self._total += 1
-            if success:
-                self._success += 1
+            if backend is not None:
+                await self._record_redis(backend, response_time_ms, success)
             else:
-                self._failed += 1
+                self._record_memory(response_time_ms, success)
 
-            self._response_times.append(response_time_ms)
+    async def _record_redis(
+        self, backend: Any, response_time_ms: float, success: bool
+    ) -> None:
+        minute = _redis_minute()
+        pipe = backend.pipeline()
+        pipe.incr(_key("total"))
+        pipe.incr(_key("m", str(minute), "count"))
+        pipe.incr(_key("m", str(minute), "ok") if success else _key("m", str(minute), "fail"))
+        pipe.incrbyfloat(_key("m", str(minute), "lat"), response_time_ms)
+        ttl = self.window_minutes * 120 + 60
+        for suffix in ("count", "ok", "fail", "lat"):
+            pipe.expire(_key("m", str(minute), suffix), ttl)
+        await pipe.execute()
 
-            # 更新每分钟请求数
-            now = datetime.now()
-            current_minute = now.replace(second=0, microsecond=0)
+    def _record_memory(self, response_time_ms: float, success: bool) -> None:
+        now = _redis_minute()
+        if now > self._current["minute"]:
+            self._minutes.append(self._current)
+            self._current = _fresh_bucket(now)
 
-            if current_minute > self._last_minute:
-                # 新分钟，保存上一分钟的数据
-                self._requests_per_minute.append({
-                    "minute": self._last_minute.isoformat(),
-                    "count": self._current_minute_count
-                })
-                self._current_minute_count = 0
-                self._last_minute = current_minute
-
-            self._current_minute_count += 1
+        current = self._current
+        current["count"] += 1
+        current["lat_sum"] += response_time_ms
+        if success:
+            self._ok += 1
+            current["ok"] += 1
+        else:
+            self._fail += 1
+            current["fail"] += 1
+        self._total += 1
 
     async def get_stats(self) -> Dict[str, Any]:
         """获取统计信息"""
+        backend = await self._backend()
         async with self._lock:
-            avg_response_time = 0.0
-            if self._response_times:
-                avg_response_time = sum(self._response_times) / len(self._response_times)
+            if backend is not None:
+                return await self._stats_redis(backend)
+            return self._stats_memory()
 
-            # 计算每分钟请求数
-            rpm = 0
-            if self._requests_per_minute:
-                rpm = sum(r["count"] for r in self._requests_per_minute) / len(self._requests_per_minute)
-            elif self._current_minute_count > 0:
-                rpm = self._current_minute_count
+    async def _stats_redis(self, backend: Any) -> Dict[str, Any]:
+        total = int((await backend.get(_key("total"))) or 0)
 
-            return {
-                "total": self._total,
-                "success": self._success,
-                "failed": self._failed,
-                "avg_response_time_ms": round(avg_response_time, 2),
-                "requests_per_minute": round(rpm, 2)
-            }
+        now_min = _redis_minute()
+        complete = [now_min - i for i in range(1, self.window_minutes + 1)]
+        parts = await backend.mget(
+            *[
+                _key("m", str(m), suffix)
+                for m in complete
+                for suffix in ("count", "ok", "fail", "lat")
+            ]
+        )
 
-    async def reset(self):
-        """重置统计"""
+        counts = [int(parts[i] or 0) for i in range(0, len(parts), 4)]
+        oks = [int(parts[i] or 0) for i in range(1, len(parts), 4)]
+        fails = [int(parts[i] or 0) for i in range(2, len(parts), 4)]
+        lats = [float(parts[i] or 0.0) for i in range(3, len(parts), 4)]
+
+        count_sum = sum(counts)
+        count_minutes = max(1, sum(1 for c in counts if c > 0))
+        rpm = round(count_sum / count_minutes, 2) if count_sum else 0.0
+
+        lat_sum = sum(lats)
+        lat_n = count_sum
+        avg = round(lat_sum / lat_n, 2) if lat_n else 0.0
+
+        return {
+            "total": total,
+            "success": sum(oks),
+            "failed": sum(fails),
+            "avg_response_time_ms": avg,
+            "requests_per_minute": rpm,
+            "window_minutes": self.window_minutes,
+        }
+
+    def _stats_memory(self) -> Dict[str, Any]:
+        buckets = list(self._minutes)
+        count = sum(b["count"] for b in buckets)
+        success = sum(b["ok"] for b in buckets)
+        failed = sum(b["fail"] for b in buckets)
+        lat_sum = sum(b["lat_sum"] for b in buckets)
+
+        n = max(1, len(buckets))
+        rpm = round(count / n, 2) if count else 0.0
+        avg = round(lat_sum / count, 2) if count else 0.0
+
+        return {
+            "total": self._total,
+            "success": success,
+            "failed": failed,
+            "avg_response_time_ms": avg,
+            "requests_per_minute": rpm,
+            "window_minutes": self.window_minutes,
+        }
+
+    async def reset(self, backend: Optional[Any] = None):
+        """重置统计（Redis 键一并清理）"""
         async with self._lock:
             self._total = 0
-            self._success = 0
-            self._failed = 0
-            self._response_times.clear()
-            self._requests_per_minute.clear()
-            self._current_minute_count = 0
+            self._ok = 0
+            self._fail = 0
+            self._minutes.clear()
+            self._current = _fresh_bucket(_redis_minute())
+            client = backend if backend is not None else await self._backend()
+            if client is not None:
+                try:
+                    await client.delete(_key("total"))
+                except Exception:  # noqa: BLE001 — 清理为尽力而为
+                    pass
 
 
 # 全局统计实例
@@ -102,22 +204,22 @@ def get_request_stats() -> RequestStats:
 class RequestStatsMiddleware(BaseHTTPMiddleware):
     """
     请求统计中间件
-    
+
     统计所有 HTTP 请求的性能指标
     """
-    
+
     def __init__(self, app, exclude_paths: Optional[list] = None):
         super().__init__(app)
         self.exclude_paths = exclude_paths or []
         self.stats = get_request_stats()
-    
+
     def _should_record(self, path: str) -> bool:
         """检查是否应该记录该路径"""
         for exclude_path in self.exclude_paths:
             if path.startswith(exclude_path):
                 return False
         return True
-    
+
     async def dispatch(self, request: Request, call_next):
         """处理请求"""
         if not self._should_record(request.url.path):

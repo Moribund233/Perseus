@@ -23,7 +23,7 @@ def _get_oauth_service():
 async def oauth_login(provider: str):
     service = _get_oauth_service()
     try:
-        return service.initiate_login(provider)
+        return await service.initiate_login(provider)
     except ValueError as e:
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail=str(e))

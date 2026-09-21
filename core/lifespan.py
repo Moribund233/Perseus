@@ -19,6 +19,7 @@ from fastapi import FastAPI
 
 from models.async_db import get_async_engine
 from api.websocket.manager import manager as websocket_manager
+from utils.realtime_bus import bus as realtime_bus
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ class AppLifecycleManager:
 
     def __init__(self):
         self._websocket_manager = websocket_manager
+        self._realtime_bus = realtime_bus
         self._is_shutting_down = False
 
     async def startup(self) -> None:
@@ -58,6 +60,12 @@ class AppLifecycleManager:
         except Exception as e:
             logger.warning(f"WebSocket 管理器初始化失败（不影响服务启动）: {e}")
 
+        # 启动跨 worker 广播总线 — 非致命错误，Redis 不可用时退化为进程内
+        try:
+            await self._init_realtime_bus()
+        except Exception as e:
+            logger.warning(f"实时广播总线初始化失败（退化为进程内广播）: {e}")
+
     async def _init_async_database(self) -> None:
         """初始化异步数据库引擎"""
         from models.async_db import get_async_engine
@@ -76,6 +84,7 @@ class AppLifecycleManager:
 
         logger.info("开始执行关闭流程...")
 
+        await self._shutdown_realtime_bus()
         await self._shutdown_websocket_connections()
         await self._dispose_database_engine()
 
@@ -99,6 +108,20 @@ class AppLifecycleManager:
         except Exception as e:
             logger.error(f"WebSocket 管理器初始化失败: {e}")
             raise
+
+    async def _init_realtime_bus(self) -> None:
+        """绑定并启动跨 worker 广播总线"""
+        self._realtime_bus.bind(self._websocket_manager)
+        started = await self._realtime_bus.start()
+        if not started:
+            logger.info("实时广播总线未启用（Redis 不可用），使用进程内广播")
+
+    async def _shutdown_realtime_bus(self) -> None:
+        """停止广播总线"""
+        try:
+            await self._realtime_bus.stop()
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"停止实时广播总线时出错: {e}")
 
     async def _shutdown_websocket_connections(self) -> None:
         """优雅关闭所有 WebSocket 连接"""

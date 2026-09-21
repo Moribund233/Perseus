@@ -136,7 +136,24 @@ class ConnectionManager:
         # 并发控制锁
         self._lock: asyncio.Lock = asyncio.Lock()
 
+        # 跨 worker 广播总线（None = 纯进程内，行为与旧版一致）
+        self._bus = None
+
         ConnectionManager._initialized = True
+
+    def set_bus(self, bus) -> None:
+        """注入跨 worker 广播总线（由 lifespan 启动时调用）"""
+        self._bus = bus
+
+    async def _publish(self, scope: str, target_id, message: Dict[str, Any],
+                       exclude_user_id: Optional[uuid.UUID] = None) -> None:
+        """把消息发布到广播总线，供其他 worker 投递（本 worker 已直投）"""
+        if self._bus is None:
+            return
+        try:
+            await self._bus.publish(scope, target_id, message, exclude_user_id)
+        except Exception as e:  # noqa: BLE001 — 发布失败不影响本地投递
+            logger.warning(f"实时广播发布失败 scope={scope}: {e}")
     
     def _generate_connection_id(self) -> str:
         """生成唯一的连接ID（调用者需持有锁）"""
@@ -307,8 +324,14 @@ class ConnectionManager:
                     del self._room_index[room_id]
 
     async def send_to_room(self, room_id: uuid.UUID, message: Dict[str, Any], exclude_user_id: Optional[uuid.UUID] = None) -> int:
+        """发送消息到房间的所有订阅者（本地直投 + 广播到其他 worker）"""
+        count = await self._deliver_room(room_id, message, exclude_user_id)
+        await self._publish("room", room_id, message, exclude_user_id)
+        return count
+
+    async def _deliver_room(self, room_id: uuid.UUID, message: Dict[str, Any], exclude_user_id: Optional[uuid.UUID] = None) -> int:
         """
-        发送消息到房间的所有订阅者
+        发送消息到房间的所有订阅者（仅本 worker）
 
         Args:
             room_id: 房间ID
@@ -370,8 +393,14 @@ class ConnectionManager:
         return success_count
     
     async def send_to_user(self, user_id: uuid.UUID, message: Dict[str, Any]) -> int:
+        """发送消息给用户的所有连接（本地直投 + 广播到其他 worker）"""
+        count = await self._deliver_user(user_id, message)
+        await self._publish("user", user_id, message)
+        return count
+
+    async def _deliver_user(self, user_id: uuid.UUID, message: Dict[str, Any]) -> int:
         """
-        发送消息给用户的所有连接
+        发送消息给用户的所有连接（仅本 worker）
         
         Args:
             user_id: 用户ID
@@ -391,8 +420,14 @@ class ConnectionManager:
         return success_count
     
     async def send_to_repository(self, repository_id: uuid.UUID, message: Dict[str, Any], exclude_user_id: Optional[uuid.UUID] = None) -> int:
+        """广播消息到仓库的所有订阅者（本地直投 + 广播到其他 worker）"""
+        count = await self._deliver_repository(repository_id, message, exclude_user_id)
+        await self._publish("repository", repository_id, message, exclude_user_id)
+        return count
+
+    async def _deliver_repository(self, repository_id: uuid.UUID, message: Dict[str, Any], exclude_user_id: Optional[uuid.UUID] = None) -> int:
         """
-        广播消息到仓库的所有订阅者
+        广播消息到仓库的所有订阅者（仅本 worker）
         
         Args:
             repository_id: 仓库ID
@@ -419,8 +454,14 @@ class ConnectionManager:
         return success_count
     
     async def broadcast(self, message: Dict[str, Any]) -> int:
+        """广播消息给所有连接（本地直投 + 广播到其他 worker）"""
+        count = await self._deliver_broadcast(message)
+        await self._publish("broadcast", None, message)
+        return count
+
+    async def _deliver_broadcast(self, message: Dict[str, Any]) -> int:
         """
-        广播消息给所有连接
+        广播消息给所有连接（仅本 worker）
         
         Args:
             message: 消息字典

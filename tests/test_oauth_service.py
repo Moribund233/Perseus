@@ -20,7 +20,7 @@ class TestOAuthServiceInitiateLogin:
         config.oauth.github_redirect_uri = "http://localhost:5173/auth/github/callback"
 
         service = OAuthService(config)
-        result = service.initiate_login("github")
+        result = await service.initiate_login("github")
 
         assert "authorization_url" in result
         assert "state" in result
@@ -28,7 +28,8 @@ class TestOAuthServiceInitiateLogin:
         assert "client_id=test_client_id" in result["authorization_url"]
         assert len(result["state"]) > 8
 
-    def test_initiate_login_unknown_provider_raises(self):
+    @pytest.mark.asyncio
+    async def test_initiate_login_unknown_provider_raises(self):
         from services.oauth_service import OAuthService
         from core.config import Config
 
@@ -36,7 +37,7 @@ class TestOAuthServiceInitiateLogin:
         service = OAuthService(config)
 
         with pytest.raises(ValueError, match="Unsupported OAuth provider"):
-            service.initiate_login("unknown")
+            await service.initiate_login("unknown")
 
 
 class TestOAuthServiceHandleCallback:
@@ -54,7 +55,7 @@ class TestOAuthServiceHandleCallback:
         config.oauth.github_redirect_uri = "http://localhost:5173/auth/github/callback"
 
         service = OAuthService(config)
-        init_result = service.initiate_login("github")
+        init_result = await service.initiate_login("github")
         state = init_result["state"]
 
         with respx.mock:
@@ -98,7 +99,7 @@ class TestOAuthServiceHandleCallback:
         config.oauth.github_redirect_uri = "http://localhost/callback"
 
         service = OAuthService(config)
-        init_result = service.initiate_login("github")
+        init_result = await service.initiate_login("github")
         state = init_result["state"]
 
         with respx.mock:

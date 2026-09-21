@@ -1,3 +1,4 @@
+import json
 import logging
 import secrets
 import time
@@ -13,6 +14,7 @@ from models.user import User
 from models.user_oauth import UserOAuthAccount
 from services.token_service import create_token_pair
 from services.auth.oauth import GitHubProvider, GitLabProvider, OAuthProvider
+from utils.redis_client import get_redis, key as redis_key
 
 logger = logging.getLogger(__name__)
 
@@ -20,28 +22,76 @@ STATE_TTL = 600  # 10 minutes
 
 
 class OAuthStateStore:
-    """OAuth state 临时存储（内存实现，生产环境应换 Redis）"""
+    """
+    OAuth state 临时存储。
 
-    def __init__(self):
+    Redis 可用时以共享键存储（``perseus:oauth:state:<state>``，带 TTL），
+    使多 worker / 多副本下签发与回调校验一致；Redis 不可用时回退进程内
+    内存并**显式告警**（不再静默，见规划 D2）。内存副本始终写入，作为
+    同 worker 的本地兜底。
+    """
+
+    def __init__(self, ttl: int = STATE_TTL):
+        self._ttl = ttl
         self._states: dict[str, dict] = {}
+        self._warned = False
 
-    def generate(self, provider: str) -> str:
+    def _warn_fallback(self) -> None:
+        if not self._warned:
+            self._warned = True
+            logger.warning(
+                "OAuth state 存储回退进程内内存（Redis 不可用）；多 worker 下登录可能失败"
+            )
+
+    @staticmethod
+    def _validate(raw: str, provider: str) -> bool:
+        try:
+            data = json.loads(raw)
+        except (ValueError, TypeError):
+            return False
+        if not isinstance(data, dict) or data.get("provider") != provider:
+            return False
+        created_at = data.get("created_at")
+        if not isinstance(created_at, (int, float)):
+            return False
+        return (time.time() - created_at) <= STATE_TTL
+
+    async def generate(self, provider: str) -> str:
         state = secrets.token_urlsafe(32)
-        self._states[state] = {
-            "provider": provider,
-            "created_at": time.time(),
-        }
+        payload = {"provider": provider, "created_at": time.time()}
+        # 内存兜底（同 worker 场景 / Redis 抖动）
+        self._states[state] = payload
+        client = await get_redis()
+        if client is not None:
+            try:
+                await client.setex(
+                    redis_key("oauth", "state", state),
+                    self._ttl,
+                    json.dumps(payload),
+                )
+                return state
+            except Exception as exc:  # noqa: BLE001 — 写失败即降级
+                logger.warning("OAuth state 写入 Redis 失败，回退内存: %s", exc)
+        self._warn_fallback()
         return state
 
-    def consume(self, state: str, provider: str) -> bool:
+    async def consume(self, state: str, provider: str) -> bool:
+        client = await get_redis()
+        if client is not None:
+            try:
+                raw = await client.getdel(redis_key("oauth", "state", state))
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("OAuth state 读取 Redis 失败，回退内存: %s", exc)
+                raw = None
+            if raw is not None:
+                return self._validate(raw, provider)
+        return self._consume_memory(state, provider)
+
+    def _consume_memory(self, state: str, provider: str) -> bool:
         data = self._states.pop(state, None)
-        if data is None:
+        if data is None or data.get("provider") != provider:
             return False
-        if data["provider"] != provider:
-            return False
-        if time.time() - data["created_at"] > STATE_TTL:
-            return False
-        return True
+        return (time.time() - data["created_at"]) <= STATE_TTL
 
 
 _state_store = OAuthStateStore()
@@ -71,9 +121,9 @@ class OAuthService:
             )
         raise ValueError(f"Unsupported OAuth provider: {provider_name}")
 
-    def initiate_login(self, provider_name: str) -> dict:
+    async def initiate_login(self, provider_name: str) -> dict:
         provider = self._get_provider(provider_name)
-        state = _state_store.generate(provider_name)
+        state = await _state_store.generate(provider_name)
         auth_url = provider.get_authorization_url(state=state)
         return {"authorization_url": auth_url, "state": state}
 
@@ -84,7 +134,7 @@ class OAuthService:
         code: str,
         state: str,
     ) -> dict:
-        if not _state_store.consume(state, provider_name):
+        if not await _state_store.consume(state, provider_name):
             raise AuthenticationException("Invalid or expired OAuth state", error_code="oauth_invalid_state")
 
         provider = self._get_provider(provider_name)

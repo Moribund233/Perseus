@@ -112,6 +112,9 @@ class RedisSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="PERSEUS_REDIS_", extra="ignore")
 
     url: str = Field(default="", description="Redis 连接 URL，为空时不使用 Redis。优先读 PERSEUS_REDIS_URL，回退到 REDIS_URL")
+    namespace: str = Field(default="perseus", description="Redis 键命名空间前缀（统一分域命名，如 perseus:req:*）")
+    pubsub_prefix: str = Field(default="", description="实时广播通道前缀；为空时使用 <namespace>:ws")
+    reconnect_cooldown: float = Field(default=5.0, ge=0.0, description="连接失败后的重试冷却秒数（避免每次调用都重连）")
 
     @field_validator("url", mode="before")
     @classmethod
@@ -119,6 +122,11 @@ class RedisSettings(BaseSettings):
         if not v:
             return os.environ.get("REDIS_URL", "")
         return v
+
+    @property
+    def ws_prefix(self) -> str:
+        """WebSocket 广播通道前缀"""
+        return (self.pubsub_prefix or f"{self.namespace}:ws").strip(":")
 
 
 class LoggingSettings(BaseSettings):
