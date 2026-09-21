@@ -9,7 +9,11 @@
 #
 # 访问：
 #   - Prometheus: http://127.0.0.1:9090 (Targets → perseus)
-#   - Grafana:    http://127.0.0.1:3000 (默认 admin/admin，首次登录请修改)
+#   - Grafana:    http://127.0.0.1:3000，或经网关同源子路径
+#                 http://<部署机>:${PERSEUS_GATEWAY_PORT:-8000}/grafana
+#                 （admin 控制台「打开 Grafana」一键 SSO 免登录；凭据由 .env
+#                  注入 app → Grafana /api/login 换取会话 Cookie 下发浏览器）
+#   - Grafana 登录: admin / ${GRAFANA_ADMIN_PASSWORD}（首次 .env 生成时自动创建）
 #
 # 告警规则: docker/prometheus/alerts.yml
 #   - PerseusErrorRateHigh: 错误率 > 1% 持续 5 分钟（F-057）
@@ -45,7 +49,12 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      # 经网关 /grafana 同源子路径（serve_from_sub_path），供 admin 控制台 SSO
+      GF_SERVER_ROOT_URL: "http://${PERSEUS_GATEWAY_HOST:-127.0.0.1}:${PERSEUS_GATEWAY_PORT:-8000}/grafana"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
     volumes:
+      # provisioning：Prometheus 数据源自动注入（docker/grafana/provisioning）
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana-data:/var/lib/grafana
     ports:
       - "127.0.0.1:3000:3000"

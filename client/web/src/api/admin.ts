@@ -14,6 +14,8 @@ export interface RequestMetrics {
   failed: number;
   avg_response_time_ms: number;
   requests_per_minute: number;
+  /** 滑窗长度（分钟）；success/failed/avg/rpm 均基于最近 window_minutes 个完整分钟 */
+  window_minutes: number;
 }
 
 export interface GitOperationMetrics {
@@ -118,6 +120,48 @@ export const adminApi = {
   /** 切换调试模式（仅管理员；写 config.toml，重启后生效） */
   setDebugMode: (enabled: boolean) =>
     apiRequest<DebugModeResponse>('/api/app/debug', {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    }),
+};
+
+// ---------- 监控栈（Prometheus / Grafana） ----------
+
+export interface MonitoringServiceState {
+  running: boolean;
+  configured: boolean;
+  ready: boolean;
+  /** 反代入口路径（Grafana 的 /grafana） */
+  entry: string;
+  /** Docker 容器 ID；为空/未部署时该组件不在运行 */
+  container_id: string | null;
+}
+
+/** GET /api/app/monitoring 响应 */
+export interface MonitoringResponse {
+  available: boolean;
+  reason: string | null;
+  generated_at: string;
+  grafana: MonitoringServiceState;
+  prometheus: MonitoringServiceState;
+}
+
+/** GET /api/app/monitoring/grafana/sso 响应（会话 Cookie 已随响应下发） */
+export interface GrafanaSsoResponse {
+  ok: boolean;
+  entry: string;
+}
+
+/** 监控栈在网关下的反代入口 */
+export const GRAFANA_ENTRY = '/grafana';
+
+export const monitoringApi = {
+  getStatus: () => apiRequest<MonitoringResponse>('/api/app/monitoring'),
+  /** Grafana 免密登录：后端 login，浏览器收到 Path=/grafana 的会话 Cookie */
+  sso: () => apiRequest<GrafanaSsoResponse>('/api/app/monitoring/grafana/sso'),
+  /** 启停监控栈容器；返回切换后的全量监控状态（409 表示监控栈从未部署） */
+  setEnabled: (enabled: boolean) =>
+    apiRequest<MonitoringResponse>('/api/app/monitoring/enabled', {
       method: 'POST',
       body: JSON.stringify({ enabled }),
     }),

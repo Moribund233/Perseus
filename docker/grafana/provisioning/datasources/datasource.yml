@@ -1,0 +1,11 @@
+# Prometheus 数据源自动注入（Grafana provisioning）
+# 使「仅 Perseus 的监控栈」开箱即可查询：Grafana 启动即指向同网络的 Prometheus。
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

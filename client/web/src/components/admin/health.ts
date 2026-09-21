@@ -50,9 +50,11 @@ const GROUP_OF: Record<string, string> = {
   redis: 'data',
   docker_socket_proxy: 'data',
   init: 'tasks',
+  prometheus: 'monitoring',
+  grafana: 'monitoring',
 };
 
-export const GROUP_ORDER = ['ingress', 'application', 'git', 'data', 'tasks', 'other'];
+export const GROUP_ORDER = ['ingress', 'application', 'git', 'data', 'tasks', 'monitoring', 'other'];
 
 export function groupOf(service: string): string {
   const key = service.toLowerCase().replace(/-/g, '_');

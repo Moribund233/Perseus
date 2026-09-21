@@ -74,18 +74,12 @@ async def get_platform_stats(db: AsyncSession) -> dict:
     from models.user import User
 
     repo_count = (await db.execute(
-        select(func.count()).select_from(Repository).filter(Repository.is_public.is_(True))
+        select(func.count()).select_from(Repository)
     )).scalar() or 0
 
-    commit_count = 0
-    if repo_count:
-        public_repo_ids = (await db.execute(
-            select(Repository.id).filter(Repository.is_public.is_(True))
-        )).scalars().all()
-        if public_repo_ids:
-            commit_count = (await db.execute(
-                select(func.count()).select_from(Commit).filter(Commit.repository_id.in_(public_repo_ids))
-            )).scalar() or 0
+    commit_count = (await db.execute(
+        select(func.count()).select_from(Commit)
+    )).scalar() or 0
 
     user_count = (await db.execute(
         select(func.count()).select_from(User)

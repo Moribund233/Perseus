@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_DOCKER_HOST = "http://docker-socket-proxy:2375"
 DEFAULT_CONTAINER_PREFIX = "perseus-"
 
-# 组件展示顺序（compose service 名）
+# 组件展示顺序（compose service 名；prometheus/grafana 仅在启用监控栈时出现）
 COMPONENT_ORDER = [
     "gateway",
     "app",
@@ -41,6 +41,8 @@ COMPONENT_ORDER = [
     "postgres",
     "redis",
     "init",
+    "prometheus",
+    "grafana",
 ]
 
 COMPONENT_LABELS = {
@@ -52,6 +54,8 @@ COMPONENT_LABELS = {
     "postgres": "PostgreSQL",
     "redis": "Redis",
     "init": "数据库初始化任务",
+    "prometheus": "Prometheus (监控)",
+    "grafana": "Grafana (监控)",
 }
 
 
@@ -226,6 +230,7 @@ class OrchestrationService:
             "service": service,
             "name": name,
             "label": COMPONENT_LABELS.get(service, service),
+            "container_id": container.get("Id"),
             "state": state,
             "health": health,
             "running": state == "running",

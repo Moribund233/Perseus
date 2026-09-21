@@ -38,6 +38,7 @@ TAG=""
 NO_BUILD=false
 DEFAULT_MODE=false
 ENABLE_MONITORING=false
+MONITORING_FLAG_SET=false
 INSTALL_CLI=true
 NO_CLI=false
 INTERACTIVE=false
@@ -67,7 +68,7 @@ while [[ $# -gt 0 ]]; do
     --upgrade) UPGRADE=true ;;
     --tag) TAG="${2:?--tag 需要参数}"; shift ;;
     --no-build) NO_BUILD=true ;;
-    --with-monitoring) ENABLE_MONITORING=true ;;
+    --with-monitoring) ENABLE_MONITORING=true; MONITORING_FLAG_SET=true ;;
     --no-cli) NO_CLI=true; INSTALL_CLI=false ;;
     -h|--help) usage; exit 0 ;;
     *) die "未知参数: $1 (bash scripts/install.sh --help)" ;;
@@ -93,6 +94,10 @@ print_credentials() {
   echo "  管理员账号:    ${user}"
   [[ -n "$pw" ]] && echo "  管理员密码:    ${C_BOLD}${pw}${C_RESET}"
   echo ""
+  if [[ "$ENABLE_MONITORING" == true ]]; then
+    echo "  Grafana (监控): ${C_BOLD}http://${local_ip}:${port}/grafana${C_RESET}"
+    echo "                 admin 控制台「打开 Grafana」自动登录; 凭据 .env GRAFANA_ADMIN_PASSWORD"
+  fi
   log_warn "管理员密码请妥善保存；若遗忘执行: perseus reset-admin"
   echo "  运维命令:      perseus help   (bash scripts/mgt.sh help)"
   echo "================================================================"
@@ -168,14 +173,33 @@ main() {
 
   # 补充升级后新增的可选配置字段（旧版 .env 可能缺失; 缺失才追加, 默认空=管理员控制台拒绝）
   ensure_env_keys PERSEUS_ADMIN_ALLOWED_SOURCES=
+  ensure_env_keys PERSEUS_GATEWAY_HOST=127.0.0.1
+  # 监控栈偏好持久化到 .env（历史部署缺失时默认关闭; 升级/再次部署沿用上次选择）
+  ensure_env_keys MONITORING_ENABLED=false
 
   if [[ -n "$TAG" ]]; then
     set_env_key "PERSEUS_IMAGE_TAG" "$TAG"
   fi
 
+  # 未显式传 --with-monitoring 时, 沿用 .env 中持久化的监控栈选择
+  if [[ "$MONITORING_FLAG_SET" != true ]]; then
+    if [[ "$(env_get MONITORING_ENABLED)" == true ]]; then
+      ENABLE_MONITORING=true
+    else
+      ENABLE_MONITORING=false
+    fi
+  fi
+
   # ---------- 2. 自定义配置 ----------
   if [[ "$INTERACTIVE" == true ]]; then
     interactive_config
+  fi
+
+  # 持久化本次生效的监控栈选择, 供后续 --upgrade / 再次部署沿用
+  if [[ "$ENABLE_MONITORING" == true ]]; then
+    set_env_key "MONITORING_ENABLED" "true"
+  else
+    set_env_key "MONITORING_ENABLED" "false"
   fi
 
   # ---------- 3. 部署状态判定 ----------

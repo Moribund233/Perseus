@@ -149,6 +149,7 @@
           "requestRate": "Request rate",
           "avgResponse": "Avg response",
           "outcome": "Request outcome",
+          "windowMinutes": "Last {{count}} min",
           "success": "Succeeded",
           "failed": "Failed",
           "noOutcome": "No requests yet"
@@ -192,6 +193,24 @@
           "uptime": "Uptime"
         }
       },
+      "monitoring": {
+        "title": "Monitoring (Prometheus / Grafana)",
+        "actionLabel": "Optional monitoring stack, start/stop here",
+        "running": "Running",
+        "stopped": "Stopped",
+        "on": "On",
+        "off": "Off",
+        "open": "Open Grafana",
+        "refresh": "Refresh",
+        "loading": "Loading…",
+        "loadFailed": "Failed to load: {{msg}}",
+        "toggleFailed": "Failed to toggle: {{msg}}",
+        "openFailed": "Failed to open: {{msg}}",
+        "notDeployed": "Monitoring stack is not deployed to the orchestration host",
+        "notDeployedHint": "Monitoring stack not deployed: run {{cmd}} on the deploy host first, then start/stop it here.",
+        "unavailable": "Orchestration unavailable: {{reason}}",
+        "notConfigured": "GRAFANA_ADMIN_PASSWORD not set; passwordless entry unavailable"
+      },
       "components": {
         "title": "Components",
         "subtitle": "Service component state and health",
@@ -219,6 +238,7 @@
           "git": "Git Services",
           "data": "Data Layer",
           "tasks": "Tasks",
+          "monitoring": "Monitoring",
           "other": "Other"
         },
         "inspector": {

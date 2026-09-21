@@ -21,6 +21,7 @@ Perseus .env 生成脚本
     PERSEUS_IMAGE_PREFIX            镜像前缀（默认空=本地构建 perseus-*；推送私有仓库时设置）
     PERSEUS_NETWORK_NAME            compose 共享网络名（默认 perseus-network）
     PERSEUS_GATEWAY_PORT            网关对外端口（默认 8000）
+    PERSEUS_GATEWAY_HOST            网关对外主机（默认 127.0.0.1；Grafana root_url 拼装用）
     PERSEUS_ADMIN_USERNAME          初始管理员用户名（默认 admin）
     PERSEUS_ADMIN_EMAIL             初始管理员邮箱（默认 admin@perseus.local）
     PERSEUS_APP_DEBUG               调试模式（固定 false，可手动改）
@@ -85,11 +86,14 @@ DEFAULT_VARS: dict[str, str] = {
     "PERSEUS_IMAGE_PREFIX": "",
     "PERSEUS_NETWORK_NAME": "perseus-network",
     "PERSEUS_GATEWAY_PORT": "8000",
+    "PERSEUS_GATEWAY_HOST": "127.0.0.1",
     "PERSEUS_ADMIN_USERNAME": "admin",
     "PERSEUS_ADMIN_EMAIL": "admin@perseus.local",
     # Admin 控制台来源白名单：网关按此放行 /api/app/*（IP 或 IPv4 CIDR，
     # 逗号/分号/空格分隔）；留空则网关拒绝一切 admin API 访问。
     "PERSEUS_ADMIN_ALLOWED_SOURCES": "",
+    # 监控栈 (Prometheus/Grafana) 部署偏好; install.sh 据此启停并在之后沿用。
+    "MONITORING_ENABLED": "false",
 }
 
 

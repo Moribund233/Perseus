@@ -92,6 +92,12 @@ services:
       PERSEUS_COLLAB_INTERNAL_SECRET: ${PERSEUS_COLLAB_INTERNAL_SECRET:-dev-collab-internal-secret}
       # 编排组件状态（admin 控制台）：经只读 docker-socket-proxy 查询容器
       PERSEUS_DOCKER_HOST: "http://docker-socket-proxy:2375"
+      # 窄写 Docker 代理：admin 控制台开关可选服务栈（启停容器）
+      PERSEUS_DOCKER_WRITE_HOST: "http://docker-write-proxy:2376"
+      # 监控栈（Grafana SSO）：开发环境与生产共用 .env 的 GRAFANA_ADMIN_PASSWORD
+      PERSEUS_GRAFANA_URL: "http://grafana:3000"
+      PERSEUS_GRAFANA_SUBPATH: "/grafana"
+      PERSEUS_GRAFANA_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-}"
     volumes:
       # 代码挂载（支持热重载）
       - .:/app
@@ -161,6 +167,26 @@ services:
       CONTAINERS: "1"   # 允许 GET /containers/*
       POST: "0"         # 禁止写操作
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+        reservations:
+          memory: 16M
+
+  # =============================================
+  # 窄写 Docker 代理 — 供 admin 控制台启停可选服务栈（监控栈）
+  # 仅放行 POST /containers/{id}/{start|stop|restart}; 内网部署，目标容器
+  # 选择在应用层审计，代理层只做最小写窗口
+  # =============================================
+  docker-write-proxy:
+    image: openresty/openresty:1.31.1.1-0-bookworm-fat
+    container_name: perseus-docker-write-proxy-dev
+    volumes:
+      - ./docker/docker-write-proxy/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - ./docker/docker-write-proxy/docker_write_acl.lua:/etc/nginx/docker_write_acl.lua:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: unless-stopped
     deploy:

@@ -126,7 +126,29 @@ class AppService:
 
     def __init__(self):
         """初始化应用服务"""
-        self._start_time = datetime.now()
+        self._start_time = self._resolve_start_time()
+
+    @staticmethod
+    def _resolve_start_time() -> datetime:
+        """
+        解析应用启动时间（跨 uvicorn worker 一致）。
+
+        多 worker 部署下各进程的 AppService 会各自记录启动时间，
+        导致概览「运行时长」在刷新间跳动；改为取父进程（uvicorn
+        master，即容器主进程）的创建时间，所有 worker 返回同一值。
+        """
+        import os
+
+        import psutil
+
+        for target in (os.getppid(), os.getpid()):
+            try:
+                return datetime.fromtimestamp(
+                    psutil.Process(target).create_time()
+                )
+            except Exception:  # noqa: BLE001 — 逐级回退到本进程
+                continue
+        return datetime.now()
 
     def _check_permission(self, is_debug: bool, is_admin: bool) -> None:
         """

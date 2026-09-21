@@ -47,6 +47,12 @@ services:
       PERSEUS_COLLAB_INTERNAL_SECRET: ${PERSEUS_COLLAB_INTERNAL_SECRET:?必需设置协作网关内部密钥 (scripts/generate_env.py)}
       # 编排组件状态：经只读 docker-socket-proxy 查询容器状态（admin 控制台）
       PERSEUS_DOCKER_HOST: "http://docker-socket-proxy:2375"
+      # 窄写 Docker 代理：admin 控制台开关可选服务栈（启停容器，仅 start/stop/restart）
+      PERSEUS_DOCKER_WRITE_HOST: "http://docker-write-proxy:2376"
+      # 监控栈（Grafana SSO）：内网地址 + 部署注入的管理员凭据（监控栈未启用时留空无害）
+      PERSEUS_GRAFANA_URL: "http://grafana:3000"
+      PERSEUS_GRAFANA_SUBPATH: "/grafana"
+      PERSEUS_GRAFANA_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-}"
     volumes:
       - ./config.toml:/app/config.toml:ro
       - repos:/data/repositories
@@ -160,6 +166,8 @@ services:
       - "${PERSEUS_GATEWAY_PORT:-8000}:8000"
     volumes:
       - ./docker/gateway/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      # Admin 白名单 Lua（/api/app/* 与 /grafana/* 共用），运行时读取
+      - ./docker/gateway/admin_acl.lua:/etc/nginx/admin_acl.lua:ro
       - /etc/localtime:/etc/localtime:ro
     environment:
       # Admin 控制台来源白名单 (IP / IPv4 CIDR，逗号分号或空格分隔)。
@@ -234,7 +242,28 @@ services:
           cpus: '0.05'
           memory: 16M
 
-  # 一次性数据库初始化任务（Alembic 迁移 + 管理员引导）
+  # 窄写 Docker 代理 — 仅放行应用对项目的 start/stop/restart（admin 控制台开关
+  # 监控栈等可选服务栈）。读仍走 docker-socket-proxy（只读）；本代理严格限定
+  # 方法/路径，不给 create/exec 等控制面权限（见 docker/docker-write-proxy）。
+  # 内网部署场景，目标容器选择在应用层审计，代理层只做最小写窗口。
+  docker-write-proxy:
+    image: openresty/openresty:1.31.1.1-0-bookworm-fat
+    container_name: perseus-docker-write-proxy
+    volumes:
+      - ./docker/docker-write-proxy/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - ./docker/docker-write-proxy/docker_write_acl.lua:/etc/nginx/docker_write_acl.lua:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - default
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 32M
+        reservations:
+          cpus: '0.05'
+          memory: 16M
   # 运行: docker compose --profile init run --rm init
   init:
     image: ${PERSEUS_IMAGE_PREFIX:-perseus}-app:${PERSEUS_IMAGE_TAG:-latest}

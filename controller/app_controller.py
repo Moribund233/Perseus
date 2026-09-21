@@ -11,9 +11,10 @@
 配置管理、关机、重启等 API 仅在调试模式或管理员权限下可用
 """
 from datetime import datetime
+import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, Body, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +22,12 @@ from api.routes_prefix import get_route_prefix
 from core.config import get_config
 from services.app_service import get_app_service
 from services.config_service import get_config_service
+from services.grafana_service import get_grafana_service, GrafanaError
+from services.monitoring_service import (
+    get_monitoring_service,
+    MonitoringControlError,
+    MonitoringNotDeployedError,
+)
 from services.orchestration_service import get_orchestration_service
 from api.dependencies import get_current_user, get_current_admin_user
 from models.user import User
@@ -29,6 +36,8 @@ from core.exception import AuthorizationException
 
 # 创建路由实例 - 根路由无前缀
 router = APIRouter(prefix=get_route_prefix("root"), tags=["app-management"])
+
+logger = logging.getLogger(__name__)
 
 
 # ============== 根路由和健康检查 ==============
@@ -146,6 +155,35 @@ class ComponentsResponse(BaseModel):
     generated_at: str
     components: List[ComponentInfo] = Field(default_factory=list)
     summary: Dict[str, int] = Field(default_factory=dict)
+
+
+class MonitoringServiceState(BaseModel):
+    """监控栈单服务状态（Grafana / Prometheus）"""
+    running: bool
+    configured: bool = False
+    ready: bool = False
+    entry: str = ""
+    container_id: Optional[str] = None
+
+
+class MonitoringResponse(BaseModel):
+    """监控栈状态响应模型"""
+    available: bool
+    reason: Optional[str] = None
+    generated_at: str
+    grafana: MonitoringServiceState
+    prometheus: MonitoringServiceState
+
+
+class MonitoringEnabledRequest(BaseModel):
+    """监控栈开关请求"""
+    enabled: bool = Field(..., description="是否启用监控栈（启动/停止 Prometheus+Grafana）")
+
+
+class GrafanaSsoResponse(BaseModel):
+    """Grafana SSO 登录响应（会话 Cookie 已随响应下发）"""
+    ok: bool
+    entry: str
 
 
 # ============== 依赖函数 ==============
@@ -521,6 +559,112 @@ async def get_components_endpoint(
     data = await orchestration_service.get_components()
 
     return ComponentsResponse(**data)
+
+
+# ============== 监控栈（Prometheus / Grafana）接口 ==============
+
+
+@router.get("/api/app/monitoring", response_model=MonitoringResponse, tags=["app-management"])
+async def get_monitoring_endpoint(
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    探测可选监控栈（Prometheus / Grafana）是否在运行。
+
+    经只读 docker-socket-proxy 复用编排容器清单判定；Docker 不可用时降级
+    available=false。Grafana 的 ready 表示容器运行中且已注入凭据，
+    admin 控制台据此展示「打开 Grafana」入口。
+
+    Returns:
+        MonitoringResponse: 监控栈服务状态
+    """
+    monitoring_service = get_monitoring_service()
+    data = await monitoring_service.get_monitoring()
+
+    return MonitoringResponse(**data)
+
+
+@router.post(
+    "/api/app/monitoring/enabled",
+    response_model=MonitoringResponse,
+    tags=["app-management"],
+)
+async def set_monitoring_enabled_endpoint(
+    request: MonitoringEnabledRequest,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    开关可选监控栈（Prometheus / Grafana 一并启停，仅管理员）。
+
+    经窄写代理（docker-write-proxy）对监控栈容器做 start/stop；容器需已创建
+    （曾以监控 compose 部署过一次，之后可被后续一键部署遗漏而停摆），
+    从未部署过时返回 409 并给出拉起命令。编排不可用或控制失败返回 502。
+
+    Returns:
+        MonitoringResponse: 启停后重新探测的监控栈状态
+    """
+    monitoring_service = get_monitoring_service()
+    try:
+        data = await monitoring_service.set_enabled(request.enabled)
+    except MonitoringNotDeployedError as exc:
+        logger.warning(
+            "审计[monitoring-toggle] 管理员 %s 尝试%s监控栈但栈从未部署: %s",
+            current_user.username, "启动" if request.enabled else "停止", exc,
+        )
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except MonitoringControlError as exc:
+        logger.error(
+            "审计[monitoring-toggle] 管理员 %s %s监控栈失败: %s",
+            current_user.username, "启动" if request.enabled else "停止", exc,
+        )
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    logger.info(
+        "审计[monitoring-toggle] 管理员 %s %s了监控栈: grafana=%s prometheus=%s",
+        current_user.username,
+        "启动" if request.enabled else "停止",
+        data["grafana"]["container_id"] or "-",
+        data["prometheus"]["container_id"] or "-",
+    )
+    return MonitoringResponse(**data)
+
+
+@router.get(
+    "/api/app/monitoring/grafana/sso",
+    response_model=GrafanaSsoResponse,
+    tags=["app-management"],
+)
+async def grafana_sso_endpoint(
+    response: Response,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Grafana 免密登录（SSO）：以管理员身份在 app 侧登录 Grafana，
+    取出 ``grafana_session`` 并以同源 Cookie（Path=/grafana）下发给浏览器，
+    前端随后跳转到网关反代子路径 ``/grafana`` 即可直接进入 Grafana。
+
+    仅管理员可访问；Grafana 不可达或凭据无效时返回 502。
+
+    Returns:
+        GrafanaSsoResponse: 登录成功 + 入口路径（前端据此 location.assign）
+    """
+    grafana_service = get_grafana_service()
+    try:
+        session = await grafana_service.login()
+    except GrafanaError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Grafana 登录失败: {exc}",
+        ) from exc
+
+    response.set_cookie(
+        "grafana_session",
+        session,
+        path=grafana_service.entry_path,
+        httponly=True,
+        samesite="lax",
+    )
+    return GrafanaSsoResponse(ok=True, entry=grafana_service.entry_path)
 
 
 

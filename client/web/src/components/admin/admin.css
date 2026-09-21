@@ -705,6 +705,16 @@
   font-size: 13px;
 }
 
+.ac-empty.lv-warn { color: var(--ac-warn); }
+.ac-empty.lv-error { color: var(--ac-danger); }
+
+.ac-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
 @media (max-width: 1080px) {
   .ac-components-layout { grid-template-columns: minmax(0, 1fr); }
   .ac-rail { display: none; }

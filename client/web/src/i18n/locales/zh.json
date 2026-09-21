@@ -149,6 +149,7 @@
           "requestRate": "请求速率",
           "avgResponse": "平均响应",
           "outcome": "请求结果",
+          "windowMinutes": "近 {{count}} 分钟",
           "success": "成功",
           "failed": "失败",
           "noOutcome": "暂无请求"
@@ -192,6 +193,24 @@
           "uptime": "运行时长"
         }
       },
+      "monitoring": {
+        "title": "监控（Prometheus / Grafana）",
+        "actionLabel": "可选监控栈，此处启停",
+        "running": "运行中",
+        "stopped": "已停止",
+        "on": "开",
+        "off": "关",
+        "open": "打开 Grafana",
+        "refresh": "刷新",
+        "loading": "正在加载…",
+        "loadFailed": "加载失败：{{msg}}",
+        "toggleFailed": "切换失败：{{msg}}",
+        "openFailed": "打开失败：{{msg}}",
+        "notDeployed": "监控栈尚未部署到编排环境",
+        "notDeployedHint": "监控栈尚未部署：先在部署机执行 {{cmd}}，之后即可在此页启停。",
+        "unavailable": "编排不可用：{{reason}}",
+        "notConfigured": "未注入 GRAFANA_ADMIN_PASSWORD，免密入口不可用"
+      },
       "components": {
         "title": "组件健康",
         "subtitle": "编排组件状态与健康检查",
@@ -219,6 +238,7 @@
           "git": "Git 服务",
           "data": "数据层",
           "tasks": "任务",
+          "monitoring": "监控栈",
           "other": "其他"
         },
         "inspector": {

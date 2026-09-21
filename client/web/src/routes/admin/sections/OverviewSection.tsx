@@ -3,11 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Alert, Button, Empty } from 'antd';
 import { ArrowRightOutlined, ReloadOutlined } from '@ant-design/icons';
-import { Area, Line, Pie, Tiny } from '@ant-design/charts';
+import { Area, Column, Line, Tiny } from '@ant-design/charts';
 import { adminApi, logsApi, type AppStatus } from '../../../api/admin';
 import { statsApi, type PlatformStats } from '../../../api/stats';
 import KeyValueLedger from '../../../components/admin/KeyValueLedger';
 import AdminSkeleton from '../../../components/admin/AdminSkeleton';
+import MonitoringCard from '../../../components/admin/MonitoringCard';
 import { formatBytesMb } from '../../../components/admin/health';
 import {
   pushSample,
@@ -253,21 +254,28 @@ export default function OverviewSection() {
                     />
                   </div>
                   <div className="ac-trend-side">
-                    <div className="ac-trend-title">{t('app.admin.overview.trends.outcome')}</div>
+                    <div className="ac-trend-title">
+                      {t('app.admin.overview.trends.outcome')}
+                      <span className="ac-trend-unit">
+                        {t('app.admin.overview.trends.windowMinutes', {
+                          count: status.requests.window_minutes,
+                        })}
+                      </span>
+                    </div>
                     {outcome.every((o) => o.value === 0) ? (
                       <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('app.admin.overview.trends.noOutcome')} />
                     ) : (
-                      <Pie
+                      <Column
                         data={outcome}
-                        angleField="value"
-                        colorField="type"
-                        innerRadius={0.64}
+                        xField="type"
+                        yField="value"
                         height={200}
                         autoFit
                         theme={DARK_THEME}
                         scale={{ color: { range: [C.success, C.failed] } }}
-                        legend={{ color: { position: 'bottom' } }}
-                        style={{ stroke: '#0d1117', lineWidth: 2 }}
+                        legend={false}
+                        axis={AXIS}
+                        style={{ fillOpacity: 0.9 }}
                       />
                     )}
                   </div>
@@ -370,6 +378,8 @@ export default function OverviewSection() {
               </div>
             </div>
           )}
+
+          <MonitoringCard />
 
           <div className="ac-panel">
             <div className="ac-panel-head">
