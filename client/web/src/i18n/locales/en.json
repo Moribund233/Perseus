@@ -129,62 +129,56 @@
       },
       "overview": {
         "title": "Overview",
-        "subtitle": "Live process, request and platform status",
+        "subtitle": "Live process, request and platform status; history from the backend timeseries API (Redis minute buckets)",
         "debugMode": "Debug mode",
         "updatedAt": "Updated {{time}}",
         "refresh": "Refresh",
+        "autoOn": "● Auto refresh",
+        "autoOff": "○ Paused",
         "loadFailed": "Failed to load status",
-        "vitals": {
-          "uptime": "Uptime",
+        "kpis": {
+          "requestRate": "Request rate",
+          "errorRate": "Error rate",
+          "p95": "P95 latency",
           "memory": "Memory",
           "cpu": "CPU",
-          "threads": "Threads",
-          "connections": "Connections",
-          "requestRateNote": "Request rate",
-          "windowNote": "Last 60 samples"
+          "perMin": "/min",
+          "thresholdError": "Alert above 1%",
+          "avgLatency": "avg {{value}} ms",
+          "rssNote": "RSS · pid {{pid}}",
+          "threadsConns": "threads {{threads}} · conns {{conns}}"
         },
         "trends": {
-          "title": "Runtime Trends",
-          "window": "{{count}} samples",
-          "collecting": "Collecting samples…",
+          "title": "Traffic & Health Trends",
+          "range": "last {{range}}",
           "requestRate": "Request rate",
-          "avgResponse": "Avg response",
-          "outcome": "Request outcome",
-          "windowMinutes": "Last {{count}} min",
-          "success": "Succeeded",
-          "failed": "Failed",
-          "noOutcome": "No requests yet"
+          "errorRate": "Error rate",
+          "latency": "Latency",
+          "avg": "Avg",
+          "p95": "P95",
+          "noData": "No data"
         },
-        "recentLogs": {
-          "title": "Recent Logs",
-          "hint": "Last {{count}} lines",
-          "open": "Open logs",
-          "empty": "No logs"
+        "health": {
+          "title": "System Health",
+          "running": "containers",
+          "healthy": "Healthy",
+          "starting": "Starting",
+          "unhealthy": "Unhealthy",
+          "redis": "Redis",
+          "workers": "Worker registry",
+          "schema": "DB schema",
+          "gitQueue": "Git queue",
+          "uptime": "Uptime",
+          "alive": "{{alive}} / {{expected}} alive",
+          "unavailable": "unavailable"
         },
-        "process": {
-          "title": "Process",
-          "pid": "PID",
-          "memory": "Memory",
-          "cpu": "CPU",
-          "threads": "Threads",
-          "connections": "Connections",
-          "version": "Version",
-          "serverTime": "Server time",
-          "schema": "Schema"
-        },
-        "requests": {
-          "title": "Request Metrics",
-          "total": "Total requests",
-          "success": "Succeeded",
-          "failed": "Failed",
-          "rate": "Request rate",
-          "avgTime": "Avg response"
-        },
-        "git": {
-          "title": "Git Queue",
-          "activeClones": "Active clones",
-          "activePushes": "Active pushes",
-          "queue": "Queued"
+        "distribution": {
+          "title": "Request Outcomes",
+          "successRate": "success",
+          "s2xx": "2xx success",
+          "s3xx": "3xx redirect",
+          "s4xx": "4xx client",
+          "s5xx": "5xx server"
         },
         "platform": {
           "title": "Platform Stats",
@@ -192,6 +186,19 @@
           "commits": "Commits",
           "users": "Users",
           "uptime": "Uptime"
+        },
+        "monitoring": {
+          "title": "Monitoring Stack",
+          "running": "Running",
+          "stopped": "Stopped",
+          "ready": "Ready",
+          "notReady": "Not ready",
+          "open": "Open Grafana"
+        },
+        "recentErrors": {
+          "title": "Recent Errors & Warnings",
+          "open": "Open logs",
+          "empty": "No error logs"
         }
       },
       "monitoring": {

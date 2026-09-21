@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, Suspense, type ReactNode } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons';
 import { adminApi, type AppStatus } from '../../api/admin';
 import AdminHeader from '../../components/admin/AdminHeader';
+import AdminSkeleton from '../../components/admin/AdminSkeleton';
 import PermissionPanel from '../../components/admin/PermissionPanel';
 import '../../components/admin/admin.css';
 
@@ -74,6 +75,7 @@ export default function AdminConsolePage() {
       <div className="ac-shell">
         <aside className={`ac-rail${collapsed ? ' collapsed' : ''}`}>
           <div className="ac-rail-head">
+            {!collapsed && <span className="ac-rail-cap">{t('app.admin.railTitle')}</span>}
             <button
               type="button"
               className="ac-rail-toggle"
@@ -85,8 +87,6 @@ export default function AdminConsolePage() {
               {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             </button>
           </div>
-
-          {!collapsed && <div className="ac-rail-cap">{t('app.admin.railTitle')}</div>}
 
           <nav className="ac-idx">
             {sections.map((section) => {
@@ -127,7 +127,15 @@ export default function AdminConsolePage() {
         </aside>
 
         <main className="ac-stage">
-          <Outlet />
+          <Suspense
+            fallback={
+              <div className="ac-stage-loading">
+                <AdminSkeleton rows={6} />
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

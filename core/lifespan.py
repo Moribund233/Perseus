@@ -75,6 +75,12 @@ class AppLifecycleManager:
         except Exception as e:
             logger.warning(f"worker 心跳初始化失败（admin 将看不到本 worker）: {e}")
 
+        # 启动进程指标采样（供 admin 概览趋势图的内存/CPU 曲线）
+        try:
+            await self._init_process_metrics()
+        except Exception as e:
+            logger.warning(f"进程指标采样初始化失败（概览趋势将缺少内存/CPU）: {e}")
+
     async def _init_async_database(self) -> None:
         """初始化异步数据库引擎"""
         from models.async_db import get_async_engine
@@ -94,6 +100,7 @@ class AppLifecycleManager:
         logger.info("开始执行关闭流程...")
 
         await self._shutdown_worker_heartbeat()
+        await self._shutdown_process_metrics()
         await self._shutdown_realtime_bus()
         await self._shutdown_websocket_connections()
         await self._dispose_database_engine()
@@ -152,6 +159,21 @@ class AppLifecycleManager:
             except (asyncio.CancelledError, Exception):  # noqa: BLE001
                 pass
             self._worker_task = None
+
+    async def _init_process_metrics(self) -> None:
+        """启动进程指标后台采样"""
+        from services.process_metrics import get_process_metrics
+
+        await get_process_metrics().start()
+
+    async def _shutdown_process_metrics(self) -> None:
+        """停止进程指标后台采样"""
+        try:
+            from services.process_metrics import get_process_metrics
+
+            await get_process_metrics().stop()
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"停止进程指标采样时出错: {e}")
 
     async def _shutdown_realtime_bus(self) -> None:
         """停止广播总线"""

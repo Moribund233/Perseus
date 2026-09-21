@@ -121,6 +121,9 @@ class TestAppManagementRoutes:
         _assert_route(app, "GET", "/api/app/status")
         _assert_route(app, "GET", "/api/v1/stats/platform")
 
+    def test_metrics_timeseries_route(self, app: FastAPI):
+        _assert_route(app, "GET", "/api/app/metrics/timeseries")
+
     def test_components_route(self, app: FastAPI):
         _assert_route(app, "GET", "/api/app/components")
 

@@ -127,6 +127,9 @@ class AppService:
     def __init__(self):
         """初始化应用服务"""
         self._start_time = self._resolve_start_time()
+        # 缓存 psutil.Process：cpu_percent(interval=None) 的基线存在实例上，
+        # 每次新建实例会永远返回 0.0。
+        self._process = None
 
     @staticmethod
     def _resolve_start_time() -> datetime:
@@ -328,7 +331,9 @@ class AppService:
         import psutil
 
         try:
-            process = psutil.Process(os.getpid())
+            if self._process is None:
+                self._process = psutil.Process(os.getpid())
+            process = self._process
             memory_info = process.memory_info()
 
             return {

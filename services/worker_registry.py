@@ -22,6 +22,31 @@ DEFAULT_TTL_SECONDS = 45
 _STARTED_AT = time.time()
 
 
+def _resolve_boot_id() -> Optional[int]:
+    """
+    本次部署（同一 master 进程）的稳定标识：父进程创建时间。
+
+    所有 worker 的父进程都是同一个 master（uvicorn/gunicorn），因此共享该值；
+    容器重建后 master 变化 → boot_id 变化，据此可把上一轮部署的残留心跳
+    排除在「当前 worker」之外（无需等待 TTL 过期）。无法解析时返回 None，
+    此时不做过滤，行为退回纯 TTL 判定。
+    """
+    try:
+        import psutil
+
+        for target in (os.getppid(), os.getpid()):
+            try:
+                return int(psutil.Process(target).create_time())
+            except Exception:  # noqa: BLE001 — 逐级回退
+                continue
+    except Exception:  # noqa: BLE001 — psutil 不可用
+        pass
+    return None
+
+
+_BOOT_ID = _resolve_boot_id()
+
+
 def _worker_key(worker_id: str) -> str:
     return redis_key("worker", worker_id)
 
@@ -47,6 +72,8 @@ class WorkerRegistry:
             "started_at": str(int(_STARTED_AT)),
             "last_seen": str(int(time.time())),
         }
+        if _BOOT_ID is not None:
+            fields["boot_id"] = str(_BOOT_ID)
         if bus is not None:
             try:
                 stats = bus.stats()
@@ -94,6 +121,10 @@ class WorkerRegistry:
             return []
 
         items.sort(key=lambda x: x.get("worker_id") or "")
+        # 仅保留当前部署的心跳：boot_id 不同的为上一轮容器残留（TTL 内仍会存在），
+        # 无 boot_id 的旧版记录保留以兼容滚动升级。
+        if _BOOT_ID is not None:
+            items = [it for it in items if it.get("boot_id") in (None, _BOOT_ID)]
         return items
 
     def _decode(self, raw: Dict[str, Any], now: float) -> Dict[str, Any]:
@@ -103,6 +134,7 @@ class WorkerRegistry:
             "worker_id": raw.get("worker_id"),
             "pid": _to_int(raw.get("pid"), None),
             "host": raw.get("host"),
+            "boot_id": _to_int(raw.get("boot_id"), None),
             "started_at": _to_int(raw.get("started_at"), None),
             "last_seen": last_seen or None,
             "age_seconds": age,

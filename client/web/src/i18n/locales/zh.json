@@ -129,62 +129,56 @@
       },
       "overview": {
         "title": "状态概览",
-        "subtitle": "应用进程、请求与平台实时状态",
+        "subtitle": "进程、请求与平台实时状态，历史曲线来自后端时序接口（Redis 分钟桶兜底）",
         "debugMode": "调试模式",
         "updatedAt": "更新于 {{time}}",
         "refresh": "刷新",
+        "autoOn": "● 自动刷新",
+        "autoOff": "○ 已暂停",
         "loadFailed": "加载状态失败",
-        "vitals": {
-          "uptime": "运行时长",
+        "kpis": {
+          "requestRate": "请求速率",
+          "errorRate": "错误率",
+          "p95": "P95 延迟",
           "memory": "内存",
           "cpu": "CPU",
-          "threads": "线程",
-          "connections": "连接数",
-          "requestRateNote": "请求速率",
-          "windowNote": "近 60 次采样"
+          "perMin": "/min",
+          "thresholdError": "阈值 >1% 告警",
+          "avgLatency": "平均 {{value}} ms",
+          "rssNote": "RSS · 进程 {{pid}}",
+          "threadsConns": "线程 {{threads}} · 连接 {{conns}}"
         },
         "trends": {
-          "title": "运行趋势",
-          "window": "近 {{count}} 次采样",
-          "collecting": "正在采集数据…",
+          "title": "流量与健康趋势",
+          "range": "近 {{range}}",
           "requestRate": "请求速率",
-          "avgResponse": "平均响应",
-          "outcome": "请求结果",
-          "windowMinutes": "近 {{count}} 分钟",
-          "success": "成功",
-          "failed": "失败",
-          "noOutcome": "暂无请求"
+          "errorRate": "错误率",
+          "latency": "延迟",
+          "avg": "平均",
+          "p95": "P95",
+          "noData": "暂无数据"
         },
-        "recentLogs": {
-          "title": "最近日志",
-          "hint": "最后 {{count}} 行",
-          "open": "打开日志",
-          "empty": "暂无日志"
+        "health": {
+          "title": "系统健康",
+          "running": "容器运行",
+          "healthy": "健康",
+          "starting": "启动中",
+          "unhealthy": "异常",
+          "redis": "Redis",
+          "workers": "Worker 注册表",
+          "schema": "DB Schema",
+          "gitQueue": "Git 队列",
+          "uptime": "运行时长",
+          "alive": "{{alive}} / {{expected}} alive",
+          "unavailable": "不可用"
         },
-        "process": {
-          "title": "进程",
-          "pid": "PID",
-          "memory": "内存",
-          "cpu": "CPU",
-          "threads": "线程",
-          "connections": "连接数",
-          "version": "版本",
-          "serverTime": "服务端时间",
-          "schema": "Schema"
-        },
-        "requests": {
-          "title": "请求指标",
-          "total": "累计请求",
-          "success": "成功",
-          "failed": "失败",
-          "rate": "请求速率",
-          "avgTime": "平均响应"
-        },
-        "git": {
-          "title": "Git 队列",
-          "activeClones": "进行中克隆",
-          "activePushes": "进行中推送",
-          "queue": "队列积压"
+        "distribution": {
+          "title": "请求结果分布",
+          "successRate": "成功率",
+          "s2xx": "2xx 成功",
+          "s3xx": "3xx 重定向",
+          "s4xx": "4xx 客户端",
+          "s5xx": "5xx 服务端"
         },
         "platform": {
           "title": "平台统计",
@@ -192,6 +186,19 @@
           "commits": "提交数",
           "users": "用户数",
           "uptime": "运行时长"
+        },
+        "monitoring": {
+          "title": "监控栈",
+          "running": "运行中",
+          "stopped": "已停止",
+          "ready": "就绪",
+          "notReady": "未就绪",
+          "open": "打开 Grafana"
+        },
+        "recentErrors": {
+          "title": "最近错误与告警",
+          "open": "打开日志",
+          "empty": "暂无错误日志"
         }
       },
       "monitoring": {

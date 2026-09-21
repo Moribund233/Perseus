@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, App as AntApp, Spin } from 'antd';
 import { perseusTheme } from './styles/theme';
@@ -29,14 +29,6 @@ const LogsSection = lazy(() => import('./routes/admin/sections/LogsSection'));
 const OperationsSection = lazy(() => import('./routes/admin/sections/OperationsSection'));
 const DebugSection = lazy(() => import('./routes/admin/sections/DebugSection'));
 const RedisSection = lazy(() => import('./routes/admin/sections/RedisSection'));
-
-function AdminFallback() {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', padding: 48 }}>
-      <Spin size="large" />
-    </div>
-  );
-}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -113,9 +105,7 @@ function AppRoutes() {
         element={
           <PageTransition fill={false}>
             <AdminRoute>
-              <Suspense fallback={<AdminFallback />}>
-                <AdminConsolePage />
-              </Suspense>
+              <AdminConsolePage />
             </AdminRoute>
           </PageTransition>
         }

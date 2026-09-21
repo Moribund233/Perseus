@@ -343,6 +343,24 @@ class SentrySettings(BaseSettings):
     release: str = Field(default="", description="发布版本号")
 
 
+class MetricsSettings(BaseSettings):
+    """运行时指标时序配置（admin 概览趋势图）"""
+    model_config = SettingsConfigDict(env_prefix="PERSEUS_METRICS_")
+
+    history_minutes: int = Field(
+        default=1440, ge=5, le=10080,
+        description="请求/进程指标分钟桶保留时长（分钟，默认 24h）",
+    )
+    sample_interval_seconds: int = Field(
+        default=15, ge=5, le=300,
+        description="进程指标（内存/CPU）采样间隔（秒）",
+    )
+    max_points: int = Field(
+        default=120, ge=10, le=1000,
+        description="时序接口单次返回的最大点数（超出则降采样）",
+    )
+
+
 class OAuthSettings(BaseSettings):
     """OAuth2 认证配置"""
     model_config = SettingsConfigDict(env_prefix="PERSEUS_OAUTH_")
@@ -369,6 +387,7 @@ class Config(BaseSettings):
     sentry: SentrySettings = Field(default_factory=SentrySettings)
     lfs: LFSSettings = Field(default_factory=LFSSettings)
     search: SearchSettings = Field(default_factory=SearchSettings)
+    metrics: MetricsSettings = Field(default_factory=MetricsSettings)
     oauth: OAuthSettings = Field(default_factory=OAuthSettings)
 
     @property

@@ -125,6 +125,44 @@ export const adminApi = {
     }),
 };
 
+// ---------- 概览时序（请求 + 进程，Redis 分钟桶） ----------
+
+export type MetricsRange = '5m' | '30m' | '1h' | '6h' | '24h';
+
+/** GET /api/app/metrics/timeseries 单点（一个降采样桶） */
+export interface MetricsPoint {
+  /** 桶结束时刻（epoch 毫秒） */
+  t: number;
+  /** 每分钟请求数（桶内均值） */
+  rpm: number;
+  /** 错误率百分比（非 2xx/3xx 占比） */
+  err_rate: number;
+  avg_ms: number;
+  p95_ms: number;
+  mem_mb: number | null;
+  cpu_pct: number | null;
+  s2xx: number;
+  s3xx: number;
+  s4xx: number;
+  s5xx: number;
+}
+
+/** GET /api/app/metrics/timeseries 响应 */
+export interface MetricsTimeseries {
+  range: MetricsRange;
+  /** 降采样步长（秒） */
+  step: number;
+  generated_at: string;
+  /** 数据来源：redis | memory */
+  source: string;
+  points: MetricsPoint[];
+}
+
+export const metricsApi = {
+  getTimeseries: (range: MetricsRange) =>
+    apiRequest<MetricsTimeseries>(`/api/app/metrics/timeseries?range=${range}`),
+};
+
 // ---------- 监控栈（Prometheus / Grafana） ----------
 
 export interface MonitoringServiceState {

@@ -112,3 +112,50 @@ async def test_list_workers_alive_flag(fake_redis):
 
 async def test_list_workers_no_redis(no_redis):
     assert await WorkerRegistry().list_workers() == []
+
+
+def _boot_entry(worker_id: str, boot_id, last_seen=None) -> dict:
+    raw = {
+        "worker_id": worker_id,
+        "pid": "1",
+        "host": "h",
+        "last_seen": str(int(last_seen if last_seen is not None else time.time())),
+        "started_at": "1",
+    }
+    if boot_id is not None:
+        raw["boot_id"] = str(boot_id)
+    return raw
+
+
+async def test_list_workers_filters_other_boot(fake_redis, monkeypatch):
+    """不同 boot_id 的残留心跳被排除，仅保留当前部署（避免重启后 alive 虚高）"""
+    monkeypatch.setattr(wr, "_BOOT_ID", 1000)
+    fake_redis.hashes[_worker_key("cur1")] = _boot_entry("cur1", 1000)
+    fake_redis.hashes[_worker_key("cur2")] = _boot_entry("cur2", 1000)
+    fake_redis.hashes[_worker_key("old1")] = _boot_entry("old1", 999)
+    fake_redis.hashes[_worker_key("old2")] = _boot_entry("old2", 999)
+
+    items = await WorkerRegistry().list_workers()
+    assert [i["worker_id"] for i in items] == ["cur1", "cur2"]
+    assert all(i["boot_id"] == 1000 for i in items)
+
+
+async def test_list_workers_keeps_legacy_without_boot_id(fake_redis, monkeypatch):
+    """无 boot_id 的旧版记录保留（滚动升级兼容）"""
+    monkeypatch.setattr(wr, "_BOOT_ID", 1000)
+    fake_redis.hashes[_worker_key("cur")] = _boot_entry("cur", 1000)
+    fake_redis.hashes[_worker_key("legacy")] = _boot_entry("legacy", None)
+    fake_redis.hashes[_worker_key("old")] = _boot_entry("old", 999)
+
+    items = await WorkerRegistry().list_workers()
+    assert [i["worker_id"] for i in items] == ["cur", "legacy"]
+
+
+async def test_list_workers_no_filter_when_boot_id_unknown(fake_redis, monkeypatch):
+    """无法解析 boot_id 时退回纯 TTL 判定（不过滤）"""
+    monkeypatch.setattr(wr, "_BOOT_ID", None)
+    fake_redis.hashes[_worker_key("a")] = _boot_entry("a", 1)
+    fake_redis.hashes[_worker_key("b")] = _boot_entry("b", 2)
+
+    items = await WorkerRegistry().list_workers()
+    assert len(items) == 2

@@ -140,7 +140,7 @@
   width: 208px;
   flex-shrink: 0;
   border-right: 1px solid var(--ac-rule);
-  padding: 14px 12px;
+  padding: 8px 12px 14px;
   overflow-y: auto;
   background: var(--ac-bg);
   transition: width 0.18s ease, padding 0.18s ease;
@@ -148,16 +148,15 @@
 
 .ac-rail.collapsed {
   width: 60px;
-  padding: 14px 8px;
+  padding: 8px 8px 14px;
 }
 
 .ac-rail-head {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 8px;
-  min-height: 34px;
-  padding: 0 2px 12px;
+  padding: 0 0 8px;
 }
 
 .ac-rail.collapsed .ac-rail-head {
@@ -195,7 +194,10 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ac-text-faint);
-  padding: 0 10px 10px;
+  padding-left: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ac-idx {
@@ -330,6 +332,16 @@
   min-width: 0;
   overflow-y: auto;
   padding: 22px 26px 40px;
+}
+
+/* 分节懒加载占位：保持外壳（顶栏/侧栏）不变，避免整页白屏割裂 */
+.ac-stage-loading {
+  animation: ac-fade-in 0.18s ease;
+}
+
+@keyframes ac-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .ac-page-head {
@@ -1365,4 +1377,153 @@
   border: none;
   width: auto;
   min-height: 0;
+}
+
+/* ---------- 概览重构：KPI / 网格 / 健康 / 分布 ---------- */
+.ac-kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--ac-rule);
+  border: 1px solid var(--ac-rule);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+
+.ac-kpi {
+  background: var(--ac-band);
+  padding: 14px 18px;
+  min-width: 0;
+}
+
+.ac-kpi-top { display: flex; align-items: center; gap: 8px; }
+
+.ac-kpi-label { font-size: 11.5px; color: var(--ac-text-faint); }
+
+.ac-kpi-tag {
+  margin-left: auto;
+  font-family: var(--ac-mono);
+  font-size: 9.5px;
+  color: var(--ac-text-faint);
+  border: 1px solid var(--ac-rule);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.ac-kpi-value {
+  margin-top: 7px;
+  font-family: var(--ac-mono);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.ac-kpi-value.warn { color: var(--ac-warn); }
+.ac-kpi-value.bad { color: var(--ac-danger); }
+
+.ac-kpi-value .unit {
+  font-size: 12px;
+  color: var(--ac-text-dim);
+  margin-left: 4px;
+  font-weight: 400;
+}
+
+.ac-kpi-foot { display: flex; align-items: center; gap: 10px; margin-top: 8px; min-height: 30px; }
+
+.ac-kpi-spark { flex: 1; min-width: 0; height: 30px; }
+
+.ac-kpi-note {
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--ac-text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ac-delta { font-family: var(--ac-mono); font-size: 11px; white-space: nowrap; }
+.ac-delta.good { color: var(--ac-ok); }
+.ac-delta.bad { color: var(--ac-danger); }
+.ac-delta.flat { color: var(--ac-text-faint); }
+
+.ac-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; }
+.ac-grid > .ac-panel { margin-bottom: 0; }
+.ac-span4 { grid-column: span 4; }
+.ac-span8 { grid-column: span 8; }
+.ac-span12 { grid-column: span 12; }
+
+.ac-chart-title { font-size: 11px; color: var(--ac-text-faint); margin: 2px 0 6px; }
+.ac-chart-block + .ac-chart-block { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--ac-rule); }
+
+.ac-chart-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ac-text-dim);
+}
+.ac-chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+.ac-legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+/* 健康面板 */
+.ac-health-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ac-rule);
+  margin-bottom: 10px;
+}
+
+.ac-ring-txt { font-family: var(--ac-mono); font-size: 15px; font-weight: 600; fill: var(--ac-text); }
+.ac-ring-sub { font-size: 9px; fill: var(--ac-text-faint); }
+
+.ac-health-legend { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; font-size: 12px; color: var(--ac-text-dim); }
+.ac-health-legend .row { display: flex; align-items: center; gap: 8px; }
+.ac-health-legend .row b { margin-left: auto; font-family: var(--ac-mono); color: var(--ac-text); }
+
+.ac-hrow { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--ac-rule); font-size: 12.5px; }
+.ac-hrow:first-of-type { border-top: none; }
+.ac-hrow .k { color: var(--ac-text-dim); }
+.ac-hrow .v { margin-left: auto; font-family: var(--ac-mono); color: var(--ac-text); text-align: right; }
+
+/* 请求结果分布 */
+.ac-donut-wrap { display: flex; align-items: center; gap: 18px; }
+.ac-donut { position: relative; width: 150px; height: 150px; flex-shrink: 0; }
+.ac-donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.ac-donut-center .n { font-family: var(--ac-mono); font-size: 16px; font-weight: 600; line-height: 1.1; }
+.ac-donut-center .l { font-size: 9.5px; color: var(--ac-text-faint); }
+
+.ac-dlegend { display: flex; flex-direction: column; gap: 7px; flex: 1; min-width: 0; }
+.ac-dlegend .row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ac-text-dim); }
+.ac-dlegend .row .n { margin-left: auto; font-family: var(--ac-mono); color: var(--ac-text); }
+.ac-dlegend .row .p { width: 46px; text-align: right; font-family: var(--ac-mono); color: var(--ac-text-faint); }
+
+/* 监控磁贴 */
+.ac-mon-row { display: flex; align-items: center; gap: 9px; padding: 7px 0; font-size: 12.5px; color: var(--ac-text-dim); }
+.ac-mon-row:first-child { padding-top: 0; }
+.ac-mon-row .v { margin-left: auto; font-family: var(--ac-mono); font-size: 12px; color: var(--ac-text); }
+.ac-mon-foot { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--ac-rule); }
+
+@media (max-width: 1240px) {
+  .ac-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ac-span4, .ac-span8 { grid-column: span 12; }
+}
+
+@media (max-width: 760px) {
+  .ac-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ac-donut-wrap { flex-direction: column; align-items: flex-start; }
 }

@@ -299,3 +299,43 @@ def test_set_debug_mode_requires_admin():
 
     with pytest.raises(AuthorizationException):
         ConfigService().set_debug_mode(True, is_admin=False)
+
+def test_get_process_info_reuses_psutil_instance(monkeypatch):
+    """psutil.Process 必须复用实例，否则 cpu_percent(interval=None) 恒为 0"""
+    import psutil
+    from types import SimpleNamespace
+
+    created = []
+
+    class FakeProc:
+        pid = 123
+
+        def __init__(self, target):
+            created.append(target)
+
+        def cpu_percent(self, interval=None):
+            return 7.5
+
+        def memory_info(self):
+            return SimpleNamespace(rss=64 * 1024 * 1024)
+
+        def num_threads(self):
+            return 4
+
+        def connections(self):
+            return []
+
+    monkeypatch.setattr(psutil, "Process", FakeProc)
+
+    svc = AppService()
+    created.clear()  # 排除构造期 _resolve_start_time 的探测
+    svc._process = None
+
+    first = svc._get_process_info()
+    second = svc._get_process_info()
+
+    assert first["cpu_percent"] == 7.5
+    assert first["memory_mb"] == 64.0
+    assert first["threads"] == 4
+    assert second["cpu_percent"] == 7.5
+    assert len(created) == 1

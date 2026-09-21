@@ -136,6 +136,14 @@ pg_ssl_mode = "prefer"
 pg_connect_timeout = 10
 pg_application_name = "perseus"
 
+[metrics]
+# admin 概览趋势图：请求/进程分钟桶保留时长（分钟，默认 24h）
+history_minutes = 1440
+# 进程内存/CPU 采样间隔（秒）
+sample_interval_seconds = 15
+# 时序接口单次返回的最大点数（超出则降采样）
+max_points = 120
+
 # 限流配置已移至 Nginx（参见 docker/nginx/nginx.conf）
 # Python 端不再处理速率限制
 

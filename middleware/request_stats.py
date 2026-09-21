@@ -38,6 +38,78 @@ def _redis_minute() -> int:
     return int(time.time()) // 60
 
 
+# 延迟直方图桶上界（毫秒）：时序接口据此估算 p95，避免存储全量样本。
+LATENCY_BUCKETS_MS: tuple = (10, 25, 50, 100, 200, 500, 1000, 2500, 5000)
+_INF_LABEL = "inf"
+_BUCKET_LABELS: tuple = tuple(str(b) for b in LATENCY_BUCKETS_MS) + (_INF_LABEL,)
+
+# 请求分钟桶的字符串字段（get_stats 仅用前 4 个，其余供时序接口使用）。
+_BUCKET_SUFFIXES: tuple = ("count", "ok", "fail", "lat", "s2xx", "s3xx", "s4xx", "s5xx")
+
+
+def _history_minutes() -> int:
+    """指标历史保留分钟数（配置不可用时回退 1440）"""
+    try:
+        from core.config import get_config
+
+        return int(getattr(get_config().metrics, "history_minutes", 1440) or 1440)
+    except Exception:  # noqa: BLE001 — 配置未就绪时用默认值
+        return 1440
+
+
+def _bucket_label(latency_ms: float) -> str:
+    """返回命中的直方图桶标签（首个 >= 延迟的上界，超出则 inf）"""
+    for bound in LATENCY_BUCKETS_MS:
+        if latency_ms <= bound:
+            return str(bound)
+    return _INF_LABEL
+
+
+def _status_class_field(status_code: int) -> Optional[str]:
+    """2xx/3xx/4xx/5xx → s2xx/...；其他状态码返回 None"""
+    cls = int(status_code) // 100
+    return f"s{cls}xx" if cls in (2, 3, 4, 5) else None
+
+
+def _as_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def percentile_from_hist(hist: Dict[str, int], q: float = 0.95) -> float:
+    """由直方图估算分位数（毫秒）；返回命中桶上界（inf 桶回退到上一上界）"""
+    total = sum(hist.values())
+    if total <= 0:
+        return 0.0
+    target = q * total
+    cum = 0
+    prev_bound = 0.0
+    for label in _BUCKET_LABELS:
+        cum += hist.get(label, 0)
+        if cum >= target:
+            if label == _INF_LABEL:
+                return float(max(prev_bound, LATENCY_BUCKETS_MS[-1]))
+            return float(label)
+        if label != _INF_LABEL:
+            prev_bound = float(label)
+    return float(LATENCY_BUCKETS_MS[-1])
+
+
+def merge_hist(target: Dict[str, int], source: Dict[str, int]) -> None:
+    """把 ``source`` 直方图累加进 ``target``（原地）"""
+    for label, count in source.items():
+        target[label] = target.get(label, 0) + count
+
+
 def _fresh_bucket(minute: int) -> _MinuteBucket:
     return {
         "minute": minute,
@@ -45,6 +117,11 @@ def _fresh_bucket(minute: int) -> _MinuteBucket:
         "ok": 0,
         "fail": 0,
         "lat_sum": 0.0,
+        "s2xx": 0,
+        "s3xx": 0,
+        "s4xx": 0,
+        "s5xx": 0,
+        "hist": {},
     }
 
 
@@ -60,7 +137,9 @@ class RequestStats:
         self._total = 0
         self._ok = 0
         self._fail = 0
-        self._minutes: Deque[_MinuteBucket] = deque(maxlen=window_minutes)
+        self._minutes: Deque[_MinuteBucket] = deque(
+            maxlen=max(window_minutes, _history_minutes())
+        )
         self._current: _MinuteBucket = _fresh_bucket(_redis_minute())
 
     async def _backend(self) -> Optional[Any]:
@@ -70,17 +149,26 @@ class RequestStats:
             self._redis = await get_redis()
         return self._redis
 
-    async def record_request(self, response_time_ms: float, success: bool):
-        """记录一个请求"""
+    async def record_request(
+        self,
+        response_time_ms: float,
+        success: bool,
+        status_code: Optional[int] = None,
+    ):
+        """记录一个请求（``status_code`` 可选，用于 2xx/3xx/4xx/5xx 分布）"""
         backend = await self._backend()
         async with self._lock:
             if backend is not None:
-                await self._record_redis(backend, response_time_ms, success)
+                await self._record_redis(backend, response_time_ms, success, status_code)
             else:
-                self._record_memory(response_time_ms, success)
+                self._record_memory(response_time_ms, success, status_code)
 
     async def _record_redis(
-        self, backend: Any, response_time_ms: float, success: bool
+        self,
+        backend: Any,
+        response_time_ms: float,
+        success: bool,
+        status_code: Optional[int] = None,
     ) -> None:
         minute = _redis_minute()
         pipe = backend.pipeline()
@@ -88,12 +176,26 @@ class RequestStats:
         pipe.incr(_key("m", str(minute), "count"))
         pipe.incr(_key("m", str(minute), "ok") if success else _key("m", str(minute), "fail"))
         pipe.incrbyfloat(_key("m", str(minute), "lat"), response_time_ms)
-        ttl = self.window_minutes * 120 + 60
-        for suffix in ("count", "ok", "fail", "lat"):
+
+        cls_field = _status_class_field(status_code) if status_code is not None else None
+        if cls_field:
+            pipe.incr(_key("m", str(minute), cls_field))
+
+        hist_key = _key("m", str(minute), "hist")
+        pipe.hincrby(hist_key, _bucket_label(response_time_ms), 1)
+
+        ttl = max(self.window_minutes * 120 + 60, _history_minutes() * 60 + 60)
+        for suffix in _BUCKET_SUFFIXES:
             pipe.expire(_key("m", str(minute), suffix), ttl)
+        pipe.expire(hist_key, ttl)
         await pipe.execute()
 
-    def _record_memory(self, response_time_ms: float, success: bool) -> None:
+    def _record_memory(
+        self,
+        response_time_ms: float,
+        success: bool,
+        status_code: Optional[int] = None,
+    ) -> None:
         now = _redis_minute()
         if now > self._current["minute"]:
             self._minutes.append(self._current)
@@ -108,6 +210,12 @@ class RequestStats:
         else:
             self._fail += 1
             current["fail"] += 1
+        if status_code is not None:
+            field = _status_class_field(status_code)
+            if field:
+                current[field] = current.get(field, 0) + 1
+        label = _bucket_label(response_time_ms)
+        current["hist"][label] = current["hist"].get(label, 0) + 1
         self._total += 1
 
     async def get_stats(self) -> Dict[str, Any]:
@@ -154,7 +262,8 @@ class RequestStats:
         }
 
     def _stats_memory(self) -> Dict[str, Any]:
-        buckets = list(self._minutes)
+        # _minutes 的 maxlen 已扩大到历史保留量，实时统计只取最近 window 分钟
+        buckets = list(self._minutes)[-self.window_minutes:]
         count = sum(b["count"] for b in buckets)
         success = sum(b["ok"] for b in buckets)
         failed = sum(b["fail"] for b in buckets)
@@ -172,6 +281,59 @@ class RequestStats:
             "requests_per_minute": rpm,
             "window_minutes": self.window_minutes,
         }
+
+    # ---------------- 时序历史（admin 概览趋势图） ----------------
+
+    async def get_history(self, minutes: int) -> Dict[int, _MinuteBucket]:
+        """
+        读取最近 ``minutes`` 分钟的每分钟请求桶（含状态分布与延迟直方图）。
+
+        不含当前未走完的分钟，与 ``get_stats`` 口径一致；缺失分钟不补零，
+        由调用方按时间轴对齐。
+        """
+        backend = await self._backend()
+        if backend is not None:
+            return await self._history_redis(backend, minutes)
+        return self._history_memory(minutes)
+
+    def _history_memory(self, minutes: int) -> Dict[int, _MinuteBucket]:
+        lo = _redis_minute() - minutes + 1
+        return {b["minute"]: b for b in self._minutes if b["minute"] >= lo}
+
+    async def _history_redis(self, backend: Any, minutes: int) -> Dict[int, _MinuteBucket]:
+        now_min = _redis_minute()
+        mins = list(range(now_min - minutes + 1, now_min))  # 排除当前未走完分钟
+        if not mins:
+            return {}
+
+        pipe = backend.pipeline()
+        for m in mins:
+            pipe.mget(*[_key("m", str(m), suffix) for suffix in _BUCKET_SUFFIXES])
+            pipe.hgetall(_key("m", str(m), "hist"))
+        raw = await pipe.execute()
+
+        out: Dict[int, _MinuteBucket] = {}
+        for idx, m in enumerate(mins):
+            vals = raw[idx * 2] or []
+            hist = raw[idx * 2 + 1] or {}
+
+            def _get(i: int):
+                return vals[i] if len(vals) > i else None
+
+            bucket = _fresh_bucket(m)
+            bucket.update(
+                count=_as_int(_get(0)),
+                ok=_as_int(_get(1)),
+                fail=_as_int(_get(2)),
+                lat_sum=_as_float(_get(3)),
+                s2xx=_as_int(_get(4)),
+                s3xx=_as_int(_get(5)),
+                s4xx=_as_int(_get(6)),
+                s5xx=_as_int(_get(7)),
+            )
+            bucket["hist"] = {str(k): _as_int(v) for k, v in hist.items()}
+            out[m] = bucket
+        return out
 
     async def reset(self, backend: Optional[Any] = None):
         """重置统计（Redis 键一并清理）"""
@@ -233,13 +395,13 @@ class RequestStatsMiddleware(BaseHTTPMiddleware):
             # 计算响应时间（毫秒）
             response_time_ms = (time.time() - start_time) * 1000
 
-            # 记录请求（2xx 和 3xx 视为成功）
+            # 记录请求（2xx 和 3xx 视为成功；status_code 供状态分布使用）
             success = 200 <= response.status_code < 400
-            await self.stats.record_request(response_time_ms, success)
+            await self.stats.record_request(response_time_ms, success, response.status_code)
 
             return response
         except Exception as e:
             # 记录失败的请求
             response_time_ms = (time.time() - start_time) * 1000
-            await self.stats.record_request(response_time_ms, False)
+            await self.stats.record_request(response_time_ms, False, 500)
             raise

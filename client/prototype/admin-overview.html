@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Perseus · 状态概览（重构原型）</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cpath d='M43.9 46.1 A24 24 0 0 1 69.9 67.9' fill='none' stroke='%233D7BFF' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M39.7 34.5 A36 36 0 0 1 81.9 73.1' fill='none' stroke='%233D7BFF' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M62.4 24.9 A48 48 0 0 1 92.4 57.6' fill='none' stroke='%2312A38B' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M37.8 92.6 A24 24 0 0 1 23.4 78.2' fill='none' stroke='%23E9F1FF' stroke-width='8' stroke-linecap='round'/%3E%3Ccircle cx='46' cy='70' r='11' fill='%233D7BFF'/%3E%3Ccircle cx='10' cy='73' r='4.5' fill='%2312A38B'/%3E%3C/svg%3E" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --bg:#0d1117;
+    --band:#0f151d;
+    --panel:#111820;
+    --raised:#161b22;
+    --rule:#21262d;
+    --rule-strong:#30363d;
+    --text:#e6edf3;
+    --muted:#8b949e;
+    --faint:#6e7681;
+    --accent:#1f6feb;
+    --accent-bright:#58a6ff;
+    --ok:#3fb950;
+    --warn:#d29922;
+    --danger:#f85149;
+    --violet:#bc8cff;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+    --rail:232px;
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--text);
+    font-family:var(--sans);font-size:13px;line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+    display:flex;flex-direction:column;height:100vh;overflow:hidden;
+  }
+  .mono{font-family:var(--mono);font-variant-ligatures:none}
+  button{font-family:inherit;font-size:inherit;color:inherit;background:none;border:none;cursor:pointer}
+  ::selection{background:rgba(31,111,235,.35)}
+  :focus-visible{outline:2px solid var(--accent-bright);outline-offset:2px;border-radius:3px}
+
+  /* ============ ribbon ============ */
+  .ribbon{
+    flex-shrink:0;height:46px;display:flex;align-items:center;gap:16px;
+    padding:0 18px;border-bottom:1px solid var(--rule);background:var(--raised);z-index:20;
+  }
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand svg{width:22px;height:22px;display:block}
+  .brand-name{font-weight:700;letter-spacing:.14em;font-size:12px}
+  .brand-sep{color:var(--rule-strong)}
+  .brand-sub{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .ribbon-status{display:flex;align-items:center;gap:14px;margin-left:8px}
+  .pulse{position:relative;width:7px;height:7px;border-radius:50%;background:var(--ok);flex-shrink:0}
+  .pulse::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid var(--ok);opacity:.7;animation:beat 2.4s ease-out infinite}
+  @keyframes beat{0%{transform:scale(.4);opacity:.8}70%{transform:scale(1.5);opacity:0}100%{opacity:0}}
+  .status-word{font-size:12px;color:var(--ok);font-weight:500}
+  .chip{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;padding:2px 7px;
+    border-radius:4px;border:1px solid var(--rule-strong);color:var(--muted);background:var(--bg);
+  }
+  .chip.prod{color:var(--accent-bright);border-color:rgba(88,166,255,.4);background:rgba(88,166,255,.08)}
+  .chip.debug{color:var(--warn);border-color:rgba(210,153,34,.45);background:rgba(210,153,34,.08)}
+  .chip.ok{color:var(--ok);border-color:rgba(63,185,80,.4);background:rgba(63,185,80,.08)}
+  .chip.bad{color:var(--danger);border-color:rgba(248,81,73,.4);background:rgba(248,81,73,.08)}
+  .ribbon-right{margin-left:auto;display:flex;align-items:center;gap:16px}
+  .clock{font-size:12px;color:var(--muted)}
+  .who{display:flex;align-items:center;gap:8px}
+  .who .av{width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#1f6feb,#bc8cff);display:grid;place-items:center;font-size:10px;font-weight:700;color:#fff}
+
+  /* ============ shell / rail ============ */
+  .shell{flex:1;display:flex;min-height:0}
+  .rail{
+    width:var(--rail);flex-shrink:0;border-right:1px solid var(--rule);background:var(--band);
+    display:flex;flex-direction:column;padding:16px 12px 12px;overflow-y:auto;
+  }
+  .rail-cap{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--faint);padding:0 10px 10px}
+  .idx{display:flex;flex-direction:column;gap:1px}
+  .idx-item{
+    display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;
+    color:var(--muted);position:relative;text-align:left;width:100%;
+  }
+  .idx-item .ico{width:16px;display:grid;place-items:center;color:var(--faint)}
+  .idx-item.on{background:#141d2b;color:var(--text)}
+  .idx-item.on::before{content:'';position:absolute;left:-12px;top:50%;transform:translateY(-50%);width:2px;height:18px;background:var(--accent);border-radius:0 2px 2px 0}
+  .idx-item.on .ico{color:var(--accent-bright)}
+  .idx-label{font-size:12.5px;font-weight:500;flex:1}
+  .sim{margin-top:auto;padding-top:16px;border-top:1px solid var(--rule)}
+  .sim-cap{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--faint);padding:0 10px 8px}
+  .sim-row{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;font-size:12px;color:var(--muted)}
+  .switch{width:32px;height:18px;border-radius:10px;background:var(--rule-strong);position:relative;transition:background .16s;flex-shrink:0}
+  .switch::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#8b949e;transition:transform .16s,background .16s}
+  .switch.on{background:rgba(31,111,235,.35)}
+  .switch.on::after{transform:translateX(14px);background:var(--accent-bright)}
+
+  /* ============ stage ============ */
+  .stage{flex:1;min-width:0;overflow-y:auto;background:var(--bg)}
+  .page-head{padding:20px 28px 16px;border-bottom:1px solid var(--rule);display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+  .page-head h1{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em}
+  .page-head p{margin:5px 0 0;font-size:12.5px;color:var(--muted);max-width:78ch}
+  .head-actions{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+  .seg{display:inline-flex;border:1px solid var(--rule-strong);border-radius:7px;overflow:hidden;background:var(--bg)}
+  .seg button{padding:5px 11px;font-family:var(--mono);font-size:11px;color:var(--muted);border-right:1px solid var(--rule)}
+  .seg button:last-child{border-right:none}
+  .seg button:hover{background:#1c2333;color:var(--text)}
+  .seg button.on{background:#141d2b;color:var(--accent-bright)}
+
+  .btn{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px;border-radius:6px;font-size:12.5px;font-weight:500;border:1px solid var(--rule-strong);background:var(--raised);color:var(--text);white-space:nowrap}
+  .btn:hover{background:#1c2333;border-color:#4b5563}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{background:#2a7aef}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+  .btn.ghost:hover{background:#1c2333;color:var(--text)}
+  .btn.sm{height:26px;padding:0 10px;font-size:11.5px}
+
+  /* ============ KPI band ============ */
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--rule);border-bottom:1px solid var(--rule)}
+  .kpi{background:var(--bg);padding:15px 20px 13px;min-width:0;cursor:default}
+  .kpi-top{display:flex;align-items:center;gap:8px}
+  .kpi-label{font-size:11.5px;color:var(--faint)}
+  .kpi-tag{margin-left:auto;font-family:var(--mono);font-size:9.5px;color:var(--faint);border:1px solid var(--rule);border-radius:3px;padding:1px 5px}
+  .kpi-value{font-family:var(--mono);font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.15;margin-top:7px;white-space:nowrap}
+  .kpi-value small{font-size:12px;font-weight:400;color:var(--muted);margin-left:3px}
+  .kpi-value.warn{color:var(--warn)}
+  .kpi-value.bad{color:var(--danger)}
+  .kpi-foot{display:flex;align-items:center;gap:10px;margin-top:8px;min-height:30px}
+  .kpi-spark{flex:1;min-width:0;height:30px;display:block;overflow:visible}
+  .delta{font-family:var(--mono);font-size:11px;white-space:nowrap;display:inline-flex;align-items:center;gap:3px}
+  .delta.up-good,.delta.down-bad{color:var(--ok)}
+  .delta.up-bad,.delta.down-good{color:var(--danger)}
+  .delta.flat{color:var(--faint)}
+  .kpi-note{font-size:10.5px;color:var(--faint)}
+
+  /* ============ grid / panels ============ */
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;padding:16px 28px 8px}
+  .span3{grid-column:span 3}.span4{grid-column:span 4}.span5{grid-column:span 5}
+  .span6{grid-column:span 6}.span7{grid-column:span 7}.span8{grid-column:span 8}.span12{grid-column:span 12}
+  .panel{background:var(--panel);border:1px solid var(--rule);border-radius:10px;min-width:0;display:flex;flex-direction:column}
+  .panel-head{display:flex;align-items:center;gap:10px;padding:12px 15px;border-bottom:1px solid var(--rule);flex-wrap:wrap}
+  .panel-head h2{margin:0;font-size:13.5px;font-weight:600}
+  .panel-head .hint{font-size:10.5px;color:var(--faint);font-family:var(--mono)}
+  .panel-head .right{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .panel-body{padding:14px 15px;flex:1}
+  .panel-body.tight{padding:10px 12px}
+
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:8px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+
+  .chart-wrap{position:relative}
+  .chart-wrap svg{display:block;width:100%;height:auto}
+  .chart-tip{
+    position:absolute;pointer-events:none;background:rgba(13,17,23,.96);border:1px solid var(--rule-strong);
+    border-radius:6px;padding:7px 10px;font-family:var(--mono);font-size:11px;line-height:1.6;
+    color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,.5);white-space:nowrap;opacity:0;transition:opacity .1s;z-index:5;
+  }
+  .chart-tip .tt{color:var(--faint);font-size:10.5px;margin-bottom:3px}
+  .chart-tip b{font-weight:600}
+
+  /* health rows */
+  .health-top{display:flex;align-items:center;gap:16px;padding-bottom:14px;border-bottom:1px solid var(--rule);margin-bottom:12px}
+  .ring{flex-shrink:0}
+  .ring-txt{font-family:var(--mono);font-size:15px;font-weight:600;fill:var(--text)}
+  .ring-sub{font-family:var(--sans);font-size:9px;fill:var(--faint)}
+  .health-legend{display:flex;flex-direction:column;gap:6px;font-size:11.5px;color:var(--muted)}
+  .health-legend .row{display:flex;align-items:center;gap:7px}
+  .health-legend .row b{font-family:var(--mono);color:var(--text);font-weight:600;margin-left:auto}
+  .hrow{display:flex;align-items:center;gap:9px;padding:7px 0;border-top:1px solid #171d24;font-size:12px}
+  .hrow:first-of-type{border-top:none}
+  .hrow .k{color:var(--muted)}
+  .hrow .v{margin-left:auto;font-family:var(--mono);color:var(--text)}
+  .hrow .v.dim{color:var(--faint)}
+
+  /* donut */
+  .donut-wrap{display:flex;align-items:center;gap:18px}
+  .donut{position:relative;flex-shrink:0}
+  .donut .center{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+  .donut .center .n{font-family:var(--mono);font-size:16px;font-weight:600;line-height:1.1}
+  .donut .center .l{font-size:9.5px;color:var(--faint)}
+  .dlegend{display:flex;flex-direction:column;gap:7px;flex:1;min-width:0}
+  .dlegend .row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .dlegend .row .n{margin-left:auto;font-family:var(--mono);color:var(--text)}
+  .dlegend .row .p{font-family:var(--mono);color:var(--faint);width:44px;text-align:right}
+
+  /* stat inline */
+  .statgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 18px}
+  .statgrid .s .n{font-family:var(--mono);font-size:19px;font-weight:600;line-height:1.2}
+  .statgrid .s .l{font-size:11px;color:var(--faint)}
+
+  /* monitoring tile */
+  .mon-row{display:flex;align-items:center;gap:9px;padding:7px 0;font-size:12px;color:var(--muted)}
+  .mon-row:first-child{padding-top:0}
+  .mon-row .v{margin-left:auto;font-family:var(--mono);font-size:11.5px}
+  .mon-foot{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--rule)}
+  .mon-foot .lab{font-size:11.5px;color:var(--muted)}
+
+  /* logs */
+  .term{margin:0;background:#0a0e13;border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+  .term-body{padding:8px 0}
+  .ln{display:grid;grid-template-columns:148px 62px 1fr;gap:12px;padding:3px 14px;font-family:var(--mono);font-size:11.5px;line-height:1.7}
+  .ln:hover{background:rgba(88,166,255,.045)}
+  .ln .ts{color:#4b5563}
+  .ln .lvl{font-weight:600}
+  .ln .msg{color:#b9c3cd;white-space:pre-wrap;word-break:break-word}
+  .ln[data-level="WARNING"] .lvl{color:var(--warn)}
+  .ln[data-level="ERROR"] .lvl{color:var(--danger)}
+  .ln[data-level="ERROR"] .msg{color:#e8b4b0}
+  .ln[data-level="WARNING"] .msg{color:#e3cf9e}
+
+  .empty{padding:26px 14px;text-align:center;color:var(--faint);font-size:12.5px}
+
+  .footnote{padding:12px 28px 26px;color:var(--faint);font-size:10.5px;font-family:var(--mono);line-height:1.8}
+  .footnote b{color:var(--muted);font-weight:500}
+
+  .toasts{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:200;max-width:380px}
+  .toast{display:flex;gap:10px;align-items:flex-start;background:var(--raised);border:1px solid var(--rule-strong);border-left-width:3px;border-radius:7px;padding:11px 14px;font-size:12.5px;box-shadow:0 10px 30px rgba(0,0,0,.45);animation:toast-in .2s ease}
+  .toast.ok{border-left-color:var(--ok)}
+  .toast.warn{border-left-color:var(--warn)}
+  .toast.err{border-left-color:var(--danger)}
+  .toast .tt{font-weight:500}
+  .toast .td{color:var(--muted);font-size:11.5px;margin-top:2px}
+  @keyframes toast-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  @media (max-width:1240px){
+    .kpis{grid-template-columns:repeat(3,1fr)}
+    .span8,.span4,.span5,.span6,.span7{grid-column:span 12}
+    .span3{grid-column:span 6}
+  }
+  @media (max-width:760px){
+    :root{--rail:100%}
+    .shell{flex-direction:column}
+    .rail{width:100%;border-right:none;border-bottom:1px solid var(--rule);flex-direction:row;align-items:center;overflow-x:auto;padding:10px}
+    .rail-cap,.sim{display:none}
+    .idx{flex-direction:row}
+    .idx-item{white-space:nowrap}
+    .idx-item.on::before{display:none}
+    .kpis{grid-template-columns:1fr 1fr}
+    .grid{padding:12px}
+    .statgrid{grid-template-columns:1fr}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="ribbon">
+  <div class="brand">
+    <svg viewBox="0 0 120 120" aria-hidden="true">
+      <path d="M43.9 46.1 A24 24 0 0 1 69.9 67.9" fill="none" stroke="#3D7BFF" stroke-width="9" stroke-linecap="round"/>
+      <path d="M39.7 34.5 A36 36 0 0 1 81.9 73.1" fill="none" stroke="#3D7BFF" stroke-width="9" stroke-linecap="round"/>
+      <path d="M62.4 24.9 A48 48 0 0 1 92.4 57.6" fill="none" stroke="#12A38B" stroke-width="9" stroke-linecap="round"/>
+      <path d="M37.8 92.6 A24 24 0 0 1 23.4 78.2" fill="none" stroke="#E9F1FF" stroke-width="8" stroke-linecap="round"/>
+      <circle cx="46" cy="70" r="11" fill="#3D7BFF"/>
+      <circle cx="10" cy="73" r="4.5" fill="#12A38B"/>
+    </svg>
+    <span class="brand-name">PERSEUS</span>
+    <span class="brand-sep">//</span>
+    <span class="brand-sub">application console</span>
+  </div>
+  <div class="ribbon-status">
+    <span class="pulse" aria-hidden="true"></span>
+    <span class="status-word">running</span>
+    <span class="chip prod" id="envChip">RELEASE</span>
+    <span class="mono" style="font-size:11.5px;color:var(--muted)">v1.0.0</span>
+  </div>
+  <div class="ribbon-right">
+    <span class="mono" style="font-size:11.5px;color:var(--faint)">API /api/v1 · :8000</span>
+    <span class="clock mono" id="clock">--:--:--</span>
+    <div class="who"><span class="av">AD</span><span class="name mono" style="font-size:11.5px">admin</span></div>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="rail">
+    <div class="rail-cap">SYSTEM INDEX</div>
+    <nav class="idx" id="rail"></nav>
+    <div class="sim">
+      <div class="sim-cap">PERMISSION</div>
+      <div class="sim-row"><span>管理员 <span class="mono">is_admin</span></span><span class="chip ok">ON</span></div>
+      <div class="sim-row"><span>调试模式 <span class="mono">app.debug</span></span><span class="chip">OFF</span></div>
+    </div>
+  </aside>
+
+  <main class="stage" id="stage"></main>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+(function(){
+  'use strict';
+
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function pad(n){ return n<10?'0'+n:''+n; }
+  function fmtUptime(sec){
+    var d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60),s=sec%60,p=[];
+    if(d)p.push(d+'天'); if(h)p.push(h+'小时'); if(m)p.push(m+'分'); if(!p.length||s)p.push(s+'秒');
+    return p.join('');
+  }
+  function toast(kind,title,detail){
+    var el=document.createElement('div'); el.className='toast '+kind;
+    var ic=kind==='ok'?'✓':kind==='warn'?'!':'×';
+    el.innerHTML='<span>'+ic+'</span><div><div class="tt">'+esc(title)+'</div>'+(detail?'<div class="td">'+esc(detail)+'</div>':'')+'</div>';
+    $('toasts').appendChild(el);
+    setTimeout(function(){el.style.transition='opacity .25s,transform .25s';el.style.opacity='0';el.style.transform='translateY(6px)';setTimeout(function(){el.remove();},260);},3800);
+  }
+
+  /* ================= rail (static, overview active) ================= */
+  var NAV=[
+    {l:'状态概览',on:true},{l:'组件健康'},{l:'Redis'},{l:'配置管理'},{l:'日志查看'},{l:'运维操作'},{l:'调试工具'}
+  ];
+  var ICONS=['◫','▦','▤','⚙','▥','⚡','◉'];
+  function renderRail(){
+    $('rail').innerHTML=NAV.map(function(it,i){
+      return '<span class="idx-item'+(it.on?' on':'')+'"><span class="ico">'+ICONS[i]+'</span>'+
+        '<span class="idx-label">'+esc(it.l)+'</span></span>';
+    }).join('');
+  }
+
+  /* ================= helpers: numbers ================= */
+  function niceMax(v,min){
+    min=min||0; v=Math.max(v,min); if(!(v>0)) return 1;
+    var pow=Math.pow(10,Math.floor(Math.log10(v))), f=v/pow;
+    var nice=f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10;
+    return nice*pow;
+  }
+  function fmtNum(n,dec){
+    if(n>=1000) return n.toLocaleString(undefined,{maximumFractionDigits:dec||0});
+    return dec?n.toFixed(dec):String(Math.round(n));
+  }
+
+  /* ================= mock data (mirrors proposed /api/app/metrics/timeseries) =================
+     Contract:
+       GET /api/app/metrics/timeseries?range=5m|30m|1h|6h|24h&step=<sec>
+       -> { range, step, generated_at, points:[
+              { t, rpm, err_rate, avg_ms, p95_ms, mem_mb, cpu_pct,
+                s2xx, s3xx, s4xx, s5xx } ] }
+     Redis-backed (per-minute buckets already in middleware/request_stats.py),
+     process samples added server-side; Prometheus optional enhancement.        */
+  var RANGES={
+    '5m':{minutes:5,step:10}, '30m':{minutes:30,step:60}, '1h':{minutes:60,step:120},
+    '6h':{minutes:360,step:720}, '24h':{minutes:1440,step:2880}
+  };
+  function genSeries(range){
+    var cfg=RANGES[range], n=34, now=Date.now(), pts=[];
+    var seed=range.length*97+cfg.minutes;
+    function rnd(){ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; }
+    var rpm=16+cfg.minutes/60, mem=380+cfg.minutes*0.6, cpu=4, base=cfg.minutes/60;
+    for(var i=0;i<n;i++){
+      var t=now-(n-1-i)*cfg.step*1000;
+      var wave=Math.sin((i/n)*Math.PI*2)*6 + Math.sin((i/n)*Math.PI*6)*2;
+      rpm=Math.max(1, rpm+(rnd()*6-3)+wave*0.15);
+      var errBase=0.18+rnd()*0.25 + (i>n*0.62 && i<n*0.72 ? 1.4 : 0);
+      var errRate=Math.max(0, errBase*(rnd()*0.5+0.75));
+      var avgMs=28+rnd()*18+base*4;
+      var p95Ms=avgMs*(2.6+rnd()*1.1);
+      mem=Math.min(900, Math.max(320, mem+(rnd()*14-6)));
+      cpu=Math.max(0.5, Math.min(72, cpu+(rnd()*5-2.5)+(i>n*0.6&&i<n*0.72?3:0)));
+      var total=Math.round(rpm*cfg.step/60);
+      var s5=Math.round(total*errRate/100);
+      var s4=Math.round(total*(0.04+rnd()*0.05))+s5;
+      var s3=Math.round(total*0.06);
+      var s2=Math.max(0,total-s3-s4);
+      pts.push({t:t,rpm:+rpm.toFixed(1),err_rate:+errRate.toFixed(2),avg_ms:+avgMs.toFixed(1),p95_ms:+p95Ms.toFixed(1),
+        mem_mb:Math.round(mem),cpu_pct:+cpu.toFixed(1),s2xx:s2,s3xx:s3,s4xx:Math.max(0,s4-s5),s5xx:s5});
+    }
+    return pts;
+  }
+  var STATUS={
+    uptime:3*86400+4*3600+12*60+8, version:'1.0.0', debug:false,
+    schema_applied:'c9d0e1f2a3b4', schema_head:'c9d0e1f2a3b4',
+    process:{pid:9,threads:7,connections:11},
+    git:{active_clones:0,active_pushes:0,queue_size:0}
+  };
+  var PLATFORM={repositories:5,commits:0,users:3};
+  var COMPONENTS={total:7,running:7,healthy:6,unhealthy:0,starting:1};
+  // 7/7 running, 6 healthy + 1 starting（ring 以 running/total 判定可用性）
+  var REDIS={reachable:true,latency_ms:0.42,workers_alive:4,workers_expected:4};
+  var MONITORING={grafana_running:true,prometheus_running:true,grafana_ready:true};
+
+  var ERROR_POOL=[
+    ['ERROR','http','GET  /api/v1/repositories/missing 404 2.2ms path=/api/v1/repositories/missing'],
+    ['WARNING','git','slow git operation: fetch upstream 3.4s exceeds 2s budget repo=admin/Eridanus'],
+    ['WARNING','orm','connection pool approaching capacity in_use=17/20'],
+    ['ERROR','orm','deadlock detected on repository_members, retrying (attempt 1/3)'],
+    ['ERROR','collab','session save failed doc=Eridanus:master:README.md reason=timeout'],
+    ['WARNING','http','POST /api/v1/auth/login 429 1.1ms rate_limited ip=10.0.0.12']
+  ];
+
+  /* ================= svg chart primitives ================= */
+  function sparkline(values,color){
+    var w=120,h=30,mx=Math.max.apply(null,values),mn=Math.min.apply(null,values),rng=(mx-mn)||1;
+    var pts=values.map(function(d,i){
+      var x=(i/(values.length-1))*w, y=h-((d-mn)/rng)*(h-8)-4;
+      return x.toFixed(1)+','+y.toFixed(1);
+    }).join(' ');
+    return '<svg class="kpi-spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" aria-hidden="true">'+
+      '<polyline points="'+pts+'" fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  }
+
+  /* dual-axis traffic chart: rpm area (left) + error rate line (right) */
+  function buildMainChart(pts,uid){
+    var W=780,H=250,padL=46,padR=46,padT=14,padB=26;
+    var iw=W-padL-padR, ih=H-padT-padB, n=pts.length;
+    var maxRpm=niceMax(Math.max.apply(null,pts.map(function(p){return p.rpm;})));
+    var maxErr=niceMax(Math.max.apply(null,pts.map(function(p){return p.err_rate;})),0.5);
+    function x(i){ return padL+(i/(n-1))*iw; }
+    function yR(v){ return padT+ih*(1-v/maxRpm); }
+    function yE(v){ return padT+ih*(1-v/maxErr); }
+    var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" role="img" aria-label="请求速率与错误率趋势">';
+    s+='<defs><linearGradient id="g'+uid+'" x1="0" y1="0" x2="0" y2="1">'+
+       '<stop offset="0%" stop-color="#1f6feb" stop-opacity="0.42"/><stop offset="100%" stop-color="#1f6feb" stop-opacity="0.02"/></linearGradient></defs>';
+    var gi;
+    for(gi=0;gi<=5;gi++){
+      var gy=padT+ih*(gi/5), val=maxRpm*(1-gi/5);
+      s+='<line x1="'+padL+'" y1="'+gy.toFixed(1)+'" x2="'+(padL+iw)+'" y2="'+gy.toFixed(1)+'" stroke="#1c2333" stroke-width="1"/>';
+      s+='<text x="'+(padL-8)+'" y="'+(gy+3.5).toFixed(1)+'" fill="#6e7681" font-size="10" font-family="JetBrains Mono,monospace" text-anchor="end">'+fmtNum(val,0)+'</text>';
+      s+='<text x="'+(padL+iw+8)+'" y="'+(gy+3.5).toFixed(1)+'" fill="#6e7681" font-size="10" font-family="JetBrains Mono,monospace">'+(maxErr*(1-gi/5)).toFixed(2)+'</text>';
+    }
+    var area='M '+x(0).toFixed(1)+' '+yR(pts[0].rpm).toFixed(1);
+    for(var i=1;i<n;i++) area+=' L '+x(i).toFixed(1)+' '+yR(pts[i].rpm).toFixed(1);
+    area+=' L '+x(n-1).toFixed(1)+' '+(padT+ih)+' L '+x(0).toFixed(1)+' '+(padT+ih)+' Z';
+    s+='<path d="'+area+'" fill="url(#g'+uid+')"/>';
+    var line='M '+x(0).toFixed(1)+' '+yR(pts[0].rpm).toFixed(1);
+    for(i=1;i<n;i++) line+=' L '+x(i).toFixed(1)+' '+yR(pts[i].rpm).toFixed(1);
+    s+='<path d="'+line+'" fill="none" stroke="#58a6ff" stroke-width="1.8" stroke-linejoin="round"/>';
+    var err='M '+x(0).toFixed(1)+' '+yE(pts[0].err_rate).toFixed(1);
+    for(i=1;i<n;i++) err+=' L '+x(i).toFixed(1)+' '+yE(pts[i].err_rate).toFixed(1);
+    s+='<path d="'+err+'" fill="none" stroke="#f85149" stroke-width="1.6" stroke-linejoin="round"/>';
+    var li;
+    for(li=0;li<6;li++){
+      var idx=Math.round((n-1)*(li/5)), d=new Date(pts[idx].t);
+      var lbl=RANGES[state.range].minutes>60?(pad(d.getMonth()+1)+'/'+pad(d.getDate())+' '+pad(d.getHours())+':00'):(pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()));
+      s+='<text x="'+x(idx).toFixed(1)+'" y="'+(H-8)+'" fill="#6e7681" font-size="10" font-family="JetBrains Mono,monospace" text-anchor="middle">'+lbl+'</text>';
+    }
+    s+='<g class="hover" style="display:none"><line class="hl" y1="'+padT+'" y2="'+(padT+ih)+'" stroke="#4b5563" stroke-width="1" stroke-dasharray="3 3"/>'+
+       '<circle class="hd1" r="3.5" fill="#58a6ff"/><circle class="hd2" r="3.5" fill="#f85149"/></g>';
+    s+='<rect class="ovl" x="'+padL+'" y="'+padT+'" width="'+iw+'" height="'+ih+'" fill="transparent" style="cursor:crosshair"/>';
+    s+='</svg>';
+    return {svg:s,padL:padL,iw:iw,padT:padT,ih:ih,n:n,x:x,yR:yR,yE:yE,pts:pts,maxRpm:maxRpm,maxErr:maxErr};
+  }
+
+  /* single-axis latency strip: p95 + avg */
+  function buildLatencyChart(pts){
+    var W=780,H=104,padL=46,padR=46,padT=10,padB=20;
+    var iw=W-padL-padR, ih=H-padT-padB, n=pts.length;
+    var mx=niceMax(Math.max.apply(null,pts.map(function(p){return p.p95_ms;})));
+    function x(i){ return padL+(i/(n-1))*iw; }
+    function y(v){ return padT+ih*(1-v/mx); }
+    var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" role="img" aria-label="延迟趋势">';
+    [0,0.5,1].forEach(function(f){
+      var gy=padT+ih*f;
+      s+='<line x1="'+padL+'" y1="'+gy.toFixed(1)+'" x2="'+(padL+iw)+'" y2="'+gy.toFixed(1)+'" stroke="#1c2333" stroke-width="1"/>';
+      s+='<text x="'+(padL-8)+'" y="'+(gy+3.5).toFixed(1)+'" fill="#6e7681" font-size="10" font-family="JetBrains Mono,monospace" text-anchor="end">'+Math.round(mx*(1-f))+'</text>';
+    });
+    var avg='M '+x(0).toFixed(1)+' '+y(pts[0].avg_ms).toFixed(1);
+    for(var i=1;i<n;i++) avg+=' L '+x(i).toFixed(1)+' '+y(pts[i].avg_ms).toFixed(1);
+    s+='<path d="'+avg+'" fill="none" stroke="#bc8cff" stroke-width="1.6" stroke-linejoin="round"/>';
+    var p95='M '+x(0).toFixed(1)+' '+y(pts[0].p95_ms).toFixed(1);
+    for(i=1;i<n;i++) p95+=' L '+x(i).toFixed(1)+' '+y(pts[i].p95_ms).toFixed(1);
+    s+='<path d="'+p95+'" fill="none" stroke="#d29922" stroke-width="1.6" stroke-linejoin="round"/>';
+    s+='</svg>';
+    return s;
+  }
+
+  function donut(segments,size){
+    var r=size/2-10, C=2*Math.PI*r, cum=0;
+    var total=segments.reduce(function(a,b){return a+b.v;},0)||1;
+    var s='<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'" aria-hidden="true"><g transform="rotate(-90 '+(size/2)+' '+(size/2)+')">';
+    s+='<circle cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'" fill="none" stroke="#1c2333" stroke-width="12"/>';
+    segments.forEach(function(seg){
+      var len=C*(seg.v/total);
+      s+='<circle cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'" fill="none" stroke="'+seg.c+'" stroke-width="12" '+
+         'stroke-dasharray="'+len.toFixed(2)+' '+(C-len).toFixed(2)+'" stroke-dashoffset="'+(-cum).toFixed(2)+'"/>';
+      cum+=len;
+    });
+    s+='</g></svg>';
+    return s;
+  }
+
+  function ring(pct,size,color,centerN,centerL){
+    var r=size/2-7, C=2*Math.PI*r, len=C*pct;
+    return '<svg class="ring" width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'" aria-hidden="true">'+
+      '<circle cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'" fill="none" stroke="#1c2333" stroke-width="7"/>'+
+      '<circle cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="7" stroke-linecap="round" '+
+      'stroke-dasharray="'+len.toFixed(1)+' '+(C-len).toFixed(1)+'" transform="rotate(-90 '+(size/2)+' '+(size/2)+')"/>'+
+      '<text x="'+(size/2)+'" y="'+(size/2-1)+'" text-anchor="middle" class="ring-txt">'+centerN+'</text>'+
+      '<text x="'+(size/2)+'" y="'+(size/2+12)+'" text-anchor="middle" class="ring-sub">'+centerL+'</text></svg>';
+  }
+
+  /* ================= state ================= */
+  var state={range:'1h',auto:true,series:genSeries('1h')};
+  var mainChart=null;
+
+  /* ================= render ================= */
+  function delta(cur,prev,goodWhenUp){
+    if(!prev) return '<span class="delta flat">—</span>';
+    var d=(cur-prev)/prev*100, up=d>=0;
+    var cls=Math.abs(d)<0.5?'flat':(up?(goodWhenUp?'up-good':'up-bad'):(goodWhenUp?'down-bad':'down-good'));
+    var arrow=Math.abs(d)<0.5?'→':(up?'▲':'▼');
+    return '<span class="delta '+cls+'">'+arrow+' '+Math.abs(d).toFixed(1)+'%</span>';
+  }
+  function kpi(label,tag,value,unit,sparkHtml,deltaHtml,note,cls){
+    return '<div class="kpi"><div class="kpi-top"><span class="kpi-label">'+esc(label)+'</span><span class="kpi-tag">'+esc(tag)+'</span></div>'+
+      '<div class="kpi-value'+(cls?' '+cls:'')+'">'+value+(unit?'<small>'+unit+'</small>':'')+'</div>'+
+      '<div class="kpi-foot">'+sparkHtml+(deltaHtml||'')+'</div>'+(note?'<div class="kpi-note">'+note+'</div>':'')+'</div>';
+  }
+
+  function renderKpis(pts){
+    var last=pts[pts.length-1], prev=pts[pts.length-2]||last;
+    var rpmV=pts.map(function(p){return p.rpm;});
+    var errV=pts.map(function(p){return p.err_rate;});
+    var p95V=pts.map(function(p){return p.p95_ms;});
+    var memV=pts.map(function(p){return p.mem_mb;});
+    var cpuV=pts.map(function(p){return p.cpu_pct;});
+    var errCls=last.err_rate>1?'bad':last.err_rate>0.5?'warn':'';
+    var cpuCls=last.cpu_pct>60?'warn':'';
+    var memCls=last.mem_mb>800?'warn':'';
+    return kpi('请求速率','Tiny.Area',fmtNum(last.rpm,1),'/min',sparkline(rpmV,'#58a6ff'),delta(last.rpm,prev.rpm,true),'近 '+RANGES[state.range].minutes+' 分钟窗口')+
+      kpi('错误率','Tiny.Line',last.err_rate.toFixed(2),'%',sparkline(errV,'#f85149'),delta(last.err_rate,prev.err_rate,false),'阈值 >1% 告警',errCls)+
+      kpi('P95 延迟','Tiny.Line',fmtNum(last.p95_ms,0),'ms',sparkline(p95V,'#d29922'),delta(last.p95_ms,prev.p95_ms,false),'平均 '+last.avg_ms+' ms')+
+      kpi('内存','Tiny.Area',fmtNum(last.mem_mb,0),'MB',sparkline(memV,'#3fb950'),delta(last.mem_mb,prev.mem_mb,false),'RSS · 进程 '+STATUS.process.pid,memCls)+
+      kpi('CPU','Tiny.Area',last.cpu_pct.toFixed(1),'%',sparkline(cpuV,'#bc8cff'),delta(last.cpu_pct,prev.cpu_pct,false),'线程 '+STATUS.process.threads+' · 连接 '+STATUS.process.connections,cpuCls);
+  }
+
+  function renderMainPanel(pts){
+    var mc=buildMainChart(pts,'m');
+    mainChart=mc;
+    var lat=buildLatencyChart(pts);
+    return '<section class="panel span8"><div class="panel-head"><h2>流量与健康趋势</h2>'+
+      '<span class="hint">Area+Line 双轴 · /api/app/metrics/timeseries?range='+state.range+'</span></div>'+
+      '<div class="panel-body">'+
+        '<div class="chart-wrap" id="mainWrap">'+mc.svg+'<div class="chart-tip" id="mainTip"></div></div>'+
+        '<div class="legend"><span><i class="dot" style="background:#58a6ff"></i>请求速率（左轴 /min）</span>'+
+        '<span><i class="dot" style="background:#f85149"></i>错误率（右轴 %）</span></div>'+
+        '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)">'+
+          '<div class="legend" style="margin:0 0 6px"><span><i class="dot" style="background:#d29922"></i>P95 延迟（ms）</span>'+
+          '<span><i class="dot" style="background:#bc8cff"></i>平均延迟（ms）</span></div>'+
+          '<div class="chart-wrap">'+lat+'</div>'+
+        '</div>'+
+      '</div></section>';
+  }
+
+  function renderHealthPanel(){
+    var pct=COMPONENTS.running/COMPONENTS.total;
+    var color=COMPONENTS.unhealthy>0?'#f85149':(COMPONENTS.running<COMPONENTS.total?'#d29922':'#3fb950');
+    return '<section class="panel span4"><div class="panel-head"><h2>系统健康</h2>'+
+      '<span class="hint">components · redis/status</span></div><div class="panel-body">'+
+      '<div class="health-top">'+ring(pct,86,color,COMPONENTS.running+'/'+COMPONENTS.total,'容器运行')+
+        '<div class="health-legend">'+
+          '<div class="row"><i class="dot" style="background:#3fb950"></i>健康 <b>'+COMPONENTS.healthy+'</b></div>'+
+          '<div class="row"><i class="dot" style="background:#d29922"></i>启动中 <b>'+COMPONENTS.starting+'</b></div>'+
+          '<div class="row"><i class="dot" style="background:#f85149"></i>异常 <b>'+COMPONENTS.unhealthy+'</b></div>'+
+        '</div></div>'+
+      '<div class="hrow"><span class="k">Redis</span><span class="v">'+(REDIS.reachable?'<span style="color:var(--ok)">● </span>':'<span style="color:var(--danger)">● </span>')+REDIS.latency_ms+' ms</span></div>'+
+      '<div class="hrow"><span class="k">Worker 注册表</span><span class="v'+(REDIS.workers_alive===REDIS.workers_expected?'':' warn')+'">'+REDIS.workers_alive+' / '+REDIS.workers_expected+' alive</span></div>'+
+      '<div class="hrow"><span class="k">DB Schema</span><span class="v">'+esc(STATUS.schema_applied)+' / '+esc(STATUS.schema_head)+'</span></div>'+
+      '<div class="hrow"><span class="k">Git 队列</span><span class="v dim">clone '+STATUS.git.active_clones+' · push '+STATUS.git.active_pushes+' · 积压 '+STATUS.git.queue_size+'</span></div>'+
+      '<div class="hrow"><span class="k">运行时长</span><span class="v">'+fmtUptime(STATUS.uptime)+'</span></div>'+
+      '</div></section>';
+  }
+
+  function renderDistribution(pts){
+    var t={s2xx:0,s3xx:0,s4xx:0,s5xx:0};
+    pts.forEach(function(p){ t.s2xx+=p.s2xx;t.s3xx+=p.s3xx;t.s4xx+=p.s4xx;t.s5xx+=p.s5xx; });
+    var total=t.s2xx+t.s3xx+t.s4xx+t.s5xx||1;
+    var segs=[{c:'#3fb950',v:t.s2xx,k:'2xx 成功'},{c:'#58a6ff',v:t.s3xx,k:'3xx 重定向'},{c:'#d29922',v:t.s4xx,k:'4xx 客户端'},{c:'#f85149',v:t.s5xx,k:'5xx 服务端'}];
+    var okPct=(t.s2xx/total*100);
+    var rows=segs.map(function(s){
+      return '<div class="row"><i class="dot" style="background:'+s.c+'"></i>'+s.k+'<span class="n">'+fmtNum(s.v)+'</span><span class="p">'+(s.v/total*100).toFixed(1)+'%</span></div>';
+    }).join('');
+    return '<section class="panel span4"><div class="panel-head"><h2>请求结果分布</h2>'+
+      '<span class="hint">Pie · 区间合计</span></div><div class="panel-body"><div class="donut-wrap">'+
+      '<div class="donut">'+donut(segs,120)+'<div class="center"><div class="n">'+okPct.toFixed(1)+'%</div><div class="l">成功率</div></div></div>'+
+      '<div class="dlegend">'+rows+'</div></div></div></section>';
+  }
+
+  function renderPlatform(){
+    return '<section class="panel span4"><div class="panel-head"><h2>平台统计</h2>'+
+      '<span class="hint">/api/v1/stats/platform</span></div><div class="panel-body">'+
+      '<div class="statgrid">'+
+        '<div class="s"><div class="n">'+fmtNum(PLATFORM.repositories)+'</div><div class="l">仓库数</div></div>'+
+        '<div class="s"><div class="n">'+fmtNum(PLATFORM.commits)+'</div><div class="l">提交数</div></div>'+
+        '<div class="s"><div class="n">'+fmtNum(PLATFORM.users)+'</div><div class="l">用户数</div></div>'+
+        '<div class="s"><div class="n">'+fmtUptime(STATUS.uptime)+'</div><div class="l">实例运行时长</div></div>'+
+      '</div></div></section>';
+  }
+
+  function renderMonitoring(){
+    function dot(on){ return on?'<span style="color:var(--ok)">●</span>':'<span style="color:var(--danger)">●</span>'; }
+    return '<section class="panel span4"><div class="panel-head"><h2>监控栈</h2>'+
+      '<span class="hint">/api/app/monitoring</span>'+
+      '<span class="right"><span class="chip '+(MONITORING.grafana_running?'ok':'')+'">'+(MONITORING.grafana_running?'运行中':'已停止')+'</span></span></div>'+
+      '<div class="panel-body">'+
+      '<div class="mon-row">'+dot(MONITORING.grafana_running)+' Grafana <span class="v">'+(MONITORING.grafana_ready?'就绪':'未就绪')+'</span></div>'+
+      '<div class="mon-row">'+dot(MONITORING.prometheus_running)+' Prometheus <span class="v">'+(MONITORING.prometheus_running?'运行中':'已停止')+'</span></div>'+
+      '<div class="mon-foot"><span class="lab">监控栈</span>'+
+        '<button class="switch'+(MONITORING.grafana_running?' on':'')+'" id="monSwitch" role="switch" aria-checked="'+MONITORING.grafana_running+'" aria-label="监控栈开关" style="margin-left:auto"></button>'+
+        '<button class="btn sm" data-act="grafana">打开 Grafana →</button></div>'+
+      '</div></section>';
+  }
+
+  function renderErrors(){
+    var lines=ERROR_POOL.slice(0,6).map(function(l){
+      return '<div class="ln" data-level="'+l[0]+'"><span class="ts">'+l[0].toLowerCase()+'</span><span class="lvl">'+l[0]+'</span><span class="msg">['+esc(l[1])+'] '+esc(l[2])+'</span></div>';
+    }).join('');
+    return '<section class="panel span12"><div class="panel-head"><h2>最近错误与告警</h2>'+
+      '<span class="hint">/api/app/logs/content?level=error&lines=6</span>'+
+      '<span class="right"><button class="btn ghost sm" data-act="logs">打开日志 →</button></span></div>'+
+      '<div class="panel-body tight"><div class="term"><div class="term-body">'+lines+'</div></div></div></section>';
+  }
+
+  function render(){
+    renderRail();
+    var pts=state.series;
+    var html='';
+    html+='<div class="page-head"><div><h1>状态概览</h1>'+
+      '<p>进程、请求与平台实时状态。历史曲线来自后端时序接口（Redis 分钟桶兜底，可选接 Prometheus）。</p></div>'+
+      '<div class="head-actions">'+
+        '<div class="seg" id="rangeSeg">'+Object.keys(RANGES).map(function(r){
+          return '<button data-range="'+r+'" class="'+(r===state.range?'on':'')+'">'+r+'</button>';
+        }).join('')+'</div>'+
+        '<button class="btn sm" id="autoBtn">'+(state.auto?'● 自动刷新':'○ 已暂停')+'</button>'+
+        '<button class="btn sm" data-act="refresh">刷新</button>'+
+      '</div></div>';
+
+    html+='<div class="kpis">'+renderKpis(pts)+'</div>';
+    html+='<div class="grid">'+renderMainPanel(pts)+renderHealthPanel()+
+      renderDistribution(pts)+renderPlatform()+renderMonitoring()+
+      renderErrors()+'</div>';
+    html+='<div class="footnote"><b>数据源映射</b> · /api/app/status → KPI/健康 · <b>新增</b> /api/app/metrics/timeseries?range=… → 趋势/分布 · '+
+      '/api/app/components → 容器环 · /api/app/redis/status → Redis 行 · /api/v1/stats/platform → 平台统计 · '+
+      '/api/app/monitoring → 监控磁贴 · /api/app/logs/content?level=error → 最近错误<br>'+
+      '<b>图表组件</b> · @ant-design/charts：KPI=Tiny.Area/Tiny.Line，趋势=Area+Line(双轴)，延迟=Line×2，分布=Pie，容器环=Progress dashboard</div>';
+
+    $('stage').innerHTML=html;
+    $('stage').scrollTop=0;
+    mountHover();
+  }
+
+  /* ================= main chart hover ================= */
+  function mountHover(){
+    var wrap=$('mainWrap'); if(!wrap||!mainChart) return;
+    var mc=mainChart, tip=$('mainTip');
+    var svg=wrap.querySelector('svg'), hov=svg.querySelector('.hover');
+    var hl=svg.querySelector('.hl'), d1=svg.querySelector('.hd1'), d2=svg.querySelector('.hd2'), ovl=svg.querySelector('.ovl');
+    ovl.addEventListener('mousemove',function(e){
+      var box=svg.getBoundingClientRect();
+      var relX=((e.clientX-box.left)/box.width)*780;
+      var inner=((relX-mc.padL)/mc.iw)*(mc.n-1);
+      var idx=Math.max(0,Math.min(mc.n-1,Math.round(inner)));
+      var p=mc.pts[idx], px=mc.x(idx);
+      hov.style.display='';
+      hl.setAttribute('x1',px.toFixed(1)); hl.setAttribute('x2',px.toFixed(1));
+      d1.setAttribute('cx',px.toFixed(1)); d1.setAttribute('cy',mc.yR(p.rpm).toFixed(1));
+      d2.setAttribute('cx',px.toFixed(1)); d2.setAttribute('cy',mc.yE(p.err_rate).toFixed(1));
+      var d=new Date(p.t);
+      tip.innerHTML='<div class="tt">'+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds())+'</div>'+
+        '请求 <b>'+p.rpm+'</b> /min<br>错误率 <b style="color:#f85149">'+p.err_rate.toFixed(2)+'%</b><br>P95 <b>'+Math.round(p.p95_ms)+'</b> ms';
+      var left=(px/780)*box.width+10;
+      if(left>box.width-140) left=left-160;
+      tip.style.left=left+'px'; tip.style.top='8px'; tip.style.opacity='1';
+    });
+    ovl.addEventListener('mouseleave',function(){ hov.style.display='none'; tip.style.opacity='0'; });
+  }
+
+  /* ================= events ================= */
+  $('stage').addEventListener('click',function(e){
+    var seg=e.target.closest('[data-range]');
+    if(seg){ state.range=seg.getAttribute('data-range'); state.series=genSeries(state.range); render(); toast('ok','时间范围 '+state.range,'重新拉取 timeseries'); return; }
+    if(e.target.closest('#autoBtn')){ state.auto=!state.auto; render(); toast(state.auto?'ok':'warn',state.auto?'已开启自动刷新':'已暂停自动刷新','5s 轮询'); return; }
+    var act=e.target.closest('[data-act]');
+    if(!act) return;
+    var a=act.getAttribute('data-act');
+    if(a==='refresh'){ state.series=genSeries(state.range); render(); toast('ok','已刷新','/api/app/status + timeseries'); }
+    if(a==='logs'){ toast('ok','跳转日志查看','/admin/logs'); }
+    if(a==='grafana'){ toast('ok','打开 Grafana','POST /api/app/monitoring/grafana/sso → /grafana'); }
+  });
+  $('stage').addEventListener('click',function(e){
+    var sw=e.target.closest('#monSwitch'); if(!sw) return;
+    MONITORING.grafana_running=!MONITORING.grafana_running;
+    MONITORING.prometheus_running=MONITORING.grafana_running;
+    render(); toast(MONITORING.grafana_running?'ok':'warn','监控栈 '+(MONITORING.grafana_running?'已启动':'已停止'),'POST /api/app/monitoring/enabled');
+  });
+
+  /* ================= timers ================= */
+  function tickClock(){
+    var n=new Date();
+    $('clock').textContent=pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds());
+  }
+  function tickLive(){
+    if(!state.auto) return;
+    var pts=state.series, last=pts[pts.length-1];
+    var np={t:Date.now(),rpm:+Math.max(1,last.rpm+(Math.random()*6-3)).toFixed(1),
+      err_rate:+Math.max(0,last.err_rate+(Math.random()*0.24-0.12)).toFixed(2),
+      avg_ms:+Math.max(8,last.avg_ms+(Math.random()*6-3)).toFixed(1),
+      p95_ms:+Math.max(20,last.p95_ms+(Math.random()*14-7)).toFixed(1),
+      mem_mb:Math.round(Math.min(900,Math.max(320,last.mem_mb+(Math.random()*12-6)))),
+      cpu_pct:+Math.max(0.4,Math.min(72,last.cpu_pct+(Math.random()*4-2))).toFixed(1),
+      s2xx:last.s2xx,s3xx:last.s3xx,s4xx:last.s4xx,s5xx:last.s5xx};
+    state.series=pts.slice(1).concat([np]);
+    if(location.hash===''||location.hash==='#overview') render();
+  }
+
+  /* ================= init ================= */
+  render();
+  tickClock();
+  setInterval(tickClock,1000);
+  setInterval(tickLive,5000);
+})();
+</script>
+</body>
+</html>

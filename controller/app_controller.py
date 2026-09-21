@@ -12,7 +12,7 @@
 """
 from datetime import datetime
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Body, Response
 from pydantic import BaseModel, Field
@@ -115,6 +115,30 @@ class ActionResponse(BaseModel):
     """操作响应模型"""
     success: bool
     message: str
+
+
+class MetricsPoint(BaseModel):
+    """概览时序单点（一个降采样桶）"""
+    t: int = Field(..., description="桶结束时刻（epoch 毫秒）")
+    rpm: float = Field(0.0, description="每分钟请求数（桶内均值）")
+    err_rate: float = Field(0.0, description="错误率百分比（非 2xx/3xx 占比）")
+    avg_ms: float = Field(0.0, description="平均响应时间（毫秒）")
+    p95_ms: float = Field(0.0, description="P95 响应时间（毫秒，直方图估算）")
+    mem_mb: Optional[float] = Field(None, description="进程内存 RSS（MB，跨 worker 求和）")
+    cpu_pct: Optional[float] = Field(None, description="进程 CPU 占用（%，跨 worker 求和）")
+    s2xx: int = Field(0, description="2xx 请求数")
+    s3xx: int = Field(0, description="3xx 请求数")
+    s4xx: int = Field(0, description="4xx 请求数")
+    s5xx: int = Field(0, description="5xx 请求数")
+
+
+class MetricsTimeseriesResponse(BaseModel):
+    """概览时序响应模型"""
+    range: str
+    step: int = Field(..., description="降采样步长（秒）")
+    generated_at: str
+    source: str = Field(..., description="数据来源：redis | memory")
+    points: List[MetricsPoint] = Field(default_factory=list)
 
 
 class DebugToggleRequest(BaseModel):
@@ -381,6 +405,32 @@ async def get_platform_stats_endpoint(db: AsyncSession = Depends(get_async_db)):
         **stats,
         "uptime_seconds": status["uptime_seconds"],
     }
+
+
+@router.get(
+    "/api/app/metrics/timeseries",
+    response_model=MetricsTimeseriesResponse,
+    tags=["app-management"],
+)
+async def get_metrics_timeseries_endpoint(
+    range_key: Literal["5m", "30m", "1h", "6h", "24h"] = Query(
+        "1h", alias="range", description="时间范围"
+    ),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    获取概览趋势时序（仅管理员）。
+
+    合并请求分钟桶与进程内存/CPU 采样，按范围降采样为点序列。历史存于 Redis
+    （请求桶见 middleware/request_stats，进程采样见 services/process_metrics），
+    保留时长由 ``metrics.history_minutes`` 控制；Redis 不可用时退回进程内实现。
+
+    Returns:
+        MetricsTimeseriesResponse: 范围、步长、数据来源与点序列
+    """
+    from services.metrics_service import get_timeseries
+
+    return await get_timeseries(range_key)
 
 
 @router.post("/api/app/shutdown", response_model=ActionResponse)
