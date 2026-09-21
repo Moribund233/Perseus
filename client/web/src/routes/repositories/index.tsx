@@ -17,6 +17,8 @@ import {
   ReadOutlined,
   UnorderedListOutlined,
   AppstoreOutlined,
+  ArrowLeftOutlined,
+  EditOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useSpring, animated } from '@react-spring/web';
@@ -113,6 +115,12 @@ function buildTree(files: RepoFile[]): TreeNode[] {
   return roots;
 }
 
+/** "src/utils/a.ts" → "src/utils"；根级返回 "" */
+function parentPath(path: string): string {
+  const i = path.lastIndexOf('/');
+  return i >= 0 ? path.slice(0, i) : '';
+}
+
 function getIconColor(name: string): string | undefined {
   const ext = name.split('.').pop();
   switch (ext) {
@@ -193,7 +201,7 @@ function TreeNodeView({
   node: TreeNode;
   depth: number;
   selectedKey: string;
-  onSelect: (key: string) => void;
+  onSelect: (key: string, type: 'folder' | 'file') => void;
   branchName?: string;
   repoId?: string;
   branchRef?: string;
@@ -205,7 +213,7 @@ function TreeNodeView({
   const fetchTree = useRepositoriesStore((s) => s.fetchTree);
 
   const handleClick = async () => {
-    onSelect(node.key);
+    onSelect(node.key, node.type);
     if (node.type !== 'folder') return;
     if (!hasChildren && !loading && repoId) {
       setLoading(true);
@@ -308,6 +316,8 @@ export default function RepositoriesPage() {
   const [selectedTreeKey, setSelectedTreeKey] = useState('');
   const [selectedFileContent, setSelectedFileContent] = useState<RepoBlob | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
+  const [currentDir, setCurrentDir] = useState('');
+  const [dirLoading, setDirLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [isStarred, setIsStarred] = useState(false);
   const [isWatching, setIsWatching] = useState(false);
@@ -377,20 +387,49 @@ export default function RepositoriesPage() {
 
   const repoTree = useMemo(() => buildTree(storeFiles), [storeFiles]);
 
-  const rootFiles = useMemo(
-    () => storeFiles.filter((f) => !f.path.includes('/')),
-    [storeFiles]
+  // 当前目录下的条目（目录 + 文件）
+  const dirEntries = useMemo(
+    () => storeFiles.filter((f) => parentPath(f.path) === currentDir),
+    [storeFiles, currentDir]
   );
 
   const displayFiles = useMemo(() => {
-    if (activeFilter === 'all') return rootFiles;
-    return rootFiles.filter((f) => {
+    if (activeFilter === 'all') return dirEntries;
+    return dirEntries.filter((f) => {
+      if (f.type === 'directory') return true; // 目录始终显示
       if (activeFilter === 'source') return /\.(ts|tsx|js|jsx|rs|go|py)$/i.test(f.name);
       if (activeFilter === 'config') return /\.(json|ya?ml|toml)$/i.test(f.name) || f.name === '.gitignore';
       if (activeFilter === 'tests') return f.path.includes('test') || f.path.includes('__tests__') || /\.(test|spec)\./i.test(f.name);
       return true;
     });
-  }, [rootFiles, activeFilter]);
+  }, [dirEntries, activeFilter]);
+
+  /** 进入目录：清空文件选择并把列表切到该目录 */
+  const goToDir = useCallback((path: string) => {
+    setSelectedTreeKey('');
+    setSelectedFileContent(null);
+    setCurrentDir(path);
+  }, []);
+
+  /** 从文件列表进入目录：若子项尚未加载则拉取 */
+  const openDir = useCallback(async (path: string) => {
+    if (!currentRepo) return;
+    goToDir(path);
+    const loaded = storeFiles.some((f) => parentPath(f.path) === path);
+    if (!loaded) {
+      setDirLoading(true);
+      try {
+        await fetchTree(currentRepo.id, currentRepo.default_branch, path);
+      } finally {
+        setDirLoading(false);
+      }
+    }
+  }, [currentRepo, storeFiles, fetchTree, goToDir]);
+
+  const closeViewer = useCallback(() => {
+    setSelectedTreeKey('');
+    setSelectedFileContent(null);
+  }, []);
 
   const latestCommit = useMemo(
     () => (commits.length > 0 ? commits[0] : null),
@@ -776,7 +815,10 @@ export default function RepositoriesPage() {
                 node={node}
                 depth={0}
                 selectedKey={selectedTreeKey}
-                onSelect={(key) => setSelectedTreeKey(key)}
+                onSelect={(key, type) => {
+                  if (type === 'folder') goToDir(key);
+                  else setSelectedTreeKey(key);
+                }}
                 branchName={currentRepo.default_branch}
                 repoId={currentRepo.id}
                 branchRef={currentRepo.default_branch}
@@ -794,6 +836,16 @@ export default function RepositoriesPage() {
       <Content style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '24px 24px 0' }}>
         <div style={{ flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+            <Button
+              type="text"
+              icon={<ArrowLeftOutlined />}
+              onClick={() => navigate('/repositories')}
+              style={{ color: textSecondary, fontSize: 13, padding: '0 8px', height: 30, flexShrink: 0 }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = textPrimary; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = textSecondary; }}
+            >
+              {t('app.repositories.backToRepos')}
+            </Button>
             <span style={{ fontSize: 24, color: blueLight, display: 'flex', alignItems: 'center' }}>
               <FolderOutlined />
             </span>
@@ -829,7 +881,91 @@ export default function RepositoriesPage() {
         </div>
 
         {activeTab === 'code' ? (
+        selectedFileContent ? (
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', paddingBottom: 24 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '10px 14px',
+              background: bgTertiary,
+              border: `1px solid ${borderColor}`,
+              borderBottom: 'none',
+              borderRadius: '12px 12px 0 0',
+              fontSize: 13,
+              fontWeight: 500,
+              color: textPrimary,
+            }}
+          >
+            <span
+              onClick={closeViewer}
+              title={t('app.repositories.backToList')}
+              style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', color: textSecondary, flexShrink: 0 }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = blueLight; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = textSecondary; }}
+            >
+              <ArrowLeftOutlined />
+            </span>
+            <FileTextOutlined style={{ fontSize: 16, flexShrink: 0 }} />
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedFileContent.path}</span>
+            <span style={{ marginLeft: 'auto', color: textTertiary, fontSize: 12, fontWeight: 400, whiteSpace: 'nowrap' }}>
+              {selectedFileContent.size} bytes
+            </span>
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => navigate(`/editor/${owner}/${repo}?file=${encodeURIComponent(selectedFileContent.path)}`)}
+              style={{ background: bgSecondary, color: textPrimary, border: `1px solid ${borderColor}`, fontSize: 12, height: 26, flexShrink: 0 }}
+            >
+              {t('app.repositories.openInEditor')}
+            </Button>
+          </div>
+          <pre
+            style={{
+              flex: 1,
+              minHeight: 0,
+              margin: 0,
+              padding: 16,
+              fontSize: 13,
+              lineHeight: 1.5,
+              color: textPrimary,
+              overflow: 'auto',
+              border: `1px solid ${borderColor}`,
+              borderRadius: '0 0 12px 12px',
+              background: '#0d1117',
+              fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+            }}
+          >
+            {selectedFileContent.content}
+          </pre>
+        </div>
+        ) : (
         <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, fontSize: 13, flexWrap: 'wrap' }}>
+          <span
+            onClick={() => goToDir('')}
+            style={{ color: currentDir ? blueLight : textPrimary, cursor: currentDir ? 'pointer' : 'default', fontWeight: currentDir ? 400 : 600 }}
+          >
+            {currentRepo?.name}
+          </span>
+          {currentDir.split('/').filter(Boolean).map((seg, i, arr) => {
+            const upTo = arr.slice(0, i + 1).join('/');
+            const isLast = i === arr.length - 1;
+            return (
+              <span key={upTo} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: textTertiary }}>/</span>
+                <span
+                  onClick={() => goToDir(upTo)}
+                  style={{ color: isLast ? textPrimary : blueLight, cursor: isLast ? 'default' : 'pointer', fontWeight: isLast ? 600 : 400 }}
+                >
+                  {seg}
+                </span>
+              </span>
+            );
+          })}
+          {dirLoading && <Spin size="small" style={{ marginLeft: 4 }} />}
+        </div>
         <div
           style={{
             border: `1px solid ${borderColor}`,
@@ -873,7 +1009,7 @@ export default function RepositoriesPage() {
               key={file.path}
               onClick={() => {
                 if (file.type === 'directory') {
-                  navigate(`/editor/${owner}/${repo}`);
+                  void openDir(file.path);
                 } else {
                   setSelectedTreeKey(file.path);
                 }
@@ -940,58 +1076,13 @@ export default function RepositoriesPage() {
           )}
         </div>
 
-        {selectedFileContent && (
-          <div
-            style={{
-              border: `1px solid ${borderColor}`,
-              borderRadius: 12,
-              overflow: 'hidden',
-              background: bgSecondary,
-              marginBottom: 20,
-            }}
-          >
-            <div
-              style={{
-                padding: '12px 16px',
-                background: bgTertiary,
-                borderBottom: `1px solid ${borderColor}`,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                fontSize: 13,
-                fontWeight: 500,
-                color: textPrimary,
-              }}
-            >
-              <FileTextOutlined style={{ fontSize: 16 }} />
-              {selectedFileContent.path}
-              <span style={{ marginLeft: 'auto', color: textTertiary, fontSize: 12, fontWeight: 400 }}>
-                {selectedFileContent.size} bytes
-              </span>
-            </div>
-            <pre style={{
-              margin: 0,
-              padding: 16,
-              fontSize: 13,
-              lineHeight: 1.5,
-              color: textPrimary,
-              overflow: 'auto',
-              maxHeight: 600,
-              background: '#0d1117',
-              fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-            }}>
-              {selectedFileContent.content}
-            </pre>
-          </div>
-        )}
-
         {fileLoading && (
           <div style={{ textAlign: 'center', padding: 40, color: textSecondary }}>
             <Spin />
           </div>
         )}
 
-        {readme && (
+        {readme && currentDir === '' && (
           <div
             style={{
               border: `1px solid ${borderColor}`,
@@ -1024,6 +1115,7 @@ export default function RepositoriesPage() {
           </div>
         )}
       </div>
+      )
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0 24px' }}>
           {activeTab === 'releases' && <ReleasesTab repoId={currentRepo.id} />}

@@ -44,12 +44,14 @@ def _ensure_handlers_registered() -> None:
 @router.websocket("/logs")
 async def logs_websocket(
     websocket: WebSocket,
-    token: Optional[str] = Query(None, description="认证token（可选）")
+    token: Optional[str] = Query(None, description="认证token（必填，需管理员）")
 ):
     """
-    实时日志 WebSocket 端点
+    实时日志 WebSocket 端点（仅管理员）
 
-    用于接收实时日志推送，替代传统的 HTTP 轮询日志接口
+    用于接收实时日志推送，替代传统的 HTTP 轮询日志接口。
+    日志流含进程内部信息，属管理面数据：连接必须携带有效 JWT 且用户为
+    管理员，匿名或非管理员一律以 1008 关闭。
 
     连接URL格式:
     - ws://host:port/ws/logs?token=your_jwt_token
@@ -78,34 +80,36 @@ async def logs_websocket(
     _ensure_handlers_registered()
     connection: Optional[Connection] = None
 
+    # 必须先认证且为管理员（在 accept 之前拒绝，避免建立匿名连接）
+    try:
+        user_info = await authenticate_websocket(websocket)
+    except WebSocketAuthError as e:
+        await websocket.close(code=e.code, reason=e.message)
+        return
+
+    if not user_info or not user_info.get("is_admin"):
+        await websocket.close(code=1008, reason="Admin permission required")
+        return
+
     try:
         # 接受连接
         connection = await manager.connect(websocket)
 
-        # 可选认证
-        user_info = await authenticate_websocket(websocket, required=False)
-        if user_info:
-            await manager.bind_user(
-                connection,
-                user_id=user_info["user_id"],
-                username=user_info["username"]
-            )
+        # 绑定管理员用户
+        await manager.bind_user(
+            connection,
+            user_id=user_info["user_id"],
+            username=user_info["username"]
+        )
+        connection.metadata["is_admin"] = True
 
-            await connection.send({
-                "type": "connected",
-                "connection_id": connection.connection_id,
-                "authenticated": True,
-                "channel": "logs",
-                "message": "日志通道已连接"
-            })
-        else:
-            await connection.send({
-                "type": "connected",
-                "connection_id": connection.connection_id,
-                "authenticated": False,
-                "channel": "logs",
-                "message": "日志通道已连接（匿名模式）"
-            })
+        await connection.send({
+            "type": "connected",
+            "connection_id": connection.connection_id,
+            "authenticated": True,
+            "channel": "logs",
+            "message": "日志通道已连接"
+        })
 
         # 主消息循环
         while connection.is_alive:

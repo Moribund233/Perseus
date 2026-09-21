@@ -13,8 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.release import Release, ReleaseAsset
 from models.repository import Repository
 from services import release_service
-from services.release_service import (
-    _create_git_tag, _delete_git_tag, list_git_tags, get_git_tag
+from utils.git_utils import (
+    create_git_tag as _create_git_tag,
+    delete_git_tag as _delete_git_tag,
+    list_git_tags,
+    get_git_tag,
 )
 from core.exception import NotFoundException, ValidationException
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseLogLines, splitLine } from './logLine';
+import { buildSegmentedRows, parseLogLines, splitLine } from './logLine';
 
 describe('splitLine', () => {
   it('切出 INFO 级别并保留前后文', () => {
@@ -33,5 +33,49 @@ describe('parseLogLines', () => {
 
   it('保留中间空行', () => {
     expect(parseLogLines('a\n\nb')).toEqual(['a', '', 'b']);
+  });
+});
+
+describe('buildSegmentedRows', () => {
+  const label = (name: string) => `── 续 ${name} ──`;
+
+  it('单个分片不插入分隔行', () => {
+    const rows = buildSegmentedRows(['a', 'b'], [{ name: 'x.log', offset: 0 }], label);
+    expect(rows).toEqual([{ text: 'a' }, { text: 'b' }]);
+  });
+
+  it('跨分片时按 offset 插入分隔行', () => {
+    const rows = buildSegmentedRows(
+      ['old', 'mid', 'new'],
+      [
+        { name: 'x.log.2', offset: 0 },
+        { name: 'x.log.1', offset: 1 },
+        { name: 'x.log', offset: 2 },
+      ],
+      label,
+    );
+    expect(rows).toEqual([
+      { text: '── 续 x.log.2 ──', kind: 'segment' },
+      { text: 'old' },
+      { text: '── 续 x.log.1 ──', kind: 'segment' },
+      { text: 'mid' },
+      { text: '── 续 x.log ──', kind: 'segment' },
+      { text: 'new' },
+    ]);
+  });
+
+  it('窗口只覆盖部分分片时按实际 offset 插入', () => {
+    const rows = buildSegmentedRows(
+      ['a', 'b'],
+      [
+        { name: 'x.log.1', offset: 0 },
+        { name: 'x.log', offset: 1 },
+      ],
+      label,
+    );
+    expect(rows.filter((r) => r.kind === 'segment').map((r) => r.text)).toEqual([
+      '── 续 x.log.1 ──',
+      '── 续 x.log ──',
+    ]);
   });
 });

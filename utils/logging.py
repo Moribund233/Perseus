@@ -12,13 +12,18 @@
 - 内存缓冲区（用于快速查询历史日志）
 """
 import logging
+import re
 import sys
 from pathlib import Path
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Tuple
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
 
 _websocket_handler = None
+
+# RotatingFileHandler 默认保留策略（init_logging 未显式传参时生效）
+DEFAULT_MAX_BYTES = 10 * 1024 * 1024
+DEFAULT_BACKUP_COUNT = 5
 
 
 def _get_websocket_log_handler():
@@ -343,9 +348,66 @@ def cleanup_old_logs(log_dir: str = "logs", keep_days: int = 30) -> int:
     return deleted_count
 
 
+def get_log_retention() -> Tuple[int, int]:
+    """返回当前日志保留策略 (max_bytes, backup_count)"""
+    global _log_manager
+    if _log_manager is not None:
+        return _log_manager.max_bytes, _log_manager.backup_count
+    return DEFAULT_MAX_BYTES, DEFAULT_BACKUP_COUNT
+
+
+_SEGMENT_RE = re.compile(r"^(?P<base>.+\.log)(?:\.(?P<idx>\d+))?$")
+
+
+def parse_log_segment(name: str) -> Optional[Tuple[str, int]]:
+    """
+    解析日志文件名中的基名与分片序号。
+
+    - ``error.log``   → ``("error.log", 0)``（当前段）
+    - ``error.log.3`` → ``("error.log", 3)``（第 3 个备份，数字越大越旧）
+    - 非日志文件      → ``None``
+    """
+    m = _SEGMENT_RE.match(name)
+    if not m:
+        return None
+    return m.group("base"), int(m.group("idx") or 0)
+
+
+def resolve_log_segments(
+    log_dir: str,
+    date: str,
+    log_name: str,
+) -> List[Tuple[int, Path]]:
+    """
+    解析某日期下某个日志文件的全部磁盘分片（RotatingFileHandler 产物）。
+
+    Args:
+        log_dir: 日志根目录
+        date: 日期 (YYYY-MM-DD)
+        log_name: 文件基名（不含 .log）
+
+    Returns:
+        List[Tuple[int, Path]]: ``(分片序号, 路径)`` 按**新→旧**排序；
+        序号 0 为当前段，数字越大越旧。无匹配时返回空列表。
+    """
+    day_dir = Path(log_dir) / date
+    base = f"{log_name}.log"
+    segments: List[Tuple[int, Path]] = []
+    if day_dir.exists():
+        for path in day_dir.iterdir():
+            parsed = parse_log_segment(path.name)
+            if parsed and parsed[0] == base:
+                segments.append((parsed[1], path))
+    segments.sort(key=lambda item: item[0])
+    return segments
+
+
 def get_log_info(log_dir: str = "logs") -> Dict[str, Any]:
     """
     获取日志系统信息
+
+    每个日志文件按基名聚合其磁盘分片（``X.log`` + ``X.log.1..N``），
+    返回分片数、合计大小与是否已达保留上限（更早分片可能已被丢弃）。
 
     Args:
         log_dir: 日志根目录
@@ -359,19 +421,40 @@ def get_log_info(log_dir: str = "logs") -> Dict[str, Any]:
 
     files = []
     total_size = 0
+    _, backup_count = get_log_retention()
 
     if today_dir.exists():
+        groups: Dict[str, List[Tuple[int, Path]]] = {}
         for log_file in today_dir.iterdir():
-            if log_file.suffix == ".log":
-                stat = log_file.stat()
-                size = stat.st_size
-                total_size += size
-                files.append({
-                    "name": log_file.name,
-                    "size": size,
-                    "size_formatted": _format_file_size(size),
-                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                })
+            parsed = parse_log_segment(log_file.name)
+            if parsed:
+                groups.setdefault(parsed[0], []).append((parsed[1], log_file))
+
+        for base in sorted(groups):
+            segs = sorted(groups[base], key=lambda item: item[0])
+            seg_total = 0
+            for _, seg_path in segs:
+                try:
+                    seg_total += seg_path.stat().st_size
+                except OSError:
+                    pass
+            total_size += seg_total
+
+            current = next((p for idx, p in segs if idx == 0), None)
+            newest_path = current or segs[0][1]
+            current_size = current.stat().st_size if current else 0
+            max_idx = segs[-1][0]
+
+            files.append({
+                "name": base,
+                "size": current_size,
+                "size_formatted": _format_file_size(current_size),
+                "modified": datetime.fromtimestamp(newest_path.stat().st_mtime).isoformat(),
+                "parts": len(segs),
+                "total_size": seg_total,
+                "total_size_formatted": _format_file_size(seg_total),
+                "truncated": backup_count > 0 and max_idx >= backup_count,
+            })
 
     available_dates = []
     if log_path.exists():

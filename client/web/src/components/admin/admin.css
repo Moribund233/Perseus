@@ -18,10 +18,121 @@
   --ac-mono: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace);
 
   display: flex;
+  flex-direction: column;
   height: 100vh;
   min-height: 0;
   background: var(--ac-bg);
   color: var(--ac-text);
+}
+
+.ac-shell {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.ac-mono { font-family: var(--ac-mono); }
+
+/* ---------- 顶栏 ---------- */
+.ac-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-shrink: 0;
+  height: 52px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--ac-rule);
+  background: var(--ac-band);
+}
+
+.ac-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ac-brand-name {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.ac-brand-sep { color: var(--ac-text-faint); }
+
+.ac-brand-sub {
+  color: var(--ac-text-faint);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.ac-header-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ac-text-dim);
+}
+
+.ac-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ac-text-faint);
+}
+
+.ac-pulse.on {
+  background: var(--ac-ok);
+  animation: ac-pulse 2s infinite;
+}
+
+@keyframes ac-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.5); }
+  70% { box-shadow: 0 0 0 6px rgba(63, 185, 80, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0); }
+}
+
+.ac-status-word { text-transform: lowercase; }
+
+.ac-chip.debug {
+  color: var(--ac-violet);
+  border-color: rgba(163, 113, 247, 0.4);
+  background: rgba(163, 113, 247, 0.08);
+}
+
+.ac-version { color: var(--ac-text-faint); }
+
+.ac-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--ac-text-faint);
+  font-size: 11px;
+}
+
+.ac-clock { color: var(--ac-text-dim); }
+
+.ac-who { display: flex; align-items: center; gap: 7px; }
+
+.ac-av {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ac-active);
+  color: var(--ac-accent-light);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ac-who-name { color: var(--ac-text-dim); }
+
+@media (max-width: 720px) {
+  .ac-brand-sub,
+  .ac-endpoint { display: none; }
 }
 
 /* ---------- 左侧系统索引 ---------- */
@@ -29,9 +140,53 @@
   width: 208px;
   flex-shrink: 0;
   border-right: 1px solid var(--ac-rule);
-  padding: 18px 12px;
+  padding: 14px 12px;
   overflow-y: auto;
   background: var(--ac-bg);
+  transition: width 0.18s ease, padding 0.18s ease;
+}
+
+.ac-rail.collapsed {
+  width: 60px;
+  padding: 14px 8px;
+}
+
+.ac-rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 2px 12px;
+}
+
+.ac-rail.collapsed .ac-rail-head {
+  justify-content: center;
+}
+
+.ac-rail-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--ac-rule);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ac-text-dim);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.ac-rail-toggle:hover {
+  background: var(--ac-hover);
+  color: var(--ac-text);
+}
+
+.ac-rail-toggle:focus-visible {
+  outline: 2px solid var(--ac-accent);
+  outline-offset: 1px;
 }
 
 .ac-rail-cap {
@@ -71,16 +226,27 @@
   color: var(--ac-accent-light);
 }
 
-.ac-idx-num {
-  font-family: var(--ac-mono);
-  font-size: 11px;
-  color: var(--ac-text-faint);
+.ac-idx-icon {
+  display: inline-flex;
+  justify-content: center;
   width: 18px;
   flex-shrink: 0;
+  font-size: 15px;
 }
 
-.ac-idx-item.active .ac-idx-num {
+.ac-idx-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ac-idx-item.active .ac-idx-icon {
   color: var(--ac-accent);
+}
+
+.ac-rail.collapsed .ac-idx-item {
+  justify-content: center;
+  padding: 9px 0;
 }
 
 .ac-idx-item.disabled {
@@ -97,6 +263,65 @@
   margin-left: auto;
   font-size: 10px;
   color: var(--ac-text-faint);
+}
+
+/* ---------- 权限面板 ---------- */
+.ac-perm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ac-rule);
+}
+
+.ac-perm-cap {
+  font-family: var(--ac-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ac-text-faint);
+  padding: 0 10px;
+}
+
+.ac-perm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: var(--ac-text-dim);
+}
+
+.ac-perm-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ac-perm-label .ac-mono { color: var(--ac-text-faint); font-size: 10px; }
+
+.ac-perm-on {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ac-ok);
+  border: 1px solid rgba(63, 185, 80, 0.4);
+  background: rgba(63, 185, 80, 0.08);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+
+.ac-perm-pending {
+  margin: 0 10px;
+  padding: 6px 9px;
+  border: 1px solid rgba(210, 153, 34, 0.35);
+  background: rgba(210, 153, 34, 0.08);
+  color: var(--ac-warn);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 /* ---------- 主舞台 ---------- */
@@ -806,6 +1031,37 @@
 .ac-log-line.lv-warning .ac-log-lvl { color: var(--ac-warn); }
 .ac-log-line.lv-error .ac-log-lvl { color: var(--ac-danger); }
 .ac-log-line.lv-critical .ac-log-lvl { color: var(--ac-danger); }
+
+.ac-log-meta { color: var(--ac-text-faint); white-space: nowrap; }
+
+.ac-log-note {
+  margin: 0 0 10px;
+  padding: 7px 12px;
+  border: 1px solid rgba(210, 153, 34, 0.35);
+  border-radius: 8px;
+  background: rgba(210, 153, 34, 0.08);
+  color: var(--ac-warn);
+  font-size: 12px;
+}
+
+.ac-log-seg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 14px;
+  color: var(--ac-text-faint);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.ac-log-seg-rule { flex: 1; height: 1px; background: var(--ac-rule); }
+.ac-log-seg-label { white-space: nowrap; }
 
 /* ---------- 运维 / 调试操作行 ---------- */
 .ac-op-list { border-bottom: 1px solid var(--ac-rule); }

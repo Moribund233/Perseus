@@ -19,6 +19,14 @@ describe('api/admin 请求构造', () => {
     expect(mockedRequest).toHaveBeenNthCalledWith(2, '/api/app/components');
   });
 
+  it('adminApi.setDebugMode 为 POST 且携带 enabled', async () => {
+    await adminApi.setDebugMode(true);
+    expect(mockedRequest).toHaveBeenCalledWith('/api/app/debug', {
+      method: 'POST',
+      body: JSON.stringify({ enabled: true }),
+    });
+  });
+
   it('logsApi.getContent 组装全部查询参数', async () => {
     await logsApi.getContent({
       date: '2026-09-20',

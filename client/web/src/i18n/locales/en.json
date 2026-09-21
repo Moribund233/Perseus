@@ -79,7 +79,22 @@
     },
     "admin": {
       "railTitle": "System Index",
+      "collapse": "Collapse navigation",
+      "expand": "Expand navigation",
       "soon": "SOON",
+      "header": {
+        "console": "application console",
+        "unknown": "unknown"
+      },
+      "permissions": {
+        "title": "Permissions",
+        "admin": "Administrator",
+        "adminOn": "Signed in with administrator privileges",
+        "debug": "Debug mode",
+        "debugHint": "Unlocks debug tools; restart the service to apply",
+        "on": "ON",
+        "pending": "Saved to config; restart the service to take effect"
+      },
       "gate": {
         "title": "Admin Console",
         "subtitle": "Sign in with an administrator account to continue",
@@ -107,7 +122,7 @@
         "overview": "Overview",
         "components": "Components",
         "config": "Configuration",
-        "logs": "Log Viewer",
+        "logs": "Logs",
         "operations": "Maintenance",
         "debug": "Debug Tools"
       },
@@ -272,7 +287,7 @@
       },
       "logs": {
         "title": "Log Viewer",
-        "subtitle": "Retrieve runtime logs by date, file and level; follow and cleanup supported",
+        "subtitle": "Historical file search and live log stream; level filtering and cleanup supported",
         "date": "Date",
         "file": "File",
         "lines": "Lines",
@@ -287,6 +302,25 @@
         "loading": "Loading…",
         "empty": "No logs match the current filters",
         "count": "{{shown}} / {{total}} lines",
+        "fileMode": "FILE",
+        "segment": "── continued: {{name}} ──",
+        "segmentMeta": "{{parts}} parts · {{size}}",
+        "truncated": "Segment retention limit reached; older logs may have been dropped",
+        "tabs": {
+          "file": "File logs",
+          "stream": "Live stream"
+        },
+        "stream": {
+          "logger": "Logger",
+          "loggerPlaceholder": "Type a logger name, press Enter",
+          "keywordPlaceholder": "Filter messages containing keyword",
+          "clear": "Clear",
+          "channel": "Live channel /ws/logs",
+          "waiting": "Waiting for log stream…",
+          "connecting": "Connecting…",
+          "connected": "Connected",
+          "disconnected": "Disconnected"
+        },
         "cleanup": {
           "button": "Cleanup old logs",
           "title": "Cleanup old logs",
@@ -389,7 +423,11 @@
       "searching": "Searching...",
       "searchFailed": "Search failed. Please try again.",
       "searchNoResults": "No results for '{{query}}'",
-      "searchViewAll": "View all results"
+      "searchViewAll": "View all results",
+      "contextOverview": "Repository overview",
+      "contextIssues": "Issues",
+      "recentProjects": "Recent projects",
+      "recentEmpty": "No recently opened projects"
     },
     "notifications": {
       "title": "Notifications",
@@ -401,6 +439,9 @@
       "title": "Repositories",
       "noRepos": "No repositories yet",
       "explorer": "Explorer",
+      "backToRepos": "Back to repositories",
+      "backToList": "Back to files",
+      "openInEditor": "Open in editor",
       "filter": {
         "mine": "My Repositories",
         "all": "All Repositories"

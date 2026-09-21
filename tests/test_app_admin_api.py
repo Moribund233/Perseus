@@ -13,6 +13,7 @@
 from types import SimpleNamespace
 
 import pytest
+from starlette.websockets import WebSocketDisconnect
 
 import controller.app_controller as app_ctl
 import controller.debug_controller as dbg_ctl
@@ -293,3 +294,85 @@ class TestComponentsEndpoint:
         r = test_client.get("/api/app/components", headers=admin_headers)
         assert r.status_code == 200
         assert r.json()["available"] is False
+
+
+class TestLogsWebSocketAdmin:
+    """/ws/logs 实时日志流仅管理员可订阅（收紧原匿名可读）"""
+
+    @staticmethod
+    def _token(headers: dict) -> str:
+        return headers["Authorization"].split(" ", 1)[1]
+
+    def test_anonymous_rejected(self, test_client):
+        with pytest.raises(WebSocketDisconnect):
+            with test_client.websocket_connect("/ws/logs"):
+                pass
+
+    def test_non_admin_rejected(self, test_client, auth_headers):
+        token = self._token(auth_headers)
+        with pytest.raises(WebSocketDisconnect):
+            with test_client.websocket_connect(f"/ws/logs?token={token}"):
+                pass
+
+    def test_admin_can_subscribe(self, test_client, admin_headers):
+        token = self._token(admin_headers)
+        with test_client.websocket_connect(f"/ws/logs?token={token}") as ws:
+            connected = ws.receive_json()
+            assert connected["type"] == "connected"
+            assert connected["authenticated"] is True
+
+            ws.send_json({
+                "type": "subscribe_logs",
+                "filters": {"levels": ["INFO"]},
+                "history_count": 5,
+            })
+            subscribed = ws.receive_json()
+            assert subscribed["type"] == "logs_subscribed"
+
+    def test_general_ws_anonymous_cannot_subscribe(self, test_client):
+        """通用 /ws/ 端点匿名连接不得订阅日志流（handler 层兜底）"""
+        with test_client.websocket_connect("/ws/") as ws:
+            assert ws.receive_json()["type"] == "connected"
+            ws.send_json({"type": "subscribe_logs", "filters": {"levels": ["INFO"]}})
+            reply = ws.receive_json()
+            assert reply["type"] == "error"
+            assert "Admin" in reply["error"]
+
+    def test_general_ws_admin_can_subscribe(self, test_client, admin_headers):
+        token = self._token(admin_headers)
+        with test_client.websocket_connect(f"/ws/?token={token}") as ws:
+            connected = ws.receive_json()
+            assert connected["type"] == "connected"
+            assert connected["authenticated"] is True
+            ws.send_json({"type": "subscribe_logs", "filters": {"levels": ["INFO"]}})
+            assert ws.receive_json()["type"] == "logs_subscribed"
+
+
+class TestDebugModeToggle:
+    """POST /api/app/debug：仅管理员可切换调试模式（重启后生效）"""
+
+    def test_requires_auth(self, test_client):
+        r = test_client.post("/api/app/debug", json={"enabled": True})
+        assert r.status_code == 401
+
+    def test_requires_admin(self, test_client, auth_headers):
+        r = test_client.post("/api/app/debug", json={"enabled": True}, headers=auth_headers)
+        assert r.status_code == 403
+
+    def test_admin_ok(self, test_client, admin_headers, monkeypatch):
+        class FakeCfgSvc:
+            def set_debug_mode(self, enabled, is_admin=False):
+                return {
+                    "success": True,
+                    "debug": enabled,
+                    "restart_required": True,
+                    "message": "调试模式已开启，重启服务后生效",
+                }
+
+        monkeypatch.setattr(app_ctl, "get_config_service", lambda: FakeCfgSvc())
+        r = test_client.post("/api/app/debug", json={"enabled": True}, headers=admin_headers)
+        assert r.status_code == 200
+        body = r.json()
+        assert body["success"] is True
+        assert body["debug"] is True
+        assert body["restart_required"] is True

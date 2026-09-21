@@ -498,6 +498,11 @@ class ConfigManager:
             raise RuntimeError("Config has not been initialized")
         return self._config
 
+    @property
+    def config_path(self) -> str:
+        """配置文件路径"""
+        return self._config_path
+
     def reload(self):
         """重新加载配置"""
         self._load_config()

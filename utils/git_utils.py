@@ -5,6 +5,7 @@ Git 操作工具模块
 """
 import os
 import asyncio
+import fnmatch
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional, Tuple, List, cast
@@ -552,21 +553,16 @@ def enable_receive_pack(repo_path: str) -> None:
     git-http-backend 默认仅启用 upload-pack（clone/fetch），
     receive-pack（push）需要仓库配置 http.receivepack=true。
 
+    直接通过 pygit2 写仓库 config（等价于 `git config --file <repo>/config`），
+    避免起子进程。
+
     Args:
         repo_path: bare 仓库的完整物理路径（含 .git 后缀）
     """
-    config_path = os.path.join(repo_path, "config")
     try:
-        import subprocess
-        result = subprocess.run(
-            ["git", "config", "--file", config_path,
-             "http.receivepack", "true"],
-            capture_output=True, text=True, timeout=10
-        )
-        if result.returncode != 0:
-            logger.warning(f"Failed to set http.receivepack for {repo_path}: {result.stderr.strip()}")
-        else:
-            logger.info(f"Enabled http.receivepack for {repo_path}")
+        repo = pygit2.Repository(repo_path)
+        repo.config["http.receivepack"] = True
+        logger.info(f"Enabled http.receivepack for {repo_path}")
     except Exception as e:
         logger.warning(f"Failed to enable receive-pack for {repo_path}: {e}")
 
@@ -701,6 +697,138 @@ def ensure_repository_root(repo_root: Optional[str] = None) -> str:
 
 
 # =============================================================================
+# 标签 / HEAD（pygit2，无子进程）
+# =============================================================================
+
+def get_head_commit(repo_path: str) -> Optional[str]:
+    """获取 HEAD 指向的提交哈希（空仓库 / HEAD 未出生返回 None）"""
+    try:
+        repo = pygit2.Repository(repo_path)
+    except Exception:
+        return None
+    if repo.head_is_unborn:
+        return None
+    try:
+        return str(repo.head.peel(pygit2.Commit).id)
+    except Exception:
+        return None
+
+
+def _resolve_commit(repo: pygit2.Repository, rev: str) -> pygit2.Commit:
+    """把提交哈希/引用解析为 Commit，失败抛 GitError"""
+    try:
+        obj = repo.revparse_single(rev)
+    except Exception as e:
+        raise GitError(f"Invalid commit '{rev}': {e}")
+    try:
+        return obj.peel(pygit2.Commit)
+    except Exception as e:
+        raise GitError(f"'{rev}' is not a commit: {e}")
+
+
+def _tag_info(repo: pygit2.Repository, tag_name: str) -> Optional[Dict[str, Any]]:
+    """读取单个标签信息（name/message/commit_hash），不存在返回 None"""
+    try:
+        ref = repo.references[f"refs/tags/{tag_name}"]
+    except KeyError:
+        return None
+
+    obj = repo[ref.target]
+    if obj.type == pygit2.GIT_OBJECT_TAG:
+        message = (cast(pygit2.Tag, obj).message or "").strip()
+    else:
+        # 轻量标签无注解：回退到提交标题（对齐 `git tag -l -n1`）
+        commit = cast(pygit2.Commit, obj)
+        message = commit.message.splitlines()[0] if commit.message else ""
+
+    commit = ref.peel(pygit2.Commit)
+    return {"name": tag_name, "message": message, "commit_hash": str(commit.id)}
+
+
+def create_git_tag(
+    repo_path: str,
+    tag_name: str,
+    target_commit: str,
+    message: Optional[str] = None,
+    tagger_name: str = "Perseus",
+    tagger_email: str = "noreply@perseus.local",
+) -> str:
+    """
+    创建 Git 标签（幂等：已存在则复用），返回关联的提交哈希。
+
+    message 为空 → 轻量标签；否则 → 附注标签。附注标签使用显式 Signature，
+    不依赖运行环境的 git 全局 user.name/user.email。
+
+    Raises:
+        GitError: 仓库不可用或目标提交无效
+    """
+    try:
+        repo = pygit2.Repository(repo_path)
+    except Exception as e:
+        raise GitError(f"Failed to open repository {repo_path}: {e}")
+
+    existing = _tag_info(repo, tag_name)
+    if existing is not None:
+        return existing["commit_hash"]
+
+    commit = _resolve_commit(repo, target_commit)
+
+    if message:
+        tagger = pygit2.Signature(tagger_name, tagger_email)
+        repo.create_tag(tag_name, commit.id, pygit2.GIT_OBJECT_COMMIT, tagger, message)
+    else:
+        repo.references.create(f"refs/tags/{tag_name}", commit.id)
+
+    return str(commit.id)
+
+
+def delete_git_tag(repo_path: str, tag_name: str) -> None:
+    """删除 Git 标签（不存在则忽略）"""
+    try:
+        repo = pygit2.Repository(repo_path)
+    except Exception as e:
+        raise GitError(f"Failed to open repository {repo_path}: {e}")
+    try:
+        repo.references.delete(f"refs/tags/{tag_name}")
+    except KeyError:
+        return
+    except Exception as e:
+        raise GitError(f"Failed to delete tag {tag_name}: {e}")
+
+
+def list_git_tags(repo_path: str, pattern: Optional[str] = None) -> List[Dict[str, Any]]:
+    """列出标签（name/message/commit_hash）；pattern 为 glob（如 ``v1.*``）"""
+    try:
+        repo = pygit2.Repository(repo_path)
+    except Exception as e:
+        raise GitError(f"Failed to open repository {repo_path}: {e}")
+
+    names = [
+        ref[len("refs/tags/"):]
+        for ref in repo.listall_references()
+        if ref.startswith("refs/tags/")
+    ]
+    if pattern:
+        names = [n for n in names if fnmatch.fnmatch(n, pattern)]
+
+    tags = []
+    for name in sorted(names):
+        info = _tag_info(repo, name)
+        if info:
+            tags.append(info)
+    return tags
+
+
+def get_git_tag(repo_path: str, tag_name: str) -> Optional[Dict[str, Any]]:
+    """获取单个标签信息（不存在返回 None）"""
+    try:
+        repo = pygit2.Repository(repo_path)
+    except Exception as e:
+        raise GitError(f"Failed to open repository {repo_path}: {e}")
+    return _tag_info(repo, tag_name)
+
+
+# =============================================================================
 # PR Diff 相关功能
 # =============================================================================
 
@@ -712,221 +840,104 @@ class DiffFileStatus:
     RENAMED = "renamed"
 
 
+def _build_diff(repo_path: str, base_commit: str, head_commit: str) -> pygit2.Diff:
+    """解析 base/head 提交并构建 Diff（含重命名探测），失败抛 GitError"""
+    try:
+        repo = pygit2.Repository(repo_path)
+    except Exception as e:
+        raise GitError(f"Failed to open repository {repo_path}: {e}")
+
+    try:
+        base = repo.revparse_single(base_commit)
+        head = repo.revparse_single(head_commit)
+    except Exception as e:
+        raise GitError(f"Failed to resolve commits: {e}")
+
+    diff = repo.diff(base.id, head.id)
+    try:
+        diff.find_similar()  # 重命名探测，对齐 git diff 默认行为
+    except Exception:
+        pass
+    return diff
+
+
 def get_pr_diff(repo_path: str, base_commit: str, head_commit: str) -> str:
     """
-    获取 PR 的 diff 内容
-
-    使用 git diff 命令获取两个提交之间的变更
-
-    Args:
-        repo_path: 仓库物理路径
-        base_commit: 基础提交（目标分支）
-        head_commit: 头部提交（源分支）
-
-    Returns:
-        str: diff 内容
+    获取 PR 的 diff 内容（pygit2 统一 diff 文本，与 `git diff` 一致）
 
     Raises:
         GitError: 获取 diff 失败
     """
-    import subprocess
+    return _build_diff(repo_path, base_commit, head_commit).patch
 
-    try:
-        # 使用 git diff 获取变更
-        # 格式: git diff base_commit..head_commit
-        result = subprocess.run(
-            ["git", "diff", f"{base_commit}..{head_commit}"],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            encoding="utf-8"
-        )
 
-        if result.returncode != 0:
-            raise GitError(f"Failed to get diff: {result.stderr}")
-
-        return result.stdout
-
-    except subprocess.SubprocessError as e:
-        raise GitError(f"Failed to execute git diff: {e}")
+_DIFF_STATUS_MAP = {
+    pygit2.GIT_DELTA_ADDED: (DiffFileStatus.ADDED, "A"),
+    pygit2.GIT_DELTA_DELETED: (DiffFileStatus.DELETED, "D"),
+    pygit2.GIT_DELTA_MODIFIED: (DiffFileStatus.MODIFIED, "M"),
+    pygit2.GIT_DELTA_RENAMED: (DiffFileStatus.RENAMED, "R"),
+    pygit2.GIT_DELTA_COPIED: ("copied", "C"),
+}
 
 
 def get_pr_files(repo_path: str, base_commit: str, head_commit: str) -> list:
     """
-    获取 PR 变更的文件列表
-
-    Args:
-        repo_path: 仓库物理路径
-        base_commit: 基础提交（目标分支）
-        head_commit: 头部提交（源分支）
+    获取 PR 变更的文件列表（pygit2）
 
     Returns:
-        list: 文件列表，每个文件包含状态、路径、增删行数等信息
+        list: 每项含 status/path/old_path/status_code
 
     Raises:
         GitError: 获取文件列表失败
     """
-    import subprocess
-
-    try:
-        # 使用 git diff --name-status 获取文件状态
-        result = subprocess.run(
-            ["git", "diff", "--name-status", f"{base_commit}..{head_commit}"],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            encoding="utf-8"
-        )
-
-        if result.returncode != 0:
-            raise GitError(f"Failed to get file list: {result.stderr}")
-
-        files = []
-        for line in result.stdout.strip().split("\n"):
-            if not line:
-                continue
-
-            parts = line.split("\t")
-            status_code = parts[0]
-
-            if status_code.startswith("A"):
-                status = DiffFileStatus.ADDED
-                file_path = parts[1]
-                old_path = None
-            elif status_code.startswith("M"):
-                status = DiffFileStatus.MODIFIED
-                file_path = parts[1]
-                old_path = None
-            elif status_code.startswith("D"):
-                status = DiffFileStatus.DELETED
-                file_path = parts[1]
-                old_path = None
-            elif status_code.startswith("R"):
-                status = DiffFileStatus.RENAMED
-                old_path = parts[1]
-                file_path = parts[2]
-            else:
-                status = "unknown"
-                file_path = parts[1]
-                old_path = None
-
-            files.append({
-                "status": status,
-                "path": file_path,
-                "old_path": old_path,
-                "status_code": status_code
-            })
-
-        return files
-
-    except subprocess.SubprocessError as e:
-        raise GitError(f"Failed to execute git diff: {e}")
+    diff = _build_diff(repo_path, base_commit, head_commit)
+    files = []
+    for patch in diff:
+        delta = patch.delta
+        status, code = _DIFF_STATUS_MAP.get(delta.status, ("unknown", "?"))
+        old_path = delta.old_file.path
+        new_path = delta.new_file.path
+        files.append({
+            "status": status,
+            "path": new_path or old_path,
+            "old_path": old_path if status == DiffFileStatus.RENAMED else None,
+            "status_code": code,
+        })
+    return files
 
 
 def get_pr_stats(repo_path: str, base_commit: str, head_commit: str) -> dict:
     """
-    获取 PR 的统计信息
-
-    Args:
-        repo_path: 仓库物理路径
-        base_commit: 基础提交（目标分支）
-        head_commit: 头部提交（源分支）
+    获取 PR 的统计信息（pygit2）
 
     Returns:
-        dict: 统计信息，包含文件数、新增行数、删除行数等
+        dict: files_changed / additions / deletions / total_changes
 
     Raises:
         GitError: 获取统计信息失败
     """
-    import subprocess
-
-    try:
-        # 使用 git diff --stat 获取统计信息
-        result = subprocess.run(
-            ["git", "diff", "--stat", f"{base_commit}..{head_commit}"],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            encoding="utf-8"
-        )
-
-        if result.returncode != 0:
-            raise GitError(f"Failed to get stats: {result.stderr}")
-
-        # 解析统计信息
-        lines = result.stdout.strip().split("\n")
-        if not lines:
-            return {
-                "files_changed": 0,
-                "additions": 0,
-                "deletions": 0,
-                "total_changes": 0
-            }
-
-        # 最后一行包含总计信息
-        # 格式: " X files changed, Y insertions(+), Z deletions(-)"
-        last_line = lines[-1]
-
-        files_changed = 0
-        additions = 0
-        deletions = 0
-
-        # 解析文件数
-        if "file changed" in last_line or "files changed" in last_line:
-            parts = last_line.split(",")
-            for part in parts:
-                if "file" in part:
-                    files_changed = int(part.strip().split()[0])
-                elif "insertion" in part or "insertions" in part:
-                    additions = int(part.strip().split()[0])
-                elif "deletion" in part or "deletions" in part:
-                    deletions = int(part.strip().split()[0])
-
-        return {
-            "files_changed": files_changed,
-            "additions": additions,
-            "deletions": deletions,
-            "total_changes": additions + deletions
-        }
-
-    except subprocess.SubprocessError as e:
-        raise GitError(f"Failed to execute git diff: {e}")
+    stats = _build_diff(repo_path, base_commit, head_commit).stats
+    return {
+        "files_changed": stats.files_changed,
+        "additions": stats.insertions,
+        "deletions": stats.deletions,
+        "total_changes": stats.insertions + stats.deletions,
+    }
 
 
 def get_file_diff(repo_path: str, base_commit: str, head_commit: str, file_path: str) -> str:
     """
-    获取单个文件的 diff 内容
-
-    Args:
-        repo_path: 仓库物理路径
-        base_commit: 基础提交（目标分支）
-        head_commit: 头部提交（源分支）
-        file_path: 文件路径
-
-    Returns:
-        str: 文件的 diff 内容
+    获取单个文件的 diff 内容（pygit2；文件无变更返回空串）
 
     Raises:
         GitError: 获取 diff 失败
     """
-    import subprocess
-
-    try:
-        result = subprocess.run(
-            ["git", "diff", f"{base_commit}..{head_commit}", "--", file_path],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            encoding="utf-8"
-        )
-
-        if result.returncode != 0:
-            raise GitError(f"Failed to get file diff: {result.stderr}")
-
-        return result.stdout
-
-    except subprocess.SubprocessError as e:
-        raise GitError(f"Failed to execute git diff: {e}")
+    diff = _build_diff(repo_path, base_commit, head_commit)
+    for patch in diff:
+        delta = patch.delta
+        if file_path in (delta.old_file.path, delta.new_file.path):
+            return patch.text
+    return ""
 
 
 def commit_file_changes(

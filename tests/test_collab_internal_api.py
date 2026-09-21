@@ -265,32 +265,21 @@ class TestCollabSave:
         assert resp.status_code == 413
 
     def test_save_triggers_incremental_index_update(self, test_client, db, test_user, internal_env, monkeypatch):
-        """collab save 后应增量更新搜索索引 (单文件, 经 to_thread 离开事件循环)"""
+        """collab save 后应增量更新搜索索引（主库持久化）"""
         repo = create_test_repo(db, name="save-index-repo", owner_id=test_user.id)
         monkeypatch.setattr(
             "services.repository_browser_service.commit_file",
             AsyncMock(return_value={"commit_id": "abc123", "branch": "main", "path": "src/app.py"}),
         )
 
-        from services.search_service import SearchService
-
         fake_service = Mock()
-        fake_service.update_files = Mock(return_value=None)
-        monkeypatch.setattr("controller.collab_internal_controller.SearchService", fake_service)
-
-        to_thread_targets = []
-
-        async def fake_to_thread(fn, *args, **kwargs):
-            to_thread_targets.append(fn)
-            return fn(*args, **kwargs)
-
-        monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
+        fake_service.update_files = AsyncMock(return_value=None)
+        monkeypatch.setattr("controller.collab_internal_controller.SearchService", lambda: fake_service)
 
         resp = self._save(test_client, test_user, repo, content="def collab_indexed():\n    pass\n")
         assert resp.status_code == 200
 
         assert fake_service.update_files.called, "collab save 应触发索引增量更新"
         args = fake_service.update_files.call_args[0]
-        assert args[1] == ["src/app.py"], "索引更新应只覆盖本次保存的单个文件"
-        assert fake_service.update_files in to_thread_targets, \
-            "索引更新应经 to_thread 调用, 避免阻塞事件循环"
+        assert args[1] == repo.id
+        assert args[3] == ["src/app.py"], "索引更新应只覆盖本次保存的单个文件"

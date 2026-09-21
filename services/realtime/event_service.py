@@ -150,6 +150,7 @@ async def broadcast_push(
     pusher_id: uuid.UUID,
     pusher_username: str,
     repo_path: Optional[str] = None,
+    repository_id: Optional[uuid.UUID] = None,
     db=None,
     commit_sha: Optional[str] = None,
     commit_message: Optional[str] = None,
@@ -162,17 +163,19 @@ async def broadcast_push(
         "pusher": {"id": pusher_id, "username": pusher_username},
     }, exclude_user_id=pusher_id)
 
-    if repo_path:
+    if repo_path and db is not None and repository_id is not None:
         try:
             # 有 old_sha 时按 diff 只增量重索引变更文件; 无法计算 diff 时回退全量重建。
-            # 索引为 CPU/IO 密集操作, 一律放线程池避免阻塞事件循环 (F-039)。
+            search_service = SearchService()
             changed = None
             if old_sha and commit_sha:
-                changed = SearchService.diff_changed_files(repo_path, old_sha, commit_sha)
+                changed = await asyncio.to_thread(
+                    SearchService.diff_changed_files, repo_path, old_sha, commit_sha
+                )
             if changed is not None:
-                await asyncio.to_thread(SearchService.update_files, repo_path, changed)
+                await search_service.update_files(db, repository_id, repo_path, changed)
             else:
-                await asyncio.to_thread(SearchService.rebuild_index, repo_path)
+                await search_service.rebuild_index(db, repository_id, repo_path)
         except Exception as e:
             logger.warning("Search index update failed: %s", e)
 

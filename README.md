@@ -57,8 +57,8 @@ Perseus 提供完整的代码仓库管理、Pull Request 工作流、Issue 跟�
 |------|------|------|
 | 反向代理 | **Nginx / OpenResty** | TLS 终止、Git Smart Protocol、WebSocket 代理、速率限制 |
 | 容器化 | **Docker Compose** | 多环境容器编排（开发/生产） |
-| 数据库 | **SQLite / PostgreSQL** | 双数据库支持，异步驱动自动适配 |
-| 代码搜索 | **FTS5 + ripgrep** | SQLite 全文索引 + ripgrep 回退 |
+| 数据库 | **PostgreSQL** | dev/prod 部署统一 PostgreSQL；测试容器用 SQLite 快速验证 |
+| 代码搜索 | **主库索引 + pg_trgm** | 内容来自 Git 对象，索引持久化主库；PostgreSQL `pg_trgm` GIN 加速子串检索 |
 
 ---
 
@@ -98,7 +98,7 @@ Perseus 提供完整的代码仓库管理、Pull Request 工作流、Issue 跟�
     ┌────▼─────────────────────────────────────────────┐
     │              Data Layer                           │
     │  SQLAlchemy ORM · 25+ tables                     │
-    │  UUID7 PKs · SQLite (WAL) / PostgreSQL           │
+    │  UUID7 PKs · PostgreSQL (部署) / SQLite (测试)   │
     │  Sync + Async engines · Alembic migrations       │
     └──────────────────────────────────────────────────┘
 ```
@@ -140,8 +140,9 @@ Perseus 提供完整的代码仓库管理、Pull Request 工作流、Issue 跟�
 - Issue 评论
 
 ### 🔍 代码搜索
-- **FTS5 全文索引** — 增量构建、实时搜索
-- **ripgrep 回退** — FTS5 未命中时自动降级
+- **Git 对象索引** — 内容取自 ref 的 Git tree/blob（适配 bare 仓库），索引持久化到主库
+- **PostgreSQL `pg_trgm` GIN** — 加速 `ILIKE '%q%'` 子串检索（测试环境 SQLite 退化为 LIKE）
+- **Git tree 回退** — 索引未就绪或指定非默认 `ref` 时进程内扫描
 - 文件符号（Symbol）提取与语言识别
 
 ### 🔔 通知与 WebHook
@@ -281,7 +282,7 @@ perseus/
 │   ├── repository_browser_service.py  # 仓库浏览（pygit2 操作）
 │   ├── issue_service.py          # Issue 业务逻辑
 │   ├── pull_request_service.py   # PR 业务逻辑
-│   ├── search_service.py         # 代码搜索（FTS5 + ripgrep）
+│   ├── search_service.py         # 代码搜索（Git 对象 + 主库索引）
 │   ├── webhook_service.py        # WebHook 投递
 │   ├── notification_service.py   # 通知管理
 │   ├── oauth_service.py          # OAuth 流程
@@ -321,7 +322,6 @@ perseus/
 │
 ├── utils/                        # 工具模块
 │   ├── git_utils.py              # pygit2 Git 操作封装
-│   ├── ripgrep_utils.py          # ripgrep 代码搜索
 │   ├── password_utils.py         # 密码哈希（bcrypt）
 │   ├── security_utils.py         # 敏感数据过滤
 │   ├── response_builder.py       # 统一 JSON 响应构建
@@ -392,7 +392,7 @@ cd perseus
 # 2. 配置环境变量
 cp config.example.toml config.toml
 # 编辑 config.toml 或设置环境变量：
-export DATABASE_URL="sqlite:///./perseus_dev.db"
+export DATABASE_URL="postgresql://perseus:password@localhost:5432/perseus"
 export PERSEUS_SECURITY_SECRET_KEY="your-secret-key"
 
 # 3. 使用 Docker Compose 启动开发环境
@@ -464,7 +464,7 @@ docker compose up -d --build
 
 | 数据库 | 同步驱动 | 异步驱动 | 说明 |
 |--------|----------|----------|------|
-| **SQLite** | 内置 | `aiosqlite` | 开发/小规模部署（默认 WAL 模式） |
+| **SQLite** | 内置 | `aiosqlite` | 仅测试容器（默认 WAL 模式） |
 | **PostgreSQL** | `psycopg2` | `asyncpg` | 生产环境推荐 |
 
 ### 关键设计

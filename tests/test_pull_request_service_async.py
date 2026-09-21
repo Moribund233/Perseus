@@ -691,18 +691,14 @@ async def test_merge_pr_rebuilds_search_index(async_db: AsyncSession, test_repo_
     """
     测试 PR 合并后自动重建搜索索引
 
-    验证点：
-    1. PR 合并成功
-    2. 仓库物理路径下生成 .perseus_search_index 目录
+    验证点：PR 合并成功后，搜索索引行写入主库（repo_search_files）
     """
-    import os
+    from sqlalchemy import func, select
     from services import pull_request_service
-    from services.search_service import SearchService
-    from utils.git_utils import get_repository_storage_path
+    from models.repo_search import RepoSearchFile
 
     repo = test_repo_with_git
 
-    # 创建并合并 PR
     pr = await pull_request_service.create_pull_request(
         async_db, repo.id, async_test_user.id,
         title="Search Index PR",
@@ -715,14 +711,12 @@ async def test_merge_pr_rebuilds_search_index(async_db: AsyncSession, test_repo_
         async_db, repo.id, pr["pr_number"], async_test_user.id, merge_method="merge"
     )
 
-    # 验证搜索索引目录已创建
-    repo_path = get_repository_storage_path(repo.path)
-    index_path = os.path.join(repo_path, ".perseus_search_index")
-    assert os.path.exists(index_path), "合并后应创建搜索索引目录"
-
-    # 验证索引文件已生成
-    index_db_path = os.path.join(index_path, "fts.db")
-    assert os.path.exists(index_db_path), "搜索索引数据库文件应存在"
+    rows = (await async_db.execute(
+        select(func.count()).select_from(RepoSearchFile).where(
+            RepoSearchFile.repository_id == repo.id
+        )
+    )).scalar_one()
+    assert rows > 0, "合并后应写入搜索索引行"
 
     print("✓ test_merge_pr_rebuilds_search_index 通过")
 
@@ -738,24 +732,25 @@ async def test_merge_pr_uses_incremental_index_update(
     1. SearchService.diff_changed_files 被执行 (用于计算变更文件)
     2. SearchService.update_files 被调用 (增量更新替代全量重建)
     """
-    import asyncio
     from services import pull_request_service
     from services.search_service import SearchService
     from utils.git_utils import get_repository_storage_path
 
     diff_calls = []
     update_calls = []
-    original_to_thread = asyncio.to_thread
+    original_diff = SearchService.diff_changed_files
+    original_update = SearchService.update_files
 
-    async def fake_to_thread(fn, *args, **kwargs):
-        result = await original_to_thread(fn, *args, **kwargs)
-        if fn is SearchService.diff_changed_files:
-            diff_calls.append(args)
-        elif fn is SearchService.update_files:
-            update_calls.append(args)
-        return result
+    def fake_diff(repo_path, old_ref, new_ref):
+        diff_calls.append((repo_path, old_ref, new_ref))
+        return original_diff(repo_path, old_ref, new_ref)
 
-    monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
+    async def fake_update(self, db, repository_id, repo_path, changed_files):
+        update_calls.append((repository_id, repo_path, changed_files))
+        return await original_update(self, db, repository_id, repo_path, changed_files)
+
+    monkeypatch.setattr(SearchService, "diff_changed_files", staticmethod(fake_diff))
+    monkeypatch.setattr(SearchService, "update_files", fake_update)
 
     repo = test_repo_with_git
     pr = await pull_request_service.create_pull_request(
@@ -776,6 +771,6 @@ async def test_merge_pr_uses_incremental_index_update(
     assert old_sha, "应携带合并前的 target 分支 tip"
     assert new_sha, "应携带合并后的 commit sha"
     assert update_calls, "PR 合并应触发增量索引更新"
-    assert len(update_calls[0][1]) > 0, "变更文件列表不应为空"
+    assert len(update_calls[0][2]) > 0, "变更文件列表不应为空"
 
     print("✓ test_merge_pr_uses_incremental_index_update 通过")

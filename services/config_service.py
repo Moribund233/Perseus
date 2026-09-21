@@ -8,6 +8,8 @@
 """
 from typing import Any, Dict, List, Optional, Tuple
 
+import os
+
 from core.config import ConfigManager, get_config as get_core_config
 from core.exception import ValidationException, AuthorizationException
 
@@ -138,6 +140,63 @@ class ConfigService:
             return True, []
         except Exception as e:
             return False, [f"重置配置失败: {str(e)}"]
+
+    def set_debug_mode(self, enabled: bool, is_admin: bool = False) -> Dict[str, Any]:
+        """
+        开启/关闭调试模式（写入 config.toml 的 app.debug，重启后生效）
+
+        直接以原始 TOML dict 读改写，仅改动 ``app.debug``、保留文件中的其余键，
+        且**不刷新内存中的运行态配置**——因此不会即时生效，需重启服务。
+
+        Args:
+            enabled: 是否开启调试模式
+            is_admin: 调用者是否为管理员（仅管理员可切换）
+
+        Returns:
+            Dict: {success, debug, restart_required, message}
+        """
+        if not is_admin:
+            raise AuthorizationException(
+                detail="该操作需要管理员权限", error_code="config_admin_required"
+            )
+
+        import toml
+
+        config_path = ConfigManager().config_path
+        try:
+            if os.path.exists(config_path):
+                with open(config_path, "r", encoding="utf-8") as f:
+                    data = toml.load(f)
+            else:
+                data = {}
+        except Exception as e:
+            return {
+                "success": False, "debug": None, "restart_required": True,
+                "message": f"读取配置文件失败: {e}",
+            }
+
+        app_section = data.get("app")
+        if not isinstance(app_section, dict):
+            app_section = {}
+        app_section["debug"] = bool(enabled)
+        data["app"] = app_section
+
+        try:
+            with open(config_path, "w", encoding="utf-8") as f:
+                toml.dump(data, f)
+        except OSError as e:
+            return {
+                "success": False, "debug": None, "restart_required": True,
+                "message": f"写入配置文件失败（可能为只读挂载）: {e}",
+            }
+
+        state = "开启" if enabled else "关闭"
+        return {
+            "success": True,
+            "debug": bool(enabled),
+            "restart_required": True,
+            "message": f"调试模式已{state}，重启服务后生效",
+        }
 
     def validate_config(self, config_data: Optional[Dict[str, Any]] = None) -> Tuple[bool, List[str]]:
         """

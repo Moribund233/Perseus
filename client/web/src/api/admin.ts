@@ -115,6 +115,12 @@ export const configApi = {
 export const adminApi = {
   getStatus: () => apiRequest<AppStatus>('/api/app/status'),
   getComponents: () => apiRequest<ComponentsResponse>('/api/app/components'),
+  /** 切换调试模式（仅管理员；写 config.toml，重启后生效） */
+  setDebugMode: (enabled: boolean) =>
+    apiRequest<DebugModeResponse>('/api/app/debug', {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    }),
 };
 
 // ---------- 日志 ----------
@@ -124,6 +130,13 @@ export interface LogFileInfo {
   size: number;
   size_formatted: string;
   modified: string;
+  /** 磁盘分片数（含当前段） */
+  parts: number;
+  /** 全部分片合计大小 */
+  total_size: number;
+  total_size_formatted: string;
+  /** 已达保留上限，更早分片可能已被丢弃 */
+  truncated: boolean;
 }
 
 /** GET /api/app/logs 响应 */
@@ -134,6 +147,12 @@ export interface LogInfo {
   available_dates: string[];
 }
 
+/** 日志分片在返回窗口内的起始偏移 */
+export interface LogSegmentStart {
+  name: string;
+  offset: number;
+}
+
 /** GET /api/app/logs/content 响应 */
 export interface LogContent {
   date: string;
@@ -142,6 +161,12 @@ export interface LogContent {
   total_lines: number;
   content: string;
   exists: boolean;
+  /** 窗口覆盖的分片（旧→新） */
+  window_parts: string[];
+  /** 各分片在窗口内的起始行偏移 */
+  segment_starts: LogSegmentStart[];
+  /** 是否已达保留上限、更早分片可能被丢弃 */
+  truncated: boolean;
 }
 
 /** POST /api/app/logs/cleanup 响应 */
@@ -171,6 +196,14 @@ export const logsApi = {
 /** POST /api/app/restart · POST /api/app/shutdown 响应 */
 export interface ActionResponse {
   success: boolean;
+  message: string;
+}
+
+/** POST /api/app/debug 响应（调试模式切换，重启后生效） */
+export interface DebugModeResponse {
+  success: boolean;
+  debug: boolean | null;
+  restart_required: boolean;
   message: string;
 }
 

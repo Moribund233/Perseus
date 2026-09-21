@@ -13,8 +13,7 @@ import sys
 import signal
 import logging
 import subprocess
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
 
 from core.config import get_config
@@ -393,6 +392,18 @@ class AppService:
             "available_dates": info["available_dates"],
         }
 
+    @staticmethod
+    def _level_matches(line: str, level_upper: Optional[str]) -> bool:
+        """
+        按格式化器边界匹配日志级别。
+
+        格式为 ``asctime - name - LEVEL - message``，故用 `` - LEVEL - `` 精确匹配，
+        避免子串误伤（如 ``INFO`` 命中 ``INFORMATION`` 或含该词的 logger 名）。
+        """
+        if not level_upper:
+            return True
+        return f" - {level_upper} - " in line
+
     def get_log_content(
         self,
         date: Optional[str] = None,
@@ -401,18 +412,26 @@ class AppService:
         level: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        获取日志内容
+        获取日志内容（将磁盘分片拼接为逻辑流）
+
+        将 ``X.log`` 与其滚动备份 ``X.log.1..N`` 按时间顺序拼接，返回逻辑流末尾
+        ``lines`` 行；``segment_starts`` 给出各分片在返回窗口内的起始偏移，
+        供前端绘制分片分隔；``truncated`` 表示已达保留上限、更早分片可能被丢弃。
 
         Args:
             date: 日期字符串 (YYYY-MM-DD)
-            log_name: 日志文件名
+            log_name: 日志文件基名（不含 .log）
             lines: 返回的行数
             level: 过滤日志级别
 
         Returns:
             Dict[str, Any]: 日志内容和元数据
         """
-        from utils.logging import LogManager
+        from utils.logging import (
+            LogManager,
+            resolve_log_segments,
+            get_log_retention,
+        )
 
         if date is None:
             date = datetime.now().strftime("%Y-%m-%d")
@@ -422,13 +441,11 @@ class AppService:
         except ValueError:
             raise ValidationException(detail="日期格式无效，应为 YYYY-MM-DD", error_code="app_invalid_date_format")
 
-        log_dir = Path(LogManager.DEFAULT_LOG_DIR) / date
-        log_file = log_dir / f"{log_name}.log"
+        segments = resolve_log_segments(LogManager.DEFAULT_LOG_DIR, date, log_name)
+        if not segments and log_name != "perseus":
+            segments = resolve_log_segments(LogManager.DEFAULT_LOG_DIR, date, "perseus")
 
-        if not log_file.exists():
-            log_file = log_dir / "perseus.log"
-
-        if not log_file.exists():
+        if not segments:
             return {
                 "date": date,
                 "log_name": log_name,
@@ -436,29 +453,66 @@ class AppService:
                 "total_lines": 0,
                 "content": "",
                 "exists": False,
+                "window_parts": [],
+                "segment_starts": [],
+                "truncated": False,
             }
 
-        try:
-            with open(log_file, "r", encoding="utf-8") as f:
-                all_lines = f.readlines()
-        except Exception as e:
-            raise AppServiceException(f"读取日志文件失败: {e}", error_code="app_log_read_failed")
+        level_upper = level.upper() if level else None
 
-        if level:
-            level_upper = level.upper()
-            all_lines = [line for line in all_lines if level_upper in line]
+        # 第一遍：流式统计过滤后总行数（精确 total，不驻留全部内容）
+        total_lines = 0
+        for _, seg_path in segments:
+            try:
+                with open(seg_path, "r", encoding="utf-8", errors="replace") as f:
+                    for line in f:
+                        if self._level_matches(line, level_upper):
+                            total_lines += 1
+            except OSError as e:
+                raise AppServiceException(f"读取日志文件失败: {e}", error_code="app_log_read_failed")
 
-        total_lines = len(all_lines)
-        start_line = max(0, total_lines - lines)
-        selected_lines = all_lines[start_line:]
+        # 第二遍：从最新分片向前取尾部，凑够 lines 行即停
+        chunks: List[Tuple[str, List[str]]] = []
+        remaining = lines
+        for _, seg_path in segments:  # 新 → 旧
+            if remaining <= 0:
+                break
+            seg_lines: List[str] = []
+            try:
+                with open(seg_path, "r", encoding="utf-8", errors="replace") as f:
+                    for line in f:
+                        if self._level_matches(line, level_upper):
+                            seg_lines.append(line)
+            except OSError as e:
+                raise AppServiceException(f"读取日志文件失败: {e}", error_code="app_log_read_failed")
+            if len(seg_lines) > remaining:
+                seg_lines = seg_lines[-remaining:]
+            chunks.append((seg_path.name, seg_lines))
+            remaining -= len(seg_lines)
+
+        chunks.reverse()  # 旧 → 新，保证拼接顺序正确
+        window: List[str] = []
+        segment_starts: List[Dict[str, Any]] = []
+        for name, seg_lines in chunks:
+            if not seg_lines:
+                continue
+            segment_starts.append({"name": name, "offset": len(window)})
+            window.extend(seg_lines)
+
+        _, backup_count = get_log_retention()
+        max_idx = segments[-1][0]
+        truncated = backup_count > 0 and max_idx >= backup_count
 
         return {
             "date": date,
             "log_name": log_name,
-            "lines": len(selected_lines),
+            "lines": len(window),
             "total_lines": total_lines,
-            "content": "".join(selected_lines),
+            "content": "".join(window),
             "exists": True,
+            "window_parts": [s["name"] for s in segment_starts],
+            "segment_starts": segment_starts,
+            "truncated": truncated,
         }
 
     def cleanup_old_logs(self, keep_days: int = 30, is_debug: bool = False, is_admin: bool = False) -> Dict[str, Any]:

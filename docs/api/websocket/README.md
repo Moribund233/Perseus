@@ -35,7 +35,7 @@ ws://host:port/ws/repository/42?token=your_jwt_token
 | 端点 | 认证要求 | 匿名支持 |
 |------|----------|----------|
 | `/ws/` | 可选 | ✅ 匿名连接（功能受限）|
-| `/ws/logs` | 可选 | ✅ 匿名连接（只能接收公开日志）|
+| `/ws/logs` | 必需（管理员） | ❌ 仅管理员可连接 |
 | `/ws/notifications` | 必需 | ❌ 必须提供有效 Token |
 | `/ws/repository/{id}` | 可选 | ✅ 公开仓库可匿名 |
 
@@ -141,6 +141,10 @@ ws://host:port/ws/repository/42?token=your_jwt_token
 
 实时日志推送端点，替代传统的 HTTP 轮询日志接口。
 
+> **仅管理员**：连接必须携带有效 JWT 且用户 `is_admin=true`，匿名或非管理员一律以
+> 1008 关闭。日志流属管理面数据。通用 `/ws/` 端点上的 `subscribe_logs` 亦由处理器
+> 层校验管理员权限（匿名订阅返回 `error`）。
+
 ### 连接响应
 
 ```json
@@ -171,7 +175,7 @@ ws://host:port/ws/repository/42?token=your_jwt_token
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| filters.levels | string[] | ❌ | 日志级别筛选（默认全部）|
+| filters.levels | string[] | ❌ | 日志级别筛选（默认 `["INFO","WARNING","ERROR"]`）|
 | filters.loggers | string[] | ❌ | 日志器名称筛选 |
 | filters.keywords | string[] | ❌ | 关键词筛选 |
 | history_count | int | ❌ | 发送历史日志条数（0=不发送）|

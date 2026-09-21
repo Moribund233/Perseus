@@ -2,7 +2,10 @@
 
 > **创建日期**: 2026-09-15
 > **用途**: 汇总 2026-09-15 文档盘点发现的待迭代任务与文档滞后项，作为后续排期与迭代输入。
-> **最近更新**: 2026-09-20（Admin 概览页可视化：vitals 迷你趋势（`Tiny.Line/Area`）+ 运行趋势（请求速率面积图 / 平均响应折线 / 成功失败环图）+ 最近日志面板，历史走前端 60 点滚动缓冲；引入 `@ant-design/charts` 并按路由懒加载（charts chunk 仅访问 /admin 时加载）；移除主应用侧边栏 admin 入口（主应用面向用户、不做 admin 鉴权，控制台仅 `/admin` 独立入口）；i18n 全量审计并补齐 23 个缺失键（editor/chat/settings/repositories/releases），zh/en 各 770 键对齐）；
+> **最近更新**: 2026-09-20（代码搜索架构重构：内容取自 Git 对象（pygit2）、索引持久化主库 `repo_search_files`/`repo_search_state`，PostgreSQL `pg_trgm` GIN 加速 `ILIKE`，支持 `ref`/`path`，进程内 Git tree 兜底；ripgrep 退役——删除 `utils/ripgrep_utils.py`、镜像不再安装；后端 1269 passed）；
+> 2026-09-20（Admin 控制台顶栏 + 权限面板：新增 `AdminHeader`（logo/状态/端点/时钟/用户）与左栏 `PermissionPanel`（`is_admin` 只读、`app.debug` 可切换）；新增后端 `POST /api/app/debug`（仅管理员，读改写 config.toml 单键、重启生效）；左栏导航加图标/logo、取消序号、支持收起展开、日志项改名「日志查看」；后端 1283 passed、前端 41 用例）；
+> 2026-09-20（Admin 日志查看器重构：拆为「文件日志」+「实时日志流」两个 tab；`/ws/logs` 收紧为仅管理员并修补通用 `/ws/` 匿名 `subscribe_logs` 旁路；文件端点跨 `X.log.1..N` 分片拼接（`window_parts`/`segment_starts`/`truncated`）、级别过滤改边界匹配；前端分片分隔行 + 丢弃提示；后端 1278 passed、前端 40 用例）；
+> 2026-09-20（Admin 概览页可视化：vitals 迷你趋势（`Tiny.Line/Area`）+ 运行趋势（请求速率面积图 / 平均响应折线 / 成功失败环图）+ 最近日志面板，历史走前端 60 点滚动缓冲；引入 `@ant-design/charts` 并按路由懒加载（charts chunk 仅访问 /admin 时加载）；移除主应用侧边栏 admin 入口（主应用面向用户、不做 admin 鉴权，控制台仅 `/admin` 独立入口）；i18n 全量审计并补齐 23 个缺失键（editor/chat/settings/repositories/releases），zh/en 各 770 键对齐）；
 > 2026-09-20（Admin 控制台**独立入口 + 门禁**：`/admin` 提为顶层路由（不再经 `ProtectedRoute`/`AppLayout`），未认证不再回落 landing；进入前 `GET /api/app/status` 来源预检（403=网关白名单拒绝页 / 401=独立登录门禁 `AdminGate`），已登录非管理员=拒绝页；修复 Overview 请求指标与后端 `{total,success,failed,avg_response_time_ms,requests_per_minute}` 不一致导致的渲染崩溃；网关镜像构建置 `VITE_API_URL=` 实现同源）；
 > 2026-09-20（DevOps：Web 前端改为**网关镜像内多阶段构建**——`docker/gateway/Dockerfile` 在 Node 阶段构建 `client/web`，产物内嵌 OpenResty 镜像，`install.sh`/`perseus update` 经 `build_images` 自动产出，宿主机无需 Node/pnpm；修复同步脚本 `repositories`/`data`/`logs` 过度排除导致嵌套源码漏同步）；
 > 2026-09-20（Admin 控制台 A–F 批次全部完成收官，见 6.4；D 日志查看器 + E 运维/调试 + F 打磨落地）；
@@ -138,7 +141,7 @@
 
 ### 6.1 代码搜索闭环 —— 已闭环但索引保鲜有断层
 
-**现状**: 单仓 `/{repo_id}/search`（`controller/search_controller.py:49`）+ 跨仓 `/search/code` 聚合 + `/search/global` 三类聚合已可用；FTS5 SQLite 索引存于仓库内 `.perseus_search_index/`（`services/search_service.py:29`），ripgrep fallback。
+**现状**: 单仓 `/{repo_id}/search` + 跨仓 `/search/code` 聚合 + `/search/global` 三类聚合已可用；**搜索索引已重构为「内容取自 Git 对象（pygit2）、持久化到主库」**（`repo_search_files`/`repo_search_state`，PostgreSQL `pg_trgm` GIN 加速 `ILIKE '%q%'` 子串检索，dev SQLite 退化 LIKE）；支持 `ref`/`path` 过滤；索引未就绪或非默认 `ref` 时进程内扫描 Git tree 兜底。ripgrep 已退役（`utils/ripgrep_utils.py` 删除，镜像不再安装 ripgrep）。
 
 | 优先级 | 任务 | 缺口说明 | TDD 要点 | 涉及文件 |
 |--------|------|----------|----------|----------|
@@ -180,7 +183,7 @@
 | A. 控制台骨架 + 只读概览 ✅（2026-09-20） | `AdminRoute` 守卫、`/admin` 壳、`OverviewSection`（status+platform，5s 轮询）、`api/admin.ts`、i18n `app.admin.*` | `pnpm lint`+`pnpm build` ✅；dev 栈 `/api/app/status` 200 | `client/web/src/routes/admin/`、`components/admin/`、`api/admin.ts` |
 | B. 组件健康 ✅（2026-09-20） | `ComponentsSection` + `ComponentRow`/`StatusDot`、10s 轮询、异常过滤、`available:false` 降级；网关白名单门控 | dev `/api/app/components` 200 `available:true`；prod `/api/app/*` 403（白名单留空） | 同上 + `docker/gateway/nginx.conf`、`docker/dev/nginx.dev.conf` |
 | C. 配置管理 ✅（2026-09-20） | `ConfigSection` 分节表单（受保护节只读账本 + 可编辑节只读字段标注）、`ConfigFieldEditor`、`configField.ts`（可编辑节/只读字段/控件类型映射）；脏值计数、validate、reset（`ConfirmDangerModal` 确认词）、重启提示；i18n `app.admin.config.*` | `pnpm lint`+`pnpm build` ✅；dev 网关实测 get/validate/update(noop→重启 hints)/受保护负路径 ✅；Playwright 冒烟：只读标注、脏值计数、校验横幅、reset 校验词门控 ✅ | `api/admin.ts`（configApi）、`components/admin/{configField.ts,ConfigFieldEditor.tsx,ConfirmDangerModal.tsx}`、`routes/admin/sections/ConfigSection.tsx` |
-| D. 日志查看器 ✅（2026-09-20） | `LogsSection` 日志终端（日期/文件/行数/级别筛选、级别着色、实时跟随 5s 轮询自动滚底、计数）＋ `confirmWord=CLEANUP` 清理确认（`ConfirmDangerModal` 新增 `extra` 插槽放保留天数）；i18n `app.admin.logs.*` | `pnpm lint`+`pnpm build` ✅ | `api/admin.ts`（logsApi）、`routes/admin/sections/LogsSection.tsx`、`components/admin/{ConfirmDangerModal.tsx,admin.css}` |
+| D. 日志查看器 ✅（2026-09-20；同日重构为双 tab + 分片接续） | `LogsSection` 双 tab：`FileLogTab`（日期/文件/行数/级别 + 跨 `X.log.1..N` 分片拼接、分片分隔行、`truncated` 丢弃提示）与 `StreamLogTab`（`/ws/logs` 实时流：级别/logger/关键字、历史回填、跟随）；`api/logSocket.ts` + `components/admin/VirtualLogBody.tsx`（rows 泛化）；`confirmWord=CLEANUP` 清理确认；`/ws/logs` 仅管理员 + 通用 `/ws/` 匿名订阅旁路修补；i18n `app.admin.logs.*` | `pnpm lint`+`pnpm test`(40)+`pnpm build` ✅；后端 `test_app_service`（分片/级别边界）+ `test_app_admin_api`（WS 门控）✅ | `api/admin.ts`（logsApi）、`api/logSocket.ts`、`routes/admin/sections/{LogsSection,FileLogTab,StreamLogTab}.tsx`、`components/admin/{VirtualLogBody.tsx,logLine.ts,ConfirmDangerModal.tsx,admin.css}`、`services/app_service.py`、`utils/logging.py`、`api/websocket/{router.py,handlers/log_handler.py}` |
 | E. 运维 + 调试 ✅（2026-09-20） | `OperationsSection`（restart/shutdown 危险确认 RESTART/SHUTDOWN）、`DebugSection`（`/api/v1/debug/status` 账本 + `PERSEUS_*` 环境变量脱敏表 + `admin∧debug` 门控卡片 + initdb/initconf 确认 `RESET DATABASE`/`RESET CONFIG`）；i18n `app.admin.{operations,debug}.*` | `pnpm lint`+`pnpm build` ✅；debug 门控在未开 `app.debug` 时显示置灰说明（不请求 403 端点） | `api/admin.ts`（operationsApi/debugApi）、`routes/admin/sections/{OperationsSection,DebugSection}.tsx`、`App.tsx`、`routes/admin/index.tsx`（侧栏全启用） |
 | F. 打磨 ✅（2026-09-20） | `AdminSkeleton` 统一骨架屏（Overview/Components/Config/Logs/Debug 首屏）；Overview 平台统计降级隐藏；响应式补强（页面头/运维行换行、环境表横向滚动、≤720px 适配）；键盘焦点可见（`.admin-console :focus-visible`）；i18n zh/en 各 712 键对齐 | `pnpm lint`+`pnpm build` ✅ | `components/admin/AdminSkeleton.tsx`、`routes/admin/sections/*`、`components/admin/admin.css`、i18n `{zh,en}.json` |
 

@@ -148,3 +148,154 @@ def test_cleanup_old_logs_deletes_old_dirs(service, tmp_path, monkeypatch):
     assert result["deleted_count"] == 1
     assert not old_dir.exists()
     assert recent_dir.exists()
+
+
+# ---------- 日志分片接续（RotatingFileHandler 产物拼接） ----------
+
+
+def test_get_log_content_concatenates_segments(service, tmp_path, monkeypatch):
+    """X.log 与 X.log.1..N 应按时间顺序拼接为逻辑流"""
+    from utils.logging import LogManager
+
+    monkeypatch.setattr(LogManager, "DEFAULT_LOG_DIR", str(tmp_path))
+    day = tmp_path / "2026-09-20"
+    day.mkdir()
+    (day / "perseus.log.2").write_text("2026-09-20 10:00:00 - app - INFO - oldest\n", encoding="utf-8")
+    (day / "perseus.log.1").write_text("2026-09-20 10:01:00 - app - INFO - middle\n", encoding="utf-8")
+    (day / "perseus.log").write_text("2026-09-20 10:02:00 - app - INFO - newest\n", encoding="utf-8")
+
+    res = service.get_log_content(date="2026-09-20", log_name="perseus", lines=10)
+
+    assert res["exists"] is True
+    assert res["total_lines"] == 3
+    assert res["content"].splitlines() == [
+        "2026-09-20 10:00:00 - app - INFO - oldest",
+        "2026-09-20 10:01:00 - app - INFO - middle",
+        "2026-09-20 10:02:00 - app - INFO - newest",
+    ]
+    assert [s["name"] for s in res["segment_starts"]] == [
+        "perseus.log.2", "perseus.log.1", "perseus.log",
+    ]
+    assert res["window_parts"] == ["perseus.log.2", "perseus.log.1", "perseus.log"]
+    assert res["truncated"] is False
+
+
+def test_get_log_content_tail_spans_segments(service, tmp_path, monkeypatch):
+    """尾部窗口跨分片时，segment_starts 记录窗口内偏移"""
+    from utils.logging import LogManager
+
+    monkeypatch.setattr(LogManager, "DEFAULT_LOG_DIR", str(tmp_path))
+    day = tmp_path / "2026-09-20"
+    day.mkdir()
+    (day / "perseus.log.1").write_text("old1\nold2\n", encoding="utf-8")
+    (day / "perseus.log").write_text("new1\nnew2\n", encoding="utf-8")
+
+    res = service.get_log_content(date="2026-09-20", lines=3)
+
+    assert res["total_lines"] == 4
+    assert res["content"].splitlines() == ["old2", "new1", "new2"]
+    assert res["segment_starts"] == [
+        {"name": "perseus.log.1", "offset": 0},
+        {"name": "perseus.log", "offset": 1},
+    ]
+
+
+def test_get_log_content_level_boundary(service, tmp_path, monkeypatch):
+    """级别过滤按 ` - LEVEL - ` 边界匹配，不误伤 INFORMATION"""
+    from utils.logging import LogManager
+
+    monkeypatch.setattr(LogManager, "DEFAULT_LOG_DIR", str(tmp_path))
+    day = tmp_path / "2026-09-20"
+    day.mkdir()
+    (day / "perseus.log").write_text(
+        "t - app - INFO - ok\n"
+        "t - app - INFORMATION - not info level\n"
+        "t - app - ERROR - boom\n",
+        encoding="utf-8",
+    )
+
+    res = service.get_log_content(date="2026-09-20", level="INFO")
+
+    assert res["content"].splitlines() == ["t - app - INFO - ok"]
+    assert res["total_lines"] == 1
+
+
+def test_get_log_content_truncated_flag(service, tmp_path, monkeypatch):
+    """存在 .{backup_count} 分片时标记 truncated"""
+    from utils.logging import LogManager
+
+    monkeypatch.setattr(LogManager, "DEFAULT_LOG_DIR", str(tmp_path))
+    day = tmp_path / "2026-09-20"
+    day.mkdir()
+    for idx in range(0, 6):  # 0..5 → 达到默认 backup_count=5
+        name = "perseus.log" if idx == 0 else f"perseus.log.{idx}"
+        (day / name).write_text("x\n", encoding="utf-8")
+
+    res = service.get_log_content(date="2026-09-20")
+
+    assert res["truncated"] is True
+
+
+def test_get_log_info_groups_segments(tmp_path):
+    """get_log_info 按基名聚合分片，返回 parts/total_size/truncated"""
+    from datetime import datetime
+
+    from utils.logging import get_log_info
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    day = tmp_path / today
+    day.mkdir()
+    (day / "error.log").write_text("a\n", encoding="utf-8")
+    (day / "error.log.1").write_text("b\n", encoding="utf-8")
+    (day / "error.log.2").write_text("c\n", encoding="utf-8")
+    (day / "perseus.log").write_text("d\n", encoding="utf-8")
+
+    info = get_log_info(str(tmp_path))
+    by_name = {f["name"]: f for f in info["files"]}
+
+    assert by_name["error.log"]["parts"] == 3
+    assert by_name["error.log"]["truncated"] is False
+    assert by_name["error.log"]["total_size"] >= by_name["error.log"]["size"]
+    assert by_name["perseus.log"]["parts"] == 1
+
+
+# ---------- 调试模式切换（专用端点，写 config.toml 单键） ----------
+
+
+def test_set_debug_mode_writes_single_key(tmp_path, monkeypatch):
+    """set_debug_mode 仅改 app.debug，保留文件中的其余键与配置节"""
+    import toml
+
+    from services import config_service as cfg
+
+    target = tmp_path / "config.toml"
+    target.write_text(
+        '[server]\nport = 8000\n\n[app]\ntitle = "X"\ndebug = false\n',
+        encoding="utf-8",
+    )
+
+    class FakeManager:
+        @property
+        def config_path(self):
+            return str(target)
+
+    monkeypatch.setattr(cfg, "ConfigManager", FakeManager)
+
+    res = cfg.ConfigService().set_debug_mode(True, is_admin=True)
+
+    assert res["success"] is True
+    assert res["debug"] is True
+    assert res["restart_required"] is True
+
+    data = toml.loads(target.read_text(encoding="utf-8"))
+    assert data["app"]["debug"] is True
+    assert data["app"]["title"] == "X"        # app 节其余键保留
+    assert data["server"]["port"] == 8000     # 其他节保留
+
+
+def test_set_debug_mode_requires_admin():
+    """非管理员切换调试模式抛 AuthorizationException"""
+    from services.config_service import ConfigService
+
+    with pytest.raises(AuthorizationException):
+        ConfigService().set_debug_mode(True, is_admin=False)

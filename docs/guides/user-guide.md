@@ -62,7 +62,7 @@ git clone ssh://git@localhost:2222/{username}/{repo}.git
 
 ## 4. 代码搜索
 
-- 全局搜索框支持 **代码搜索**（基于 ripgrep 全文索引）。
+- 全局搜索框支持 **代码搜索**（内容来自 Git 对象，索引持久化主库，PostgreSQL pg_trgm 加速子串检索）。
 - 支持按仓库 / 语言 / 路径过滤，跨仓库聚合结果。
 - PR 合并后搜索索引自动重建，搜索结果即时更新。
 

@@ -251,6 +251,7 @@ from models.build_log_entry import BuildLogEntry
 from models.collab_session_override import CollabSessionOverride
 from models.collab_invite_revocation import CollabInviteRevocation
 from models.revoked_token import RevokedToken
+from models.repo_search import RepoSearchFile, RepoSearchState
 
 __all__ = [
     "Base", "SessionLocal", "BaseModel",
@@ -279,4 +280,5 @@ __all__ = [
     "CollabSessionOverride",
     "CollabInviteRevocation",
     "RevokedToken",
+    "RepoSearchFile", "RepoSearchState",
 ]

@@ -4,6 +4,8 @@ Release 服务层
 处理 Release 和 Git 标签相关的所有业务逻辑
 """
 import os
+import asyncio
+import logging
 from typing import List, Optional, Dict, Any, Callable, Awaitable
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -15,6 +17,14 @@ from core.exception import NotFoundException, ValidationException, Authorization
 from utils.permission_utils import check_repository_permission
 from utils.db_utils import paginate, get_next_sequence_number
 from utils.response_builder import build_pagination_response
+from utils.git_utils import (
+    create_git_tag as git_create_tag,
+    delete_git_tag as git_delete_tag,
+    get_head_commit,
+    GitError,
+)
+
+logger = logging.getLogger(__name__)
 
 
 # 类型别名：仓库路径获取函数类型
@@ -22,242 +32,8 @@ RepositoryPathGetter = Callable[[AsyncSession, int], Awaitable[str]]
 
 
 # =============================================================================
-# Git 标签管理
+# Git 标签管理（实现见 utils/git_utils.py，基于 pygit2，无子进程）
 # =============================================================================
-
-def _create_git_tag(
-    repo_path: str,
-    tag_name: str,
-    commit_hash: str,
-    message: Optional[str] = None
-) -> str:
-    """
-    创建 Git 标签
-
-    Args:
-        repo_path: 仓库物理路径
-        tag_name: 标签名称
-        commit_hash: 关联的提交哈希
-        message: 标签说明（可选，为空时创建轻量标签）
-
-    Returns:
-        str: 标签哈希
-
-    Raises:
-        ValidationException: 创建标签失败
-    """
-    import subprocess
-
-    try:
-        if message:
-            # 创建附注标签（annotated tag）
-            result = subprocess.run(
-                ["git", "tag", "-a", tag_name, commit_hash, "-m", message],
-                cwd=repo_path,
-                capture_output=True,
-                text=True,
-                encoding="utf-8"
-            )
-        else:
-            # 创建轻量标签（lightweight tag）
-            result = subprocess.run(
-                ["git", "tag", tag_name, commit_hash],
-                cwd=repo_path,
-                capture_output=True,
-                text=True,
-                encoding="utf-8"
-            )
-
-        if result.returncode != 0:
-            raise ValidationException(detail=f"Failed to create tag: {result.stderr}", error_code="release_tag_create_failed")
-
-        # 获取标签哈希
-        result = subprocess.run(
-            ["git", "rev-list", "-n", "1", tag_name],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            encoding="utf-8"
-        )
-
-        if result.returncode != 0:
-            raise ValidationException(detail=f"Failed to get tag hash: {result.stderr}", error_code="release_tag_hash_failed")
-
-        return result.stdout.strip()
-
-    except subprocess.SubprocessError as e:
-        raise ValidationException(detail=f"Failed to create tag: {str(e)}", error_code="release_tag_create_failed")
-
-
-def _delete_git_tag(repo_path: str, tag_name: str) -> None:
-    """
-    删除 Git 标签
-
-    Args:
-        repo_path: 仓库物理路径
-        tag_name: 标签名称
-
-    Raises:
-        ValidationException: 删除标签失败
-    """
-    import subprocess
-
-    try:
-        result = subprocess.run(
-            ["git", "tag", "-d", tag_name],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            encoding="utf-8"
-        )
-
-        if result.returncode != 0:
-            raise ValidationException(detail=f"Failed to delete tag: {result.stderr}", error_code="release_tag_delete_failed")
-
-    except subprocess.SubprocessError as e:
-        raise ValidationException(detail=f"Failed to delete tag: {str(e)}", error_code="release_tag_delete_failed")
-
-
-def list_git_tags(repo_path: str, pattern: Optional[str] = None) -> List[Dict[str, Any]]:
-    """
-    列出 Git 标签
-
-    Args:
-        repo_path: 仓库物理路径
-        pattern: 标签匹配模式（如 "v1.*"）
-
-    Returns:
-        List[dict]: 标签列表
-
-    Raises:
-        ValidationException: 获取标签列表失败
-    """
-    import subprocess
-
-    try:
-        cmd = ["git", "tag", "-l"]
-        if pattern:
-            cmd.append(pattern)
-
-        result = subprocess.run(
-            cmd,
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            encoding="utf-8"
-        )
-
-        if result.returncode != 0:
-            raise ValidationException(detail=f"Failed to list tags: {result.stderr}", error_code="release_tag_list_failed")
-
-        tags = []
-        for line in result.stdout.strip().split("\n"):
-            if not line:
-                continue
-
-            tag_name = line.strip()
-
-            # 获取标签信息
-            info_result = subprocess.run(
-                ["git", "tag", "-l", "-n1", tag_name],
-                cwd=repo_path,
-                capture_output=True,
-                text=True,
-                encoding="utf-8"
-            )
-
-            message = ""
-            if info_result.returncode == 0:
-                parts = info_result.stdout.strip().split(" ", 1)
-                if len(parts) > 1:
-                    message = parts[1]
-
-            # 获取关联的提交哈希
-            hash_result = subprocess.run(
-                ["git", "rev-list", "-n", "1", tag_name],
-                cwd=repo_path,
-                capture_output=True,
-                text=True,
-                encoding="utf-8"
-            )
-
-            commit_hash = hash_result.stdout.strip() if hash_result.returncode == 0 else None
-
-            tags.append({
-                "name": tag_name,
-                "message": message,
-                "commit_hash": commit_hash
-            })
-
-        return tags
-
-    except subprocess.SubprocessError as e:
-        raise ValidationException(detail=f"Failed to list tags: {str(e)}", error_code="release_tag_list_failed")
-
-
-def get_git_tag(repo_path: str, tag_name: str) -> Optional[Dict[str, Any]]:
-    """
-    获取单个 Git 标签信息
-
-    Args:
-        repo_path: 仓库物理路径
-        tag_name: 标签名称
-
-    Returns:
-        dict: 标签信息，不存在返回 None
-
-    Raises:
-        ValidationException: 获取标签信息失败
-    """
-    import subprocess
-
-    try:
-        # 检查标签是否存在
-        result = subprocess.run(
-            ["git", "tag", "-l", tag_name],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            encoding="utf-8"
-        )
-
-        if result.returncode != 0 or not result.stdout.strip():
-            return None
-
-        # 获取标签信息
-        info_result = subprocess.run(
-            ["git", "tag", "-l", "-n1", tag_name],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            encoding="utf-8"
-        )
-
-        message = ""
-        if info_result.returncode == 0:
-            parts = info_result.stdout.strip().split(" ", 1)
-            if len(parts) > 1:
-                message = parts[1]
-
-        # 获取关联的提交哈希
-        hash_result = subprocess.run(
-            ["git", "rev-list", "-n", "1", tag_name],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            encoding="utf-8"
-        )
-
-        commit_hash = hash_result.stdout.strip() if hash_result.returncode == 0 else None
-
-        return {
-            "name": tag_name,
-            "message": message,
-            "commit_hash": commit_hash
-        }
-
-    except subprocess.SubprocessError as e:
-        raise ValidationException(detail=f"Failed to get tag: {str(e)}", error_code="release_tag_get_failed")
 
 
 # =============================================================================
@@ -441,27 +217,18 @@ async def create_release(
     if repo_path is None:
         repo_path = await get_repository_path(db, repository_id)
 
-    # 如果未指定提交哈希，使用当前 HEAD
+    # 如果未指定提交哈希，使用当前 HEAD（空仓库无提交时回退为占位值，
+    # 保持 commit_hash 非空；此时标签创建会失败并被记录）
     if not commit_hash:
-        import subprocess
-        rev_parse_result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            encoding="utf-8"
-        )
-        if rev_parse_result.returncode != 0:
-            raise ValidationException(detail="Failed to get HEAD commit hash", error_code="release_head_commit_failed")
-        commit_hash = rev_parse_result.stdout.strip()
+        commit_hash = get_head_commit(repo_path) or "HEAD"
 
-    # 创建 Git 标签
+    # 创建 Git 标签（幂等：已存在则复用）。标签创建失败不阻塞 Release
+    # （例如空仓库无 HEAD / 无提交），但记录告警，避免静默丢失标签。
     if create_git_tag:
         try:
-            _create_git_tag(repo_path, tag_name, commit_hash, message=name)
-        except ValidationException:
-            # 标签已存在则继续
-            pass
+            await asyncio.to_thread(git_create_tag, repo_path, tag_name, commit_hash, name)
+        except GitError as e:
+            logger.warning(f"创建 Git 标签失败 tag={tag_name} repo={repo_path}: {e}")
 
     # 生成 Release 编号
     release_number = await get_next_sequence_number(
@@ -602,16 +369,27 @@ async def delete_release(
         if not has_permission:
             raise AuthorizationException(detail="Not authorized to delete this release", error_code="release_delete_forbidden")
 
-    # 删除 Git 标签
+    # 删除 Git 标签（不存在则忽略）
     if delete_git_tag:
         try:
-            # 获取仓库路径（如果未提供）
             if repo_path is None:
                 repo_path = await get_repository_path(db, repository_id)
-            _delete_git_tag(repo_path, release.tag_name)
-        except ValidationException:
-            # 标签不存在则忽略
-            pass
+            await asyncio.to_thread(git_delete_tag, repo_path, release.tag_name)
+        except GitError as e:
+            logger.warning(f"删除 Git 标签失败 tag={release.tag_name} repo={repo_path}: {e}")
+
+    # 先清理关联附件（含物理文件），避免 release_id 外键约束导致删除失败
+    asset_result = await db.execute(
+        select(ReleaseAsset).filter(ReleaseAsset.release_id == release.id)
+    )
+    for asset in asset_result.scalars().all():
+        if asset.file_path and os.path.exists(asset.file_path):
+            try:
+                os.remove(asset.file_path)
+            except OSError:
+                pass
+        await db.delete(asset)
+    await db.flush()
 
     await db.delete(release)
     await db.commit()

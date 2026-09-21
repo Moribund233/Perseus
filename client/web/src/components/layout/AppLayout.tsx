@@ -13,6 +13,10 @@ import {
   PlusOutlined,
   UserOutlined,
   TranslationOutlined,
+  DownOutlined,
+  HistoryOutlined,
+  BookOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/auth';
@@ -23,6 +27,7 @@ import { chatApi, dmApi, type DMSession } from '../../api/chat';
 import type { Notification } from '../../api/notifications';
 import Logo from '../brand/Logo';
 import GlobalSearch from './GlobalSearch';
+import { getRecentRepos, recordRecentRepo, type RecentRepo } from './recentRepos';
 
 const { Header, Sider, Content } = Layout;
 
@@ -35,6 +40,24 @@ const textPrimary = '#e6edf3';
 const blueLight = '#58a6ff';
 const bluePrimary = '#1f6feb';
 const red = '#f85149';
+
+/** 顶栏上下文/最近项目下拉的触发器样式 */
+const pillStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  height: 32,
+  padding: '0 10px',
+  background: '#0d1117',
+  border: `1px solid #30363d`,
+  borderRadius: 6,
+  color: textPrimary,
+  fontSize: 13,
+  cursor: 'pointer',
+  flexShrink: 0,
+  whiteSpace: 'nowrap',
+  transition: 'border-color 0.15s, background 0.15s',
+};
 
 function formatNotificationTime(iso: string, lang: string): string {
   const date = new Date(iso);
@@ -189,6 +212,50 @@ export default function AppLayout() {
   const activeKey = navItems.find((item) => location.pathname.startsWith(item.path))?.key || 'dashboard';
   const activeLabel = navItems.find((item) => item.key === activeKey)?.label || t('app.nav.dashboard');
 
+  // 当前仓库上下文（仓库 / PR / 编辑器页）
+  const repoMatch = location.pathname.match(/^\/(?:repositories|editor)\/([^/]+)\/([^/]+)/);
+  const currentRepo = repoMatch
+    ? { owner: repoMatch[1], repo: repoMatch[2], path: `${repoMatch[1]}/${repoMatch[2]}` }
+    : null;
+  const repoOwner = currentRepo?.owner;
+  const repoName = currentRepo?.repo;
+
+  const [recentRepos, setRecentRepos] = useState<RecentRepo[]>([]);
+
+  // 记录最近打开的项目（仅写 localStorage，不在 effect 内 setState）
+  useEffect(() => {
+    if (repoOwner && repoName) recordRecentRepo(repoOwner, repoName);
+  }, [repoOwner, repoName]);
+
+  const contextItems: MenuProps['items'] = currentRepo
+    ? [
+        { key: 'path', label: currentRepo.path, disabled: true },
+        { type: 'divider' },
+        { key: 'repo-overview', label: t('app.topBar.contextOverview'), icon: <BookOutlined />, onClick: () => navigate(`/repositories/${currentRepo.path}`) },
+        { key: 'repo-pulls', label: t('app.nav.pullRequests'), icon: <PullRequestOutlined />, onClick: () => navigate(`/repositories/${currentRepo.path}/pulls`) },
+        { key: 'repo-issues', label: t('app.topBar.contextIssues'), icon: <ExclamationCircleOutlined />, onClick: () => navigate(`/repositories/${currentRepo.path}/issues`) },
+        { key: 'repo-editor', label: t('app.nav.codeEditor'), icon: <EditOutlined />, onClick: () => navigate(`/editor/${currentRepo.path}`) },
+      ]
+    : navItems.map((item) => ({ key: item.key, label: item.label, icon: item.icon, onClick: () => navigate(item.path) }));
+
+  const recentItems: MenuProps['items'] = recentRepos.length
+    ? recentRepos.map((r) => ({
+        key: r.path,
+        label: (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>{r.path}</span>
+            {r.path === currentRepo?.path && <span style={{ color: blueLight, fontSize: 11 }}>•</span>}
+          </span>
+        ),
+        onClick: () => navigate(`/repositories/${r.path}`),
+      }))
+    : [{ key: 'empty', label: t('app.topBar.recentEmpty'), disabled: true }];
+
+  const pillHover = (e: React.MouseEvent<HTMLButtonElement>, on: boolean) => {
+    e.currentTarget.style.borderColor = on ? blueLight : '#30363d';
+    e.currentTarget.style.background = on ? hoverBg : '#0d1117';
+  };
+
   const userMenu: MenuProps['items'] = [
     { key: 'profile', label: t('app.userMenu.profile'), onClick: () => navigate('/settings') },
     { key: 'settings', label: t('app.userMenu.settings'), onClick: () => navigate('/settings') },
@@ -228,19 +295,32 @@ export default function AppLayout() {
             minHeight: 0,
           }}
         >
-          {/* Logo */}
+          {/* Logo / 品牌 */}
           <div
-            style={{
-              width: 40,
-              height: 40,
-              marginBottom: 20,
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
             onClick={() => setCollapsed(!collapsed)}
             title="Perseus"
+            style={{
+              width: '100%',
+              height: 40,
+              marginBottom: 20,
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              gap: 10,
+              padding: collapsed ? 0 : '0 20px',
+              cursor: 'pointer',
+              color: textPrimary,
+            }}
           >
-            <Logo size="100%" />
+            <span style={{ width: 32, height: 32, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Logo size="100%" />
+            </span>
+            {!collapsed && (
+              <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
+                Perseus
+              </span>
+            )}
           </div>
 
           {/* Main Nav */}
@@ -377,28 +457,52 @@ export default function AppLayout() {
               </div>
             </Tooltip>
 
-            {/* User avatar */}
+            {/* User */}
             <div
               style={{
-                padding: collapsed ? '8px 0' : '8px 0',
-                textAlign: 'center',
                 borderTop: `1px solid ${borderColor}`,
                 marginTop: 4,
+                paddingTop: 8,
               }}
             >
               <Dropdown menu={{ items: userMenu }} placement="topRight" trigger={['click']}>
-                <Avatar
-                  size={32}
-                  icon={<UserOutlined />}
+                <div
                   style={{
-                    background: `linear-gradient(135deg, ${bluePrimary}, #bc8cff)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: collapsed ? 'center' : 'flex-start',
+                    gap: 10,
+                    padding: collapsed ? '4px 0' : '6px 12px',
+                    borderRadius: 8,
                     cursor: 'pointer',
-                    flexShrink: 0,
+                    overflow: 'hidden',
+                    transition: 'background 0.2s',
                   }}
-                  src={user?.avatar_url}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
-                  {user?.username?.slice(0, 2).toUpperCase()}
-                </Avatar>
+                  <Avatar
+                    size={32}
+                    icon={<UserOutlined />}
+                    style={{
+                      background: `linear-gradient(135deg, ${bluePrimary}, #bc8cff)`,
+                      flexShrink: 0,
+                    }}
+                    src={user?.avatar_url}
+                  >
+                    {user?.username?.slice(0, 2).toUpperCase()}
+                  </Avatar>
+                  {!collapsed && (
+                    <div style={{ minWidth: 0, lineHeight: 1.25 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {user?.username}
+                      </div>
+                      <div style={{ fontSize: 11, color: textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {user?.email}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </Dropdown>
             </div>
           </div>
@@ -418,44 +522,47 @@ export default function AppLayout() {
             flexShrink: 0,
           }}
         >
-          {/* Breadcrumb */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              fontSize: 13,
-              color: textSecondary,
-              flexShrink: 0,
-            }}
-          >
-            {(() => {
-              const repoMatch = location.pathname.match(/^\/repositories\/([^/]+)\/([^/]+)/);
-              if (repoMatch) {
-                const [, owner, repoName] = repoMatch;
-                return (
-                  <>
-                    <span
-                      onClick={() => navigate('/repositories')}
-                      style={{ cursor: 'pointer', transition: 'color 0.15s' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.color = textPrimary; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.color = textSecondary; }}
-                    >
-                      {t('app.nav.repositories')}
-                    </span>
-                    <span style={{ color: '#6e7681' }}>/</span>
-                    <span style={{ color: textSecondary }}>{owner}</span>
-                    <span style={{ color: '#6e7681' }}>/</span>
-                    <span style={{ color: textPrimary, fontWeight: 500 }}>{repoName}</span>
-                  </>
-                );
-              }
-              return <span style={{ color: textPrimary, fontWeight: 500 }}>{activeLabel}</span>;
-            })()}
-          </div>
-
           {/* Search */}
           <GlobalSearch />
+
+          {/* 上下文下拉（原面包屑） */}
+          <Dropdown menu={{ items: contextItems }} trigger={['click']} placement="bottomLeft">
+            <button
+              type="button"
+              style={pillStyle}
+              onMouseEnter={(e) => pillHover(e, true)}
+              onMouseLeave={(e) => pillHover(e, false)}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, fontSize: 14, color: textSecondary }}>
+                {currentRepo ? <BookOutlined /> : navItems.find((i) => i.key === activeKey)?.icon}
+              </span>
+              <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {currentRepo ? currentRepo.path : activeLabel}
+              </span>
+              <DownOutlined style={{ fontSize: 10, color: textSecondary }} />
+            </button>
+          </Dropdown>
+
+          {/* 最近项目下拉（仅仓库 / PR / 编辑器页） */}
+          {currentRepo && (
+            <Dropdown
+              menu={{ items: recentItems }}
+              trigger={['click']}
+              placement="bottomLeft"
+              onOpenChange={(open) => { if (open) setRecentRepos(getRecentRepos()); }}
+            >
+              <button
+                type="button"
+                style={pillStyle}
+                title={t('app.topBar.recentProjects')}
+                onMouseEnter={(e) => pillHover(e, true)}
+                onMouseLeave={(e) => pillHover(e, false)}
+              >
+                <HistoryOutlined style={{ fontSize: 14, color: textSecondary }} />
+                <DownOutlined style={{ fontSize: 10, color: textSecondary }} />
+              </button>
+            </Dropdown>
+          )}
 
           {/* Actions */}
           <Space size={8} style={{ marginLeft: 'auto' }}>

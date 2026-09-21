@@ -553,10 +553,11 @@ async def merge_pull_request(
                 pre_merge_target_sha,
                 merged_commit_hash,
             )
+            search_service = SearchService()
             if changed:
-                await asyncio.to_thread(SearchService.update_files, repo_path, changed)
+                await search_service.update_files(db, repository_id, repo_path, changed)
             else:
-                await asyncio.to_thread(SearchService.rebuild_index, repo_path)
+                await search_service.rebuild_index(db, repository_id, repo_path)
     except Exception as index_err:
         logger.warning(f"Failed to update search index after PR merge: {index_err}")
 

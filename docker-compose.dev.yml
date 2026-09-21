@@ -2,20 +2,17 @@
 # Perseus 开发环境 Docker Compose 配置（精简版）
 #
 # 适用场景：
-#   外部已运行 PostgreSQL、Redis、Nginx/OpenResty（如 1Panel 管理的服务）
-#   只需启动 Perseus 相关的自定义服务
+#   开发环境（自包含）：内置 PostgreSQL（容器 perseus-postgres-dev，独立数据卷）；
+#   前端本地 Vite、网关容器内置 Nginx 反代。
 #
 # 架构:
 #   本地 Vite (localhost:5173) → 前端开发服务器
-#   外部 Nginx/OpenResty → git-http-backend (CGI) — Git HTTP Smart Protocol
-#   外部 Nginx/OpenResty → FastAPI (proxy)       — API / WebSocket
-#   FastAPI → 外部 PostgreSQL                    — 数据库
-#   FastAPI → 外部 Redis                         — 缓存
+#   网关容器 (localhost:8080) → git-http-backend (CGI) — Git HTTP Smart Protocol
+#   网关容器 (localhost:8080) → FastAPI (proxy)        — API / WebSocket
+#   FastAPI → PostgreSQL（compose 内置 postgres 服务）  — 数据库
 #
 # 前置条件:
-#   1. PostgreSQL 已运行，端口 5432 可访问
-#   2. Redis 已运行，端口 6379 可访问
-#   3. Nginx/OpenResty 已配置反向代理
+#   1. .env 已设置 POSTGRES_PASSWORD（与生产共用 .env）
 #
 # 使用方式:
 #   1. 复制环境变量模板: cp .env.dev .env
@@ -37,6 +34,31 @@
 
 services:
   # =============================================
+  # PostgreSQL（开发自包含；独立容器/数据卷，避免与生产 perseus-postgres 冲突）
+  # =============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: perseus-postgres-dev
+    environment:
+      POSTGRES_USER: perseus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?错误：请设置 POSTGRES_PASSWORD 到 .env 文件}
+      POSTGRES_DB: perseus
+      TZ: Asia/Shanghai
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U perseus -d perseus"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # =============================================
   # FastAPI 后端 (开发模式，支持热重载)
   # =============================================
   app:
@@ -45,8 +67,8 @@ services:
       dockerfile: docker/dev/Dockerfile.backend
     container_name: perseus-backend-dev
     environment:
-      # 数据库连接（SQLite 开发环境）
-      DATABASE_URL: ${DATABASE_URL:-sqlite+aiosqlite:///./perseus_dev.db}
+      # 数据库连接（compose 内置 PostgreSQL）
+      DATABASE_URL: postgresql://perseus:${POSTGRES_PASSWORD:?错误：请设置 POSTGRES_PASSWORD 到 .env 文件}@postgres:5432/perseus
       # Redis 连接（可选）
       # REDIS_URL: ${REDIS_URL:-redis://host.docker.internal:6379/0}
       # JWT 密钥（必需修改！）
@@ -98,6 +120,9 @@ services:
     # 使用 host.docker.internal 访问宿主机上的外部服务
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   # =============================================
   # 协作编辑 Yjs 网关 (Hocuspocus 哑管道, 开发模式热重载)
@@ -236,6 +261,8 @@ volumes:
   lfs_dev:
     driver: local
   collab_gateway_node_modules:
+    driver: local
+  postgres_dev_data:
     driver: local
 
 # =============================================

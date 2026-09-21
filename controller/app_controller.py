@@ -108,6 +108,19 @@ class ActionResponse(BaseModel):
     message: str
 
 
+class DebugToggleRequest(BaseModel):
+    """调试模式切换请求"""
+    enabled: bool = Field(..., description="是否开启调试模式")
+
+
+class DebugToggleResponse(BaseModel):
+    """调试模式切换响应"""
+    success: bool
+    debug: Optional[bool] = None
+    restart_required: bool = True
+    message: str
+
+
 class ComponentInfo(BaseModel):
     """编排组件（容器）状态"""
     service: str
@@ -269,6 +282,25 @@ async def validate_config_endpoint(
     )
 
 
+@router.post("/api/app/debug", response_model=DebugToggleResponse, tags=["app-management"])
+async def set_debug_mode_endpoint(
+    request: DebugToggleRequest,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    开启/关闭调试模式（仅管理员）
+
+    将 ``app.debug`` 写入 config.toml（保留文件中的其余配置），**重启服务后生效**；
+    不刷新当前运行态，因此不会即时解锁调试工具。
+
+    Returns:
+        DebugToggleResponse: 切换结果与重启提示
+    """
+    config_service = get_config_service()
+    result = config_service.set_debug_mode(request.enabled, is_admin=current_user.is_admin)
+    return DebugToggleResponse(**result)
+
+
 @router.get("/api/app/status", response_model=StatusResponse)
 async def get_status_endpoint(
     current_user: User = Depends(get_current_user),
@@ -384,6 +416,9 @@ class LogContentResponse(BaseModel):
     total_lines: int
     content: str
     exists: bool
+    window_parts: list = Field(default_factory=list, description="返回窗口覆盖的分片（旧→新）")
+    segment_starts: list = Field(default_factory=list, description="各分片在窗口内的起始行偏移")
+    truncated: bool = Field(default=False, description="是否已达保留上限、更早分片可能被丢弃")
 
 
 class LogCleanupResponse(BaseModel):

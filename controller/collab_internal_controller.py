@@ -260,9 +260,9 @@ async def collab_save(
         commit_message,
     )
 
-    # F-039: 协作保存后增量更新搜索索引 (单文件, 放线程池避免阻塞事件循环)
+    # F-039: 协作保存后增量更新搜索索引（主库持久化）
     try:
-        await asyncio.to_thread(SearchService.update_files, repo_path, [path])
+        await SearchService().update_files(db, repo.id, repo_path, [path])
     except Exception as index_err:
         logger.warning("Search index update failed after collab save: %s", index_err)
 

@@ -227,17 +227,11 @@ class TestSearch:
         assert data["issues"] or data["pull_requests"] or data["repositories"]
 
     def test_global_code_search_with_results(self, test_client, test_user, db):
-        """global code search：索引含目标文件时返回聚合结果"""
-        from tests.test_repo_browser_controller import create_repo_with_content
-        from services.search_service import SearchIndex
-        repo, path = create_repo_with_content(db, "codesearch",
-                                              owner_id=test_user.id)
-        for fname in ("a.py", "b.py"):
-            with open(os.path.join(path, fname), "w",
-                      encoding="utf-8") as f:
-                f.write("markerfrobnicate = 1\nprint(markerfrobnicate)\n")
-        idx = SearchIndex(path)
-        idx.build()
+        """global code search：Git 对象含目标内容时返回聚合结果"""
+        from tests.test_repo_browser_controller import create_repo_with_content, create_commit_in_repo
+        repo, path = create_repo_with_content(db, "codesearch", owner_id=test_user.id)
+        create_commit_in_repo(path, "a.py", b"markerfrobnicate = 1\nprint(markerfrobnicate)\n")
+        create_commit_in_repo(path, "b.py", b"markerfrobnicate = 1\n")
         from services.token_service import create_access_token
         token = create_access_token({
             "sub": str(test_user.id), "username": test_user.username,
@@ -253,16 +247,10 @@ class TestSearch:
 
     def test_global_code_search_truncation(self, test_client, test_user, db):
         """截断逻辑：结果数超过 max_results 时触发聚合截断分支"""
-        from tests.test_repo_browser_controller import create_repo_with_content
-        from services.search_service import SearchIndex
-        repo, path = create_repo_with_content(db, "codesearchtrunc",
-                                              owner_id=test_user.id)
+        from tests.test_repo_browser_controller import create_repo_with_content, create_commit_in_repo
+        repo, path = create_repo_with_content(db, "codesearchtrunc", owner_id=test_user.id)
         for fname in ("f1.py", "f2.py", "f3.py"):
-            with open(os.path.join(path, fname), "w",
-                      encoding="utf-8") as f:
-                f.write("filternical line\n")
-        idx = SearchIndex(path)
-        idx.build()
+            create_commit_in_repo(path, fname, b"filternical line\n")
         from services.token_service import create_access_token
         token = create_access_token({
             "sub": str(test_user.id), "username": test_user.username,

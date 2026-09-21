@@ -3,7 +3,6 @@
 
 处理与代码搜索相关的HTTP请求，调用服务层方法并返回响应
 """
-import asyncio
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
@@ -23,16 +22,9 @@ router = APIRouter(prefix=get_route_prefix("repositories"), tags=["search"])
 global_search_router = APIRouter(prefix="/api/v1/search", tags=["search"])
 
 
-async def _get_repo_path(repo_id: uuid.UUID, db: AsyncSession) -> str:
+async def _get_repo(repo_id: uuid.UUID, db: AsyncSession) -> Repository:
     """
-    获取仓库物理路径
-
-    Args:
-        repo_id: 仓库ID
-        db: 数据库会话
-
-    Returns:
-        str: 仓库物理路径
+    获取仓库对象（用于取物理路径与仓库ID）
 
     Raises:
         NotFoundException: 仓库不存在
@@ -41,8 +33,7 @@ async def _get_repo_path(repo_id: uuid.UUID, db: AsyncSession) -> str:
     repo = result.scalar_one_or_none()
     if not repo:
         raise NotFoundException(detail="Repository not found", error_code="repository_not_found")
-
-    return get_repository_storage_path(repo.path)
+    return repo
 
 
 @router.get("/{repo_id}/search")
@@ -50,6 +41,7 @@ async def search_code(
     repo_id: uuid.UUID,
     q: str = Query(..., description="搜索关键词"),
     path: str = Query(None, description="限制搜索目录"),
+    ref: str = Query(None, description="分支/标签/提交，缺省为默认分支"),
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -60,18 +52,23 @@ async def search_code(
         repo_id: 仓库ID
         q: 搜索关键词
         path: 限制搜索目录
+        ref: 分支/标签/提交（缺省默认分支）
         db: 数据库会话
         current_user: 当前认证用户
 
     Returns:
         dict: 搜索结果
     """
-    repo_path = await _get_repo_path(repo_id, db)
+    repo = await _get_repo(repo_id, db)
+    repo_path = get_repository_storage_path(repo.path)
     search_service = SearchService()
-    return search_service.search_code(
+    return await search_service.search_code(
+        db=db,
+        repository_id=repo.id,
         repo_path=repo_path,
         query=q,
         path=path,
+        ref=ref,
     )
 
 
@@ -79,6 +76,7 @@ async def search_code(
 async def global_search_code(
     q: str = Query(..., description="搜索关键词"),
     path: str = Query(None, description="限制搜索目录"),
+    ref: str = Query(None, description="分支/标签/提交，缺省为各仓库默认分支"),
     max_results: int = Query(100, ge=1, le=500, description="最大返回结果数"),
     per_repo_max: int = Query(50, ge=1, le=200, description="每个仓库最大结果数"),
     db: AsyncSession = Depends(get_async_db),
@@ -92,6 +90,7 @@ async def global_search_code(
     Args:
         q: 搜索关键词
         path: 限制搜索目录
+        ref: 分支/标签/提交（缺省各仓库默认分支）
         max_results: 最大返回结果总数
         per_repo_max: 单个仓库最大结果数
         db: 数据库会话
@@ -120,11 +119,13 @@ async def global_search_code(
     async def search_one(repo: Repository):
         repo_path = get_repository_storage_path(repo.path)
         try:
-            response = await asyncio.to_thread(
-                search_service.search_code,
+            response = await search_service.search_code(
+                db=db,
+                repository_id=repo.id,
                 repo_path=repo_path,
                 query=q,
                 path=path,
+                ref=ref,
                 max_results=per_repo_max,
             )
         except Exception:
@@ -143,8 +144,12 @@ async def global_search_code(
             "truncated": response.truncated,
         }
 
-    repo_results = await asyncio.gather(*[search_one(repo) for repo in repos])
-    aggregated = [r for r in repo_results if r is not None]
+    # 串行执行：共用一个 AsyncSession，并发不安全
+    aggregated = []
+    for repo in repos:
+        result = await search_one(repo)
+        if result is not None:
+            aggregated.append(result)
 
     # 按总结果数截断
     total_count = sum(r["total_count"] for r in aggregated)

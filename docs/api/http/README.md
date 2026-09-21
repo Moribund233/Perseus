@@ -1579,6 +1579,32 @@ POST /api/app/config/validate
 }
 ```
 
+### 切换调试模式
+
+```
+POST /api/app/debug
+```
+
+认证：✅ 仅管理员
+
+将 `app.debug` 写入 `config.toml`（仅改该键，保留文件中的其余配置），
+**重启服务后生效**；不刷新当前运行态，因此不会即时解锁调试工具。
+
+Request:
+```json
+{ "enabled": true }
+```
+
+Response:
+```json
+{
+  "success": true,
+  "debug": true,
+  "restart_required": true,
+  "message": "调试模式已开启，重启服务后生效"
+}
+```
+
 ### 获取日志信息
 
 ```
@@ -1592,10 +1618,24 @@ Response:
 {
   "log_dir": "/var/log/perseus",
   "today_dir": "/var/log/perseus/2026-06-10",
-  "today_files": ["app.log", "error.log"],
+  "today_files": [
+    {
+      "name": "perseus.log",
+      "size": 2048,
+      "size_formatted": "2.0 KB",
+      "modified": "2026-06-10T10:30:00+00:00",
+      "parts": 3,
+      "total_size": 20973568,
+      "total_size_formatted": "20.0 MB",
+      "truncated": true
+    }
+  ],
   "available_dates": ["2026-06-10", "2026-06-09"]
 }
 ```
+
+> `parts` 为磁盘分片数（`X.log` + `X.log.1..N`，RotatingFileHandler 产物）；
+> `truncated=true` 表示已达保留上限，更早分片可能已被丢弃。
 
 ### 查看日志内容
 
@@ -1606,11 +1646,35 @@ GET /api/app/logs/content?date=2026-06-10&log_name=app&lines=100&level=ERROR
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | date | string | 今天 | 日期 (YYYY-MM-DD) |
-| log_name | string | "app" | 日志文件名（不含扩展名）|
-| lines | int | 100 | 返回行数（1-1000）|
-| level | string | null | 过滤级别 (debug/info/warning/error/critical) |
+| log_name | string | "app" | 日志文件基名（不含扩展名；无匹配时回退 `perseus`）|
+| lines | int | 100 | 返回行数（1-5000）|
+| level | string | null | 过滤级别 (debug/info/warning/error/critical)，按 ` - LEVEL - ` 边界匹配 |
 
 认证：✅ 需要管理员权限或调试模式
+
+服务端会把 `X.log` 与其滚动分片 `X.log.1..N` **按时间顺序拼接为逻辑流**，
+返回末尾 `lines` 行（`level` 过滤作用于逻辑流）。
+
+Response:
+```json
+{
+  "date": "2026-06-10",
+  "log_name": "app",
+  "lines": 100,
+  "total_lines": 41233,
+  "content": "...",
+  "exists": true,
+  "window_parts": ["error.log.1", "error.log"],
+  "segment_starts": [
+    { "name": "error.log.1", "offset": 0 },
+    { "name": "error.log", "offset": 88 }
+  ],
+  "truncated": true
+}
+```
+
+> `segment_starts` 为各分片在返回窗口内的起始行偏移（供前端绘制分片分隔）；
+> `truncated` 同 `/api/app/logs`。
 
 ### 清理日志
 

@@ -79,7 +79,22 @@
     },
     "admin": {
       "railTitle": "系统索引",
+      "collapse": "收起导航",
+      "expand": "展开导航",
       "soon": "SOON",
+      "header": {
+        "console": "应用控制台",
+        "unknown": "未知"
+      },
+      "permissions": {
+        "title": "权限",
+        "admin": "管理员",
+        "adminOn": "当前账号具备管理员权限",
+        "debug": "调试模式",
+        "debugHint": "开启后解锁调试工具；写入配置后需重启服务生效",
+        "on": "ON",
+        "pending": "已写入配置，重启服务后生效"
+      },
       "gate": {
         "title": "管理控制台",
         "subtitle": "请输入管理员账号以继续",
@@ -107,7 +122,7 @@
         "overview": "状态概览",
         "components": "组件健康",
         "config": "配置管理",
-        "logs": "日志查看器",
+        "logs": "日志查看",
         "operations": "运维操作",
         "debug": "调试工具"
       },
@@ -272,7 +287,7 @@
       },
       "logs": {
         "title": "日志查看器",
-        "subtitle": "按日期、文件与级别检索运行日志；支持实时跟随与清理",
+        "subtitle": "文件历史检索与实时日志流；支持级别过滤与清理",
         "date": "日期",
         "file": "文件",
         "lines": "行数",
@@ -287,6 +302,25 @@
         "loading": "加载中…",
         "empty": "当前条件无日志",
         "count": "{{shown}} / {{total}} 行",
+        "fileMode": "FILE",
+        "segment": "── 续 {{name}} ──",
+        "segmentMeta": "{{parts}} 分片 · {{size}}",
+        "truncated": "已达分片保留上限，更早日志可能已被丢弃",
+        "tabs": {
+          "file": "文件日志",
+          "stream": "实时日志流"
+        },
+        "stream": {
+          "logger": "Logger",
+          "loggerPlaceholder": "输入 logger 名，回车添加",
+          "keywordPlaceholder": "过滤包含关键字的消息",
+          "clear": "清空",
+          "channel": "实时通道 /ws/logs",
+          "waiting": "等待日志推送…",
+          "connecting": "连接中…",
+          "connected": "已连接",
+          "disconnected": "已断开"
+        },
         "cleanup": {
           "button": "清理旧日志",
           "title": "清理旧日志",
@@ -389,7 +423,11 @@
       "searching": "搜索中...",
       "searchFailed": "搜索失败，请重试",
       "searchNoResults": "未找到与 '{{query}}' 相关的结果",
-      "searchViewAll": "查看全部结果"
+      "searchViewAll": "查看全部结果",
+      "contextOverview": "仓库概览",
+      "contextIssues": "Issues",
+      "recentProjects": "最近项目",
+      "recentEmpty": "暂无最近打开的项目"
     },
     "notifications": {
       "title": "通知",
@@ -401,6 +439,9 @@
       "title": "仓库",
       "noRepos": "暂无仓库",
       "explorer": "资源管理器",
+      "backToRepos": "返回仓库列表",
+      "backToList": "返回文件列表",
+      "openInEditor": "在编辑器中打开",
       "filter": {
         "mine": "我的仓库",
         "all": "所有仓库"

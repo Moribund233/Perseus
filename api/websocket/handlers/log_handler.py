@@ -254,10 +254,20 @@ async def handle_subscribe_logs(connection: Connection, data: Dict[str, Any]) ->
     """
     处理日志订阅请求
 
+    日志流属管理面数据，仅管理员可订阅：匿名或非管理员连接一律拒绝。
+    `/ws/logs` 与通用 `/ws/` 均经此处理器，故权限校验放在此处兜底。
+
     Args:
         connection: WebSocket 连接
         data: 消息数据，包含 filters
     """
+    if not connection.metadata.get("is_admin", False):
+        await connection.send({
+            "type": "error",
+            "error": "Admin permission required for log stream"
+        })
+        return
+
     handler = get_websocket_log_handler()
     filters = data.get("filters", {})
 
@@ -313,7 +323,14 @@ async def handle_unsubscribe_logs(connection: Connection, data: Dict[str, Any]) 
 
 
 async def handle_get_log_stats(connection: Connection, data: Dict[str, Any]) -> None:
-    """处理获取日志统计请求"""
+    """处理获取日志统计请求（仅管理员）"""
+    if not connection.metadata.get("is_admin", False):
+        await connection.send({
+            "type": "error",
+            "error": "Admin permission required for log stream"
+        })
+        return
+
     handler = get_websocket_log_handler()
     stats = await handler.buffer.get_stats()
 

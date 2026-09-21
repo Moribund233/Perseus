@@ -10,6 +10,7 @@ from typing import Optional, Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+import pygit2
 
 from models import Repository, User
 from core.exception import NotFoundException, ValidationException, AuthorizationException
@@ -130,17 +131,11 @@ async def fork_repository(
         # 确保父目录存在
         os.makedirs(os.path.dirname(forked_repo_path), exist_ok=True)
 
-        # 使用 git clone --bare 创建 Fork
-        import subprocess
-        clone_result = subprocess.run(
-            ["git", "clone", "--bare", source_repo_path, forked_repo_path],
-            capture_output=True,
-            text=True,
-            encoding="utf-8"
-        )
-
-        if clone_result.returncode != 0:
-            raise ValidationException(detail=f"Failed to fork repository: {clone_result.stderr}", error_code="fork_failed")
+        # 使用 pygit2 创建 bare 克隆（等价 `git clone --bare`，无子进程）
+        try:
+            pygit2.clone_repository(source_repo_path, forked_repo_path, bare=True)
+        except Exception as e:
+            raise ValidationException(detail=f"Failed to fork repository: {e}", error_code="fork_failed")
 
         # 更新源仓库的 Fork 计数
         source_repo.fork_count += 1
@@ -362,18 +357,17 @@ async def sync_fork(
     fork_repo_path = await get_repository_path(db, repository_id, repo_root=repo_root)
     source_repo_path = await get_repository_path(db, source_repo.id, repo_root=repo_root)
 
-    # 执行 git fetch
-    import subprocess
-    fetch_result = subprocess.run(
-        ["git", "fetch", "origin"],
-        cwd=fork_repo_path,
-        capture_output=True,
-        text=True,
-        encoding="utf-8"
-    )
-
-    if fetch_result.returncode != 0:
-        raise ValidationException(detail=f"Failed to sync repository: {fetch_result.stderr}", error_code="fork_sync_failed")
+    # 通过 pygit2 从 origin 拉取并更新分支。
+    # 注意：`git clone --bare` 不写 fetch refspec，故显式指定，避免 "couldn't find remote ref HEAD"。
+    try:
+        repo = pygit2.Repository(fork_repo_path)
+        if "origin" not in [r.name for r in repo.remotes]:
+            raise ValidationException(detail="Fork has no 'origin' remote", error_code="fork_no_origin")
+        repo.remotes["origin"].fetch(["+refs/heads/*:refs/heads/*"])
+    except ValidationException:
+        raise
+    except Exception as e:
+        raise ValidationException(detail=f"Failed to sync repository: {e}", error_code="fork_sync_failed")
 
     return {
         "success": True,
