@@ -441,7 +441,7 @@
         "summary": {
           "connection": "连接",
           "workers": "存活 worker",
-          "subscriptions": "模式订阅",
+          "subscriptions": "广播订阅",
           "keys": "键总数",
           "evicted": "已淘汰键",
           "hitRate": "命中率"
@@ -457,9 +457,10 @@
         },
         "pubsub": {
           "title": "订阅（pub/sub）",
-          "hint": "模式订阅 {{subs}} · 期望 ≥ 存活 worker {{workers}}",
-          "numpat": "模式订阅数 (NUMPAT)",
-          "channels": "活跃通道"
+          "hint": "广播订阅 {{subs}}/{{workers}} worker 在跑",
+          "numpat": "模式订阅 (NUMPAT · 唯一模式数)",
+          "channels": "活跃通道",
+          "busWorkers": "广播订阅 worker"
         },
         "keyspace": {
           "title": "键空间 · 命名空间分域",

@@ -441,7 +441,7 @@
         "summary": {
           "connection": "Connection",
           "workers": "Alive workers",
-          "subscriptions": "Pattern subs",
+          "subscriptions": "Bus subscribers",
           "keys": "Total keys",
           "evicted": "Evicted keys",
           "hitRate": "Hit rate"
@@ -457,9 +457,10 @@
         },
         "pubsub": {
           "title": "Subscriptions (pub/sub)",
-          "hint": "Pattern subs {{subs}} · expected ≥ alive workers {{workers}}",
-          "numpat": "Pattern subscriptions (NUMPAT)",
-          "channels": "Active channels"
+          "hint": "Broadcast subscribers {{subs}}/{{workers}} workers",
+          "numpat": "Pattern subscriptions (NUMPAT · unique patterns)",
+          "channels": "Active channels",
+          "busWorkers": "Bus subscribers (workers)"
         },
         "keyspace": {
           "title": "Keyspace · namespace domains",

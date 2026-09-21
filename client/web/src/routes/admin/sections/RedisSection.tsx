@@ -134,8 +134,8 @@ export default function RedisSection() {
             <div className="ac-summary-label">{t('app.admin.redis.summary.workers')}</div>
           </div>
           <div className="ac-summary-cell">
-            <div className="ac-summary-value" style={{ color: status.pubsub.mismatch ? 'var(--ac-danger)' : undefined }}>
-              {fmtNum(status.pubsub.pattern_subscriptions)}
+            <div className="ac-summary-value" style={{ color: status.pubsub.mismatch ? 'var(--ac-danger)' : 'var(--ac-ok)' }}>
+              {status.pubsub.bus_running_workers ?? '—'}/{alive}
             </div>
             <div className="ac-summary-label">{t('app.admin.redis.summary.subscriptions')}</div>
           </div>
@@ -219,18 +219,24 @@ export default function RedisSection() {
             {t('app.admin.redis.pubsub.title')}
             <span className="ac-panel-hint">
               {t('app.admin.redis.pubsub.hint', {
-                subs: fmtNum(status.pubsub.pattern_subscriptions),
-                workers: status.pubsub.expected_workers,
+                subs: status.pubsub.bus_running_workers ?? 0,
+                workers: alive,
               })}
             </span>
+            {status.pubsub.mismatch && chip('danger', t('app.admin.redis.workers.mismatch'))}
           </div>
           <div className="ac-panel-body">
             <KeyValueLedger
               rows={[
                 {
+                  key: 'busWorkers',
+                  label: t('app.admin.redis.pubsub.busWorkers'),
+                  value: `${status.pubsub.bus_running_workers ?? '—'} / ${alive}`,
+                },
+                {
                   key: 'numpat',
                   label: t('app.admin.redis.pubsub.numpat'),
-                  value: `${fmtNum(status.pubsub.pattern_subscriptions)} / ${status.pubsub.expected_workers}`,
+                  value: fmtNum(status.pubsub.pattern_subscriptions),
                 },
                 {
                   key: 'channels',

@@ -71,8 +71,8 @@ def wired(monkeypatch):
     monkeypatch.setattr(svc.redis_client, "is_configured", lambda: True)
     monkeypatch.setattr(svc, "realtime_bus", _StubBus())
     monkeypatch.setattr(svc, "worker_registry", _StubRegistry([
-        {"worker_id": "w1", "alive": True},
-        {"worker_id": "w2", "alive": True},
+        {"worker_id": "w1", "alive": True, "bus_running": True},
+        {"worker_id": "w2", "alive": True, "bus_running": True},
     ]))
     # 清键空间缓存，避免跨用例污染
     svc._keyspace_cache["at"] = 0.0
@@ -95,8 +95,10 @@ async def test_status_full(wired):
     assert status["workers"]["alive"] == 2
     assert len(status["workers"]["items"]) == 2
 
+    # NUMPAT 为唯一模式数（参考值），订阅健康由 bus_running 判定
     assert status["pubsub"]["pattern_subscriptions"] == 4
-    assert status["pubsub"]["mismatch"] is False  # 4 >= 2
+    assert status["pubsub"]["bus_running_workers"] == 2
+    assert status["pubsub"]["mismatch"] is False
 
     assert status["degradation"]["bus_published"] == 5
     assert status["degradation"]["bus_last_error"] == "boom"
@@ -105,13 +107,21 @@ async def test_status_full(wired):
     assert oauth["keys"] == 2
 
 
-async def test_status_mismatch_when_subscriptions_missing(monkeypatch, wired):
-    monkeypatch.setattr(svc, "worker_registry", _StubRegistry(
-        [{"worker_id": f"w{i}", "alive": True} for i in range(5)]
-    ))
+async def test_status_mismatch_when_bus_not_running(monkeypatch, wired):
+    # 5 个存活 worker，其中 3 个广播总线在跑 → 订阅缺失
+    items = [{"worker_id": f"w{i}", "alive": True, "bus_running": i < 3} for i in range(5)]
+    monkeypatch.setattr(svc, "worker_registry", _StubRegistry(items))
     status = await RedisAdminService().get_status()
-    # 5 个存活 worker 但只有 4 个模式订阅 → mismatch
+    assert status["pubsub"]["bus_running_workers"] == 3
     assert status["pubsub"]["mismatch"] is True
+
+
+async def test_status_no_mismatch_when_all_buses_running(monkeypatch, wired):
+    items = [{"worker_id": f"w{i}", "alive": True, "bus_running": True} for i in range(5)]
+    monkeypatch.setattr(svc, "worker_registry", _StubRegistry(items))
+    status = await RedisAdminService().get_status()
+    assert status["pubsub"]["bus_running_workers"] == 5
+    assert status["pubsub"]["mismatch"] is False
 
 
 async def test_status_unreachable(monkeypatch):

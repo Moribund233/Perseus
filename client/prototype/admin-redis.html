@@ -234,9 +234,9 @@
     </section>
 
     <section class="sect">
-      <div class="sect-head"><h2>订阅（pub/sub）</h2><span class="desc">模式订阅数 vs 存活 worker</span><span class="src">PUBSUB NUMPAT / CHANNELS</span></div>
+      <div class="sect-head"><h2>订阅（pub/sub）</h2><span class="desc">广播总线 worker 数 vs 存活 worker（NUMPAT 仅唯一模式数）</span><span class="src">worker registry · PUBSUB CHANNELS</span></div>
       <div class="sect-body">
-        <div style="margin-bottom:10px;font-size:12px;color:var(--muted)"><span class="chip ok" id="numpatChip">NUMPAT 4 / 存活 worker 4</span></div>
+        <div style="margin-bottom:10px;font-size:12px;color:var(--muted)"><span class="chip ok" id="numpatChip">广播订阅 4 / 存活 worker 4</span></div>
         <table class="tbl"><thead><tr>
           <th>活跃通道</th><th>用途</th>
         </tr></thead><tbody id="psBody"></tbody></table>
@@ -308,7 +308,7 @@
       {ns:'perseus:collab:version:*', use:'协作版本计数（网关）',  keys:2,  ttl:'无',             policy:'持久(受保护)', cls:'violet'}
     ],
     pubsub:{
-      numpat:4, expected:4,
+      numpat:1, expected:4, busRunning:4,
       channels:[
         {ch:'perseus:collab:doc:*',     use:'CRDT 变更 / awareness（网关，精确订阅）'},
         {ch:'perseus:collab:version:*', use:'协作版本计数（网关）'}
@@ -331,7 +331,7 @@
     ],
     api:[
       {cap:'容器运行状态',      ep:'GET /api/app/components',        st:'ok',   note:'已存在：redis 作为编排组件之一（state/health/image/uptime/restarts）'},
-      {cap:'worker 存活 / 订阅', ep:'GET /api/app/redis/status',      st:'ok',   note:'已实现：perseus:worker:* 心跳注册表 + PUBSUB NUMPAT vs 存活 worker（mismatch 告警）'},
+      {cap:'worker 存活 / 订阅', ep:'GET /api/app/redis/status',      st:'ok',   note:'已实现：perseus:worker:* 心跳注册表 + bus_running worker 数 vs 存活 worker（NUMPAT 仅唯一模式数）'},
       {cap:'运行指标（INFO）',   ep:'GET /api/app/redis/status',      st:'ok',   note:'已实现：memory/clients/stats + 命名空间键数（SCAN 15s 缓存）+ 降级计数'},
       {cap:'配置读取',          ep:'GET /api/app/redis/config',      st:'ok',   note:'已实现：只读，连接 URL 脱敏'},
       {cap:'配置修改',          ep:'POST /api/app/redis/config',     st:'gap',  note:'未实现（决策：暂不提供写入，风险高、变更少）'},
@@ -409,7 +409,7 @@
       return '<tr><td class="ns">'+esc(p.ch)+'</td><td class="muted">'+esc(p.use)+'</td></tr>';
     }).join('');
     var chipEl = document.getElementById('numpatChip');
-    if(chipEl){ chipEl.textContent = 'NUMPAT ' + DATA.pubsub.numpat + ' / 存活 worker ' + DATA.pubsub.expected; }
+    if(chipEl){ chipEl.textContent = '广播订阅 ' + DATA.pubsub.busRunning + ' / 存活 worker ' + DATA.pubsub.expected + ' · NUMPAT ' + DATA.pubsub.numpat; }
   }
 
   function renderWk(){

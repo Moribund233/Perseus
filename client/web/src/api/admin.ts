@@ -186,8 +186,11 @@ export interface RedisWorkerInfo {
 }
 
 export interface RedisPubsub {
+  /** PUBSUB NUMPAT：唯一模式数（非订阅者数，仅供参考） */
   pattern_subscriptions: number | null;
   expected_workers: number;
+  /** 存活 worker 中广播总线在跑的数量（订阅健康主指标） */
+  bus_running_workers: number | null;
   mismatch: boolean;
   channels: string[];
 }

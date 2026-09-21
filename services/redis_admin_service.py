@@ -80,6 +80,7 @@ class RedisAdminService:
             "pubsub": {
                 "pattern_subscriptions": None,
                 "expected_workers": expected,
+                "bus_running_workers": None,
                 "mismatch": False,
                 "channels": [],
             },
@@ -199,6 +200,9 @@ class RedisAdminService:
         result["workers"]["alive"] = sum(1 for w in items if w.get("alive"))
 
     async def _fill_pubsub(self, client, result: Dict[str, Any]) -> None:
+        # 注意：PUBSUB NUMPAT 返回的是**唯一模式数**（所有 worker 订阅同一模式
+        # perseus:ws:* 时恒为 1），不能用来数订阅者。订阅健康改由 worker 注册表
+        # 的 bus_running 判定；NUMPAT 仅作参考信息。
         try:
             numpat = await client.pubsub_numpat()
             result["pubsub"]["pattern_subscriptions"] = _int(numpat)
@@ -210,12 +214,11 @@ class RedisAdminService:
         except Exception as exc:  # noqa: BLE001
             logger.warning("读取 PUBSUB CHANNELS 失败: %s", exc)
 
-        alive = result["workers"]["alive"]
-        numpat = result["pubsub"]["pattern_subscriptions"]
-        # 每个存活 worker 的广播总线应有 1 个模式订阅；少于存活数即存在订阅缺失
-        result["pubsub"]["mismatch"] = (
-            numpat is not None and alive > 0 and numpat < alive
-        )
+        alive_items = [w for w in result["workers"]["items"] if w.get("alive")]
+        bus_running = sum(1 for w in alive_items if w.get("bus_running"))
+        result["pubsub"]["bus_running_workers"] = bus_running
+        # 每个存活 worker 的广播总线都应在跑；少于存活数即订阅缺失
+        result["pubsub"]["mismatch"] = len(alive_items) > 0 and bus_running < len(alive_items)
 
     async def _keyspace_counts(self, client) -> List[Dict[str, Any]]:
         now = time.monotonic()
