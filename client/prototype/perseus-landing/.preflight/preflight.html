@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perseus</title>
+    <style id="theme-vars">
+/* Perseus Design Tokens - Dark Theme */
+:root {
+  /* Brand colors - Blue primary with purple accent */
+  --perseus-primary: #1f6feb;
+  --perseus-primary-foreground: #ffffff;
+  --perseus-primary-light: #58a6ff;
+  --perseus-primary-glow: #388bfd;
+  --perseus-accent: #bc8cff;
+
+  /* Surfaces */
+  --perseus-background: #0d1117;
+  --perseus-foreground: #e6edf3;
+  --perseus-foreground-secondary: #8b949e;
+  --perseus-foreground-tertiary: #6e7681;
+
+  --perseus-card: #161b22;
+  --perseus-card-foreground: #e6edf3;
+  --perseus-elevated: #1c2128;
+
+  --perseus-popover: #161b22;
+  --perseus-popover-foreground: #e6edf3;
+
+  /* Muted */
+  --perseus-muted: #21262d;
+  --perseus-muted-foreground: #8b949e;
+
+  /* Borders */
+  --perseus-border: #30363d;
+  --perseus-border-light: #21262d;
+  --perseus-input: #30363d;
+  --perseus-ring: #1f6feb;
+
+  /* Semantic state colors */
+  --perseus-success: #3fb950;
+  --perseus-success-foreground: #ffffff;
+  --perseus-warning: #d29922;
+  --perseus-warning-foreground: #ffffff;
+  --perseus-destructive: #f85149;
+  --perseus-destructive-foreground: #ffffff;
+
+  /* Radius scale */
+  --perseus-radius-sm: 6px;
+  --perseus-radius-md: 10px;
+  --perseus-radius-lg: 16px;
+  --perseus-radius-xl: 20px;
+
+  /* Typography */
+  --perseus-font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --perseus-font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--perseus-background);
+    --color-foreground: var(--perseus-foreground);
+    --color-card: var(--perseus-card);
+    --color-card-foreground: var(--perseus-card-foreground);
+    --color-popover: var(--perseus-popover);
+    --color-popover-foreground: var(--perseus-popover-foreground);
+    --color-primary: var(--perseus-primary);
+    --color-primary-foreground: var(--perseus-primary-foreground);
+    --color-muted: var(--perseus-muted);
+    --color-muted-foreground: var(--perseus-muted-foreground);
+    --color-accent: var(--perseus-accent);
+    --color-destructive: var(--perseus-destructive);
+    --color-destructive-foreground: var(--perseus-destructive-foreground);
+    --color-border: var(--perseus-border);
+    --color-input: var(--perseus-input);
+    --color-ring: var(--perseus-ring);
+    --radius-sm: var(--perseus-radius-sm);
+    --radius-md: var(--perseus-radius-md);
+    --radius-lg: var(--perseus-radius-lg);
+    --radius-xl: var(--perseus-radius-xl);
+  }
+  @layer base {
+    body { background: var(--perseus-background); color: var(--perseus-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--perseus-background); }
+      .text-background { color: var(--perseus-background); }
+      .border-background { border-color: var(--perseus-background); }
+      .ring-background { --tw-ring-color: var(--perseus-background); }
+      .bg-foreground { background-color: var(--perseus-foreground); }
+      .text-foreground { color: var(--perseus-foreground); }
+      .border-foreground { border-color: var(--perseus-foreground); }
+      .ring-foreground { --tw-ring-color: var(--perseus-foreground); }
+      .bg-card { background-color: var(--perseus-card); }
+      .text-card { color: var(--perseus-card); }
+      .border-card { border-color: var(--perseus-card); }
+      .ring-card { --tw-ring-color: var(--perseus-card); }
+      .bg-card-foreground { background-color: var(--perseus-card-foreground); }
+      .text-card-foreground { color: var(--perseus-card-foreground); }
+      .border-card-foreground { border-color: var(--perseus-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--perseus-card-foreground); }
+      .bg-popover { background-color: var(--perseus-popover); }
+      .text-popover { color: var(--perseus-popover); }
+      .border-popover { border-color: var(--perseus-popover); }
+      .ring-popover { --tw-ring-color: var(--perseus-popover); }
+      .bg-popover-foreground { background-color: var(--perseus-popover-foreground); }
+      .text-popover-foreground { color: var(--perseus-popover-foreground); }
+      .border-popover-foreground { border-color: var(--perseus-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--perseus-popover-foreground); }
+      .bg-primary { background-color: var(--perseus-primary); }
+      .text-primary { color: var(--perseus-primary); }
+      .border-primary { border-color: var(--perseus-primary); }
+      .ring-primary { --tw-ring-color: var(--perseus-primary); }
+      .bg-primary-foreground { background-color: var(--perseus-primary-foreground); }
+      .text-primary-foreground { color: var(--perseus-primary-foreground); }
+      .border-primary-foreground { border-color: var(--perseus-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--perseus-primary-foreground); }
+      .bg-muted { background-color: var(--perseus-muted); }
+      .text-muted { color: var(--perseus-muted); }
+      .border-muted { border-color: var(--perseus-muted); }
+      .ring-muted { --tw-ring-color: var(--perseus-muted); }
+      .bg-muted-foreground { background-color: var(--perseus-muted-foreground); }
+      .text-muted-foreground { color: var(--perseus-muted-foreground); }
+      .border-muted-foreground { border-color: var(--perseus-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--perseus-muted-foreground); }
+      .bg-accent { background-color: var(--perseus-accent); }
+      .text-accent { color: var(--perseus-accent); }
+      .border-accent { border-color: var(--perseus-accent); }
+      .ring-accent { --tw-ring-color: var(--perseus-accent); }
+      .bg-destructive { background-color: var(--perseus-destructive); }
+      .text-destructive { color: var(--perseus-destructive); }
+      .border-destructive { border-color: var(--perseus-destructive); }
+      .ring-destructive { --tw-ring-color: var(--perseus-destructive); }
+      .bg-destructive-foreground { background-color: var(--perseus-destructive-foreground); }
+      .text-destructive-foreground { color: var(--perseus-destructive-foreground); }
+      .border-destructive-foreground { border-color: var(--perseus-destructive-foreground); }
+      .ring-destructive-foreground { --tw-ring-color: var(--perseus-destructive-foreground); }
+      .bg-border { background-color: var(--perseus-border); }
+      .text-border { color: var(--perseus-border); }
+      .border-border { border-color: var(--perseus-border); }
+      .ring-border { --tw-ring-color: var(--perseus-border); }
+      .bg-input { background-color: var(--perseus-input); }
+      .text-input { color: var(--perseus-input); }
+      .border-input { border-color: var(--perseus-input); }
+      .ring-input { --tw-ring-color: var(--perseus-input); }
+      .bg-ring { background-color: var(--perseus-ring); }
+      .text-ring { color: var(--perseus-ring); }
+      .border-ring { border-color: var(--perseus-ring); }
+      .ring-ring { --tw-ring-color: var(--perseus-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <main>
+    </main>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

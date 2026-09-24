@@ -3,17 +3,25 @@
     "nav": {
       "features": "功能特性",
       "collaboration": "协同办公",
-      "docs": "文档",
+      "desktop": "桌面端",
+      "architecture": "架构",
+      "admin": "管理后台",
       "signIn": "登录",
       "getStarted": "立即开始",
       "goToDashboard": "进入控制台"
     },
     "hero": {
-      "badge": "公开测试版已发布",
-      "title": "编写代码。<1>协同合作。</1>快速交付。",
-      "description": "团队构建优秀软件所需的一切——代码托管、实时协作、团队聊天和代码审查——尽在一个统一平台。",
-      "getStartedFree": "免费开始使用",
-      "learnMore": "了解更多",
+      "badge": "自托管 · 实时协同 · 开源",
+      "titleLine1": "一起构建，",
+      "titleLine2": "部署在你自己的服务器。",
+      "description": "Perseus 是一个自托管的 Git 协作平台，提供实时协同编辑、Pull Request、问题追踪和内置聊天——一切尽在你的掌控之中。",
+      "deploy": "部署你的实例",
+      "viewGithub": "在 GitHub 查看",
+      "liveSync": "实时同步中",
+      "crdt": "由 Yjs CRDT 驱动",
+      "editorFile": "perseus/app.py — main",
+      "explorer": "资源管理器",
+      "collaborators": "3 位协作者在线",
       "stats": {
         "repositories": "代码仓库",
         "commits": "提交记录",
@@ -21,50 +29,207 @@
         "uptime": "正常运行时间"
       }
     },
+    "tech": {
+      "label": "构建于成熟的开源技术之上",
+      "fastapi": "FastAPI",
+      "react": "React 19",
+      "postgres": "PostgreSQL",
+      "redis": "Redis",
+      "docker": "Docker",
+      "wails": "Wails",
+      "git": "Git"
+    },
     "features": {
-      "title": "团队所需的一切",
-      "subtitle": "面向现代开发团队、内置协作工具的自托管 Git 平台。",
-      "codeHosting": {
-        "title": "代码托管",
-        "desc": "自托管 Git 仓库托管，支持分支保护、Webhooks 和精细化访问控制。"
-      },
-      "teamChat": {
-        "title": "团队聊天",
-        "desc": "支持频道、话题和富代码片段的实时消息。让讨论始终围绕上下文展开。"
-      },
-      "codeReview": {
-        "title": "代码审查",
-        "desc": "行内 Pull Request 审查，支持话题讨论、审批工作流和合并检查。"
-      },
-      "realtimeEditing": {
-        "title": "实时编辑",
-        "desc": "基于 CRDT 的协同代码编辑，实时光标、在线感知和冲突解决。"
-      },
-      "issueTracking": {
-        "title": "问题追踪",
-        "desc": "通过标签、里程碑、批量操作管理问题，并与 Git 工作流深度集成。"
-      },
-      "releaseManagement": {
-        "title": "发布管理",
-        "desc": "打标签、上传资源、发布 Release Note，与仓库和 Webhook 系统无缝集成。"
+      "eyebrow": "你需要的一切",
+      "title": "完整的 Git 平台",
+      "subtitle": "从仓库托管到实时协同编辑，Perseus 将团队所需的一切打包进一个自托管解决方案。",
+      "items": {
+        "codeHosting": {
+          "title": "代码托管",
+          "desc": "完整的 Git 仓库管理，支持 Fork、Star，以及 Owner、Admin、Developer、Readonly 四种角色的精细化访问控制。"
+        },
+        "pullRequests": {
+          "title": "Pull Request 与审查",
+          "desc": "草稿 PR、行内代码审查、标签、冲突检测和活动时间线——顺畅的审查工作流所需的一切。"
+        },
+        "issueTracking": {
+          "title": "问题追踪",
+          "desc": "创建、关闭和重新打开问题，支持优先级、标签、批量操作和话题式评论，让项目管理井然有序。"
+        },
+        "realtimeCollab": {
+          "title": "实时协作",
+          "desc": "由 Yjs CRDT 驱动的 Google Docs 式协同编辑。实时光标、在线状态指示和无冲突合并。"
+        },
+        "codeSearch": {
+          "title": "代码搜索",
+          "desc": "基于 Git 对象索引与 PostgreSQL pg_trgm GIN 的极速代码搜索，支持跨仓库子串匹配。"
+        },
+        "webhooks": {
+          "title": "Webhooks 与 CI",
+          "desc": "18 种事件类型，支持 HMAC-SHA256 签名、投递历史、自动重试和构建状态跟踪，便于接入 CI。"
+        },
+        "releaseManagement": {
+          "title": "发布管理",
+          "desc": "基于标签的发布，支持附件、草稿与预发布，以及每个版本结构化的 Release Note。"
+        },
+        "adminMonitoring": {
+          "title": "管理与监控",
+          "desc": "完整的 admin 控制台，涵盖系统监控、配置管理、Redis 管理和实时日志流。"
+        }
       }
     },
     "collab": {
-      "title": "内置实时协作",
-      "description": "像 Google Docs 一样与团队一起编辑代码。实时查看谁在编辑什么、进行讨论，再也不用担心合并冲突。",
-      "items": [
-        "多光标和在线状态指示器",
-        "行内代码审查与话题讨论",
-        "基于 CRDT 的无冲突同步",
-        "代码旁的实时团队聊天"
-      ]
+      "eyebrow": "实时协作",
+      "title": "一起编辑，实时同步。",
+      "description": "Perseus 为你的代码库带来 Google Docs 式的协作体验。多位开发者可以同时编辑同一文件，拥有实时光标、在线状态指示，且零合并冲突。",
+      "items": {
+        "liveCursors": {
+          "title": "实时光标与在线状态",
+          "desc": "精确看到队友正在编辑的位置，以及每个文件中谁在线。"
+        },
+        "crdtEngine": {
+          "title": "Yjs CRDT 引擎",
+          "desc": "由久经考验的 Yjs CRDT 算法驱动，任意规模下都能无冲突并发编辑。"
+        },
+        "chat": {
+          "title": "内置聊天与评论",
+          "desc": "仓库聊天频道、私信和行内文件评论——全部基于 WebSocket 实时通信。"
+        }
+      },
+      "editingNow": "3 位协作者正在编辑",
+      "liveSynced": "已实时同步",
+      "chatMessage": "LGTM！我来补上 token 刷新逻辑。",
+      "justNow": "刚刚"
+    },
+    "desktop": {
+      "eyebrow": "桌面应用",
+      "title": "原生桌面体验。",
+      "description": "基于 Wails 构建的 Perseus Desktop 将平台的全部能力带到原生应用。超越浏览器，拥有系统级集成、离线能力和专注无干扰的开发环境。",
+      "items": {
+        "wails": {
+          "title": "由 Wails + Go 驱动",
+          "desc": "轻量级 Go 后端搭配原生 WebView 前端。启动快、占用低，没有 Electron 的臃肿。"
+        },
+        "offline": {
+          "title": "离线开发",
+          "desc": "本地即可完成完整 Git 操作，恢复联网后再同步。你的代码始终可访问。"
+        },
+        "terminal": {
+          "title": "内置终端与 LSP",
+          "desc": "集成终端、Language Server Protocol 支持，以及桌面应用内完整的代码编辑器。"
+        }
+      },
+      "nativeBadge": "原生桌面应用",
+      "platforms": {
+        "windows": "Windows",
+        "macos": "macOS",
+        "linux": "Linux"
+      }
+    },
+    "architecture": {
+      "eyebrow": "自托管架构",
+      "title": "你的数据，你的服务器。",
+      "subtitle": "使用 Docker 在你自己的基础设施上部署 Perseus。完全掌控你的代码、数据和流水线。",
+      "diagramTitle": "Perseus 架构",
+      "webApp": "Web 应用",
+      "desktop": "桌面端",
+      "gitCli": "Git CLI",
+      "transport": "HTTP / WebSocket / SSH",
+      "gateway": "Nginx 网关",
+      "gatewaySub": "反向代理 · SSL 终止",
+      "fastapi": "FastAPI",
+      "fastapiSub": "后端 API",
+      "collab": "协同网关",
+      "collabSub": "Yjs / WebSocket",
+      "gitCgi": "Git CGI",
+      "gitCgiSub": "Smart HTTP",
+      "postgres": "PostgreSQL",
+      "postgresSub": "主数据存储",
+      "redis": "Redis",
+      "redisSub": "缓存 · 发布订阅",
+      "dockerNote": "所有服务均通过 Docker Compose 部署",
+      "benefits": {
+        "privacy": {
+          "title": "彻底的数据隐私",
+          "desc": "你的源代码永远不会离开你的基础设施。没有任何第三方能访问你的仓库、问题或讨论。"
+        },
+        "control": {
+          "title": "完全掌控与自定义",
+          "desc": "配置实例的方方面面——从认证方式到存储后端，并通过 Webhooks 和 API 进行扩展。"
+        },
+        "deploy": {
+          "title": "一条命令 Docker 部署",
+          "desc": "只需一次 docker compose up 即可启动，所有服务预配置、开箱即用。"
+        },
+        "security": {
+          "title": "企业级安全",
+          "desc": "OAuth 集成（GitHub/GitLab）、SSH 密钥管理、HMAC 签名 Webhooks 和审计日志，满足合规要求。"
+        }
+      }
+    },
+    "admin": {
+      "eyebrow": "管理控制台",
+      "title": "监控并管理一切。",
+      "subtitle": "完善的管理控制台让你对实例了如指掌——从系统健康到 Redis 管理，再到实时日志。",
+      "consoleTitle": "管理控制台",
+      "status": "所有系统运行正常",
+      "updated": "刚刚更新",
+      "system": "系统",
+      "data": "数据",
+      "overview": "概览",
+      "components": "组件",
+      "logs": "日志",
+      "configuration": "配置",
+      "redis": "Redis",
+      "users": "用户",
+      "webhooks": "Webhooks",
+      "activeUsers": "活跃用户",
+      "repositories": "代码仓库",
+      "collabSessions": "协同会话",
+      "apiRequests": "API 请求/分钟",
+      "liveNow": "正在实时进行",
+      "thisWeek": "本周 +{{value}}",
+      "avgLatency": "平均延迟 23ms",
+      "requestVolume": "请求量",
+      "last24h": "最近 24 小时",
+      "componentHealth": "组件健康",
+      "realtimeLogs": "实时日志",
+      "streaming": "推送中"
+    },
+    "cta": {
+      "title": "今天部署你自己的实例。",
+      "description": "几分钟内用 Docker 启动 Perseus。你的团队很快就能开始实时协作。",
+      "terminal": "终端",
+      "copy": "复制",
+      "getStarted": "免费开始使用",
+      "readDocs": "阅读文档",
+      "openSource": "开源",
+      "selfHosted": "自托管",
+      "mit": "MIT 许可"
     },
     "footer": {
-      "copyright": "© 2026 Perseus — 自托管代码协作平台",
+      "tagline": "一个自托管、支持实时编辑的 Git 协作平台，为重视掌控与速度的团队而打造。",
+      "product": "产品",
+      "resources": "资源",
+      "company": "公司",
+      "features": "功能特性",
+      "collaboration": "协同办公",
+      "desktop": "桌面应用",
+      "selfHosting": "自托管",
+      "pricing": "定价",
+      "docs": "文档",
+      "api": "API 参考",
+      "deployment": "部署指南",
+      "changelog": "更新日志",
+      "roadmap": "路线图",
       "about": "关于",
+      "blog": "博客",
+      "careers": "招聘",
       "privacy": "隐私",
       "terms": "条款",
-      "github": "GitHub"
+      "copyright": "© 2026 Perseus. 保留所有权利。",
+      "madeWith": "用心打造，",
+      "madeWithTail": "献给全世界的开发者团队。"
     }
   },
   "app": {
@@ -1099,7 +1264,13 @@
       "invalidCredentials": "用户名或密码错误。",
       "accountCreated": "账号创建成功！",
       "registrationFailed": "注册失败，请重试。"
-    }
+    },
+    "brandSubtitleLogin": "登录到你的实例",
+    "brandSubtitleRegister": "创建你的 Perseus 账号",
+    "newToPerseus": "初次使用 Perseus？",
+    "createOne": "创建账号",
+    "alreadyHave": "已有账号？",
+    "signInLink": "登录"
   },
   "common": {
     "language": "语言",

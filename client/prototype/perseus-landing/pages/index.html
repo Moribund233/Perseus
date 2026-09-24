@@ -1,0 +1,1900 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perseus — Self-Hosted Git Collaboration Platform</title>
+    <style id="theme-vars">
+/* Perseus Design Tokens - Dark Theme */
+:root {
+  /* Brand colors - Blue primary with purple accent */
+  --perseus-primary: #1f6feb;
+  --perseus-primary-foreground: #ffffff;
+  --perseus-primary-light: #58a6ff;
+  --perseus-primary-glow: #388bfd;
+  --perseus-accent: #bc8cff;
+
+  /* Surfaces */
+  --perseus-background: #0d1117;
+  --perseus-foreground: #e6edf3;
+  --perseus-foreground-secondary: #8b949e;
+  --perseus-foreground-tertiary: #6e7681;
+
+  --perseus-card: #161b22;
+  --perseus-card-foreground: #e6edf3;
+  --perseus-elevated: #1c2128;
+
+  --perseus-popover: #161b22;
+  --perseus-popover-foreground: #e6edf3;
+
+  /* Muted */
+  --perseus-muted: #21262d;
+  --perseus-muted-foreground: #8b949e;
+
+  /* Borders */
+  --perseus-border: #30363d;
+  --perseus-border-light: #21262d;
+  --perseus-input: #30363d;
+  --perseus-ring: #1f6feb;
+
+  /* Semantic state colors */
+  --perseus-success: #3fb950;
+  --perseus-success-foreground: #ffffff;
+  --perseus-warning: #d29922;
+  --perseus-warning-foreground: #ffffff;
+  --perseus-destructive: #f85149;
+  --perseus-destructive-foreground: #ffffff;
+
+  /* Radius scale */
+  --perseus-radius-sm: 6px;
+  --perseus-radius-md: 10px;
+  --perseus-radius-lg: 16px;
+  --perseus-radius-xl: 20px;
+
+  /* Typography */
+  --perseus-font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --perseus-font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--perseus-background);
+    --color-foreground: var(--perseus-foreground);
+    --color-card: var(--perseus-card);
+    --color-card-foreground: var(--perseus-card-foreground);
+    --color-popover: var(--perseus-popover);
+    --color-popover-foreground: var(--perseus-popover-foreground);
+    --color-primary: var(--perseus-primary);
+    --color-primary-foreground: var(--perseus-primary-foreground);
+    --color-muted: var(--perseus-muted);
+    --color-muted-foreground: var(--perseus-muted-foreground);
+    --color-accent: var(--perseus-accent);
+    --color-destructive: var(--perseus-destructive);
+    --color-destructive-foreground: var(--perseus-destructive-foreground);
+    --color-border: var(--perseus-border);
+    --color-input: var(--perseus-input);
+    --color-ring: var(--perseus-ring);
+    --radius-sm: var(--perseus-radius-sm);
+    --radius-md: var(--perseus-radius-md);
+    --radius-lg: var(--perseus-radius-lg);
+    --radius-xl: var(--perseus-radius-xl);
+  }
+  @layer base {
+    body { background: var(--perseus-background); color: var(--perseus-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--perseus-background); }
+      .text-background { color: var(--perseus-background); }
+      .border-background { border-color: var(--perseus-background); }
+      .ring-background { --tw-ring-color: var(--perseus-background); }
+      .bg-foreground { background-color: var(--perseus-foreground); }
+      .text-foreground { color: var(--perseus-foreground); }
+      .border-foreground { border-color: var(--perseus-foreground); }
+      .ring-foreground { --tw-ring-color: var(--perseus-foreground); }
+      .bg-card { background-color: var(--perseus-card); }
+      .text-card { color: var(--perseus-card); }
+      .border-card { border-color: var(--perseus-card); }
+      .ring-card { --tw-ring-color: var(--perseus-card); }
+      .bg-card-foreground { background-color: var(--perseus-card-foreground); }
+      .text-card-foreground { color: var(--perseus-card-foreground); }
+      .border-card-foreground { border-color: var(--perseus-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--perseus-card-foreground); }
+      .bg-popover { background-color: var(--perseus-popover); }
+      .text-popover { color: var(--perseus-popover); }
+      .border-popover { border-color: var(--perseus-popover); }
+      .ring-popover { --tw-ring-color: var(--perseus-popover); }
+      .bg-popover-foreground { background-color: var(--perseus-popover-foreground); }
+      .text-popover-foreground { color: var(--perseus-popover-foreground); }
+      .border-popover-foreground { border-color: var(--perseus-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--perseus-popover-foreground); }
+      .bg-primary { background-color: var(--perseus-primary); }
+      .text-primary { color: var(--perseus-primary); }
+      .border-primary { border-color: var(--perseus-primary); }
+      .ring-primary { --tw-ring-color: var(--perseus-primary); }
+      .bg-primary-foreground { background-color: var(--perseus-primary-foreground); }
+      .text-primary-foreground { color: var(--perseus-primary-foreground); }
+      .border-primary-foreground { border-color: var(--perseus-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--perseus-primary-foreground); }
+      .bg-muted { background-color: var(--perseus-muted); }
+      .text-muted { color: var(--perseus-muted); }
+      .border-muted { border-color: var(--perseus-muted); }
+      .ring-muted { --tw-ring-color: var(--perseus-muted); }
+      .bg-muted-foreground { background-color: var(--perseus-muted-foreground); }
+      .text-muted-foreground { color: var(--perseus-muted-foreground); }
+      .border-muted-foreground { border-color: var(--perseus-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--perseus-muted-foreground); }
+      .bg-accent { background-color: var(--perseus-accent); }
+      .text-accent { color: var(--perseus-accent); }
+      .border-accent { border-color: var(--perseus-accent); }
+      .ring-accent { --tw-ring-color: var(--perseus-accent); }
+      .bg-destructive { background-color: var(--perseus-destructive); }
+      .text-destructive { color: var(--perseus-destructive); }
+      .border-destructive { border-color: var(--perseus-destructive); }
+      .ring-destructive { --tw-ring-color: var(--perseus-destructive); }
+      .bg-destructive-foreground { background-color: var(--perseus-destructive-foreground); }
+      .text-destructive-foreground { color: var(--perseus-destructive-foreground); }
+      .border-destructive-foreground { border-color: var(--perseus-destructive-foreground); }
+      .ring-destructive-foreground { --tw-ring-color: var(--perseus-destructive-foreground); }
+      .bg-border { background-color: var(--perseus-border); }
+      .text-border { color: var(--perseus-border); }
+      .border-border { border-color: var(--perseus-border); }
+      .ring-border { --tw-ring-color: var(--perseus-border); }
+      .bg-input { background-color: var(--perseus-input); }
+      .text-input { color: var(--perseus-input); }
+      .border-input { border-color: var(--perseus-input); }
+      .ring-input { --tw-ring-color: var(--perseus-input); }
+      .bg-ring { background-color: var(--perseus-ring); }
+      .text-ring { color: var(--perseus-ring); }
+      .border-ring { border-color: var(--perseus-ring); }
+      .ring-ring { --tw-ring-color: var(--perseus-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <main>
+      <!-- ===== NAVBAR ===== -->
+      <nav id="navbar" class="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-[var(--perseus-background)]/70 border-b border-[var(--perseus-border)]/50">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--perseus-primary)] to-[var(--perseus-accent)] flex items-center justify-center">
+              <i data-lucide="git-branch" class="w-5 h-5 text-white"></i>
+            </div>
+            <span class="text-xl font-bold text-[var(--perseus-foreground)]">Perseus</span>
+          </div>
+          <div class="hidden md:flex items-center gap-8">
+            <a href="#features" class="text-sm text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Features</a>
+            <a href="#collab-spotlight" class="text-sm text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Collaboration</a>
+            <a href="#desktop-spotlight" class="text-sm text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Desktop</a>
+            <a href="#architecture" class="text-sm text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Architecture</a>
+            <a href="#admin" class="text-sm text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Admin</a>
+          </div>
+          <div class="flex items-center gap-3">
+            <button data-auth-open="login" class="hidden sm:block px-4 py-2 text-sm text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors cursor-pointer">
+              Sign In
+            </button>
+            <button data-auth-open="register" class="px-4 py-2 text-sm font-medium text-white bg-[var(--perseus-primary)] hover:bg-[var(--perseus-primary-light)] rounded-md transition-colors cursor-pointer">
+              Get Started
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <!-- ===== HERO ===== -->
+      <section id="hero" class="relative pt-32 pb-24 overflow-hidden">
+        <!-- Grid background -->
+        <div class="absolute inset-0 bg-[linear-gradient(rgba(31,111,235,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(31,111,235,0.03)_1px,transparent_1px)] bg-[size:48px_48px]"></div>
+        <!-- Gradient glow -->
+        <div class="absolute top-20 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-r from-[var(--perseus-primary)]/20 via-[var(--perseus-accent)]/15 to-transparent rounded-full blur-[120px] pointer-events-none"></div>
+        <div class="absolute top-40 right-0 w-[400px] h-[400px] bg-[var(--perseus-accent)]/10 rounded-full blur-[100px] pointer-events-none"></div>
+
+        <div class="relative max-w-7xl mx-auto px-6">
+          <div class="text-center max-w-4xl mx-auto">
+            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[var(--perseus-border)] bg-[var(--perseus-card)]/50 mb-8">
+              <span class="w-2 h-2 rounded-full bg-[var(--perseus-success)] animate-pulse"></span>
+              <span class="text-sm text-[var(--perseus-foreground-secondary)]">Self-Hosted &middot; Real-Time Collaborative &middot; Open Source</span>
+            </div>
+            <h1 class="text-5xl md:text-7xl font-bold text-[var(--perseus-foreground)] leading-tight tracking-tight mb-6">
+              Build together,
+              <br>
+              <span class="bg-gradient-to-r from-[var(--perseus-primary-light)] via-[var(--perseus-primary-glow)] to-[var(--perseus-accent)] bg-clip-text text-transparent">
+                anywhere you host.
+              </span>
+            </h1>
+            <p class="text-lg md:text-xl text-[var(--perseus-foreground-secondary)] mb-10 max-w-2xl mx-auto leading-relaxed">
+              Perseus is a self-hosted Git collaboration platform with real-time collaborative editing, pull requests, issue tracking, and built-in chat — all under your control.
+            </p>
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+              <button class="w-full sm:w-auto px-8 py-3.5 text-base font-semibold text-white bg-[var(--perseus-primary)] hover:bg-[var(--perseus-primary-light)] rounded-lg transition-all hover:shadow-lg hover:shadow-[var(--perseus-primary)]/25 flex items-center justify-center gap-2">
+                <i data-lucide="rocket" class="w-5 h-5"></i>
+                Deploy Your Instance
+              </button>
+              <button class="w-full sm:w-auto px-8 py-3.5 text-base font-semibold text-[var(--perseus-foreground)] bg-[var(--perseus-card)] hover:bg-[var(--perseus-elevated)] border border-[var(--perseus-border)] rounded-lg transition-all flex items-center justify-center gap-2">
+                <i data-lucide="github" class="w-5 h-5"></i>
+                View on GitHub
+              </button>
+            </div>
+
+            <!-- Hero stats -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 max-w-3xl mx-auto">
+              <div class="text-center">
+                <div class="text-3xl md:text-4xl font-bold text-[var(--perseus-foreground)] mb-1">4+</div>
+                <div class="text-sm text-[var(--perseus-foreground-tertiary)]">Access Roles</div>
+              </div>
+              <div class="text-center">
+                <div class="text-3xl md:text-4xl font-bold text-[var(--perseus-foreground)] mb-1">18</div>
+                <div class="text-sm text-[var(--perseus-foreground-tertiary)]">Webhook Events</div>
+              </div>
+              <div class="text-center">
+                <div class="text-3xl md:text-4xl font-bold text-[var(--perseus-foreground)] mb-1">Yjs</div>
+                <div class="text-sm text-[var(--perseus-foreground-tertiary)]">CRDT Sync</div>
+              </div>
+              <div class="text-center">
+                <div class="text-3xl md:text-4xl font-bold text-[var(--perseus-foreground)] mb-1">100%</div>
+                <div class="text-sm text-[var(--perseus-foreground-tertiary)]">Self-Hosted</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hero visual - Code editor mockup -->
+          <div class="relative mt-20 max-w-5xl mx-auto">
+            <div class="relative rounded-xl border border-[var(--perseus-border)] bg-[var(--perseus-card)] shadow-2xl shadow-black/50 overflow-hidden">
+              <!-- Window chrome -->
+              <div class="flex items-center gap-2 px-4 py-3 border-b border-[var(--perseus-border)] bg-[var(--perseus-elevated)]">
+                <div class="flex gap-1.5">
+                  <div class="w-3 h-3 rounded-full bg-[#ff5f57]"></div>
+                  <div class="w-3 h-3 rounded-full bg-[#febc2e]"></div>
+                  <div class="w-3 h-3 rounded-full bg-[#28c840]"></div>
+                </div>
+                <div class="flex-1 text-center">
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[var(--perseus-background)]/50 text-xs text-[var(--perseus-foreground-tertiary)] font-mono">
+                    <i data-lucide="git-branch" class="w-3 h-3"></i>
+                    perseus/app.py — main
+                  </div>
+                </div>
+                <div class="flex items-center gap-1 text-[var(--perseus-foreground-tertiary)]">
+                  <div class="w-6 h-6 rounded flex items-center justify-center hover:bg-[var(--perseus-muted)] cursor-pointer">
+                    <i data-lucide="minimize-2" class="w-3 h-3"></i>
+                  </div>
+                </div>
+              </div>
+              <!-- Editor content -->
+              <div class="flex">
+                <!-- File tree -->
+                <div class="w-48 border-r border-[var(--perseus-border)] bg-[var(--perseus-background)]/30 py-3 hidden md:block">
+                  <div class="px-3 py-1 text-xs font-semibold text-[var(--perseus-foreground-tertiary)] uppercase tracking-wider mb-2">Explorer</div>
+                  <div class="space-y-0.5 text-sm">
+                    <div class="flex items-center gap-1.5 px-3 py-1 text-[var(--perseus-foreground-secondary)]">
+                      <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                      <i data-lucide="folder" class="w-4 h-4 text-[var(--perseus-primary-light)]"></i>
+                      <span>perseus</span>
+                    </div>
+                    <div class="pl-9 space-y-0.5">
+                      <div class="flex items-center gap-1.5 py-1 text-[var(--perseus-foreground-secondary)]">
+                        <i data-lucide="folder" class="w-4 h-4 text-[var(--perseus-primary-light)]"></i>
+                        <span>api</span>
+                      </div>
+                      <div class="flex items-center gap-1.5 py-1 text-[var(--perseus-foreground-secondary)]">
+                        <i data-lucide="folder" class="w-4 h-4 text-[var(--perseus-primary-light)]"></i>
+                        <span>models</span>
+                      </div>
+                      <div class="flex items-center gap-1.5 py-1 bg-[var(--perseus-primary)]/10 text-[var(--perseus-foreground)] rounded-r-sm -mr-px">
+                        <i data-lucide="file-text" class="w-4 h-4 text-[var(--perseus-accent)]"></i>
+                        <span>app.py</span>
+                      </div>
+                      <div class="flex items-center gap-1.5 py-1 text-[var(--perseus-foreground-secondary)]">
+                        <i data-lucide="file-text" class="w-4 h-4 text-[var(--perseus-accent)]"></i>
+                        <span>config.example.toml</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Code area -->
+                <div class="flex-1 py-4 px-6 font-mono text-sm leading-6">
+                  <div class="flex gap-4">
+                    <div class="text-[var(--perseus-foreground-tertiary)] text-right select-none w-8">
+                      <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>10</div><div>11</div><div>12</div><div>13</div>
+                    </div>
+                    <div class="flex-1 text-[var(--perseus-foreground)]">
+                      <div><span class="text-[var(--perseus-accent)]">from</span> <span class="text-[#79c0ff]">fastapi</span> <span class="text-[var(--perseus-accent)]">import</span> FastAPI</div>
+                      <div><span class="text-[var(--perseus-accent)]">from</span> <span class="text-[#79c0ff)]">.core</span> <span class="text-[var(--perseus-accent)]">import</span> init_app</div>
+                      <div class="mt-2"></div>
+                      <div><span class="text-[var(--perseus-foreground-tertiary)]"># Perseus - Self-Hosted Git Platform</span></div>
+                      <div class="relative bg-[var(--perseus-primary)]/10 -mx-6 px-6 border-l-2 border-[var(--perseus-primary-light)]">
+                        <span class="text-[#79c0ff]">app</span> = <span class="text-[var(--perseus-accent)]">FastAPI</span>(</div>
+                      <div class="pl-4"><span class="text-[#7ee787]">title</span>=<span class="text-[#a5d6ff]">&quot;Perseus&quot;</span>,</div>
+                      <div class="pl-4"><span class="text-[#7ee787]">version</span>=<span class="text-[#a5d6ff]">&quot;1.0.0&quot;</span>,</div>
+                      <div class="pl-4"><span class="text-[#7ee787]">description</span>=<span class="text-[#a5d6ff]">&quot;Self-hosted Git collaboration&quot;</span>,</div>
+                      <div>)</div>
+                      <div class="mt-2"></div>
+                      <div class="relative">
+                        <span class="text-[var(--perseus-accent)]">async def</span> <span class="text-[#d2a8ff]">lifespan</span>(<span class="text-[#79c0ff]">app</span>: FastAPI):
+                        <div class="absolute top-0 -left-2 w-4 h-4 bg-[#f85149] rounded-sm flex items-center justify-center" title="alice@example.com">
+                          <span class="text-[10px] font-bold text-white">A</span>
+                        </div>
+                      </div>
+                      <div class="pl-8"><span class="text-[var(--perseus-accent)]">await</span> init_app.<span class="text-[#d2a8ff]">startup</span>(app)</div>
+                      <div class="pl-8"><span class="text-[var(--perseus-accent)]">yield</span></div>
+                      <div class="pl-8 relative">
+                        <span class="text-[var(--perseus-accent)]">await</span> init_app.<span class="text-[#d2a8ff]">shutdown</span>(app)
+                        <div class="absolute top-0 -left-2 w-4 h-4 bg-[#3fb950] rounded-sm flex items-center justify-center" title="bob@example.com">
+                          <span class="text-[10px] font-bold text-white">B</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Presence indicators -->
+                <div class="hidden lg:block w-12 border-l border-[var(--perseus-border)] bg-[var(--perseus-background)]/30 py-3">
+                  <div class="flex flex-col items-center gap-2">
+                    <div class="w-7 h-7 rounded-full bg-gradient-to-br from-[#f85149] to-[#d29922] flex items-center justify-center text-xs font-bold text-white border-2 border-[var(--perseus-card)]">A</div>
+                    <div class="w-7 h-7 rounded-full bg-gradient-to-br from-[#3fb950] to-[#1f6feb] flex items-center justify-center text-xs font-bold text-white border-2 border-[var(--perseus-card)]">B</div>
+                    <div class="w-7 h-7 rounded-full bg-gradient-to-br from-[#bc8cff] to-[#1f6feb] flex items-center justify-center text-xs font-bold text-white border-2 border-[var(--perseus-card)]">C</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Status bar -->
+              <div class="flex items-center justify-between px-4 py-1.5 border-t border-[var(--perseus-border)] bg-[var(--perseus-elevated)] text-xs text-[var(--perseus-foreground-tertiary)]">
+                <div class="flex items-center gap-4">
+                  <span class="flex items-center gap-1">
+                    <i data-lucide="git-branch" class="w-3 h-3"></i> main
+                  </span>
+                  <span class="flex items-center gap-1">
+                    <i data-lucide="users" class="w-3 h-3 text-[var(--perseus-success)]"></i> 3 collaborators online
+                  </span>
+                </div>
+                <div class="flex items-center gap-4">
+                  <span>Python 3.11</span>
+                  <span>UTF-8</span>
+                  <span>Ln 13, Col 28</span>
+                </div>
+              </div>
+            </div>
+            <!-- Floating badges -->
+            <div class="absolute -top-4 -right-4 px-4 py-2 rounded-lg bg-[var(--perseus-card)] border border-[var(--perseus-border)] shadow-xl text-sm hidden md:flex items-center gap-2">
+              <div class="w-2 h-2 rounded-full bg-[var(--perseus-success)] animate-pulse"></div>
+              <span class="text-[var(--perseus-foreground-secondary)]">Live sync active</span>
+            </div>
+            <div class="absolute -bottom-4 -left-4 px-4 py-2 rounded-lg bg-[var(--perseus-card)] border border-[var(--perseus-border)] shadow-xl text-sm hidden md:flex items-center gap-2">
+              <i data-lucide="zap" class="w-4 h-4 text-[var(--perseus-accent)]"></i>
+              <span class="text-[var(--perseus-foreground-secondary)]">Yjs CRDT-powered</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== TECH STACK / TRUST BAR ===== -->
+      <section id="tech-stack" class="py-16 border-y border-[var(--perseus-border)] bg-[var(--perseus-card)]/30">
+        <div class="max-w-7xl mx-auto px-6">
+          <p class="text-center text-sm text-[var(--perseus-foreground-tertiary)] uppercase tracking-widest mb-10">Built on proven open-source technologies</p>
+          <div class="flex flex-wrap items-center justify-center gap-x-12 gap-y-6">
+            <div class="flex items-center gap-2 text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">
+              <i data-lucide="zap" class="w-6 h-6 text-[#009688]"></i>
+              <span class="text-lg font-semibold font-mono">FastAPI</span>
+            </div>
+            <div class="flex items-center gap-2 text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">
+              <div class="w-6 h-6 rounded bg-gradient-to-br from-[#61dafb] to-[#087ea4] flex items-center justify-center">
+                <div class="w-4 h-1.5 border border-white/70 rounded-full transform rotate-12"></div>
+              </div>
+              <span class="text-lg font-semibold font-mono">React 19</span>
+            </div>
+            <div class="flex items-center gap-2 text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">
+              <div class="w-6 h-6 rounded-full bg-gradient-to-br from-[#336791] to-[#6495b8] flex items-center justify-center">
+                <span class="text-[10px] font-bold text-white">PG</span>
+              </div>
+              <span class="text-lg font-semibold font-mono">PostgreSQL</span>
+            </div>
+            <div class="flex items-center gap-2 text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">
+              <div class="w-6 h-6 rounded bg-gradient-to-br from-[#a41e11] to-[#dc382d] flex items-center justify-center">
+                <span class="text-[10px] font-bold text-white">R</span>
+              </div>
+              <span class="text-lg font-semibold font-mono">Redis</span>
+            </div>
+            <div class="flex items-center gap-2 text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">
+              <i data-lucide="box" class="w-6 h-6 text-[#2496ed]"></i>
+              <span class="text-lg font-semibold font-mono">Docker</span>
+            </div>
+            <div class="flex items-center gap-2 text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">
+              <div class="w-6 h-6 rounded bg-gradient-to-br from-[#d7572a] to-[#eff1f7] flex items-center justify-center">
+                <span class="text-[10px] font-bold text-white">W</span>
+              </div>
+              <span class="text-lg font-semibold font-mono">Wails</span>
+            </div>
+            <div class="flex items-center gap-2 text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">
+              <i data-lucide="git-branch" class="w-6 h-6 text-[#f05032]"></i>
+              <span class="text-lg font-semibold font-mono">Git</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== FEATURES GRID ===== -->
+      <section id="features" class="py-24">
+        <div class="max-w-7xl mx-auto px-6">
+          <div class="text-center max-w-2xl mx-auto mb-16">
+            <span class="text-sm font-semibold text-[var(--perseus-primary-light)] uppercase tracking-wider">Everything you need</span>
+            <h2 class="text-4xl md:text-5xl font-bold text-[var(--perseus-foreground)] mt-3 mb-4">
+              A complete Git platform
+            </h2>
+            <p class="text-lg text-[var(--perseus-foreground-secondary)]">
+              From repository hosting to real-time collaborative editing, Perseus packs everything your team needs into one self-hosted solution.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <!-- Feature 1: Code Hosting -->
+            <div class="group p-6 rounded-xl border border-[var(--perseus-border)] bg-[var(--perseus-card)] hover:border-[var(--perseus-primary)]/50 hover:shadow-lg hover:shadow-[var(--perseus-primary)]/5 transition-all">
+              <div class="w-12 h-12 rounded-lg bg-[var(--perseus-primary)]/10 flex items-center justify-center mb-4 group-hover:bg-[var(--perseus-primary)]/20 transition-colors">
+                <i data-lucide="folder-git" class="w-6 h-6 text-[var(--perseus-primary-light)]"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-[var(--perseus-foreground)] mb-2">Code Hosting</h3>
+              <p class="text-sm text-[var(--perseus-foreground-secondary)] leading-relaxed">
+                Full Git repository management with fork, star, and granular access control across four roles: Owner, Admin, Developer, and Readonly.
+              </p>
+            </div>
+
+            <!-- Feature 2: Pull Requests -->
+            <div class="group p-6 rounded-xl border border-[var(--perseus-border)] bg-[var(--perseus-card)] hover:border-[var(--perseus-primary)]/50 hover:shadow-lg hover:shadow-[var(--perseus-primary)]/5 transition-all">
+              <div class="w-12 h-12 rounded-lg bg-[var(--perseus-primary)]/10 flex items-center justify-center mb-4 group-hover:bg-[var(--perseus-primary)]/20 transition-colors">
+                <i data-lucide="git-pull-request" class="w-6 h-6 text-[var(--perseus-primary-light)]"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-[var(--perseus-foreground)] mb-2">Pull Requests &amp; Review</h3>
+              <p class="text-sm text-[var(--perseus-foreground-secondary)] leading-relaxed">
+                Draft PRs, inline code reviews, labels, conflict detection, and activity timelines — everything for a smooth review workflow.
+              </p>
+            </div>
+
+            <!-- Feature 3: Issue Tracking -->
+            <div class="group p-6 rounded-xl border border-[var(--perseus-border)] bg-[var(--perseus-card)] hover:border-[var(--perseus-primary)]/50 hover:shadow-lg hover:shadow-[var(--perseus-primary)]/5 transition-all">
+              <div class="w-12 h-12 rounded-lg bg-[var(--perseus-accent)]/10 flex items-center justify-center mb-4 group-hover:bg-[var(--perseus-accent)]/20 transition-colors">
+                <i data-lucide="circle-alert" class="w-6 h-6 text-[var(--perseus-accent)]"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-[var(--perseus-foreground)] mb-2">Issue Tracking</h3>
+              <p class="text-sm text-[var(--perseus-foreground-secondary)] leading-relaxed">
+                Create, close, and reopen issues with priorities, labels, batch operations, and threaded comments for organized project management.
+              </p>
+            </div>
+
+            <!-- Feature 4: Real-time Collaboration -->
+            <div class="group p-6 rounded-xl border border-[var(--perseus-border)] bg-[var(--perseus-card)] hover:border-[var(--perseus-accent)]/50 hover:shadow-lg hover:shadow-[var(--perseus-accent)]/5 transition-all">
+              <div class="w-12 h-12 rounded-lg bg-[var(--perseus-accent)]/10 flex items-center justify-center mb-4 group-hover:bg-[var(--perseus-accent)]/20 transition-colors">
+                <i data-lucide="users" class="w-6 h-6 text-[var(--perseus-accent)]"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-[var(--perseus-foreground)] mb-2">Real-time Collaboration</h3>
+              <p class="text-sm text-[var(--perseus-foreground-secondary)] leading-relaxed">
+                Google Docs-style collaborative editing powered by Yjs CRDT. Live cursors, presence indicators, and conflict-free merging.
+              </p>
+            </div>
+
+            <!-- Feature 5: Code Search -->
+            <div class="group p-6 rounded-xl border border-[var(--perseus-border)] bg-[var(--perseus-card)] hover:border-[var(--perseus-primary)]/50 hover:shadow-lg hover:shadow-[var(--perseus-primary)]/5 transition-all">
+              <div class="w-12 h-12 rounded-lg bg-[var(--perseus-primary)]/10 flex items-center justify-center mb-4 group-hover:bg-[var(--perseus-primary)]/20 transition-colors">
+                <i data-lucide="search" class="w-6 h-6 text-[var(--perseus-primary-light)]"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-[var(--perseus-foreground)] mb-2">Code Search</h3>
+              <p class="text-sm text-[var(--perseus-foreground-secondary)] leading-relaxed">
+                Blazing-fast code search across all repositories using Git object indexing and PostgreSQL pg_trgm GIN for substring matching.
+              </p>
+            </div>
+
+            <!-- Feature 6: Webhooks & CI -->
+            <div class="group p-6 rounded-xl border border-[var(--perseus-border)] bg-[var(--perseus-card)] hover:border-[var(--perseus-primary)]/50 hover:shadow-lg hover:shadow-[var(--perseus-primary)]/5 transition-all">
+              <div class="w-12 h-12 rounded-lg bg-[var(--perseus-primary)]/10 flex items-center justify-center mb-4 group-hover:bg-[var(--perseus-primary)]/20 transition-colors">
+                <i data-lucide="webhook" class="w-6 h-6 text-[var(--perseus-primary-light)]"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-[var(--perseus-foreground)] mb-2">Webhooks &amp; CI</h3>
+              <p class="text-sm text-[var(--perseus-foreground-secondary)] leading-relaxed">
+                18 event types with HMAC-SHA256 signing, delivery history, automatic retries, and build status tracking for CI integration.
+              </p>
+            </div>
+
+            <!-- Feature 7: Release Management -->
+            <div class="group p-6 rounded-xl border border-[var(--perseus-border)] bg-[var(--perseus-card)] hover:border-[var(--perseus-accent)]/50 hover:shadow-lg hover:shadow-[var(--perseus-accent)]/5 transition-all">
+              <div class="w-12 h-12 rounded-lg bg-[var(--perseus-accent)]/10 flex items-center justify-center mb-4 group-hover:bg-[var(--perseus-accent)]/20 transition-colors">
+                <i data-lucide="tag" class="w-6 h-6 text-[var(--perseus-accent)]"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-[var(--perseus-foreground)] mb-2">Release Management</h3>
+              <p class="text-sm text-[var(--perseus-foreground-secondary)] leading-relaxed">
+                Tag-based releases with file attachments, draft and pre-release support, and structured release notes for every version.
+              </p>
+            </div>
+
+            <!-- Feature 8: Admin & Monitoring -->
+            <div class="group p-6 rounded-xl border border-[var(--perseus-border)] bg-[var(--perseus-card)] hover:border-[var(--perseus-accent)]/50 hover:shadow-lg hover:shadow-[var(--perseus-accent)]/5 transition-all">
+              <div class="w-12 h-12 rounded-lg bg-[var(--perseus-accent)]/10 flex items-center justify-center mb-4 group-hover:bg-[var(--perseus-accent)]/20 transition-colors">
+                <i data-lucide="settings-2" class="w-6 h-6 text-[var(--perseus-accent)]"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-[var(--perseus-foreground)] mb-2">Admin &amp; Monitoring</h3>
+              <p class="text-sm text-[var(--perseus-foreground-secondary)] leading-relaxed">
+                Full admin console with system monitoring, configuration management, Redis administration, and real-time log streaming.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== COLLABORATION SPOTLIGHT ===== -->
+      <section id="collab-spotlight" class="py-24 relative overflow-hidden">
+        <div class="absolute top-1/2 left-0 w-[400px] h-[400px] bg-[var(--perseus-accent)]/5 rounded-full blur-[100px] pointer-events-none -translate-y-1/2"></div>
+        <div class="max-w-7xl mx-auto px-6 relative">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <!-- Left text -->
+            <div>
+              <span class="text-sm font-semibold text-[var(--perseus-accent)] uppercase tracking-wider">Real-time Collaboration</span>
+              <h2 class="text-4xl md:text-5xl font-bold text-[var(--perseus-foreground)] mt-3 mb-6">
+                Edit together, in real time.
+              </h2>
+              <p class="text-lg text-[var(--perseus-foreground-secondary)] mb-8 leading-relaxed">
+                Perseus brings Google Docs-style collaboration to your codebase. Multiple developers can edit the same file simultaneously with live cursors, presence indicators, and zero merge conflicts.
+              </p>
+              <div class="space-y-5 mb-8">
+                <div class="flex gap-4">
+                  <div class="w-10 h-10 rounded-lg bg-[var(--perseus-accent)]/10 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="cursors" class="w-5 h-5 text-[var(--perseus-accent)]"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-base font-semibold text-[var(--perseus-foreground)] mb-1">Live Cursors &amp; Presence</h4>
+                    <p class="text-sm text-[var(--perseus-foreground-secondary)]">See exactly where your teammates are editing and who is online in each file.</p>
+                  </div>
+                </div>
+                <div class="flex gap-4">
+                  <div class="w-10 h-10 rounded-lg bg-[var(--perseus-accent)]/10 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="shuffle" class="w-5 h-5 text-[var(--perseus-accent)]"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-base font-semibold text-[var(--perseus-foreground)] mb-1">Yjs CRDT Engine</h4>
+                    <p class="text-sm text-[var(--perseus-foreground-secondary)]">Powered by battle-tested Yjs CRDT algorithm for conflict-free concurrent editing at any scale.</p>
+                  </div>
+                </div>
+                <div class="flex gap-4">
+                  <div class="w-10 h-10 rounded-lg bg-[var(--perseus-accent)]/10 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="message-square" class="w-5 h-5 text-[var(--perseus-accent)]"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-base font-semibold text-[var(--perseus-foreground)] mb-1">Built-in Chat &amp; Comments</h4>
+                    <p class="text-sm text-[var(--perseus-foreground-secondary)]">Repository chat channels, direct messages, and inline file comments — all WebSocket real-time.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 text-sm text-[var(--perseus-foreground-tertiary)]">
+                <div class="flex -space-x-2">
+                  <div class="w-8 h-8 rounded-full bg-gradient-to-br from-[#f85149] to-[#d29922] border-2 border-[var(--perseus-background)] flex items-center justify-center text-xs font-bold text-white">A</div>
+                  <div class="w-8 h-8 rounded-full bg-gradient-to-br from-[#3fb950] to-[#1f6feb] border-2 border-[var(--perseus-background)] flex items-center justify-center text-xs font-bold text-white">B</div>
+                  <div class="w-8 h-8 rounded-full bg-gradient-to-br from-[#bc8cff] to-[#1f6feb] border-2 border-[var(--perseus-background)] flex items-center justify-center text-xs font-bold text-white">C</div>
+                </div>
+                <span>3 collaborators editing right now</span>
+              </div>
+            </div>
+
+            <!-- Right visual - Collaborative editor mockup -->
+            <div class="relative">
+              <div class="rounded-xl border border-[var(--perseus-border)] bg-[var(--perseus-card)] shadow-2xl shadow-black/40 overflow-hidden">
+                <!-- Editor header -->
+                <div class="flex items-center justify-between px-4 py-2.5 border-b border-[var(--perseus-border)] bg-[var(--perseus-elevated)]">
+                  <div class="flex items-center gap-2 text-sm text-[var(--perseus-foreground-secondary)]">
+                    <i data-lucide="file-code" class="w-4 h-4 text-[var(--perseus-accent)]"></i>
+                    <span class="font-mono">auth_controller.py</span>
+                    <span class="text-xs text-[var(--perseus-foreground-tertiary)]">main</span>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <div class="relative w-7 h-7 rounded-full bg-gradient-to-br from-[#f85149] to-[#d29922] flex items-center justify-center text-xs font-bold text-white border-2 border-[var(--perseus-elevated)]">
+                      A
+                      <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-[var(--perseus-success)] border-2 border-[var(--perseus-elevated)]"></div>
+                    </div>
+                    <div class="relative w-7 h-7 rounded-full bg-gradient-to-br from-[#3fb950] to-[#1f6feb] flex items-center justify-center text-xs font-bold text-white border-2 border-[var(--perseus-elevated)]">
+                      B
+                      <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-[var(--perseus-success)] border-2 border-[var(--perseus-elevated)]"></div>
+                    </div>
+                    <div class="relative w-7 h-7 rounded-full bg-gradient-to-br from-[#bc8cff] to-[#1f6feb] flex items-center justify-center text-xs font-bold text-white border-2 border-[var(--perseus-elevated)]">
+                      C
+                      <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-[var(--perseus-success)] border-2 border-[var(--perseus-elevated)]"></div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Editor body -->
+                <div class="p-4 font-mono text-sm leading-6">
+                  <div class="flex gap-4">
+                    <div class="text-[var(--perseus-foreground-tertiary)] text-right select-none w-8">
+                      <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>10</div><div>11</div><div>12</div><div>13</div><div>14</div><div>15</div>
+                    </div>
+                    <div class="flex-1">
+                      <div><span class="text-[var(--perseus-accent)]">from</span> <span class="text-[#79c0ff]">fastapi</span> <span class="text-[var(--perseus-accent)]">import</span> APIRouter, Depends</div>
+                      <div><span class="text-[var(--perseus-accent)]">from</span> <span class="text-[#79c0ff]">..models.user</span> <span class="text-[var(--perseus-accent)]">import</span> User</div>
+                      <div><span class="text-[var(--perseus-accent)]">from</span> <span class="text-[#79c0ff]">..services.auth</span> <span class="text-[var(--perseus-accent)]">import</span> auth_service</div>
+                      <div class="mt-2"></div>
+                      <div><span class="text-[#79c0ff]">router</span> = <span class="text-[#d2a8ff]">APIRouter</span>(<span class="text-[#7ee787]">prefix</span>=<span class="text-[#a5d6ff]">&quot;/auth&quot;</span>)</div>
+                      <div class="mt-2"></div>
+                      <!-- Alice's cursor line -->
+                      <div class="relative">
+                        <span class="text-[#79c0ff]">@router.post</span>(<span class="text-[#a5d6ff]">&quot;/login&quot;</span>)
+                        <div class="absolute top-0 left-24 w-0.5 h-6 bg-[#f85149] animate-pulse"></div>
+                        <div class="absolute -top-4 left-24 px-1.5 py-0.5 bg-[#f85149] text-[10px] text-white rounded-t-sm font-sans whitespace-nowrap">
+                          alice
+                        </div>
+                      </div>
+                      <div><span class="text-[var(--perseus-accent)]">async def</span> <span class="text-[#d2a8ff]">login</span>(</div>
+                      <div class="pl-8"><span class="text-[#79c0ff]">credentials</span>: LoginSchema,</div>
+                      <!-- Bob's selection -->
+                      <div class="pl-8 relative bg-[#3fb950]/20 -mx-2 px-2 rounded">
+                        <span class="text-[#79c0ff]">session</span>: Session = <span class="text-[var(--perseus-accent)]">Depends</span>(get_session),
+                        <div class="absolute -top-4 right-2 px-1.5 py-0.5 bg-[#3fb950] text-[10px] text-white rounded-t-sm font-sans whitespace-nowrap">
+                          bob
+                        </div>
+                      </div>
+                      <div>):</div>
+                      <div class="pl-8"><span class="text-[var(--perseus-accent)]">return await</span> auth_service.<span class="text-[#d2a8ff]">login</span>(</div>
+                      <div class="pl-16"><span class="text-[#79c0ff]">credentials</span>,</div>
+                      <!-- Charlie's cursor line -->
+                      <div class="pl-16 relative">
+                        <span class="text-[#79c0ff]">session</span>
+                        <div class="absolute top-0 left-20 w-0.5 h-6 bg-[#bc8cff] animate-pulse"></div>
+                        <div class="absolute -top-4 left-20 px-1.5 py-0.5 bg-[#bc8cff] text-[10px] text-white rounded-t-sm font-sans whitespace-nowrap">
+                          charlie
+                        </div>
+                      </div>
+                      <div class="pl-8">)</div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Sync status bar -->
+                <div class="flex items-center justify-between px-4 py-1.5 border-t border-[var(--perseus-border)] bg-[var(--perseus-background)]/30 text-xs">
+                  <div class="flex items-center gap-1.5 text-[var(--perseus-success)]">
+                    <i data-lucide="radio" class="w-3 h-3"></i>
+                    <span>Live synced</span>
+                  </div>
+                  <div class="text-[var(--perseus-foreground-tertiary)]">
+                    Yjs v15.5.0 &middot; WebSocket connected
+                  </div>
+                </div>
+              </div>
+              <!-- Floating chat bubble -->
+              <div class="absolute -bottom-6 -left-6 max-w-xs p-3 rounded-xl bg-[var(--perseus-card)] border border-[var(--perseus-border)] shadow-xl hidden md:block">
+                <div class="flex gap-2">
+                  <div class="w-7 h-7 rounded-full bg-gradient-to-br from-[#3fb950] to-[#1f6feb] flex items-center justify-center text-xs font-bold text-white flex-shrink-0">B</div>
+                  <div>
+                    <div class="text-xs font-semibold text-[var(--perseus-foreground)]">bob <span class="text-[var(--perseus-foreground-tertiary)] font-normal">just now</span></div>
+                    <div class="text-sm text-[var(--perseus-foreground-secondary)]">LGTM! Let me add the token refresh logic.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== DESKTOP APP SPOTLIGHT ===== -->
+      <section id="desktop-spotlight" class="py-24 bg-[var(--perseus-card)]/30 border-y border-[var(--perseus-border)] relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-[500px] h-[400px] bg-[var(--perseus-primary)]/5 rounded-full blur-[100px] pointer-events-none"></div>
+        <div class="max-w-7xl mx-auto px-6 relative">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <!-- Left visual - Desktop app mockup -->
+            <div class="order-2 lg:order-1 relative">
+              <div class="rounded-xl border border-[var(--perseus-border)] bg-[var(--perseus-background)] shadow-2xl shadow-black/40 overflow-hidden">
+                <!-- Title bar (desktop style) -->
+                <div class="flex items-center justify-between px-3 py-2 bg-[var(--perseus-elevated)] border-b border-[var(--perseus-border)]">
+                  <div class="flex gap-1.5">
+                    <div class="w-3 h-3 rounded-full bg-[#ff5f57]"></div>
+                    <div class="w-3 h-3 rounded-full bg-[#febc2e]"></div>
+                    <div class="w-3 h-3 rounded-full bg-[#28c840]"></div>
+                  </div>
+                  <div class="text-xs text-[var(--perseus-foreground-tertiary)] font-medium">Perseus Desktop</div>
+                  <div class="w-14"></div>
+                </div>
+                <!-- App content -->
+                <div class="flex h-80">
+                  <!-- Sidebar -->
+                  <div class="w-14 bg-[var(--perseus-card)] border-r border-[var(--perseus-border)] flex flex-col items-center py-3 gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--perseus-primary)] to-[var(--perseus-accent)] flex items-center justify-center">
+                      <i data-lucide="git-branch" class="w-4 h-4 text-white"></i>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg bg-[var(--perseus-primary)]/10 flex items-center justify-center text-[var(--perseus-primary-light)]">
+                      <i data-lucide="home" class="w-4 h-4"></i>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--perseus-foreground-tertiary)] hover:bg-[var(--perseus-muted)] hover:text-[var(--perseus-foreground-secondary)] cursor-pointer">
+                      <i data-lucide="search" class="w-4 h-4"></i>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--perseus-foreground-tertiary)] hover:bg-[var(--perseus-muted)] hover:text-[var(--perseus-foreground-secondary)] cursor-pointer">
+                      <i data-lucide="git-pull-request" class="w-4 h-4"></i>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--perseus-foreground-tertiary)] hover:bg-[var(--perseus-muted)] hover:text-[var(--perseus-foreground-secondary)] cursor-pointer">
+                      <i data-lucide="circle-alert" class="w-4 h-4"></i>
+                    </div>
+                    <div class="flex-1"></div>
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--perseus-foreground-tertiary)] hover:bg-[var(--perseus-muted)] cursor-pointer">
+                      <i data-lucide="message-square" class="w-4 h-4"></i>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--perseus-foreground-tertiary)] hover:bg-[var(--perseus-muted)] cursor-pointer">
+                      <i data-lucide="settings" class="w-4 h-4"></i>
+                    </div>
+                  </div>
+                  <!-- Main content area -->
+                  <div class="flex-1 flex flex-col">
+                    <!-- Tab bar -->
+                    <div class="flex items-center gap-1 px-2 py-1.5 border-b border-[var(--perseus-border)] bg-[var(--perseus-card)]/50">
+                      <div class="flex items-center gap-1.5 px-3 py-1 rounded-t-md bg-[var(--perseus-background)] border border-[var(--perseus-border)] border-b-transparent text-xs">
+                        <i data-lucide="file-code" class="w-3 h-3 text-[var(--perseus-accent)]"></i>
+                        <span class="text-[var(--perseus-foreground)]">app.py</span>
+                        <i data-lucide="x" class="w-3 h-3 text-[var(--perseus-foreground-tertiary)] ml-1 cursor-pointer"></i>
+                      </div>
+                      <div class="flex items-center gap-1.5 px-3 py-1 text-xs text-[var(--perseus-foreground-tertiary)]">
+                        <i data-lucide="file-text" class="w-3 h-3"></i>
+                        <span>README.md</span>
+                      </div>
+                    </div>
+                    <!-- Editor preview -->
+                    <div class="flex-1 p-4 font-mono text-xs leading-5 overflow-hidden">
+                      <div class="text-[var(--perseus-foreground-tertiary)] mb-1"># Perseus Desktop</div>
+                      <div class="text-[var(--perseus-foreground-secondary)] mb-3">Native desktop experience with offline support</div>
+                      <div class="grid grid-cols-[auto_1fr] gap-3">
+                        <div class="text-[var(--perseus-foreground-tertiary)] text-right select-none">
+                          <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div>
+                        </div>
+                        <div class="text-[var(--perseus-foreground)]">
+                          <div><span class="text-[var(--perseus-accent)]">package</span> <span class="text-[#79c0ff]">main</span></div>
+                          <div class="mt-1"></div>
+                          <div><span class="text-[var(--perseus-accent)]">import</span> <span class="text-[#a5d6ff]">&quot;github.com/wailsapp/wails/v2&quot;</span></div>
+                          <div class="mt-1"></div>
+                          <div><span class="text-[var(--perseus-accent)]">func</span> <span class="text-[#d2a8ff]">main</span>() {</div>
+                          <div class="pl-4">app := <span class="text-[#d2a8ff]">NewApp</span>()</div>
+                          <div class="pl-4">wails.<span class="text-[#d2a8ff]">Run</span>(app)</div>
+                          <div>}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- Terminal preview -->
+                    <div class="border-t border-[var(--perseus-border)] bg-[var(--perseus-background)]/50">
+                      <div class="flex items-center gap-2 px-3 py-1 border-b border-[var(--perseus-border)]/50">
+                        <span class="text-xs text-[var(--perseus-foreground-tertiary)]">Terminal</span>
+                        <span class="text-xs text-[var(--perseus-foreground-tertiary)]">Problems</span>
+                        <span class="text-xs text-[var(--perseus-foreground-tertiary)]">Output</span>
+                      </div>
+                      <div class="px-3 py-2 font-mono text-xs text-[var(--perseus-success)]">
+                        <span class="text-[var(--perseus-foreground-tertiary)]">~/perseus $</span> git status
+                        <div class="text-[var(--perseus-foreground-secondary)]">On branch main</div>
+                        <div class="text-[var(--perseus-success)]">nothing to commit, working tree clean</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Floating badge -->
+              <div class="absolute -top-4 -left-4 px-4 py-2 rounded-lg bg-[var(--perseus-card)] border border-[var(--perseus-border)] shadow-xl text-sm hidden md:flex items-center gap-2">
+                <i data-lucide="monitor" class="w-4 h-4 text-[var(--perseus-primary-light)]"></i>
+                <span class="text-[var(--perseus-foreground-secondary)]">Native Desktop App</span>
+              </div>
+            </div>
+
+            <!-- Right text -->
+            <div class="order-1 lg:order-2">
+              <span class="text-sm font-semibold text-[var(--perseus-primary-light)] uppercase tracking-wider">Desktop App</span>
+              <h2 class="text-4xl md:text-5xl font-bold text-[var(--perseus-foreground)] mt-3 mb-6">
+                A native desktop experience.
+              </h2>
+              <p class="text-lg text-[var(--perseus-foreground-secondary)] mb-8 leading-relaxed">
+                Perseus Desktop, built with Wails, delivers the full power of the platform as a native application. Go beyond the browser with system-level integration, offline capabilities, and a distraction-free development environment.
+              </p>
+              <div class="space-y-5 mb-8">
+                <div class="flex gap-4">
+                  <div class="w-10 h-10 rounded-lg bg-[var(--perseus-primary)]/10 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="cpu" class="w-5 h-5 text-[var(--perseus-primary-light)]"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-base font-semibold text-[var(--perseus-foreground)] mb-1">Powered by Wails + Go</h4>
+                    <p class="text-sm text-[var(--perseus-foreground-secondary)]">Lightweight Go backend with a native WebView frontend. Fast startup, minimal memory, no Electron bloat.</p>
+                  </div>
+                </div>
+                <div class="flex gap-4">
+                  <div class="w-10 h-10 rounded-lg bg-[var(--perseus-primary)]/10 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="wifi-off" class="w-5 h-5 text-[var(--perseus-primary-light)]"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-base font-semibold text-[var(--perseus-foreground)] mb-1">Offline Development</h4>
+                    <p class="text-sm text-[var(--perseus-foreground-secondary)]">Work locally with full Git operations, then sync when you are back online. Your code is always accessible.</p>
+                  </div>
+                </div>
+                <div class="flex gap-4">
+                  <div class="w-10 h-10 rounded-lg bg-[var(--perseus-primary)]/10 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="terminal" class="w-5 h-5 text-[var(--perseus-primary-light)]"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-base font-semibold text-[var(--perseus-foreground)] mb-1">Built-in Terminal &amp; LSP</h4>
+                    <p class="text-sm text-[var(--perseus-foreground-secondary)]">Integrated terminal, Language Server Protocol support, and a full code editor right in the desktop app.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-3">
+                <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--perseus-muted)]/50 text-sm text-[var(--perseus-foreground-secondary)]">
+                  <i data-lucide="monitor" class="w-4 h-4"></i>
+                  Windows
+                </div>
+                <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--perseus-muted)]/50 text-sm text-[var(--perseus-foreground-secondary)]">
+                  <i data-lucide="apple" class="w-4 h-4"></i>
+                  macOS
+                </div>
+                <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--perseus-muted)]/50 text-sm text-[var(--perseus-foreground-secondary)]">
+                  <i data-lucide="hard-drive" class="w-4 h-4"></i>
+                  Linux
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== ARCHITECTURE / SELF-HOSTED ===== -->
+      <section id="architecture" class="py-24 relative overflow-hidden">
+        <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-t from-[var(--perseus-primary)]/5 to-transparent rounded-full blur-[100px] pointer-events-none"></div>
+        <div class="max-w-7xl mx-auto px-6 relative">
+          <div class="text-center max-w-2xl mx-auto mb-16">
+            <span class="text-sm font-semibold text-[var(--perseus-primary-light)] uppercase tracking-wider">Self-Hosted Architecture</span>
+            <h2 class="text-4xl md:text-5xl font-bold text-[var(--perseus-foreground)] mt-3 mb-4">
+              Your data. Your servers.
+            </h2>
+            <p class="text-lg text-[var(--perseus-foreground-secondary)]">
+              Deploy Perseus on your own infrastructure with Docker. Full control over your code, your data, and your pipeline.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <!-- Left: Architecture diagram -->
+            <div class="relative">
+              <div class="rounded-xl border border-[var(--perseus-border)] bg-[var(--perseus-card)] p-8 shadow-xl">
+                <div class="text-center mb-6">
+                  <span class="text-sm font-semibold text-[var(--perseus-foreground-secondary)]">Perseus Architecture</span>
+                </div>
+
+                <!-- Architecture SVG diagram -->
+                <div class="relative">
+                  <!-- Client layer -->
+                  <div class="flex justify-center gap-4 mb-6">
+                    <div class="px-4 py-3 rounded-lg bg-[var(--perseus-muted)] border border-[var(--perseus-border)] text-center">
+                      <i data-lucide="monitor" class="w-6 h-6 text-[var(--perseus-primary-light)] mx-auto mb-1"></i>
+                      <div class="text-xs text-[var(--perseus-foreground-secondary)]">Web App</div>
+                    </div>
+                    <div class="px-4 py-3 rounded-lg bg-[var(--perseus-muted)] border border-[var(--perseus-border)] text-center">
+                      <i data-lucide="desktop" class="w-6 h-6 text-[var(--perseus-accent)] mx-auto mb-1"></i>
+                      <div class="text-xs text-[var(--perseus-foreground-secondary)]">Desktop</div>
+                    </div>
+                    <div class="px-4 py-3 rounded-lg bg-[var(--perseus-muted)] border border-[var(--perseus-border)] text-center">
+                      <i data-lucide="terminal" class="w-6 h-6 text-[var(--perseus-success)] mx-auto mb-1"></i>
+                      <div class="text-xs text-[var(--perseus-foreground-secondary)]">Git CLI</div>
+                    </div>
+                  </div>
+
+                  <!-- Arrows down -->
+                  <div class="flex justify-center mb-6">
+                    <div class="flex flex-col items-center gap-1 text-[var(--perseus-foreground-tertiary)]">
+                      <i data-lucide="chevrons-down" class="w-5 h-5"></i>
+                      <span class="text-[10px] uppercase tracking-wider">HTTP / WebSocket / SSH</span>
+                    </div>
+                  </div>
+
+                  <!-- Nginx / Gateway -->
+                  <div class="mb-6">
+                    <div class="px-6 py-4 rounded-lg bg-gradient-to-r from-[var(--perseus-primary)]/10 to-[var(--perseus-accent)]/10 border border-[var(--perseus-border)] text-center">
+                      <div class="flex items-center justify-center gap-2 mb-1">
+                        <i data-lucide="network" class="w-4 h-4 text-[var(--perseus-primary-light)]"></i>
+                        <span class="text-sm font-semibold text-[var(--perseus-foreground)]">Nginx Gateway</span>
+                      </div>
+                      <div class="text-xs text-[var(--perseus-foreground-tertiary)]">Reverse Proxy · SSL Termination</div>
+                    </div>
+                  </div>
+
+                  <!-- Service layer -->
+                  <div class="grid grid-cols-3 gap-3 mb-6">
+                    <div class="px-3 py-3 rounded-lg bg-[var(--perseus-elevated)] border border-[var(--perseus-border)] text-center">
+                      <i data-lucide="server" class="w-5 h-5 text-[#009688] mx-auto mb-1"></i>
+                      <div class="text-xs font-medium text-[var(--perseus-foreground)]">FastAPI</div>
+                      <div class="text-[10px] text-[var(--perseus-foreground-tertiary)]">Backend API</div>
+                    </div>
+                    <div class="px-3 py-3 rounded-lg bg-[var(--perseus-elevated)] border border-[var(--perseus-border)] text-center">
+                      <i data-lucide="zap" class="w-5 h-5 text-[var(--perseus-accent)] mx-auto mb-1"></i>
+                      <div class="text-xs font-medium text-[var(--perseus-foreground)]">Collab Gateway</div>
+                      <div class="text-[10px] text-[var(--perseus-foreground-tertiary)]">Yjs / WebSocket</div>
+                    </div>
+                    <div class="px-3 py-3 rounded-lg bg-[var(--perseus-elevated)] border border-[var(--perseus-border)] text-center">
+                      <i data-lucide="git-branch" class="w-5 h-5 text-[#f05032] mx-auto mb-1"></i>
+                      <div class="text-xs font-medium text-[var(--perseus-foreground)]">Git CGI</div>
+                      <div class="text-[10px] text-[var(--perseus-foreground-tertiary)]">Smart HTTP</div>
+                    </div>
+                  </div>
+
+                  <!-- Data layer -->
+                  <div class="grid grid-cols-2 gap-3">
+                    <div class="px-3 py-3 rounded-lg bg-[var(--perseus-muted)] border border-[var(--perseus-border)] text-center">
+                      <div class="w-8 h-8 mx-auto mb-1 rounded-full bg-gradient-to-br from-[#336791] to-[#6495b8] flex items-center justify-center">
+                        <span class="text-[10px] font-bold text-white">PG</span>
+                      </div>
+                      <div class="text-xs font-medium text-[var(--perseus-foreground)]">PostgreSQL</div>
+                      <div class="text-[10px] text-[var(--perseus-foreground-tertiary)]">Primary Data Store</div>
+                    </div>
+                    <div class="px-3 py-3 rounded-lg bg-[var(--perseus-muted)] border border-[var(--perseus-border)] text-center">
+                      <div class="w-8 h-8 mx-auto mb-1 rounded bg-gradient-to-br from-[#a41e11] to-[#dc382d] flex items-center justify-center">
+                        <span class="text-[10px] font-bold text-white">R</span>
+                      </div>
+                      <div class="text-xs font-medium text-[var(--perseus-foreground)]">Redis</div>
+                      <div class="text-[10px] text-[var(--perseus-foreground-tertiary)]">Cache · Pub/Sub</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-[var(--perseus-border)] flex items-center justify-center gap-2 text-xs text-[var(--perseus-foreground-tertiary)]">
+                  <i data-lucide="box" class="w-4 h-4"></i>
+                  <span>All services deployed via Docker Compose</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Benefits text -->
+            <div>
+              <div class="space-y-6">
+                <div class="flex gap-4 p-4 rounded-xl hover:bg-[var(--perseus-card)] transition-colors">
+                  <div class="w-12 h-12 rounded-xl bg-[var(--perseus-primary)]/10 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="shield" class="w-6 h-6 text-[var(--perseus-primary-light)]"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-lg font-semibold text-[var(--perseus-foreground)] mb-1">Complete Data Privacy</h4>
+                    <p class="text-sm text-[var(--perseus-foreground-secondary)]">
+                      Your source code never leaves your infrastructure. No third-party has access to your repositories, issues, or discussions.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="flex gap-4 p-4 rounded-xl hover:bg-[var(--perseus-card)] transition-colors">
+                  <div class="w-12 h-12 rounded-xl bg-[var(--perseus-primary)]/10 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="sliders-horizontal" class="w-6 h-6 text-[var(--perseus-primary-light)]"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-lg font-semibold text-[var(--perseus-foreground)] mb-1">Full Control &amp; Customization</h4>
+                    <p class="text-sm text-[var(--perseus-foreground-secondary)]">
+                      Configure every aspect of your instance — from authentication providers to storage backends. Extend with webhooks and APIs.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="flex gap-4 p-4 rounded-xl hover:bg-[var(--perseus-card)] transition-colors">
+                  <div class="w-12 h-12 rounded-xl bg-[var(--perseus-primary)]/10 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="rocket" class="w-6 h-6 text-[var(--perseus-primary-light)]"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-lg font-semibold text-[var(--perseus-foreground)] mb-1">One-Command Docker Deploy</h4>
+                    <p class="text-sm text-[var(--perseus-foreground-secondary)]">
+                      Get up and running with a single <code class="px-1.5 py-0.5 rounded bg-[var(--perseus-muted)] text-[var(--perseus-accent)] text-xs font-mono">docker compose up</code>. All services pre-configured and ready to go.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="flex gap-4 p-4 rounded-xl hover:bg-[var(--perseus-card)] transition-colors">
+                  <div class="w-12 h-12 rounded-xl bg-[var(--perseus-primary)]/10 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="lock" class="w-6 h-6 text-[var(--perseus-primary-light)]"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-lg font-semibold text-[var(--perseus-foreground)] mb-1">Enterprise-Grade Security</h4>
+                    <p class="text-sm text-[var(--perseus-foreground-secondary)]">
+                      OAuth integration (GitHub/GitLab), SSH key management, HMAC-signed webhooks, and audit logging for full compliance.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== ADMIN & MONITORING ===== -->
+      <section id="admin" class="py-24 bg-[var(--perseus-card)]/30 border-y border-[var(--perseus-border)]">
+        <div class="max-w-7xl mx-auto px-6">
+          <div class="text-center max-w-2xl mx-auto mb-16">
+            <span class="text-sm font-semibold text-[var(--perseus-accent)] uppercase tracking-wider">Admin Console</span>
+            <h2 class="text-4xl md:text-5xl font-bold text-[var(--perseus-foreground)] mt-3 mb-4">
+              Monitor and manage everything.
+            </h2>
+            <p class="text-lg text-[var(--perseus-foreground-secondary)]">
+              A comprehensive admin console gives you full visibility into your instance — from system health to Redis management to real-time logs.
+            </p>
+          </div>
+
+          <div class="relative rounded-xl border border-[var(--perseus-border)] bg-[var(--perseus-card)] shadow-2xl shadow-black/30 overflow-hidden">
+            <!-- Admin console header -->
+            <div class="flex items-center justify-between px-6 py-3 border-b border-[var(--perseus-border)] bg-[var(--perseus-elevated)]">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-[var(--perseus-accent)]/10 flex items-center justify-center">
+                  <i data-lucide="settings-2" class="w-4 h-4 text-[var(--perseus-accent)]"></i>
+                </div>
+                <span class="text-sm font-semibold text-[var(--perseus-foreground)]">Admin Console</span>
+                <span class="px-2 py-0.5 rounded text-xs bg-[var(--perseus-success)]/10 text-[var(--perseus-success)] border border-[var(--perseus-success)]/20">All systems operational</span>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-[var(--perseus-foreground-tertiary)]">
+                <i data-lucide="clock" class="w-3 h-3"></i>
+                <span>Updated just now</span>
+              </div>
+            </div>
+
+            <div class="flex">
+              <!-- Sidebar -->
+              <div class="w-48 border-r border-[var(--perseus-border)] bg-[var(--perseus-background)]/30 py-4 hidden md:block">
+                <div class="px-3 mb-4 text-xs font-semibold text-[var(--perseus-foreground-tertiary)] uppercase tracking-wider">System</div>
+                <div class="space-y-0.5 text-sm">
+                  <div class="flex items-center gap-2 px-3 py-2 bg-[var(--perseus-primary)]/10 text-[var(--perseus-primary-light)] border-r-2 border-[var(--perseus-primary-light)]">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    <span>Overview</span>
+                  </div>
+                  <div class="flex items-center gap-2 px-3 py-2 text-[var(--perseus-foreground-secondary)] hover:bg-[var(--perseus-muted)]/50 hover:text-[var(--perseus-foreground)] cursor-pointer">
+                    <i data-lucide="database" class="w-4 h-4"></i>
+                    <span>Components</span>
+                  </div>
+                  <div class="flex items-center gap-2 px-3 py-2 text-[var(--perseus-foreground-secondary)] hover:bg-[var(--perseus-muted)]/50 hover:text-[var(--perseus-foreground)] cursor-pointer">
+                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                    <span>Logs</span>
+                  </div>
+                  <div class="flex items-center gap-2 px-3 py-2 text-[var(--perseus-foreground-secondary)] hover:bg-[var(--perseus-muted)]/50 hover:text-[var(--perseus-foreground)] cursor-pointer">
+                    <i data-lucide="sliders" class="w-4 h-4"></i>
+                    <span>Configuration</span>
+                  </div>
+                </div>
+                <div class="px-3 mt-6 mb-2 text-xs font-semibold text-[var(--perseus-foreground-tertiary)] uppercase tracking-wider">Data</div>
+                <div class="space-y-0.5 text-sm">
+                  <div class="flex items-center gap-2 px-3 py-2 text-[var(--perseus-foreground-secondary)] hover:bg-[var(--perseus-muted)]/50 hover:text-[var(--perseus-foreground)] cursor-pointer">
+                    <i data-lucide="zap" class="w-4 h-4"></i>
+                    <span>Redis</span>
+                  </div>
+                  <div class="flex items-center gap-2 px-3 py-2 text-[var(--perseus-foreground-secondary)] hover:bg-[var(--perseus-muted)]/50 hover:text-[var(--perseus-foreground)] cursor-pointer">
+                    <i data-lucide="users" class="w-4 h-4"></i>
+                    <span>Users</span>
+                  </div>
+                  <div class="flex items-center gap-2 px-3 py-2 text-[var(--perseus-foreground-secondary)] hover:bg-[var(--perseus-muted)]/50 hover:text-[var(--perseus-foreground)] cursor-pointer">
+                    <i data-lucide="webhook" class="w-4 h-4"></i>
+                    <span>Webhooks</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Main content -->
+              <div class="flex-1 p-6">
+                <!-- Stats cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div class="p-4 rounded-lg bg-[var(--perseus-muted)]/30 border border-[var(--perseus-border)]">
+                    <div class="text-xs text-[var(--perseus-foreground-tertiary)] mb-1">Active Users</div>
+                    <div class="text-2xl font-bold text-[var(--perseus-foreground)]">1,247</div>
+                    <div class="text-xs text-[var(--perseus-success)] mt-1 flex items-center gap-1">
+                      <i data-lucide="trending-up" class="w-3 h-3"></i>
+                      +12.5% this week
+                    </div>
+                  </div>
+                  <div class="p-4 rounded-lg bg-[var(--perseus-muted)]/30 border border-[var(--perseus-border)]">
+                    <div class="text-xs text-[var(--perseus-foreground-tertiary)] mb-1">Repositories</div>
+                    <div class="text-2xl font-bold text-[var(--perseus-foreground)]">3,892</div>
+                    <div class="text-xs text-[var(--perseus-success)] mt-1 flex items-center gap-1">
+                      <i data-lucide="trending-up" class="w-3 h-3"></i>
+                      +4.2% this week
+                    </div>
+                  </div>
+                  <div class="p-4 rounded-lg bg-[var(--perseus-muted)]/30 border border-[var(--perseus-border)]">
+                    <div class="text-xs text-[var(--perseus-foreground-tertiary)] mb-1">Collab Sessions</div>
+                    <div class="text-2xl font-bold text-[var(--perseus-foreground)]">38</div>
+                    <div class="text-xs text-[var(--perseus-accent)] mt-1 flex items-center gap-1">
+                      <span class="w-2 h-2 rounded-full bg-[var(--perseus-accent)] animate-pulse"></span>
+                      Live right now
+                    </div>
+                  </div>
+                  <div class="p-4 rounded-lg bg-[var(--perseus-muted)]/30 border border-[var(--perseus-border)]">
+                    <div class="text-xs text-[var(--perseus-foreground-tertiary)] mb-1">API Requests/min</div>
+                    <div class="text-2xl font-bold text-[var(--perseus-foreground)]">2,847</div>
+                    <div class="text-xs text-[var(--perseus-foreground-tertiary)] mt-1">Avg latency 23ms</div>
+                  </div>
+                </div>
+
+                <!-- Chart + Logs row -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <!-- Mini chart -->
+                  <div class="p-4 rounded-lg bg-[var(--perseus-muted)]/30 border border-[var(--perseus-border)]">
+                    <div class="flex items-center justify-between mb-3">
+                      <span class="text-sm font-medium text-[var(--perseus-foreground)]">Request Volume</span>
+                      <span class="text-xs text-[var(--perseus-foreground-tertiary)]">Last 24h</span>
+                    </div>
+                    <!-- Simple bar chart visualization -->
+                    <div class="flex items-end gap-1 h-28">
+                      <div class="flex-1 bg-[var(--perseus-primary)]/30 rounded-t hover:bg-[var(--perseus-primary)]/50 transition-colors" style="height: 40%"></div>
+                      <div class="flex-1 bg-[var(--perseus-primary)]/30 rounded-t hover:bg-[var(--perseus-primary)]/50 transition-colors" style="height: 55%"></div>
+                      <div class="flex-1 bg-[var(--perseus-primary)]/30 rounded-t hover:bg-[var(--perseus-primary)]/50 transition-colors" style="height: 45%"></div>
+                      <div class="flex-1 bg-[var(--perseus-primary)]/30 rounded-t hover:bg-[var(--perseus-primary)]/50 transition-colors" style="height: 70%"></div>
+                      <div class="flex-1 bg-[var(--perseus-primary)]/30 rounded-t hover:bg-[var(--perseus-primary)]/50 transition-colors" style="height: 85%"></div>
+                      <div class="flex-1 bg-[var(--perseus-primary)]/30 rounded-t hover:bg-[var(--perseus-primary)]/50 transition-colors" style="height: 95%"></div>
+                      <div class="flex-1 bg-[var(--perseus-primary)]/30 rounded-t hover:bg-[var(--perseus-primary)]/50 transition-colors" style="height: 75%"></div>
+                      <div class="flex-1 bg-[var(--perseus-primary)]/30 rounded-t hover:bg-[var(--perseus-primary)]/50 transition-colors" style="height: 60%"></div>
+                      <div class="flex-1 bg-[var(--perseus-primary)]/30 rounded-t hover:bg-[var(--perseus-primary)]/50 transition-colors" style="height: 50%"></div>
+                      <div class="flex-1 bg-[var(--perseus-primary)]/30 rounded-t hover:bg-[var(--perseus-primary)]/50 transition-colors" style="height: 65%"></div>
+                      <div class="flex-1 bg-[var(--perseus-primary)]/30 rounded-t hover:bg-[var(--perseus-primary)]/50 transition-colors" style="height: 80%"></div>
+                      <div class="flex-1 bg-[var(--perseus-accent)]/50 rounded-t" style="height: 90%"></div>
+                    </div>
+                    <div class="flex justify-between mt-2 text-[10px] text-[var(--perseus-foreground-tertiary)]">
+                      <span>00:00</span>
+                      <span>06:00</span>
+                      <span>12:00</span>
+                      <span>18:00</span>
+                      <span>Now</span>
+                    </div>
+                  </div>
+
+                  <!-- Component status -->
+                  <div class="p-4 rounded-lg bg-[var(--perseus-muted)]/30 border border-[var(--perseus-border)]">
+                    <div class="flex items-center justify-between mb-3">
+                      <span class="text-sm font-medium text-[var(--perseus-foreground)]">Component Health</span>
+                    </div>
+                    <div class="space-y-2">
+                      <div class="flex items-center justify-between py-1.5">
+                        <div class="flex items-center gap-2">
+                          <span class="w-2 h-2 rounded-full bg-[var(--perseus-success)]"></span>
+                          <span class="text-sm text-[var(--perseus-foreground-secondary)]">FastAPI Backend</span>
+                        </div>
+                        <span class="text-xs text-[var(--perseus-foreground-tertiary)]">23ms avg</span>
+                      </div>
+                      <div class="flex items-center justify-between py-1.5">
+                        <div class="flex items-center gap-2">
+                          <span class="w-2 h-2 rounded-full bg-[var(--perseus-success)]"></span>
+                          <span class="text-sm text-[var(--perseus-foreground-secondary)]">PostgreSQL</span>
+                        </div>
+                        <span class="text-xs text-[var(--perseus-foreground-tertiary)]">12 active conns</span>
+                      </div>
+                      <div class="flex items-center justify-between py-1.5">
+                        <div class="flex items-center gap-2">
+                          <span class="w-2 h-2 rounded-full bg-[var(--perseus-success)]"></span>
+                          <span class="text-sm text-[var(--perseus-foreground-secondary)]">Redis</span>
+                        </div>
+                        <span class="text-xs text-[var(--perseus-foreground-tertiary)]">0.8ms avg</span>
+                      </div>
+                      <div class="flex items-center justify-between py-1.5">
+                        <div class="flex items-center gap-2">
+                          <span class="w-2 h-2 rounded-full bg-[var(--perseus-success)]"></span>
+                          <span class="text-sm text-[var(--perseus-foreground-secondary)]">Collab Gateway</span>
+                        </div>
+                        <span class="text-xs text-[var(--perseus-foreground-tertiary)]">38 sessions</span>
+                      </div>
+                      <div class="flex items-center justify-between py-1.5">
+                        <div class="flex items-center gap-2">
+                          <span class="w-2 h-2 rounded-full bg-[var(--perseus-success)]"></span>
+                          <span class="text-sm text-[var(--perseus-foreground-secondary)]">Git CGI</span>
+                        </div>
+                        <span class="text-xs text-[var(--perseus-foreground-tertiary)]">147 ops/min</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Log preview -->
+                <div class="mt-4 rounded-lg bg-[var(--perseus-muted)]/30 border border-[var(--perseus-border)] overflow-hidden">
+                  <div class="flex items-center justify-between px-4 py-2 border-b border-[var(--perseus-border)]">
+                    <span class="text-sm font-medium text-[var(--perseus-foreground)] flex items-center gap-2">
+                      <i data-lucide="terminal" class="w-4 h-4"></i>
+                      Real-time Logs
+                    </span>
+                    <div class="flex items-center gap-2">
+                      <span class="w-2 h-2 rounded-full bg-[var(--perseus-success)] animate-pulse"></span>
+                      <span class="text-xs text-[var(--perseus-foreground-tertiary)]">Streaming</span>
+                    </div>
+                  </div>
+                  <div class="p-3 font-mono text-xs space-y-1 max-h-32 overflow-hidden">
+                    <div class="text-[var(--perseus-foreground-tertiary)]"><span class="text-[var(--perseus-success)]">INFO</span>  [api] GET /api/v1/repos — 200 OK (18ms)</div>
+                    <div class="text-[var(--perseus-foreground-tertiary)]"><span class="text-[var(--perseus-primary-light)]">WS</span>    [collab] User alice joined session repo:42:file:app.py</div>
+                    <div class="text-[var(--perseus-foreground-tertiary)]"><span class="text-[var(--perseus-success)]">INFO</span>  [git] push refs/heads/main by bob — 3 objects pushed</div>
+                    <div class="text-[var(--perseus-foreground-tertiary)]"><span class="text-[var(--perseus-warning)]">WARN</span>  [webhook] Delivery #847 to https://ci.example.com retry 1/3</div>
+                    <div class="text-[var(--perseus-foreground-tertiary)]"><span class="text-[var(--perseus-primary-light)]">WS</span>    [chat] New message in #general from charlie</div>
+                    <div class="text-[var(--perseus-foreground-tertiary)]"><span class="text-[var(--perseus-success)]">INFO</span>  [api] POST /api/v1/prs/128/merge — 200 OK (124ms)</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== CTA SECTION ===== -->
+      <section id="cta" class="py-24 relative overflow-hidden">
+        <div class="absolute inset-0 bg-[linear-gradient(rgba(31,111,235,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(31,111,235,0.03)_1px,transparent_1px)] bg-[size:48px_48px]"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gradient-to-r from-[var(--perseus-primary)]/20 via-[var(--perseus-accent)]/15 to-transparent rounded-full blur-[100px] pointer-events-none"></div>
+
+        <div class="relative max-w-4xl mx-auto px-6 text-center">
+          <h2 class="text-4xl md:text-5xl font-bold text-[var(--perseus-foreground)] mb-4">
+            Deploy your own instance today.
+          </h2>
+          <p class="text-lg text-[var(--perseus-foreground-secondary)] mb-10 max-w-2xl mx-auto">
+            Get Perseus up and running in minutes with Docker. Your team will be collaborating in real time before you know it.
+          </p>
+
+          <!-- Docker command snippet -->
+          <div class="max-w-2xl mx-auto mb-10">
+            <div class="rounded-xl border border-[var(--perseus-border)] bg-[var(--perseus-card)] shadow-xl overflow-hidden">
+              <div class="flex items-center justify-between px-4 py-2.5 border-b border-[var(--perseus-border)] bg-[var(--perseus-elevated)]">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="terminal" class="w-4 h-4 text-[var(--perseus-foreground-tertiary)]"></i>
+                  <span class="text-sm text-[var(--perseus-foreground-secondary)]">Terminal</span>
+                </div>
+                <button class="flex items-center gap-1.5 text-xs text-[var(--perseus-foreground-tertiary)] hover:text-[var(--perseus-foreground-secondary)] transition-colors">
+                  <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                  Copy
+                </button>
+              </div>
+              <div class="p-5 font-mono text-sm">
+                <div class="flex items-start gap-3">
+                  <span class="text-[var(--perseus-foreground-tertiary)] select-none">$</span>
+                  <div class="text-[var(--perseus-foreground)]">
+                    <span class="text-[var(--perseus-success)]">git</span> clone https://github.com/perseus/perseus.git
+                    <div class="mt-1"><span class="text-[var(--perseus-success)]">cd</span> perseus</div>
+                    <div class="mt-1"><span class="text-[var(--perseus-primary-light)]">docker</span> compose up -d</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <button data-auth-open="register" class="w-full sm:w-auto px-8 py-3.5 text-base font-semibold text-white bg-[var(--perseus-primary)] hover:bg-[var(--perseus-primary-light)] rounded-lg transition-all hover:shadow-lg hover:shadow-[var(--perseus-primary)]/25 flex items-center justify-center gap-2 cursor-pointer">
+              <i data-lucide="rocket" class="w-5 h-5"></i>
+              Get Started Free
+            </button>
+            <button class="w-full sm:w-auto px-8 py-3.5 text-base font-semibold text-[var(--perseus-foreground)] bg-[var(--perseus-card)] hover:bg-[var(--perseus-elevated)] border border-[var(--perseus-border)] rounded-lg transition-all flex items-center justify-center gap-2">
+              <i data-lucide="book-open" class="w-5 h-5"></i>
+              Read the Docs
+            </button>
+          </div>
+
+          <div class="mt-8 flex items-center justify-center gap-6 text-sm text-[var(--perseus-foreground-tertiary)]">
+            <span class="flex items-center gap-2">
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-[var(--perseus-success)]"></i>
+              Open Source
+            </span>
+            <span class="flex items-center gap-2">
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-[var(--perseus-success)]"></i>
+              Self-Hosted
+            </span>
+            <span class="flex items-center gap-2">
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-[var(--perseus-success)]"></i>
+              MIT Licensed
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== FOOTER ===== -->
+      <footer id="footer" class="border-t border-[var(--perseus-border)] bg-[var(--perseus-card)]/50">
+        <div class="max-w-7xl mx-auto px-6 py-16">
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
+            <!-- Brand -->
+            <div class="col-span-2">
+              <div class="flex items-center gap-2 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--perseus-primary)] to-[var(--perseus-accent)] flex items-center justify-center">
+                  <i data-lucide="git-branch" class="w-5 h-5 text-white"></i>
+                </div>
+                <span class="text-xl font-bold text-[var(--perseus-foreground)]">Perseus</span>
+              </div>
+              <p class="text-sm text-[var(--perseus-foreground-secondary)] mb-6 max-w-xs">
+                A self-hosted Git collaboration platform with real-time editing, built for teams who value control and speed.
+              </p>
+              <div class="flex items-center gap-3">
+                <a href="#" class="w-9 h-9 rounded-lg bg-[var(--perseus-muted)] flex items-center justify-center text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] hover:bg-[var(--perseus-border)] transition-colors">
+                  <i data-lucide="github" class="w-5 h-5"></i>
+                </a>
+                <a href="#" class="w-9 h-9 rounded-lg bg-[var(--perseus-muted)] flex items-center justify-center text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] hover:bg-[var(--perseus-border)] transition-colors">
+                  <i data-lucide="twitter" class="w-5 h-5"></i>
+                </a>
+                <a href="#" class="w-9 h-9 rounded-lg bg-[var(--perseus-muted)] flex items-center justify-center text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] hover:bg-[var(--perseus-border)] transition-colors">
+                  <i data-lucide="message-circle" class="w-5 h-5"></i>
+                </a>
+              </div>
+            </div>
+
+            <!-- Product -->
+            <div>
+              <h4 class="text-sm font-semibold text-[var(--perseus-foreground)] mb-4">Product</h4>
+              <ul class="space-y-3 text-sm">
+                <li><a href="#features" class="text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Features</a></li>
+                <li><a href="#collab-spotlight" class="text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Collaboration</a></li>
+                <li><a href="#desktop-spotlight" class="text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Desktop App</a></li>
+                <li><a href="#architecture" class="text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Self-Hosting</a></li>
+                <li><a href="#" class="text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Pricing</a></li>
+              </ul>
+            </div>
+
+            <!-- Resources -->
+            <div>
+              <h4 class="text-sm font-semibold text-[var(--perseus-foreground)] mb-4">Resources</h4>
+              <ul class="space-y-3 text-sm">
+                <li><a href="#" class="text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Documentation</a></li>
+                <li><a href="#" class="text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">API Reference</a></li>
+                <li><a href="#" class="text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Deployment Guide</a></li>
+                <li><a href="#" class="text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Changelog</a></li>
+                <li><a href="#" class="text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Roadmap</a></li>
+              </ul>
+            </div>
+
+            <!-- Company -->
+            <div>
+              <h4 class="text-sm font-semibold text-[var(--perseus-foreground)] mb-4">Company</h4>
+              <ul class="space-y-3 text-sm">
+                <li><a href="#" class="text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">About</a></li>
+                <li><a href="#" class="text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Blog</a></li>
+                <li><a href="#" class="text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Careers</a></li>
+                <li><a href="#" class="text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Privacy</a></li>
+                <li><a href="#" class="text-[var(--perseus-foreground-secondary)] hover:text-[var(--perseus-foreground)] transition-colors">Terms</a></li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="pt-8 border-t border-[var(--perseus-border)] flex flex-col md:flex-row items-center justify-between gap-4">
+            <p class="text-sm text-[var(--perseus-foreground-tertiary)]">
+              &copy; 2026 Perseus. All rights reserved.
+            </p>
+            <p class="text-sm text-[var(--perseus-foreground-tertiary)] flex items-center gap-2">
+              Made with <i data-lucide="heart" class="w-3.5 h-3.5 text-[var(--perseus-destructive)]"></i> for developer teams everywhere.
+            </p>
+          </div>
+        </div>
+      </footer>
+    </main>
+
+    <!-- ===== AUTH MODAL (LOGIN / REGISTER) ===== -->
+    <style id="auth-modal-styles">
+      .auth-overlay {
+        position: fixed; inset: 0; z-index: 100;
+        display: flex; align-items: center; justify-content: center;
+        padding: 24px;
+        background: rgba(1, 4, 9, 0.72);
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
+        opacity: 0; visibility: hidden;
+        transition: opacity .3s ease, visibility .3s ease;
+      }
+      .auth-overlay.open { opacity: 1; visibility: visible; }
+
+      .auth-panel {
+        position: relative;
+        width: 100%; max-width: 432px;
+        height: min(620px, calc(100vh - 48px));
+        display: flex; flex-direction: column;
+        overflow: hidden;
+        border: 1px solid var(--perseus-border);
+        border-radius: var(--perseus-radius-xl);
+        background:
+          radial-gradient(120% 55% at 50% -5%, rgba(31, 111, 235, .16), transparent 70%),
+          linear-gradient(180deg, #1c2128 0%, #161b22 60%);
+        box-shadow: 0 40px 90px -20px rgba(0, 0, 0, .85), 0 0 0 1px rgba(31, 111, 235, .05);
+        transform: translateY(20px) scale(.96);
+        opacity: 0;
+        transition: transform .4s cubic-bezier(.16, 1, .3, 1), opacity .3s ease;
+        scrollbar-width: none;
+      }
+      .auth-panel::-webkit-scrollbar { display: none; }
+      .auth-overlay.open .auth-panel { transform: translateY(0) scale(1); opacity: 1; }
+      .auth-panel::before {
+        content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+        background: linear-gradient(90deg, transparent 0%, var(--perseus-primary) 30%, var(--perseus-accent) 70%, transparent 100%);
+        opacity: .9;
+      }
+
+      .auth-inner { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 26px 0 0; }
+
+      .auth-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 22px; padding: 0 26px; }
+      .auth-brand { display: flex; align-items: center; gap: 11px; }
+      .auth-brand-mark {
+        width: 38px; height: 38px; border-radius: 11px;
+        background: linear-gradient(135deg, var(--perseus-primary), var(--perseus-accent));
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 8px 20px -6px rgba(31, 111, 235, .6);
+      }
+      .auth-brand-name { font-size: 16px; font-weight: 700; color: var(--perseus-foreground); line-height: 1.2; letter-spacing: -.01em; }
+      .auth-brand-sub { font-size: 12.5px; color: var(--perseus-foreground-tertiary); line-height: 1.4; margin-top: 1px; }
+      .auth-close {
+        width: 32px; height: 32px; border-radius: 9px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--perseus-foreground-tertiary); background: transparent;
+        border: 1px solid transparent; cursor: pointer;
+        transition: color .18s ease, background .18s ease, border-color .18s ease;
+      }
+      .auth-close:hover { color: var(--perseus-foreground); background: var(--perseus-muted); border-color: var(--perseus-border); }
+
+      .auth-tabs {
+        position: relative; display: flex; gap: 4px; padding: 4px; margin: 0 26px 22px;
+        background: var(--perseus-background); border: 1px solid var(--perseus-border); border-radius: 12px;
+      }
+      .auth-tab-ind {
+        position: absolute; top: 4px; left: 4px; height: calc(100% - 8px); width: calc(50% - 6px);
+        border-radius: 9px; background: linear-gradient(180deg, #262c36, #21262d);
+        border: 1px solid var(--perseus-border); box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+        transition: transform .32s cubic-bezier(.16, 1, .3, 1);
+      }
+      .auth-tab {
+        position: relative; z-index: 1; flex: 1; padding: 9px 0;
+        font-size: 13.5px; font-weight: 600; color: var(--perseus-foreground-tertiary);
+        background: transparent; border: 0; border-radius: 9px; cursor: pointer;
+        transition: color .2s ease;
+      }
+      .auth-tab:hover { color: var(--perseus-foreground-secondary); }
+      .auth-tab.active { color: var(--perseus-foreground); }
+
+      .auth-pane { display: none; }
+      .auth-pane.active { display: block; animation: authPaneIn .38s cubic-bezier(.16, 1, .3, 1); }
+      @keyframes authPaneIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+      .auth-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 26px 22px; scrollbar-width: none; }
+      .auth-body::-webkit-scrollbar { display: none; }
+
+      .auth-oauth-row { display: flex; flex-direction: column; gap: 9px; }
+      .auth-oauth {
+        display: flex; align-items: center; gap: 11px; width: 100%;
+        padding: 11px 14px; font-size: 13.5px; font-weight: 500; text-align: left;
+        color: var(--perseus-foreground); background: rgba(33, 38, 45, .55);
+        border: 1px solid var(--perseus-border); border-radius: 11px; cursor: pointer;
+        transition: background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+      }
+      .auth-oauth:hover {
+        background: var(--perseus-elevated); border-color: rgba(31, 111, 235, .5);
+        transform: translateY(-1px); box-shadow: 0 6px 16px -6px rgba(0, 0, 0, .5);
+      }
+      .auth-oauth:active { transform: translateY(0); }
+      .auth-oauth svg { flex-shrink: 0; }
+      .auth-oauth .chev { margin-left: auto; color: var(--perseus-foreground-tertiary); transition: transform .18s ease, color .18s ease; }
+      .auth-oauth:hover .chev { transform: translateX(2px); color: var(--perseus-foreground-secondary); }
+
+      .auth-divider {
+        display: flex; align-items: center; gap: 12px; margin: 18px 0;
+        color: var(--perseus-foreground-tertiary); font-size: 11.5px;
+        text-transform: uppercase; letter-spacing: .06em;
+      }
+      .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--perseus-border); }
+
+      .auth-field { display: block; margin-bottom: 14px; }
+      .auth-label { display: block; font-size: 12.5px; font-weight: 500; color: var(--perseus-foreground-secondary); margin-bottom: 6px; }
+      .auth-input-wrap { position: relative; display: flex; align-items: center; }
+      .auth-input-icon {
+        position: absolute; left: 12px; width: 16px; height: 16px;
+        color: var(--perseus-foreground-tertiary); pointer-events: none;
+        transition: color .18s ease;
+      }
+      .auth-input {
+        width: 100%; padding: 10.5px 12px 10.5px 36px;
+        font-size: 13.5px; color: var(--perseus-foreground);
+        background: var(--perseus-background); border: 1px solid var(--perseus-input);
+        border-radius: 10px; outline: none;
+        transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+      }
+      .auth-input::placeholder { color: var(--perseus-foreground-tertiary); }
+      .auth-input:focus { border-color: var(--perseus-primary); box-shadow: 0 0 0 3px rgba(31, 111, 235, .18); background: #0b0f14; }
+      .auth-input-wrap:focus-within .auth-input-icon { color: var(--perseus-primary-light); }
+      .auth-input[type="password"] { padding-right: 40px; }
+      .auth-eye {
+        position: absolute; right: 6px; width: 28px; height: 28px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--perseus-foreground-tertiary); background: transparent;
+        border: 0; border-radius: 7px; cursor: pointer;
+        transition: color .18s ease, background .18s ease;
+      }
+      .auth-eye:hover { color: var(--perseus-foreground-secondary); background: var(--perseus-muted); }
+      .auth-eye .eye-hide { display: none; }
+      .auth-eye.revealed .eye-show { display: none; }
+      .auth-eye.revealed .eye-hide { display: inline-flex; }
+
+      .auth-row-between { display: flex; align-items: center; justify-content: space-between; margin: 2px 0 18px; }
+      .auth-check { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--perseus-foreground-secondary); cursor: pointer; user-select: none; }
+      .auth-check input {
+        appearance: none; -webkit-appearance: none; position: relative;
+        width: 15px; height: 15px; border: 1px solid var(--perseus-input);
+        border-radius: 5px; background: var(--perseus-background); cursor: pointer;
+        transition: background .18s ease, border-color .18s ease;
+      }
+      .auth-check input:checked { background: var(--perseus-primary); border-color: var(--perseus-primary); }
+      .auth-check input:checked::after {
+        content: ""; position: absolute; left: 4.5px; top: 1.5px;
+        width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg);
+      }
+      .auth-link { color: var(--perseus-primary-light); font-size: 12.5px; cursor: pointer; text-decoration: none; transition: color .18s ease; }
+      .auth-link:hover { color: var(--perseus-foreground); text-decoration: underline; }
+
+      .auth-submit {
+        position: relative; display: flex; align-items: center; justify-content: center; gap: 9px;
+        width: 100%; padding: 12px; font-size: 14px; font-weight: 600; color: #fff;
+        background: linear-gradient(180deg, var(--perseus-primary-light), var(--perseus-primary));
+        border: 1px solid rgba(88, 166, 255, .5); border-radius: 11px; cursor: pointer;
+        box-shadow: 0 10px 24px -10px rgba(31, 111, 235, .8);
+        transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
+      }
+      .auth-submit:hover { transform: translateY(-1px); box-shadow: 0 14px 30px -10px rgba(31, 111, 235, .9); filter: brightness(1.06); }
+      .auth-submit:active { transform: translateY(0); }
+      .auth-submit:disabled { cursor: default; }
+      .auth-submit .spin {
+        width: 15px; height: 15px; border: 2px solid rgba(255, 255, 255, .35);
+        border-top-color: #fff; border-radius: 50%; display: none;
+        animation: authSpin .7s linear infinite;
+      }
+      .auth-submit.loading .spin { display: block; }
+      @keyframes authSpin { to { transform: rotate(360deg); } }
+
+      .auth-error {
+        display: none; align-items: center; gap: 7px; margin-bottom: 14px;
+        padding: 9px 11px; font-size: 12.5px; color: #ffb4ae;
+        background: rgba(248, 81, 73, .1); border: 1px solid rgba(248, 81, 73, .3); border-radius: 9px;
+      }
+      .auth-error.show { display: flex; animation: authShake .4s ease; }
+      .auth-error svg { flex-shrink: 0; }
+      @keyframes authShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+      .auth-foot { margin-top: 18px; text-align: center; font-size: 12.5px; color: var(--perseus-foreground-tertiary); }
+
+      .auth-toast {
+        position: fixed; top: 22px; left: 50%; z-index: 200;
+        display: flex; align-items: center; gap: 10px;
+        padding: 12px 18px; font-size: 13.5px; font-weight: 500;
+        color: var(--perseus-foreground); background: var(--perseus-elevated);
+        border: 1px solid var(--perseus-border); border-radius: 12px;
+        box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .7);
+        transform: translate(-50%, -140%); opacity: 0; pointer-events: none;
+        transition: transform .4s cubic-bezier(.16, 1, .3, 1), opacity .3s ease;
+      }
+      .auth-toast.show { transform: translate(-50%, 0); opacity: 1; }
+      .auth-toast svg { color: var(--perseus-success); }
+
+      /* Self-contained icon sizing (independent of utility classes) */
+      .auth-brand-mark svg { width: 20px; height: 20px; color: #fff; }
+      .auth-close svg { width: 16px; height: 16px; }
+      .auth-oauth .chev { width: 16px; height: 16px; }
+      .auth-eye svg { width: 16px; height: 16px; }
+      .auth-error svg { width: 16px; height: 16px; }
+      .auth-toast svg { width: 16px; height: 16px; }
+    </style>
+
+    <div class="auth-overlay" id="authOverlay" role="dialog" aria-modal="true" aria-labelledby="authTitle" aria-hidden="true">
+      <div class="auth-panel" id="authPanel">
+        <div class="auth-inner">
+          <!-- Header -->
+          <div class="auth-head">
+            <div class="auth-brand">
+              <div class="auth-brand-mark">
+                <i data-lucide="git-branch" class="w-5 h-5 text-white"></i>
+              </div>
+              <div>
+                <div class="auth-brand-name" id="authTitle">Perseus</div>
+                <div class="auth-brand-sub" id="authSubtitle">Sign in to your instance</div>
+              </div>
+            </div>
+            <button class="auth-close" id="authClose" type="button" aria-label="Close dialog">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <!-- Tabs -->
+          <div class="auth-tabs" role="tablist">
+            <div class="auth-tab-ind" id="authTabInd"></div>
+            <button class="auth-tab active" type="button" role="tab" data-tab="login">Sign In</button>
+            <button class="auth-tab" type="button" role="tab" data-tab="register">Create Account</button>
+          </div>
+
+          <!-- LOGIN PANE -->
+          <div class="auth-body">
+          <div class="auth-pane active" id="pane-login" role="tabpanel">
+            <div class="auth-oauth-row">
+              <button class="auth-oauth" type="button">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+                <span>Continue with GitHub</span>
+                <i data-lucide="chevron-right" class="chev w-4 h-4"></i>
+              </button>
+              <button class="auth-oauth" type="button">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22.65 14.39 12 22.13 1.35 14.39a.84.84 0 0 1-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 0 1 4.82 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0 1 18.6 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.51L23 13.45a.84.84 0 0 1-.35.94z"/></svg>
+                <span>Continue with GitLab</span>
+                <i data-lucide="chevron-right" class="chev w-4 h-4"></i>
+              </button>
+            </div>
+            <div class="auth-divider"><span>or continue with email</span></div>
+
+            <div class="auth-error" id="loginError" role="alert">
+              <i data-lucide="circle-alert" class="w-4 h-4"></i><span></span>
+            </div>
+
+            <form id="loginForm" novalidate>
+              <label class="auth-field">
+                <span class="auth-label">Username</span>
+                <span class="auth-input-wrap">
+                  <i data-lucide="user" class="auth-input-icon"></i>
+                  <input class="auth-input" name="username" type="text" placeholder="your-username" autocomplete="username" required>
+                </span>
+              </label>
+              <label class="auth-field">
+                <span class="auth-label">Password</span>
+                <span class="auth-input-wrap">
+                  <i data-lucide="lock" class="auth-input-icon"></i>
+                  <input class="auth-input" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required>
+                  <button class="auth-eye" type="button" aria-label="Show password">
+                    <span class="eye-show"><i data-lucide="eye" class="w-4 h-4"></i></span>
+                    <span class="eye-hide"><i data-lucide="eye-off" class="w-4 h-4"></i></span>
+                  </button>
+                </span>
+              </label>
+              <div class="auth-row-between">
+                <label class="auth-check"><input type="checkbox" checked><span>Remember me</span></label>
+                <a class="auth-link">Forgot password?</a>
+              </div>
+              <button class="auth-submit" type="submit">
+                <span class="spin"></span><span class="label">Sign In</span>
+              </button>
+            </form>
+            <div class="auth-foot">New to Perseus? <a class="auth-link" data-tab-switch="register">Create an account</a></div>
+          </div>
+
+          <!-- REGISTER PANE -->
+          <div class="auth-pane" id="pane-register" role="tabpanel">
+            <div class="auth-oauth-row">
+              <button class="auth-oauth" type="button">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+                <span>Sign up with GitHub</span>
+                <i data-lucide="chevron-right" class="chev w-4 h-4"></i>
+              </button>
+              <button class="auth-oauth" type="button">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22.65 14.39 12 22.13 1.35 14.39a.84.84 0 0 1-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 0 1 4.82 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0 1 18.6 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.51L23 13.45a.84.84 0 0 1-.35.94z"/></svg>
+                <span>Sign up with GitLab</span>
+                <i data-lucide="chevron-right" class="chev w-4 h-4"></i>
+              </button>
+            </div>
+            <div class="auth-divider"><span>or create with email</span></div>
+
+            <div class="auth-error" id="registerError" role="alert">
+              <i data-lucide="circle-alert" class="w-4 h-4"></i><span></span>
+            </div>
+
+            <form id="registerForm" novalidate>
+              <label class="auth-field">
+                <span class="auth-label">Full Name</span>
+                <span class="auth-input-wrap">
+                  <i data-lucide="user-round" class="auth-input-icon"></i>
+                  <input class="auth-input" name="fullname" type="text" placeholder="Ada Lovelace" autocomplete="name" required>
+                </span>
+              </label>
+              <label class="auth-field">
+                <span class="auth-label">Username</span>
+                <span class="auth-input-wrap">
+                  <i data-lucide="at-sign" class="auth-input-icon"></i>
+                  <input class="auth-input" name="username" type="text" placeholder="ada" autocomplete="username" required>
+                </span>
+              </label>
+              <label class="auth-field">
+                <span class="auth-label">Email</span>
+                <span class="auth-input-wrap">
+                  <i data-lucide="mail" class="auth-input-icon"></i>
+                  <input class="auth-input" name="email" type="email" placeholder="ada@example.com" autocomplete="email" required>
+                </span>
+              </label>
+              <label class="auth-field">
+                <span class="auth-label">Password</span>
+                <span class="auth-input-wrap">
+                  <i data-lucide="lock" class="auth-input-icon"></i>
+                  <input class="auth-input" name="password" type="password" placeholder="At least 6 characters" autocomplete="new-password" required>
+                  <button class="auth-eye" type="button" aria-label="Show password">
+                    <span class="eye-show"><i data-lucide="eye" class="w-4 h-4"></i></span>
+                    <span class="eye-hide"><i data-lucide="eye-off" class="w-4 h-4"></i></span>
+                  </button>
+                </span>
+              </label>
+              <label class="auth-field">
+                <span class="auth-label">Confirm Password</span>
+                <span class="auth-input-wrap">
+                  <i data-lucide="shield-check" class="auth-input-icon"></i>
+                  <input class="auth-input" name="confirm" type="password" placeholder="Repeat your password" autocomplete="new-password" required>
+                  <button class="auth-eye" type="button" aria-label="Show password">
+                    <span class="eye-show"><i data-lucide="eye" class="w-4 h-4"></i></span>
+                    <span class="eye-hide"><i data-lucide="eye-off" class="w-4 h-4"></i></span>
+                  </button>
+                </span>
+              </label>
+              <button class="auth-submit" type="submit" style="margin-top: 4px;">
+                <span class="spin"></span><span class="label">Create Account</span>
+              </button>
+            </form>
+            <div class="auth-foot">Already have an account? <a class="auth-link" data-tab-switch="login">Sign in</a></div>
+          </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="auth-toast" id="authToast" role="status" aria-live="polite">
+      <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+      <span id="authToastMsg">Welcome back</span>
+    </div>
+
+    <script>
+      // Smooth scroll for anchor links
+      document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+          const targetId = this.getAttribute('href');
+          if (targetId === '#') return;
+          const target = document.querySelector(targetId);
+          if (target) {
+            e.preventDefault();
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+      });
+
+      // Navbar background on scroll
+      const navbar = document.getElementById('navbar');
+      window.addEventListener('scroll', () => {
+        if (window.scrollY > 10) {
+          navbar.classList.add('shadow-lg', 'shadow-black/20');
+        } else {
+          navbar.classList.remove('shadow-lg', 'shadow-black/20');
+        }
+      });
+    </script>
+    <script>
+      // ===== Auth modal (login / register) =====
+      (function () {
+        const overlay = document.getElementById('authOverlay');
+        const panel = document.getElementById('authPanel');
+        const indicator = document.getElementById('authTabInd');
+        const subtitle = document.getElementById('authSubtitle');
+        const panes = { login: document.getElementById('pane-login'), register: document.getElementById('pane-register') };
+        const tabs = Array.from(document.querySelectorAll('.auth-tab'));
+        let current = 'login';
+
+        function positionIndicator() {
+          const active = tabs.find((t) => t.dataset.tab === current);
+          if (!active) return;
+          indicator.style.width = active.offsetWidth + 'px';
+          indicator.style.transform = 'translateX(' + (active.offsetLeft - 4) + 'px)';
+        }
+
+        function applyTab(tab) {
+          current = tab;
+          tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === tab));
+          Object.keys(panes).forEach((k) => panes[k].classList.toggle('active', k === tab));
+          subtitle.textContent = tab === 'register' ? 'Create your Perseus account' : 'Sign in to your instance';
+          hideError('loginError');
+          hideError('registerError');
+          positionIndicator();
+        }
+
+        function openAuth(tab) {
+          applyTab(tab || 'login');
+          overlay.classList.add('open');
+          overlay.setAttribute('aria-hidden', 'false');
+          document.body.style.overflow = 'hidden';
+          positionIndicator();
+          setTimeout(() => {
+            const first = panes[current].querySelector('input');
+            if (first) first.focus();
+          }, 260);
+        }
+
+        function closeAuth() {
+          overlay.classList.remove('open');
+          overlay.setAttribute('aria-hidden', 'true');
+          document.body.style.overflow = '';
+        }
+
+        function showError(id, msg) {
+          const el = document.getElementById(id);
+          el.querySelector('span').textContent = msg;
+          el.classList.add('show');
+        }
+        function hideError(id) {
+          document.getElementById(id).classList.remove('show');
+        }
+
+        function showToast(msg) {
+          const toast = document.getElementById('authToast');
+          document.getElementById('authToastMsg').textContent = msg;
+          toast.classList.add('show');
+          clearTimeout(showToast._t);
+          showToast._t = setTimeout(() => toast.classList.remove('show'), 2600);
+        }
+
+        function validate(form, isRegister) {
+          for (const input of form.querySelectorAll('input[required]')) {
+            const value = input.value.trim();
+            if (!value) return { ok: false, msg: 'Please fill in all required fields.' };
+            if (input.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+              return { ok: false, msg: 'Please enter a valid email address.' };
+            }
+            if (isRegister && input.type === 'password' && value.length < 6) {
+              return { ok: false, msg: 'Password must be at least 6 characters.' };
+            }
+          }
+          return { ok: true };
+        }
+
+        function fakeSubmit(form, errorId, isRegister, done) {
+          hideError(errorId);
+          const check = validate(form, isRegister);
+          if (!check.ok) {
+            showError(errorId, check.msg);
+            return;
+          }
+          if (isRegister) {
+            const pw = form.querySelector('input[name="password"]').value;
+            const confirm = form.querySelector('input[name="confirm"]').value;
+            if (pw !== confirm) {
+              showError(errorId, 'Passwords do not match.');
+              return;
+            }
+          }
+          const btn = form.querySelector('.auth-submit');
+          btn.classList.add('loading');
+          btn.disabled = true;
+          setTimeout(() => {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+            closeAuth();
+            done();
+            form.reset();
+          }, 1100);
+        }
+
+        document.querySelectorAll('[data-auth-open]').forEach((el) => {
+          el.addEventListener('click', (e) => {
+            e.preventDefault();
+            openAuth(el.getAttribute('data-auth-open'));
+          });
+        });
+
+        tabs.forEach((t) => t.addEventListener('click', () => applyTab(t.dataset.tab)));
+        document.querySelectorAll('[data-tab-switch]').forEach((el) => {
+          el.addEventListener('click', () => applyTab(el.getAttribute('data-tab-switch')));
+        });
+
+        document.getElementById('authClose').addEventListener('click', closeAuth);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAuth(); });
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && overlay.classList.contains('open')) closeAuth();
+        });
+
+        document.querySelectorAll('.auth-eye').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const input = btn.closest('.auth-input-wrap').querySelector('input');
+            const reveal = input.type === 'password';
+            input.type = reveal ? 'text' : 'password';
+            btn.classList.toggle('revealed', reveal);
+            btn.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+          });
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const form = e.currentTarget;
+          fakeSubmit(form, 'loginError', false, () => {
+            const name = form.querySelector('input[name="username"]').value.trim();
+            showToast('Welcome back, ' + name + '!');
+          });
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          fakeSubmit(e.currentTarget, 'registerError', true, () => {
+            showToast('Account created — welcome to Perseus!');
+          });
+        });
+
+        window.addEventListener('resize', () => {
+          if (overlay.classList.contains('open')) positionIndicator();
+        });
+      })();
+    </script>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

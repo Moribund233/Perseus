@@ -3,17 +3,25 @@
     "nav": {
       "features": "Features",
       "collaboration": "Collaboration",
-      "docs": "Docs",
+      "desktop": "Desktop",
+      "architecture": "Architecture",
+      "admin": "Admin",
       "signIn": "Sign In",
       "getStarted": "Get Started",
       "goToDashboard": "Go to Dashboard"
     },
     "hero": {
-      "badge": "Now in Public Beta",
-      "title": "Code. <1>Collaborate.</1> Ship.",
-      "description": "Everything your team needs to build great software — code hosting, real-time collaboration, team chat, and code review — in one unified platform.",
-      "getStartedFree": "Get Started Free",
-      "learnMore": "Learn More",
+      "badge": "Self-Hosted · Real-Time Collaborative · Open Source",
+      "titleLine1": "Build together,",
+      "titleLine2": "anywhere you host.",
+      "description": "Perseus is a self-hosted Git collaboration platform with real-time collaborative editing, pull requests, issue tracking, and built-in chat — all under your control.",
+      "deploy": "Deploy Your Instance",
+      "viewGithub": "View on GitHub",
+      "liveSync": "Live sync active",
+      "crdt": "Yjs CRDT-powered",
+      "editorFile": "perseus/app.py — main",
+      "explorer": "Explorer",
+      "collaborators": "3 collaborators online",
       "stats": {
         "repositories": "Repositories",
         "commits": "Commits",
@@ -21,50 +29,207 @@
         "uptime": "Uptime"
       }
     },
+    "tech": {
+      "label": "Built on proven open-source technologies",
+      "fastapi": "FastAPI",
+      "react": "React 19",
+      "postgres": "PostgreSQL",
+      "redis": "Redis",
+      "docker": "Docker",
+      "wails": "Wails",
+      "git": "Git"
+    },
     "features": {
-      "title": "Everything your team needs",
-      "subtitle": "Self-hosted Git platform with built-in collaboration tools designed for modern development teams.",
-      "codeHosting": {
-        "title": "Code Hosting",
-        "desc": "Self-hosted Git repository hosting with branch protection, webhooks, and fine-grained access control."
-      },
-      "teamChat": {
-        "title": "Team Chat",
-        "desc": "Real-time messaging with channels, threads, and rich code snippets. Keep discussions in context."
-      },
-      "codeReview": {
-        "title": "Code Review",
-        "desc": "Inline pull request reviews with threaded discussions, approval workflows, and merge checks."
-      },
-      "realtimeEditing": {
-        "title": "Real-time Editing",
-        "desc": "Collaborative code editing with live cursors, presence awareness, and CRDT-based conflict resolution."
-      },
-      "issueTracking": {
-        "title": "Issue Tracking",
-        "desc": "Manage issues with labels, milestones, batch operations, and integrations with your Git workflow."
-      },
-      "releaseManagement": {
-        "title": "Release Management",
-        "desc": "Tag releases, attach assets, publish release notes. Integrated with your repository and webhook system."
+      "eyebrow": "Everything you need",
+      "title": "A complete Git platform",
+      "subtitle": "From repository hosting to real-time collaborative editing, Perseus packs everything your team needs into one self-hosted solution.",
+      "items": {
+        "codeHosting": {
+          "title": "Code Hosting",
+          "desc": "Full Git repository management with fork, star, and granular access control across four roles: Owner, Admin, Developer, and Readonly."
+        },
+        "pullRequests": {
+          "title": "Pull Requests & Review",
+          "desc": "Draft PRs, inline code reviews, labels, conflict detection, and activity timelines — everything for a smooth review workflow."
+        },
+        "issueTracking": {
+          "title": "Issue Tracking",
+          "desc": "Create, close, and reopen issues with priorities, labels, batch operations, and threaded comments for organized project management."
+        },
+        "realtimeCollab": {
+          "title": "Real-time Collaboration",
+          "desc": "Google Docs-style collaborative editing powered by Yjs CRDT. Live cursors, presence indicators, and conflict-free merging."
+        },
+        "codeSearch": {
+          "title": "Code Search",
+          "desc": "Blazing-fast code search across all repositories using Git object indexing and PostgreSQL pg_trgm GIN for substring matching."
+        },
+        "webhooks": {
+          "title": "Webhooks & CI",
+          "desc": "18 event types with HMAC-SHA256 signing, delivery history, automatic retries, and build status tracking for CI integration."
+        },
+        "releaseManagement": {
+          "title": "Release Management",
+          "desc": "Tag-based releases with file attachments, draft and pre-release support, and structured release notes for every version."
+        },
+        "adminMonitoring": {
+          "title": "Admin & Monitoring",
+          "desc": "Full admin console with system monitoring, configuration management, Redis administration, and real-time log streaming."
+        }
       }
     },
     "collab": {
-      "title": "Real-time collaboration, built in",
-      "description": "Edit code together with your team just like Google Docs. See who's working on what, discuss in real-time, and never worry about merge conflicts again.",
-      "items": [
-        "Multiple cursors and presence indicators",
-        "Inline code review with threaded discussions",
-        "CRDT-based conflict-free synchronization",
-        "Real-time team chat alongside your code"
-      ]
+      "eyebrow": "Real-time Collaboration",
+      "title": "Edit together, in real time.",
+      "description": "Perseus brings Google Docs-style collaboration to your codebase. Multiple developers can edit the same file simultaneously with live cursors, presence indicators, and zero merge conflicts.",
+      "items": {
+        "liveCursors": {
+          "title": "Live Cursors & Presence",
+          "desc": "See exactly where your teammates are editing and who is online in each file."
+        },
+        "crdtEngine": {
+          "title": "Yjs CRDT Engine",
+          "desc": "Powered by battle-tested Yjs CRDT algorithm for conflict-free concurrent editing at any scale."
+        },
+        "chat": {
+          "title": "Built-in Chat & Comments",
+          "desc": "Repository chat channels, direct messages, and inline file comments — all WebSocket real-time."
+        }
+      },
+      "editingNow": "3 collaborators editing right now",
+      "liveSynced": "Live synced",
+      "chatMessage": "LGTM! Let me add the token refresh logic.",
+      "justNow": "just now"
+    },
+    "desktop": {
+      "eyebrow": "Desktop App",
+      "title": "A native desktop experience.",
+      "description": "Perseus Desktop, built with Wails, delivers the full power of the platform as a native application. Go beyond the browser with system-level integration, offline capabilities, and a distraction-free development environment.",
+      "items": {
+        "wails": {
+          "title": "Powered by Wails + Go",
+          "desc": "Lightweight Go backend with a native WebView frontend. Fast startup, minimal memory, no Electron bloat."
+        },
+        "offline": {
+          "title": "Offline Development",
+          "desc": "Work locally with full Git operations, then sync when you are back online. Your code is always accessible."
+        },
+        "terminal": {
+          "title": "Built-in Terminal & LSP",
+          "desc": "Integrated terminal, Language Server Protocol support, and a full code editor right in the desktop app."
+        }
+      },
+      "nativeBadge": "Native Desktop App",
+      "platforms": {
+        "windows": "Windows",
+        "macos": "macOS",
+        "linux": "Linux"
+      }
+    },
+    "architecture": {
+      "eyebrow": "Self-Hosted Architecture",
+      "title": "Your data. Your servers.",
+      "subtitle": "Deploy Perseus on your own infrastructure with Docker. Full control over your code, your data, and your pipeline.",
+      "diagramTitle": "Perseus Architecture",
+      "webApp": "Web App",
+      "desktop": "Desktop",
+      "gitCli": "Git CLI",
+      "transport": "HTTP / WebSocket / SSH",
+      "gateway": "Nginx Gateway",
+      "gatewaySub": "Reverse Proxy · SSL Termination",
+      "fastapi": "FastAPI",
+      "fastapiSub": "Backend API",
+      "collab": "Collab Gateway",
+      "collabSub": "Yjs / WebSocket",
+      "gitCgi": "Git CGI",
+      "gitCgiSub": "Smart HTTP",
+      "postgres": "PostgreSQL",
+      "postgresSub": "Primary Data Store",
+      "redis": "Redis",
+      "redisSub": "Cache · Pub/Sub",
+      "dockerNote": "All services deployed via Docker Compose",
+      "benefits": {
+        "privacy": {
+          "title": "Complete Data Privacy",
+          "desc": "Your source code never leaves your infrastructure. No third-party has access to your repositories, issues, or discussions."
+        },
+        "control": {
+          "title": "Full Control & Customization",
+          "desc": "Configure every aspect of your instance — from authentication providers to storage backends. Extend with webhooks and APIs."
+        },
+        "deploy": {
+          "title": "One-Command Docker Deploy",
+          "desc": "Get up and running with a single docker compose up. All services pre-configured and ready to go."
+        },
+        "security": {
+          "title": "Enterprise-Grade Security",
+          "desc": "OAuth integration (GitHub/GitLab), SSH key management, HMAC-signed webhooks, and audit logging for full compliance."
+        }
+      }
+    },
+    "admin": {
+      "eyebrow": "Admin Console",
+      "title": "Monitor and manage everything.",
+      "subtitle": "A comprehensive admin console gives you full visibility into your instance — from system health to Redis management to real-time logs.",
+      "consoleTitle": "Admin Console",
+      "status": "All systems operational",
+      "updated": "Updated just now",
+      "system": "System",
+      "data": "Data",
+      "overview": "Overview",
+      "components": "Components",
+      "logs": "Logs",
+      "configuration": "Configuration",
+      "redis": "Redis",
+      "users": "Users",
+      "webhooks": "Webhooks",
+      "activeUsers": "Active Users",
+      "repositories": "Repositories",
+      "collabSessions": "Collab Sessions",
+      "apiRequests": "API Requests/min",
+      "liveNow": "Live right now",
+      "thisWeek": "+{{value}} this week",
+      "avgLatency": "Avg latency 23ms",
+      "requestVolume": "Request Volume",
+      "last24h": "Last 24h",
+      "componentHealth": "Component Health",
+      "realtimeLogs": "Real-time Logs",
+      "streaming": "Streaming"
+    },
+    "cta": {
+      "title": "Deploy your own instance today.",
+      "description": "Get Perseus up and running in minutes with Docker. Your team will be collaborating in real time before you know it.",
+      "terminal": "Terminal",
+      "copy": "Copy",
+      "getStarted": "Get Started Free",
+      "readDocs": "Read the Docs",
+      "openSource": "Open Source",
+      "selfHosted": "Self-Hosted",
+      "mit": "MIT Licensed"
     },
     "footer": {
-      "copyright": "© 2026 Perseus — Self-hosted Code Collaboration Platform",
+      "tagline": "A self-hosted Git collaboration platform with real-time editing, built for teams who value control and speed.",
+      "product": "Product",
+      "resources": "Resources",
+      "company": "Company",
+      "features": "Features",
+      "collaboration": "Collaboration",
+      "desktop": "Desktop App",
+      "selfHosting": "Self-Hosting",
+      "pricing": "Pricing",
+      "docs": "Documentation",
+      "api": "API Reference",
+      "deployment": "Deployment Guide",
+      "changelog": "Changelog",
+      "roadmap": "Roadmap",
       "about": "About",
+      "blog": "Blog",
+      "careers": "Careers",
       "privacy": "Privacy",
       "terms": "Terms",
-      "github": "GitHub"
+      "copyright": "© 2026 Perseus. All rights reserved.",
+      "madeWith": "Made with",
+      "madeWithTail": "for developer teams everywhere."
     }
   },
   "app": {
@@ -1099,7 +1264,13 @@
       "invalidCredentials": "Invalid username or password.",
       "accountCreated": "Account created successfully!",
       "registrationFailed": "Registration failed. Please try again."
-    }
+    },
+    "brandSubtitleLogin": "Sign in to your instance",
+    "brandSubtitleRegister": "Create your Perseus account",
+    "newToPerseus": "New to Perseus?",
+    "createOne": "Create an account",
+    "alreadyHave": "Already have an account?",
+    "signInLink": "Sign in"
   },
   "common": {
     "language": "Language",

@@ -1,0 +1,33 @@
+{
+  "data": [
+    {
+      "id": "page-index",
+      "title": "Landing Page",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1758535020000,
+      "canvasData": {
+        "x": 0,
+        "y": 12,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 7274,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-827a7254",
+          "measuredAt": 1790135111774
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/index.html",
+        "interactions": []
+      }
+    }
+  ],
+  "config": {
+    "autoLayout": false,
+    "deviceType": "desktop",
+    "projectName": "Perseus Landing Redesign",
+    "visualEditorEnabled": true
+  }
+}
