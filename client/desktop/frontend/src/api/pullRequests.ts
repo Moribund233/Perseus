@@ -80,6 +80,28 @@ export interface PaginationResponse<T> {
   has_prev: boolean;
 }
 
+export interface PRDiffFile {
+  status: string;
+  path: string;
+  old_path: string | null;
+  status_code: string;
+}
+
+export interface PRDiffResponse {
+  diff: string;
+  files: PRDiffFile[];
+  stats: { files_changed: number; additions: number; deletions: number; total_changes: number };
+  base_commit: string;
+  head_commit: string;
+}
+
+export interface PRFileDiffResponse {
+  file_path: string;
+  diff: string;
+  base_commit: string;
+  head_commit: string;
+}
+
 // pullRequestsApi：全部经本地网关 proxy 转发到目标服务器，首个参数为服务器 id。
 export const pullRequestsApi = {
   list: (serverId: string, repoId: string, params?: { status?: string; page?: number; per_page?: number }) => {
@@ -127,4 +149,12 @@ export const pullRequestsApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  getDiff: (serverId: string, repoId: string, prNumber: number) =>
+    proxyRequest<PRDiffResponse>(serverId, `/api/v1/repositories/${repoId}/pull-requests/${prNumber}/diff`),
+
+  getFileDiff: (serverId: string, repoId: string, prNumber: number, filePath: string) => {
+    const encoded = filePath.split('/').map(encodeURIComponent).join('/');
+    return proxyRequest<PRFileDiffResponse>(serverId, `/api/v1/repositories/${repoId}/pull-requests/${prNumber}/diff/${encoded}`);
+  },
 };

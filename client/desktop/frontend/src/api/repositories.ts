@@ -112,6 +112,90 @@ export interface CodeSearchResponse {
   truncated: boolean;
 }
 
+// ==================== Git 浏览器（Diff / Blame / Graph / Compare / Tag） ====================
+
+export interface DiffLine {
+  origin: string;
+  content: string;
+}
+
+export interface DiffHunk {
+  old_start: number;
+  old_lines: number;
+  new_start: number;
+  new_lines: number;
+  lines: DiffLine[];
+}
+
+export interface DiffFile {
+  old_path: string;
+  new_path: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  hunks?: DiffHunk[];
+}
+
+export interface DiffResponse {
+  files: DiffFile[];
+  stats: { files_changed: number; additions: number; deletions: number };
+}
+
+export interface BlameHunk {
+  final_start_line_number: number;
+  lines_in_hunk: number;
+  orig_start_line_number: number;
+  orig_commit_id: string;
+  final_commit_id: string;
+  orig_path: string | null;
+  boundary: boolean;
+  commit: {
+    sha: string;
+    summary: string;
+    message: string;
+    author: { name: string; email: string; date: string };
+  };
+}
+
+export interface BlameResponse {
+  path: string;
+  ref: string;
+  hunks: BlameHunk[];
+  is_empty?: boolean;
+}
+
+export interface CommitGraphNode {
+  sha: string;
+  parents: string[];
+  summary: string;
+  message: string;
+  author: { name: string; email: string; date: string };
+  committer: { name: string; email: string; date: string };
+  date: string;
+  labels: string[];
+  is_merge: boolean;
+}
+
+export interface CommitGraphResponse {
+  ref: string;
+  commits: CommitGraphNode[];
+  is_empty?: boolean;
+}
+
+export interface RepoTag {
+  name: string;
+  message: string;
+  commit_hash: string;
+}
+
+export interface CompareResponse extends DiffResponse {
+  base: string;
+  head: string;
+  merge_base: string | null;
+  ahead_by: number;
+  commits: CommitGraphNode[];
+}
+
 // repositoriesApi：全部经本地网关 proxy 转发到目标服务器，首个参数为服务器 id。
 export const repositoriesApi = {
   list: (serverId: string, params?: { page?: number; per_page?: number }) => {
@@ -197,6 +281,50 @@ export const repositoriesApi = {
     return proxyRequest<RepoCommit[]>(serverId, `/api/v1/repositories/${repoId}/commits/history${qs}`);
   },
 
+  getDiff: (serverId: string, repoId: string, head: string, base?: string, path?: string) => {
+    const params = new URLSearchParams({ head });
+    if (base) params.set('base', base);
+    if (path) params.set('path', path);
+    return proxyRequest<DiffResponse>(serverId, `/api/v1/repositories/${repoId}/diff?${params.toString()}`);
+  },
+
+  getBlame: (serverId: string, repoId: string, path: string, ref?: string) => {
+    const params = new URLSearchParams({ path });
+    if (ref) params.set('ref', ref);
+    return proxyRequest<BlameResponse>(serverId, `/api/v1/repositories/${repoId}/blame?${params.toString()}`);
+  },
+
+  getGraph: (serverId: string, repoId: string, params?: { ref?: string; limit?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.ref) q.set('ref', params.ref);
+    if (params?.limit) q.set('limit', String(params.limit));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return proxyRequest<CommitGraphResponse>(serverId, `/api/v1/repositories/${repoId}/graph${qs}`);
+  },
+
+  getCompare: (serverId: string, repoId: string, base: string, head: string, path?: string) => {
+    const params = new URLSearchParams({ base, head });
+    if (path) params.set('path', path);
+    return proxyRequest<CompareResponse>(serverId, `/api/v1/repositories/${repoId}/compare?${params.toString()}`);
+  },
+
+  listTags: (serverId: string, repoId: string, pattern?: string) => {
+    const qs = pattern ? `?pattern=${encodeURIComponent(pattern)}` : '';
+    return proxyRequest<RepoTag[]>(serverId, `/api/v1/repositories/${repoId}/tags${qs}`);
+  },
+
+  getTag: (serverId: string, repoId: string, name: string) =>
+    proxyRequest<RepoTag>(serverId, `/api/v1/repositories/${repoId}/tags/${encodeURIComponent(name)}`),
+
+  createTag: (serverId: string, repoId: string, data: { name: string; target?: string; message?: string }) =>
+    proxyRequest<RepoTag>(serverId, `/api/v1/repositories/${repoId}/tags`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  deleteTag: (serverId: string, repoId: string, name: string) =>
+    proxyRequest<void>(serverId, `/api/v1/repositories/${repoId}/tags/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+
   getBranches: (serverId: string, repoId: string) =>
     proxyRequest<RepoBranch[]>(serverId, `/api/v1/repositories/${repoId}/branches`),
 
@@ -213,6 +341,16 @@ export const repositoriesApi = {
 
   getDefaultBranch: (serverId: string, repoId: string) =>
     proxyRequest<RepoBranch>(serverId, `/api/v1/repositories/${repoId}/branches/default`),
+
+  deleteBranch: (serverId: string, repoId: string, branchName: string) =>
+    proxyRequest<{ message: string }>(serverId, `/api/v1/repositories/${repoId}/branches/${encodeURIComponent(branchName)}`, {
+      method: 'DELETE',
+    }),
+
+  setDefaultBranch: (serverId: string, repoId: string, branchName: string) =>
+    proxyRequest<RepoBranch>(serverId, `/api/v1/repositories/${repoId}/branches/${encodeURIComponent(branchName)}/default`, {
+      method: 'PUT',
+    }),
 
   star: (serverId: string, repoId: string) =>
     proxyRequest<void>(serverId, `/api/v1/repositories/${repoId}/star`, { method: 'POST' }),

@@ -15,6 +15,10 @@ import {
   UnorderedListOutlined,
   PlayCircleOutlined,
   RocketOutlined,
+  HistoryOutlined,
+  SwapOutlined,
+  TagOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import {
@@ -31,6 +35,11 @@ import PullRequestDetail from './PullRequestDetail';
 import RepositorySettings from './RepositorySettings';
 import BuildsPanel from './BuildsPanel';
 import ReleasesPanel from './ReleasesPanel';
+import GitCommitsTab from './GitCommitsTab';
+import GitBranchesTab from './GitBranchesTab';
+import GitTagsTab from './GitTagsTab';
+import GitCompareTab from './GitCompareTab';
+import GitBlameView from './GitBlameView';
 import Markdown from '../../components/Markdown';
 import RepoExplorer from '../../components/RepoExplorer';
 import { fileBadge } from '../workspace/ExplorerPanel';
@@ -111,6 +120,7 @@ export default function RepositoriesView() {
   const [selectedPR, setSelectedPR] = useState<PR | null>(null);
   const [selectedTreeKey, setSelectedTreeKey] = useState('');
   const [selectedFileContent, setSelectedFileContent] = useState<RepoBlob | null>(null);
+  const [blameMode, setBlameMode] = useState(false);
   const [fileLoading, setFileLoading] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
   const [cloning, setCloning] = useState(false);
@@ -227,6 +237,7 @@ export default function RepositoriesView() {
     let cancelled = false;
     const loadFile = async () => {
       if (!selectedTreeKey || !currentRepo || !server) return;
+      if (!cancelled) setBlameMode(false);
       const file = storeFiles.find((f) => f.path === selectedTreeKey && f.type === 'file');
       if (!file) { if (!cancelled) setSelectedFileContent(null); return; }
       if (!cancelled) setFileLoading(true);
@@ -414,6 +425,10 @@ export default function RepositoriesView() {
 
   const tabItems: TabsProps['items'] = [
     { key: 'code', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><FileTextOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.code')}</span> },
+    { key: 'commits', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><HistoryOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.commits')}</span> },
+    { key: 'branches', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><BranchesOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.branches')}</span> },
+    { key: 'tags', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><TagOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.tags')}</span> },
+    { key: 'compare', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><SwapOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.compare')}</span> },
     { key: 'pullRequests', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><GitPullRequestIco />{t('app.repositories.tabs.pullRequests')}{tabCount(prCount)}</span> },
     { key: 'issues', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><IssueIco />{t('app.repositories.tabs.issues')}{tabCount(issueCount)}</span> },
     { key: 'actions', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><PlayCircleOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.actions')}</span> },
@@ -496,6 +511,26 @@ export default function RepositoriesView() {
               )}
             </div>
           )}
+          {activeTab === 'commits' && (
+            <div style={{ flex: 1, minHeight: 0, padding: '16px 0 0', overflowY: 'auto' }}>
+              <GitCommitsTab repoId={currentRepo.id} defaultBranch={currentRepo.default_branch} />
+            </div>
+          )}
+          {activeTab === 'branches' && (
+            <div style={{ flex: 1, minHeight: 0, padding: '16px 0 0', overflowY: 'auto' }}>
+              <GitBranchesTab repoId={currentRepo.id} />
+            </div>
+          )}
+          {activeTab === 'tags' && (
+            <div style={{ flex: 1, minHeight: 0, padding: '16px 0 0', overflowY: 'auto' }}>
+              <GitTagsTab repoId={currentRepo.id} />
+            </div>
+          )}
+          {activeTab === 'compare' && (
+            <div style={{ flex: 1, minHeight: 0, padding: '16px 0 0', overflowY: 'auto' }}>
+              <GitCompareTab repoId={currentRepo.id} defaultBranch={currentRepo.default_branch} />
+            </div>
+          )}
           {activeTab === 'settings' && (
             <div style={{ flex: 1, minHeight: 0, padding: '16px 0 0', display: 'flex' }}>
               <RepositorySettings repoId={currentRepo.id} />
@@ -567,10 +602,27 @@ export default function RepositoriesView() {
                   <FileTextOutlined style={{ fontSize: 16 }} />
                   {selectedFileContent.path}
                   <span style={{ marginLeft: 'auto', color: textTertiary, fontSize: 12, fontWeight: 400 }}>{selectedFileContent.size} bytes</span>
+                  <Button
+                    size="small"
+                    icon={<UserOutlined />}
+                    type={blameMode ? 'primary' : 'default'}
+                    onClick={() => setBlameMode((v) => !v)}
+                  >
+                    {t('app.repositories.gitBrowser.blame')}
+                  </Button>
                 </div>
-                <pre style={{ margin: 0, padding: 16, fontSize: 13, lineHeight: 1.5, color: textPrimary, overflow: 'auto', maxHeight: 600, background: '#0d1117', fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace" }}>
-                  {selectedFileContent.content}
-                </pre>
+                {blameMode ? (
+                  <GitBlameView
+                    repoId={currentRepo.id}
+                    path={selectedFileContent.path}
+                    gitRef={currentRepo.default_branch}
+                    content={selectedFileContent.content}
+                  />
+                ) : (
+                  <pre style={{ margin: 0, padding: 16, fontSize: 13, lineHeight: 1.5, color: textPrimary, overflow: 'auto', maxHeight: 600, background: '#0d1117', fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace" }}>
+                    {selectedFileContent.content}
+                  </pre>
+                )}
               </div>
             )}
 
