@@ -19,6 +19,10 @@ import {
   AppstoreOutlined,
   ArrowLeftOutlined,
   EditOutlined,
+  HistoryOutlined,
+  BranchesOutlined,
+  SwapOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useSpring, animated } from '@react-spring/web';
@@ -27,6 +31,11 @@ import Markdown from '../../components/Markdown';
 import ReleasesTab from '../../components/repo/ReleasesTab';
 import BuildsTab from '../../components/repo/BuildsTab';
 import RepoSettingsTab from '../../components/repo/RepoSettingsTab';
+import CommitsTab from '../../components/repo/CommitsTab';
+import BranchesTab from '../../components/repo/BranchesTab';
+import TagsTab from '../../components/repo/TagsTab';
+import CompareTab from '../../components/repo/CompareTab';
+import BlameView from '../../components/repo/BlameView';
 import Explorer from '../../components/explorer/Explorer';
 import { useRepositoriesStore } from '../../stores/repositories';
 import { useIssuesStore } from '../../stores/issues';
@@ -145,6 +154,7 @@ export default function RepositoriesPage() {
   const [activeTab, setActiveTab] = useState('code');
   const [selectedTreeKey, setSelectedTreeKey] = useState('');
   const [selectedFileContent, setSelectedFileContent] = useState<RepoBlob | null>(null);
+  const [blameMode, setBlameMode] = useState(false);
   const [fileLoading, setFileLoading] = useState(false);
   const [currentDir, setCurrentDir] = useState('');
   const [dirLoading, setDirLoading] = useState(false);
@@ -224,6 +234,7 @@ export default function RepositoriesPage() {
   const goToDir = useCallback((path: string) => {
     setSelectedTreeKey('');
     setSelectedFileContent(null);
+    setBlameMode(false);
     setCurrentDir(path);
   }, []);
 
@@ -251,6 +262,7 @@ export default function RepositoriesPage() {
   const closeViewer = useCallback(() => {
     setSelectedTreeKey('');
     setSelectedFileContent(null);
+    setBlameMode(false);
   }, []);
 
   const latestCommit = useMemo(
@@ -502,6 +514,10 @@ export default function RepositoriesPage() {
 
   const tabItems: TabsProps['items'] = [
     { key: 'code', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><FileTextOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.code')}</span> },
+    { key: 'commits', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><HistoryOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.commits')}</span> },
+    { key: 'branches', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><BranchesOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.branches')}</span> },
+    { key: 'tags', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><TagOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.tags')}</span> },
+    { key: 'compare', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><SwapOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.compare')}</span> },
     { key: 'pullRequests', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={() => navigate(`/repositories/${owner}/${repo}/pulls`)}><PullRequestOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.pullRequests')}<span className="tab-count">{pullRequests.length}</span></span> },
     { key: 'issues', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={() => navigate(`/repositories/${owner}/${repo}/issues`)}><ExclamationCircleOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.issues')}<span className="tab-count">{issues.length}</span></span> },
     { key: 'releases', label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><TagOutlined style={{ fontSize: 14 }} />{t('app.repositories.tabs.releases')}</span> },
@@ -682,6 +698,15 @@ export default function RepositoriesPage() {
             </span>
             <Button
               size="small"
+              icon={<UserOutlined />}
+              type={blameMode ? 'primary' : 'default'}
+              onClick={() => setBlameMode((v) => !v)}
+              style={blameMode ? { fontSize: 12, height: 26, flexShrink: 0 } : { background: bgSecondary, color: textPrimary, border: `1px solid ${borderColor}`, fontSize: 12, height: 26, flexShrink: 0 }}
+            >
+              {t('app.repositories.gitBrowser.blame')}
+            </Button>
+            <Button
+              size="small"
               icon={<EditOutlined />}
               onClick={() => navigate(`/editor/${owner}/${repo}?file=${encodeURIComponent(selectedFileContent.path)}`)}
               style={{ background: bgSecondary, color: textPrimary, border: `1px solid ${borderColor}`, fontSize: 12, height: 26, flexShrink: 0 }}
@@ -689,6 +714,14 @@ export default function RepositoriesPage() {
               {t('app.repositories.openInEditor')}
             </Button>
           </div>
+          {blameMode ? (
+            <BlameView
+              repoId={currentRepo.id}
+              path={selectedFileContent.path}
+              gitRef={currentRepo.default_branch}
+              content={selectedFileContent.content}
+            />
+          ) : (
           <pre
             style={{
               flex: 1,
@@ -707,6 +740,7 @@ export default function RepositoriesPage() {
           >
             {selectedFileContent.content}
           </pre>
+          )}
         </div>
         ) : (
         <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 24 }}>
@@ -886,6 +920,10 @@ export default function RepositoriesPage() {
       )
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0 24px' }}>
+          {activeTab === 'commits' && <CommitsTab repoId={currentRepo.id} defaultBranch={currentRepo.default_branch} />}
+          {activeTab === 'branches' && <BranchesTab repoId={currentRepo.id} />}
+          {activeTab === 'tags' && <TagsTab repoId={currentRepo.id} />}
+          {activeTab === 'compare' && <CompareTab repoId={currentRepo.id} defaultBranch={currentRepo.default_branch} />}
           {activeTab === 'releases' && <ReleasesTab repoId={currentRepo.id} />}
           {activeTab === 'actions' && <BuildsTab repoId={currentRepo.id} />}
           {activeTab === 'settings' && <RepoSettingsTab repoId={currentRepo.id} />}

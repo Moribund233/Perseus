@@ -80,6 +80,28 @@ export interface PaginationResponse<T> {
   has_prev: boolean;
 }
 
+export interface PRDiffFile {
+  status: string;
+  path: string;
+  old_path: string | null;
+  status_code: string;
+}
+
+export interface PRDiffResponse {
+  diff: string;
+  files: PRDiffFile[];
+  stats: { files_changed: number; additions: number; deletions: number; total_changes: number };
+  base_commit: string;
+  head_commit: string;
+}
+
+export interface PRFileDiffResponse {
+  file_path: string;
+  diff: string;
+  base_commit: string;
+  head_commit: string;
+}
+
 export const pullRequestsApi = {
   list: (repoId: string, params?: { status?: string; page?: number; per_page?: number }) => {
     const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
@@ -126,6 +148,14 @@ export const pullRequestsApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  getDiff: (repoId: string, prNumber: number) =>
+    apiRequest<PRDiffResponse>(`/api/v1/repositories/${repoId}/pull-requests/${prNumber}/diff`),
+
+  getFileDiff: (repoId: string, prNumber: number, filePath: string) => {
+    const encoded = filePath.split('/').map(encodeURIComponent).join('/');
+    return apiRequest<PRFileDiffResponse>(`/api/v1/repositories/${repoId}/pull-requests/${prNumber}/diff/${encoded}`);
+  },
 
   getLabels: (repoId: string) =>
     apiRequest<{ id: string; name: string; color: string; description?: string }[]>(`/api/v1/repositories/${repoId}/pr-labels`),

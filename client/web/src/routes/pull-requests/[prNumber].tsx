@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
-import { Layout, Button, Input, Spin, Dropdown, Avatar, App as AntApp, Alert, Space } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
+import { Layout, Button, Input, Spin, Dropdown, Avatar, App as AntApp, Alert, Space, Empty } from 'antd';
 import type { ReactElement } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeftOutlined, PullRequestOutlined, MergeOutlined, CloseCircleOutlined, SendOutlined, DownOutlined, TagOutlined, CheckOutlined, StopOutlined, MessageOutlined, EditOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PullRequestOutlined, MergeOutlined, CloseCircleOutlined, SendOutlined, DownOutlined, TagOutlined, CheckOutlined, StopOutlined, MessageOutlined, EditOutlined, PlayCircleOutlined, DiffOutlined } from '@ant-design/icons';
 import { useRepositoriesStore } from '../../stores/repositories';
 import { usePullRequestsStore } from '../../stores/pullRequests';
-import { pullRequestsApi } from '../../api/pullRequests';
+import { pullRequestsApi, type PRDiffResponse } from '../../api/pullRequests';
 import { buildsApi, type Build } from '../../api/builds';
+import DiffView from '../../components/repo/DiffView';
+import { parseUnifiedDiff } from '../../utils/diff';
 
 const { Content } = Layout;
 
@@ -108,6 +110,60 @@ function PrBuilds({ repoId, sourceBranch, targetBranch }: { repoId: string; sour
           <span style={{ color: textTertiary, fontSize: 12, flexShrink: 0 }}>{b.branch}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** PR 文件变更（后端 patch 文本 → 结构化 DiffView） */
+function PrDiff({ repoId, prNumber }: { repoId: string; prNumber: number }) {
+  const { t } = useTranslation();
+  const [data, setData] = useState<PRDiffResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await pullRequestsApi.getDiff(repoId, prNumber);
+        if (!cancelled) { setData(res); setError(null); }
+      } catch (e) {
+        if (!cancelled) { setError((e as Error).message); setData(null); }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    Promise.resolve().then(load);
+    return () => { cancelled = true; };
+  }, [repoId, prNumber]);
+
+  const files = useMemo(() => (data ? parseUnifiedDiff(data.diff) : []), [data]);
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 12px', color: textPrimary, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <DiffOutlined style={{ color: blueLight }} />
+        {t('app.pullRequests.detail.changes')}
+        {data && (
+          <span style={{ fontSize: 12, fontWeight: 400, color: textSecondary, marginLeft: 4 }}>
+            {t('app.repositories.gitBrowser.filesChanged', { count: data.stats.files_changed })}
+            <span style={{ color: green, marginLeft: 8 }}>+{data.stats.additions}</span>
+            <span style={{ color: red, marginLeft: 6 }}>-{data.stats.deletions}</span>
+          </span>
+        )}
+      </h3>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 32 }}><Spin /></div>
+      ) : error ? (
+        <div style={{ border: `1px solid ${red}`, borderRadius: 10, background: 'rgba(248,81,73,0.1)', color: red, padding: 12, fontSize: 13 }}>{error}</div>
+      ) : !data || data.files.length === 0 ? (
+        <div style={{ border: `1px solid ${borderColor}`, borderRadius: 12, background: bgSecondary }}>
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<span style={{ color: textSecondary }}>{t('app.repositories.gitBrowser.noChanges')}</span>} style={{ padding: 32 }} />
+        </div>
+      ) : (
+        <DiffView files={files} />
+      )}
     </div>
   );
 }
@@ -374,6 +430,10 @@ export default function PullRequestDetailPage() {
 
             {currentRepo && currentPR && (
               <PrBuilds repoId={currentRepo.id} sourceBranch={currentPR.source_branch} targetBranch={currentPR.target_branch} />
+            )}
+
+            {currentRepo && currentPR && (
+              <PrDiff repoId={currentRepo.id} prNumber={currentPR.pr_number} />
             )}
 
             {/* Comments */}
