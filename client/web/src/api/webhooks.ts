@@ -32,8 +32,11 @@ export interface WebhookDelivery {
 }
 
 export const webhooksApi = {
-  list: (repoId: string) =>
-    apiRequest<Webhook[]>(`/api/v1/repositories/${repoId}/webhooks`),
+  // 后端返回分页对象 {items,...}；兼容两种形态, 避免消费方按数组遍历时崩溃
+  list: async (repoId: string): Promise<Webhook[]> => {
+    const data = await apiRequest<Webhook[] | { items: Webhook[] }>(`/api/v1/repositories/${repoId}/webhooks`);
+    return Array.isArray(data) ? data : data.items;
+  },
 
   get: (repoId: string, webhookId: string) =>
     apiRequest<Webhook>(`/api/v1/repositories/${repoId}/webhooks/${webhookId}`),
