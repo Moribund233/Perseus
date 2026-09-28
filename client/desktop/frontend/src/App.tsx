@@ -9,11 +9,13 @@ import { perseusTheme } from './styles/theme';
 import PortalShell from './layouts/PortalShell';
 import IdeShell from './layouts/IdeShell';
 import ErrorPage from './views/ErrorPage';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles/desktop.css';
 
 export default function App() {
   const ready = useGatewayStore((s) => s.ready);
   const current = useWorkspaceStore((s) => s.current);
+  const view = useNavigationStore((s) => s.view);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,7 +48,11 @@ export default function App() {
 
   return (
     <ConfigProvider theme={perseusTheme}>
-      <AntApp>{body}</AntApp>
+      <AntApp>
+        <ErrorBoundary resetKeys={[view, current?.id]}>
+          {body}
+        </ErrorBoundary>
+      </AntApp>
     </ConfigProvider>
   );
 }

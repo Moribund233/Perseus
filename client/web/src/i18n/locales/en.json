@@ -233,6 +233,15 @@
     }
   },
   "app": {
+    "errorBoundary": {
+      "title": "This page hit an error",
+      "unknown": "An unknown error occurred",
+      "retry": "Try again",
+      "reload": "Reload page",
+      "copy": "Copy error details",
+      "copied": "Copied",
+      "details": "Error details"
+    },
     "nav": {
       "dashboard": "Dashboard",
       "repositories": "Repositories",

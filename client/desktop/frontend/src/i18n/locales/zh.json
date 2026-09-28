@@ -68,6 +68,15 @@
     }
   },
   "app": {
+    "errorBoundary": {
+      "title": "页面出错了",
+      "unknown": "发生未知错误",
+      "retry": "重试",
+      "reload": "刷新页面",
+      "copy": "复制错误详情",
+      "copied": "已复制",
+      "details": "错误详情"
+    },
     "nav": {
       "dashboard": "控制台",
       "repositories": "仓库",

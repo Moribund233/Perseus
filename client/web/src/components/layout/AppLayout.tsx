@@ -17,6 +17,7 @@ import {
   HistoryOutlined,
   BookOutlined,
   ExclamationCircleOutlined,
+  LogoutOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/auth';
@@ -28,6 +29,7 @@ import { chatApi, dmApi, type DMSession } from '../../api/chat';
 import type { Notification } from '../../api/notifications';
 import Logo from '../brand/Logo';
 import GlobalSearch from './GlobalSearch';
+import { ErrorBoundary } from '../ErrorBoundary';
 import { getRecentRepos, recordRecentRepo, type RecentRepo } from './recentRepos';
 
 const { Header, Sider, Content } = Layout;
@@ -285,10 +287,10 @@ export default function AppLayout() {
   };
 
   const userMenu: MenuProps['items'] = [
-    { key: 'profile', label: t('app.userMenu.profile'), onClick: () => navigate('/settings') },
-    { key: 'settings', label: t('app.userMenu.settings'), onClick: () => navigate('/settings') },
+    { key: 'profile', icon: <UserOutlined />, label: t('app.userMenu.profile'), onClick: () => navigate('/settings') },
+    { key: 'settings', icon: <SettingOutlined />, label: t('app.userMenu.settings'), onClick: () => navigate('/settings') },
     { type: 'divider' },
-    { key: 'logout', label: t('app.userMenu.signOut'), onClick: () => { logout(); navigate('/'); } },
+    { key: 'logout', icon: <LogoutOutlined />, label: t('app.userMenu.signOut'), onClick: () => { logout(); navigate('/'); } },
   ];
 
   const toggleLanguage = () => {
@@ -493,7 +495,7 @@ export default function AppLayout() {
                 paddingTop: 8,
               }}
             >
-              <Dropdown menu={{ items: userMenu }} placement="topRight" trigger={['click']}>
+              <Dropdown menu={{ items: userMenu, inlineCollapsed: false }} placement="topRight" trigger={['click']}>
                 <div
                   style={{
                     display: 'flex',
@@ -774,7 +776,9 @@ export default function AppLayout() {
           </Space>
         </Header>
         <Content style={{ padding: 0, overflow: 'hidden', minHeight: 0 }}>
-          <Outlet />
+          <ErrorBoundary resetKeys={[location.pathname]}>
+            <Outlet />
+          </ErrorBoundary>
         </Content>
 
         <Modal
