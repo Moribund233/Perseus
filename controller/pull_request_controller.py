@@ -23,6 +23,8 @@ from services.pull_request_service import (
     create_pr_comment as service_create_pr_comment,
     create_pr_review as service_create_pr_review,
     list_pr_comments as service_list_pr_comments,
+    get_pr_diff as service_get_pr_diff,
+    get_pr_file_diff as service_get_pr_file_diff,
 )
 
 # 创建路由实例
@@ -329,4 +331,57 @@ async def create_pr_review(
         reviewer_id=current_user.id,
         status=data.status,
         comment=data.comment
+    )
+
+
+# ==================== PR Diff ====================
+
+@router.get("/{repo_id}/pull-requests/{pr_number}/diff")
+async def get_pr_diff(
+    repo_id: uuid.UUID,
+    pr_number: int,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    获取 PR 的整体 diff（文本 + 文件列表 + 统计）
+
+    Args:
+        repo_id: 仓库ID
+        pr_number: PR 编号
+        db: 数据库会话
+
+    Returns:
+        dict: {diff, files, stats, base_commit, head_commit}
+    """
+    return await service_get_pr_diff(
+        db=db,
+        repository_id=repo_id,
+        pr_number=pr_number
+    )
+
+
+@router.get("/{repo_id}/pull-requests/{pr_number}/diff/{file_path:path}")
+async def get_pr_file_diff(
+    repo_id: uuid.UUID,
+    pr_number: int,
+    file_path: str,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    获取 PR 中单个文件的 diff
+
+    Args:
+        repo_id: 仓库ID
+        pr_number: PR 编号
+        file_path: 文件路径
+        db: 数据库会话
+
+    Returns:
+        dict: {file_path, diff, base_commit, head_commit}
+    """
+    return await service_get_pr_file_diff(
+        db=db,
+        repository_id=repo_id,
+        pr_number=pr_number,
+        file_path=file_path
     )

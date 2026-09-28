@@ -771,7 +771,7 @@ async def get_pr_diff(
         ValidationException: 获取 diff 失败
     """
     from utils.git_utils import get_pr_diff as _get_pr_diff
-    from utils.git_utils import get_pr_files, get_pr_stats
+    from utils.git_utils import get_pr_files, get_pr_stats, resolve_ref_commit
 
     # 获取 PR
     pr = await get_pull_request_or_404(db, repository_id, pr_number)
@@ -780,34 +780,52 @@ async def get_pr_diff(
     from utils.git_utils import get_repository_path
     repo_path = await get_repository_path(db, repository_id)
 
+    # PR 无 base/head 提交快照列，按目标/源分支当前 tip 解析
+    try:
+        base_commit = resolve_ref_commit(repo_path, pr.target_branch)
+        head_commit = resolve_ref_commit(repo_path, pr.source_branch)
+    except Exception as e:
+        raise ValidationException(detail=f"Failed to get PR diff: {str(e)}", error_code="pr_diff_failed")
+
+    if not base_commit:
+        raise ValidationException(
+            detail=f"Base branch not found: {pr.target_branch}",
+            error_code="pr_base_branch_not_found",
+        )
+    if not head_commit:
+        raise ValidationException(
+            detail=f"Source branch not found: {pr.source_branch}",
+            error_code="pr_source_branch_not_found",
+        )
+
     try:
         # 获取 diff 内容
         diff_content = _get_pr_diff(
             repo_path,
-            pr.base_commit,
-            pr.head_commit
+            base_commit,
+            head_commit
         )
 
         # 获取文件列表
         files = get_pr_files(
             repo_path,
-            pr.base_commit,
-            pr.head_commit
+            base_commit,
+            head_commit
         )
 
         # 获取统计信息
         stats = get_pr_stats(
             repo_path,
-            pr.base_commit,
-            pr.head_commit
+            base_commit,
+            head_commit
         )
 
         return {
             "diff": diff_content,
             "files": files,
             "stats": stats,
-            "base_commit": pr.base_commit,
-            "head_commit": pr.head_commit
+            "base_commit": base_commit,
+            "head_commit": head_commit
         }
 
     except Exception as e:
@@ -836,7 +854,7 @@ async def get_pr_file_diff(
         NotFoundException: PR 不存在
         ValidationException: 获取 diff 失败
     """
-    from utils.git_utils import get_file_diff
+    from utils.git_utils import get_file_diff, resolve_ref_commit
 
     # 获取 PR
     pr = await get_pull_request_or_404(db, repository_id, pr_number)
@@ -845,20 +863,38 @@ async def get_pr_file_diff(
     from utils.git_utils import get_repository_path
     repo_path = await get_repository_path(db, repository_id)
 
+    # PR 无 base/head 提交快照列，按目标/源分支当前 tip 解析
+    try:
+        base_commit = resolve_ref_commit(repo_path, pr.target_branch)
+        head_commit = resolve_ref_commit(repo_path, pr.source_branch)
+    except Exception as e:
+        raise ValidationException(detail=f"Failed to get file diff: {str(e)}", error_code="pr_file_diff_failed")
+
+    if not base_commit:
+        raise ValidationException(
+            detail=f"Base branch not found: {pr.target_branch}",
+            error_code="pr_base_branch_not_found",
+        )
+    if not head_commit:
+        raise ValidationException(
+            detail=f"Source branch not found: {pr.source_branch}",
+            error_code="pr_source_branch_not_found",
+        )
+
     try:
         # 获取文件 diff
         diff_content = get_file_diff(
             repo_path,
-            pr.base_commit,
-            pr.head_commit,
+            base_commit,
+            head_commit,
             file_path
         )
 
         return {
             "file_path": file_path,
             "diff": diff_content,
-            "base_commit": pr.base_commit,
-            "head_commit": pr.head_commit
+            "base_commit": base_commit,
+            "head_commit": head_commit
         }
 
     except Exception as e:

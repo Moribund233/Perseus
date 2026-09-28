@@ -714,6 +714,23 @@ def get_head_commit(repo_path: str) -> Optional[str]:
         return None
 
 
+def resolve_ref_commit(repo_path: str, ref: str) -> Optional[str]:
+    """
+    将分支名/标签/提交SHA 解析为提交哈希；引用不存在返回 None。
+
+    Raises:
+        GitError: 仓库不可用
+    """
+    try:
+        repo = pygit2.Repository(repo_path)
+    except Exception as e:
+        raise GitError(f"Failed to open repository {repo_path}: {e}")
+    try:
+        return str(repo.revparse_single(ref).peel(pygit2.Commit).id)
+    except Exception:
+        return None
+
+
 def _resolve_commit(repo: pygit2.Repository, rev: str) -> pygit2.Commit:
     """把提交哈希/引用解析为 Commit，失败抛 GitError"""
     try:

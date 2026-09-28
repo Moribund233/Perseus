@@ -23,6 +23,9 @@ from services.repository_browser_service import (
     get_blob_content,
     get_commits,
     get_diff,
+    get_blame,
+    get_commit_graph,
+    compare,
     get_readme_content,
     get_file_symbols,
     detect_file_language,
@@ -277,6 +280,86 @@ async def get_repository_diff(
     """
     repo_path = await _get_repo_path(repo_id, db)
     return await get_diff(repo_path, base=base, head=head, path=path)
+
+
+@router.get("/{repo_id}/blame")
+async def get_repository_blame(
+    repo_id: uuid.UUID,
+    path: str = Query(..., description="文件路径"),
+    ref: str = Query("HEAD", description="分支名或提交SHA"),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    获取文件行级追溯 (Blame)
+
+    Args:
+        repo_id: 仓库ID
+        path: 文件路径（必填）
+        ref: 分支名或提交SHA，默认 HEAD
+        db: 数据库会话
+
+    Returns:
+        dict: 按 hunk 聚合的行级作者信息
+
+    Raises:
+        HTTPException: 仓库/引用/文件不存在
+    """
+    repo_path = await _get_repo_path(repo_id, db)
+    return await get_blame(repo_path, ref=ref, path=path)
+
+
+@router.get("/{repo_id}/graph")
+async def get_repository_graph(
+    repo_id: uuid.UUID,
+    ref: str = Query("HEAD", description="起始分支名或提交SHA"),
+    limit: int = Query(100, ge=1, le=500, description="最大节点数"),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    获取提交图（拓扑序节点 + 父边 + 引用标签）
+
+    Args:
+        repo_id: 仓库ID
+        ref: 起始引用，默认 HEAD
+        limit: 最大节点数，默认 100
+        db: 数据库会话
+
+    Returns:
+        dict: 提交图节点列表，由前端据 parents 计算泳道布局
+
+    Raises:
+        HTTPException: 仓库或引用不存在
+    """
+    repo_path = await _get_repo_path(repo_id, db)
+    return await get_commit_graph(repo_path, ref=ref, limit=limit)
+
+
+@router.get("/{repo_id}/compare")
+async def get_repository_compare(
+    repo_id: uuid.UUID,
+    base: str = Query(..., description="基准分支/标签/提交"),
+    head: str = Query(..., description="目标分支/标签/提交"),
+    path: Optional[str] = Query(None, description="特定文件路径"),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    对比两个引用（base...head）
+
+    Args:
+        repo_id: 仓库ID
+        base: 基准引用（必填）
+        head: 目标引用（必填）
+        path: 特定文件路径，None 表示所有文件
+        db: 数据库会话
+
+    Returns:
+        dict: 合并基、领先提交数、提交列表与逐文件差异
+
+    Raises:
+        HTTPException: 仓库或引用不存在
+    """
+    repo_path = await _get_repo_path(repo_id, db)
+    return await compare(repo_path, base=base, head=head, path=path)
 
 
 @router.get("/{repo_id}/readme")

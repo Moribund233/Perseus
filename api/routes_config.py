@@ -111,6 +111,10 @@ def create_api_router() -> APIRouter:
     from controller.commit_controller import router as commit_router
     api_v1_router.include_router(commit_router)
 
+    # 8b. Tag 管理路由（须在 repository_controller 的 /{owner}/{repo} 通配路由之前）
+    from controller.tag_controller import router as tag_router
+    api_v1_router.include_router(tag_router)
+
     # 9. Pull Request 路由
     from controller.pull_request_controller import router as pull_request_router
     api_v1_router.include_router(pull_request_router)

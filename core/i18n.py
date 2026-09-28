@@ -488,6 +488,14 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
         LOCALE_ZH: "获取 PR 差异失败",
         LOCALE_EN: "Failed to get PR diff",
     },
+    "pr_base_branch_not_found": {
+        LOCALE_ZH: "PR 目标分支不存在",
+        LOCALE_EN: "PR base branch not found",
+    },
+    "pr_source_branch_not_found": {
+        LOCALE_ZH: "PR 源分支不存在",
+        LOCALE_EN: "PR source branch not found",
+    },
     "pr_file_diff_failed": {
         LOCALE_ZH: "获取文件差异失败",
         LOCALE_EN: "Failed to get file diff",
@@ -567,6 +575,42 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
     "attachment_too_large": {
         LOCALE_ZH: "附件大小不能超过 20MB",
         LOCALE_EN: "Attachment size cannot exceed 20MB",
+    },
+
+    # =========================================================
+    # Git 浏览器（Blame / 提交图 / 对比）
+    # =========================================================
+    "blame_failed": {
+        LOCALE_ZH: "获取文件追溯信息失败",
+        LOCALE_EN: "Failed to get file blame",
+    },
+
+    # =========================================================
+    # Tag 管理
+    # =========================================================
+    "tag_not_found": {
+        LOCALE_ZH: "标签不存在",
+        LOCALE_EN: "Tag not found",
+    },
+    "tag_no_target": {
+        LOCALE_ZH: "仓库没有可打标签的提交",
+        LOCALE_EN: "Repository has no commit to tag",
+    },
+    "tag_list_failed": {
+        LOCALE_ZH: "列出标签失败",
+        LOCALE_EN: "Failed to list tags",
+    },
+    "tag_get_failed": {
+        LOCALE_ZH: "获取标签失败",
+        LOCALE_EN: "Failed to get tag",
+    },
+    "tag_create_failed": {
+        LOCALE_ZH: "创建标签失败",
+        LOCALE_EN: "Failed to create tag",
+    },
+    "tag_delete_failed": {
+        LOCALE_ZH: "删除标签失败",
+        LOCALE_EN: "Failed to delete tag",
     },
 
     # =========================================================

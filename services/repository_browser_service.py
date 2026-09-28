@@ -380,6 +380,59 @@ async def get_commits(
     }
 
 
+def _serialize_diff(diff: pygit2.Diff) -> Dict[str, Any]:
+    """
+    将 pygit2.Diff 序列化为前端可消费的结构（供 diff / compare 复用）
+
+    Args:
+        diff: pygit2 差异对象
+
+    Returns:
+        dict: {"files": [...], "stats": {...}}
+    """
+    files = []
+    for patch in diff:
+        if patch is None:
+            continue
+        file_data: Dict[str, Any] = {
+            "old_path": patch.delta.old_file.path,
+            "new_path": patch.delta.new_file.path,
+            "status": patch.delta.status_char(),
+            "additions": patch.line_stats[1],
+            "deletions": patch.line_stats[2]
+        }
+
+        # 添加 hunks 信息（删除的文件无新内容）
+        if patch.delta.status != pygit2.GIT_DELTA_DELETED:
+            hunks = []
+            for hunk in patch.hunks:
+                hunk_data: Dict[str, Any] = {
+                    "old_start": hunk.old_start,
+                    "old_lines": hunk.old_lines,
+                    "new_start": hunk.new_start,
+                    "new_lines": hunk.new_lines,
+                    "lines": []
+                }
+                for line in hunk.lines:
+                    hunk_data["lines"].append({
+                        "origin": line.origin,
+                        "content": line.content
+                    })
+                hunks.append(hunk_data)
+            file_data["hunks"] = hunks
+
+        files.append(file_data)
+
+    return {
+        "files": files,
+        "stats": {
+            "files_changed": len(files),
+            "additions": sum(f["additions"] for f in files),
+            "deletions": sum(f["deletions"] for f in files)
+        }
+    }
+
+
 async def get_diff(
     repo_path: str,
     base: str | None = None,
@@ -433,48 +486,245 @@ async def get_diff(
     # 如果指定了路径，过滤差异
     if path:
         diff.find_similar()
-    
-    files = []
-    for patch in diff:
-        if patch is None:
-            continue
-        file_data = {
-            "old_path": patch.delta.old_file.path,
-            "new_path": patch.delta.new_file.path,
-            "status": patch.delta.status_char(),
-            "additions": patch.line_stats[1],
-            "deletions": patch.line_stats[2]
+
+    return _serialize_diff(diff)
+
+
+async def get_blame(
+    repo_path: str,
+    ref: str = "HEAD",
+    path: str | None = None
+) -> Dict[str, Any]:
+    """
+    获取文件的行级追溯（Blame）
+
+    Args:
+        repo_path: 仓库物理路径
+        ref: 分支名或提交SHA，默认 HEAD
+        path: 文件路径（必填）
+
+    Returns:
+        dict: {"path", "ref", "hunks": [...]}；空仓库返回 is_empty=True
+
+    Raises:
+        RepositoryNotFoundException: 仓库不存在
+        PathNotFoundException: 引用或文件不存在
+        InvalidPathException: 路径是目录或 blame 失败
+    """
+    if not path:
+        raise InvalidPathException(detail="Path is required", error_code="path_required")
+
+    repo = _get_repo(repo_path)
+    commit = _resolve_ref(repo, ref)
+
+    if commit is None:
+        return {
+            "path": path,
+            "ref": ref,
+            "hunks": [],
+            "is_empty": True
         }
 
-        # 添加 hunks 信息
-        if patch.delta.status != pygit2.GIT_DELTA_DELETED:
-            hunks = []
-            for hunk in patch.hunks:
-                hunk_data: Dict[str, Any] = {
-                    "old_start": hunk.old_start,
-                    "old_lines": hunk.old_lines,
-                    "new_start": hunk.new_start,
-                    "new_lines": hunk.new_lines,
-                    "lines": []
-                }
-                for line in hunk.lines:
-                    hunk_data["lines"].append({
-                        "origin": line.origin,
-                        "content": line.content
-                    })
-                hunks.append(hunk_data)
-            file_data["hunks"] = hunks
+    try:
+        entry = commit.tree[path]
+    except KeyError:
+        raise PathNotFoundException(detail=f"File not found: {path}", error_code="file_not_found")
 
-        files.append(file_data)
+    if entry.type == pygit2.GIT_OBJECT_TREE:
+        raise InvalidPathException(detail=f"'{path}' is a directory, not a file", error_code="path_is_directory")
+    if entry.type != pygit2.GIT_OBJECT_BLOB:
+        raise InvalidPathException(detail=f"'{path}' is not a valid file", error_code="file_invalid")
+
+    try:
+        blame = repo.blame(path, newest_commit=commit.id)
+    except Exception as e:
+        raise InvalidPathException(detail=f"Failed to blame '{path}': {e}", error_code="blame_failed")
+
+    hunks = []
+    for hunk in blame:
+        hunk_commit = repo[hunk.final_commit_id]
+        hunks.append({
+            "final_start_line_number": hunk.final_start_line_number,
+            "lines_in_hunk": hunk.lines_in_hunk,
+            "orig_start_line_number": hunk.orig_start_line_number,
+            "orig_commit_id": str(hunk.orig_commit_id),
+            "final_commit_id": str(hunk.final_commit_id),
+            "orig_path": hunk.orig_path,
+            "boundary": bool(hunk.boundary),
+            "commit": {
+                "sha": str(hunk_commit.id),
+                "summary": hunk_commit.message.splitlines()[0] if hunk_commit.message else "",
+                "message": hunk_commit.message,
+                "author": {
+                    "name": hunk_commit.author.name,
+                    "email": hunk_commit.author.email,
+                    "date": datetime.fromtimestamp(hunk_commit.author.time).isoformat()
+                }
+            }
+        })
 
     return {
-        "files": files,
-        "stats": {
-            "files_changed": len(files),
-            "additions": sum(f["additions"] for f in files),
-            "deletions": sum(f["deletions"] for f in files)
-        }
+        "path": path,
+        "ref": ref,
+        "hunks": hunks
     }
+
+
+def _commit_to_node(repo: pygit2.Repository, commit: pygit2.Commit, labels: list | None = None) -> Dict[str, Any]:
+    """把提交对象序列化为提交图节点"""
+    return {
+        "sha": str(commit.id),
+        "parents": [str(parent) for parent in commit.parent_ids],
+        "summary": commit.message.splitlines()[0] if commit.message else "",
+        "message": commit.message,
+        "author": {
+            "name": commit.author.name,
+            "email": commit.author.email,
+            "date": datetime.fromtimestamp(commit.author.time).isoformat()
+        },
+        "committer": {
+            "name": commit.committer.name,
+            "email": commit.committer.email,
+            "date": datetime.fromtimestamp(commit.committer.time).isoformat()
+        },
+        "date": datetime.fromtimestamp(commit.commit_time).isoformat(),
+        "labels": labels or [],
+        "is_merge": len(commit.parent_ids) > 1
+    }
+
+
+def _collect_commit_labels(repo: pygit2.Repository) -> Dict[str, List[str]]:
+    """
+    收集指向各提交的引用标签（HEAD / 分支 / 标签）
+
+    Returns:
+        dict: {commit_sha: [label, ...]}
+    """
+    labels: Dict[str, List[str]] = {}
+
+    if not repo.head_is_unborn:
+        try:
+            head_sha = str(repo.head.peel(pygit2.Commit).id)
+            labels.setdefault(head_sha, []).append("HEAD")
+        except Exception:
+            pass
+
+    for refname in repo.listall_references():
+        try:
+            target = repo.lookup_reference(refname).peel(pygit2.Commit)
+        except Exception:
+            continue
+        sha = str(target.id)
+        if refname.startswith("refs/heads/"):
+            labels.setdefault(sha, []).append(refname[len("refs/heads/"):])
+        elif refname.startswith("refs/tags/"):
+            labels.setdefault(sha, []).append(f"tag: {refname[len('refs/tags/'):]}")
+
+    return labels
+
+
+async def get_commit_graph(
+    repo_path: str,
+    ref: str = "HEAD",
+    limit: int = 100
+) -> Dict[str, Any]:
+    """
+    获取提交图（拓扑序节点 + 父边 + 引用标签），供前端渲染分支网络
+
+    Args:
+        repo_path: 仓库物理路径
+        ref: 起始引用，默认 HEAD
+        limit: 最大节点数，默认 100
+
+    Returns:
+        dict: {"ref", "commits": [...], "is_empty"?}
+
+    Raises:
+        RepositoryNotFoundException: 仓库不存在
+        PathNotFoundException: 引用不存在
+    """
+    repo = _get_repo(repo_path)
+    commit = _resolve_ref(repo, ref)
+
+    if commit is None:
+        return {
+            "ref": ref,
+            "commits": [],
+            "is_empty": True
+        }
+
+    labels = _collect_commit_labels(repo)
+    walker = repo.walk(commit.id, pygit2.enums.SortMode.TOPOLOGICAL)
+
+    commits = []
+    for i, commit_obj in enumerate(walker):
+        if i >= limit:
+            break
+        commits.append(_commit_to_node(repo, commit_obj, labels.get(str(commit_obj.id), [])))
+
+    return {
+        "ref": ref,
+        "commits": commits
+    }
+
+
+async def compare(
+    repo_path: str,
+    base: str,
+    head: str,
+    path: str | None = None
+) -> Dict[str, Any]:
+    """
+    对比两个引用/提交（GitHub 风格 base...head）
+
+    Args:
+        repo_path: 仓库物理路径
+        base: 基准引用（分支名/标签/提交SHA）
+        head: 目标引用
+        path: 特定文件路径，None 表示所有文件
+
+    Returns:
+        dict: {"base", "head", "merge_base", "ahead_by", "commits", "files", "stats"}
+
+    Raises:
+        RepositoryNotFoundException: 仓库不存在
+        PathNotFoundException: 引用不存在
+    """
+    repo = _get_repo(repo_path)
+    base_commit = _resolve_ref(repo, base)
+    head_commit = _resolve_ref(repo, head)
+
+    if base_commit is None:
+        raise PathNotFoundException(detail=f"Base ref not found: {base}", error_code="base_ref_not_found")
+    if head_commit is None:
+        raise PathNotFoundException(detail=f"Ref not found: {head}", error_code="branch_ref_not_found")
+
+    try:
+        merge_base_id = repo.merge_base(base_commit.id, head_commit.id)
+    except Exception:
+        merge_base_id = None
+
+    diff = base_commit.tree.diff_to_tree(head_commit.tree)
+    if path:
+        diff.find_similar()
+    result = _serialize_diff(diff)
+
+    labels = _collect_commit_labels(repo)
+    walker = repo.walk(head_commit.id, pygit2.enums.SortMode.TIME)
+    walker.hide(base_commit.id)
+
+    commits = []
+    for commit_obj in walker:
+        commits.append(_commit_to_node(repo, commit_obj, labels.get(str(commit_obj.id), [])))
+
+    result.update({
+        "base": str(base_commit.id),
+        "head": str(head_commit.id),
+        "merge_base": str(merge_base_id) if merge_base_id is not None else None,
+        "ahead_by": len(commits),
+        "commits": commits
+    })
+    return result
 
 
 # ============ F-023: 文件语言检测 ============
