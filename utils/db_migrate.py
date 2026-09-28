@@ -31,12 +31,18 @@ ALEMBIC_INI = PROJECT_ROOT / "alembic.ini"
 def _to_sync_db_url(url: str) -> str:
     """将异步/带驱动 URL 转为 Alembic 可用的同步 SQLAlchemy URL。"""
     if url.startswith("postgresql+asyncpg://"):
-        return url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        url = url.replace("postgresql+asyncpg://", "postgresql://", 1)
     if url.startswith("sqlite+aiosqlite://"):
         path = url.removeprefix("sqlite+aiosqlite://")
         if path.startswith("/") and not path.startswith("/."):
             return f"sqlite:///{path}"  # 绝对路径需要 4 个斜杠
         return f"sqlite:///{path.lstrip('/')}"
+    # SQLAlchemy 2.1 起 postgresql:// 默认驱动为 psycopg3；本项目使用 psycopg2，
+    # 需显式固定驱动，避免未安装 psycopg 导致启动失败。
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg2://", 1)
     return url
 
 

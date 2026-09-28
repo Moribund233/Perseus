@@ -30,7 +30,7 @@ config = context.config
 def _to_sync_database_url(db_url: str) -> str:
     """将异步 DATABASE_URL 转为 Alembic 可用的同步 SQLAlchemy URL。"""
     if db_url.startswith('postgresql+asyncpg://'):
-        return db_url.replace('postgresql+asyncpg://', 'postgresql://', 1)
+        db_url = db_url.replace('postgresql+asyncpg://', 'postgresql://', 1)
     if db_url.startswith('sqlite+aiosqlite://'):
         path = db_url.removeprefix('sqlite+aiosqlite://')
         if path.startswith('/') and not path.startswith('/.'):
@@ -38,6 +38,11 @@ def _to_sync_database_url(db_url: str) -> str:
             return f'sqlite:///{path}'
         # 相对路径: sqlite:///./file.db
         return f'sqlite:///{path.lstrip("/")}'
+    # SQLAlchemy 2.1 起 postgresql:// 默认驱动为 psycopg3；本项目使用 psycopg2
+    if db_url.startswith('postgresql://'):
+        return db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
+    if db_url.startswith('postgres://'):
+        return db_url.replace('postgres://', 'postgresql+psycopg2://', 1)
     return db_url
 
 # 从环境变量读取 DATABASE_URL（与应用保持一致）。

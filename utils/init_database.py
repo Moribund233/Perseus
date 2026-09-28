@@ -25,7 +25,13 @@ ENV_ADMIN_EMAIL = "PERSEUS_ADMIN_EMAIL"
 
 def _to_sync_db_url(url: str) -> str:
     """将异步驱动 URL 转为同步 URL（用于迁移和命令行工具）"""
-    return url.replace("+aiosqlite", "", 1).replace("+asyncpg", "", 1)
+    sync_url = url.replace("+aiosqlite", "", 1).replace("+asyncpg", "", 1)
+    # SQLAlchemy 2.1 起 postgresql:// 默认驱动为 psycopg3；本项目使用 psycopg2
+    if sync_url.startswith("postgresql://"):
+        return sync_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    if sync_url.startswith("postgres://"):
+        return sync_url.replace("postgres://", "postgresql+psycopg2://", 1)
+    return sync_url
 
 
 class DatabaseInitializer:
